@@ -29,7 +29,7 @@ repositories {
     }
 }
 
-val ktorVersion = "2.3.3"
+val ktorVersion = "2.3.4"
 
 val nimbusSdkVersion = "10.13.2"
 
