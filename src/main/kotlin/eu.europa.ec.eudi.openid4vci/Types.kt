@@ -57,9 +57,4 @@ data class CredentialIssuerMetaData(
 
 typealias CIIdentifier = String
 
-sealed interface  CredentialSupported {
-
-
-
-}
-
+typealias CredentialSupported = String

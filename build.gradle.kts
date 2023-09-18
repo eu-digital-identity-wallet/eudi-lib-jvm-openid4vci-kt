@@ -76,7 +76,6 @@ kotlin {
         languageVersion.set(JavaLanguageVersion.of(17))
         vendor.set(JvmVendorSpec.ADOPTIUM)
     }
-    jvmToolchain(11)
 }
 
 tasks.jacocoTestReport {
