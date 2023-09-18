@@ -1,0 +1,50 @@
+name: SonarCloud
+on:
+  push:
+    branches: [ 'main', 'release/*' ]
+    tags: [ v* ]
+  workflow_dispatch:
+
+jobs:
+  run-sast:
+    name: Build and run SonarQube analysis
+    runs-on:  ubuntu-latest
+    steps:
+      - name: Checkout project sources
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 #Shallow clones should be disabled for a better relevancy of SonarCloud analysis
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      - name: Validate Gradle Wrapper
+        uses: gradle/wrapper-validation-action@v1
+      - name: Check secrets presence & SonarCloud properties setup
+        id: checksecrets
+        shell: bash
+        run: |
+          if [ "$SONAR_TOKEN" == "" ]; then
+            echo "secretspresent=NO" >> $GITHUB_OUTPUT
+          else
+            echo "secretspresent=YES" >> $GITHUB_OUTPUT
+            echo "PROJECTKEY=${{ github.repository_owner}}_$(echo ${{ github.repository }} | sed 's/.*\///')" >> $GITHUB_ENV
+          fi
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN}}
+      - name: Build with Gradle Wrapper & Run Sonar
+        if: (steps.checksecrets.outputs.secretspresent == 'YES')
+        uses: gradle/gradle-build-action@v2.7.1
+        with:
+          gradle-version: wrapper
+          arguments: test jacocoTestReport sonar --info --full-stacktrace -Dsonar.organization=${{ github.repository_owner }} -Dsonar.projectKey=${{ env.PROJECTKEY }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          CI: true
