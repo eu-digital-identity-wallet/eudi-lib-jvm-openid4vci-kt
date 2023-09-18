@@ -11,7 +11,7 @@ jobs:
     runs-on:  ubuntu-latest
     steps:
       - name: Checkout project sources
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0 #Shallow clones should be disabled for a better relevancy of SonarCloud analysis
       - uses: actions/setup-java@v3
