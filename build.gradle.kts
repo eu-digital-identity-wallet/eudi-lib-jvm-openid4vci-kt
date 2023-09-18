@@ -31,7 +31,7 @@ repositories {
 
 val ktorVersion = "2.3.3"
 
-val nimbusSdkVersion = "10.13.2"
+val nimbusSdkVersion = "10.15"
 
 dependencies {
     api("com.nimbusds:oauth2-oidc-sdk:$nimbusSdkVersion")
