@@ -1,4 +1,4 @@
-# EUDI SIOPv2 OpenId4VP library
+# EUDI OpenId4VCI library
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
@@ -15,10 +15,8 @@
 ## Overview
 
 This is a Kotlin library, targeting JVM, that supports 
-the [SIOPv2 (draft 12)](https://openid.bitbucket.io/connect/openid-connect-self-issued-v2-1_0.html) 
-and [OpenId4VP (draft 18)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html) protocols.
-In particular, the library focus on the wallet's role using those two protocols with  constraints
-included in ISO 23220-4 and ISO-18013-7
+the [OpenId4VCI (draft 13)](https://openid.bitbucket.io/connect/openid-4-verifiable-credential-issuance-1_0.html) protocol.
+In particular, the library focus on the wallet's role in the protocol
 
 
 ## Disclaimer
