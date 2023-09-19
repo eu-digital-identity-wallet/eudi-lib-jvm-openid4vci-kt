@@ -31,7 +31,7 @@ data class UnvalidatedCredentialOffer(
 data class CredentialOffer(
     val credentialIssuerIdentifier: CrednetialIssuerId,
     val credentials: List<Credential>,
-    val grants: List<GrantType>
+    val grants: List<GrantType>,
 )
 
 @Serializable
@@ -72,24 +72,23 @@ data class CredentialIssuerMetaData(
 typealias CrednetialIssuerId = String // must be an https:// URL
 typealias CredentialSupported = String
 
-
 sealed interface GrantType {
-   data class AuthorizationCode(
-       val issuerState: String? = null
-   ) : GrantType
+    data class AuthorizationCode(
+        val issuerState: String? = null,
+    ) : GrantType
 
-   data class PreAuthorizedCode(
-       val preAuthorizedCode: String,
-       val pinRequired: Boolean,
-       val interval: Long = 5
-   ) : GrantType
+    data class PreAuthorizedCode(
+        val preAuthorizedCode: String,
+        val pinRequired: Boolean,
+        val interval: Long = 5,
+    ) : GrantType
 }
 
 sealed interface Credential {
 
     data class ScopedCredential(
-        val scope: String
-    ): Credential
+        val scope: String,
+    ) : Credential
 
     sealed interface UnscopedCredential : Credential {
 
@@ -97,13 +96,12 @@ sealed interface Credential {
 
         data class MsoMdocCredential(
             override val format: String,
-            val docType: String
+            val docType: String,
         ) : UnscopedCredential
 
         data class W3CVerifiableCredential(
             override val format: String,
-            val credentialDefinition: String
+            val credentialDefinition: String,
         ) : UnscopedCredential
     }
-
 }
