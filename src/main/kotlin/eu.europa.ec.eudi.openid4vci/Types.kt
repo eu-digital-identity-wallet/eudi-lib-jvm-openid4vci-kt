@@ -17,8 +17,22 @@ package eu.europa.ec.eudi.openid4vci
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
+
+@Serializable
+data class UnvalidatedCredentialOffer(
+    @SerialName("credential_issuer") val credentialIssuerIdentifier: String,
+    @SerialName("credentials") val credentials: List<JsonElement>,
+    @SerialName("grants") val grants: List<JsonObject>,
+)
+
+data class CredentialOffer(
+    val credentialIssuerIdentifier: CrednetialIssuerId,
+    val credentials: List<Credential>,
+    val grants: List<GrantType>
+)
 
 @Serializable
 data class UnvalidatedCredentialIssuerMetaData(
@@ -44,7 +58,7 @@ data class UnvalidatedCredentialSupported(
 )
 
 data class CredentialIssuerMetaData(
-    val credentialIssuerIdentifier: CIIdentifier,
+    val credentialIssuerIdentifier: CrednetialIssuerId,
     val authorizationServer: String?,
     val credentialEndpoint: URL,
     val batchCredentialEndpoint: URL? = null,
@@ -55,6 +69,41 @@ data class CredentialIssuerMetaData(
     val credentialsSupported: List<CredentialSupported>,
 ) : java.io.Serializable
 
-typealias CIIdentifier = String
-
+typealias CrednetialIssuerId = String // must be an https:// URL
 typealias CredentialSupported = String
+
+
+sealed interface GrantType {
+   data class AuthorizationCode(
+       val issuerState: String? = null
+   ) : GrantType
+
+   data class PreAuthorizedCode(
+       val preAuthorizedCode: String,
+       val pinRequired: Boolean,
+       val interval: Long = 5
+   ) : GrantType
+}
+
+sealed interface Credential {
+
+    data class ScopedCredential(
+        val scope: String
+    ): Credential
+
+    sealed interface UnscopedCredential : Credential {
+
+        val format: String
+
+        data class MsoMdocCredential(
+            override val format: String,
+            val docType: String
+        ) : UnscopedCredential
+
+        data class W3CVerifiableCredential(
+            override val format: String,
+            val credentialDefinition: String
+        ) : UnscopedCredential
+    }
+
+}
