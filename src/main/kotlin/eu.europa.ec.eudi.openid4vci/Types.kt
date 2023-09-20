@@ -21,6 +21,31 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
 
+/**
+ * A [URL] that strictly uses the 'https' protocol.
+ */
+@JvmInline
+value class HttpsUrl private constructor(val value: URL) {
+
+    companion object {
+
+        /**
+         * Parses the provided [value] as a [URL] and tries creates a new [HttpsUrl].
+         */
+        operator fun invoke(value: String): Result<HttpsUrl> = runCatching {
+            URL(value)
+        }.mapCatching { invoke(it).getOrThrow() }
+
+        /**
+         * Tries to create an [HttpsUrl].
+         */
+        operator fun invoke(value: URL): Result<HttpsUrl> = runCatching {
+            require(value.protocol.contentEquals("https", true)) { "URL must use https protocol" }
+            HttpsUrl(value)
+        }
+    }
+}
+
 @Serializable
 data class UnvalidatedCredentialOffer(
     @SerialName("credential_issuer") val credentialIssuerIdentifier: String,
@@ -28,8 +53,8 @@ data class UnvalidatedCredentialOffer(
     @SerialName("grants") val grants: List<JsonObject>,
 )
 
-data class CredentialOffer(
-    val credentialIssuerIdentifier: CrednetialIssuerId,
+data class ResolvedCredentialOffer(
+    val credentialIssuerIdentifier: CredentialIssuerId,
     val credentials: List<Credential>,
     val grants: List<GrantType>,
 )
@@ -58,7 +83,7 @@ data class UnvalidatedCredentialSupported(
 )
 
 data class CredentialIssuerMetaData(
-    val credentialIssuerIdentifier: CrednetialIssuerId,
+    val credentialIssuerIdentifier: CredentialIssuerId,
     val authorizationServer: String?,
     val credentialEndpoint: URL,
     val batchCredentialEndpoint: URL? = null,
@@ -69,7 +94,7 @@ data class CredentialIssuerMetaData(
     val credentialsSupported: List<CredentialSupported>,
 ) : java.io.Serializable
 
-typealias CrednetialIssuerId = String // must be an https:// URL
+typealias CredentialIssuerId = HttpsUrl
 typealias CredentialSupported = String
 
 sealed interface GrantType {
