@@ -97,7 +97,28 @@ data class CredentialIssuerMetaData(
     val credentialsSupported: List<CredentialSupported>,
 ) : java.io.Serializable
 
-typealias CredentialIssuerId = HttpsUrl
+/**
+ * The Id of a Credential Issuer. An [HttpsUrl] that has no fragment or query parameters.
+ */
+@JvmInline
+value class CredentialIssuerId private constructor(val value: HttpsUrl) {
+
+    companion object {
+
+        /**
+         * Parses the provided [value] as an [HttpsUrl] and tries to create a [CredentialIssuerId].
+         */
+        operator fun invoke(value: String): Result<CredentialIssuerId> =
+            HttpsUrl(value)
+                .mapCatching {
+                    val uri = it.value.toURI()
+                    require(uri.fragment.isNullOrBlank()) { "CredentialIssuerId must not have a fragment" }
+                    require(uri.query.isNullOrBlank()) { "CredentialIssuerId must not have query parameters " }
+                    CredentialIssuerId(it)
+                }
+    }
+}
+
 typealias CredentialSupported = String
 
 sealed interface GrantType {
