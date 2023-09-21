@@ -125,7 +125,7 @@ internal class CredentialOfferRequestTest {
                 {
                     val passByReference =
                         Assertions.assertInstanceOf(CredentialOfferRequest.PassByReference::class.java, it)
-                    Assertions.assertEquals(credentialOfferUri, passByReference.value.value.toExternalForm())
+                    Assertions.assertEquals(credentialOfferUri, passByReference.value.value.toString())
                 },
                 {
                     Assertions.fail("Credential Offer Endpoint URL should have been parsed")

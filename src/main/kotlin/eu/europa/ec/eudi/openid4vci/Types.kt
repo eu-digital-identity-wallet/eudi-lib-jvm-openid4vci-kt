@@ -19,6 +19,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import java.net.URI
 import java.net.URL
 import java.time.Duration
 
@@ -28,23 +29,17 @@ typealias Json = String
  * A [URL] that strictly uses the 'https' protocol.
  */
 @JvmInline
-value class HttpsUrl private constructor(val value: URL) {
+value class HttpsUrl private constructor(val value: URI) {
 
     companion object {
 
         /**
-         * Parses the provided [value] as a [URL] and tries creates a new [HttpsUrl].
+         * Parses the provided [value] as a [URI] and tries creates a new [HttpsUrl].
          */
         operator fun invoke(value: String): Result<HttpsUrl> = runCatching {
-            URL(value)
-        }.mapCatching { invoke(it).getOrThrow() }
-
-        /**
-         * Tries to create an [HttpsUrl].
-         */
-        operator fun invoke(value: URL): Result<HttpsUrl> = runCatching {
-            require(value.protocol.contentEquals("https", true)) { "URL must use https protocol" }
-            HttpsUrl(value)
+            val uri = URI.create(value)
+            require(uri.scheme.contentEquals("https", true)) { "URL must use https protocol" }
+            HttpsUrl(uri)
         }
     }
 }
@@ -111,9 +106,8 @@ value class CredentialIssuerId private constructor(val value: HttpsUrl) {
         operator fun invoke(value: String): Result<CredentialIssuerId> =
             HttpsUrl(value)
                 .mapCatching {
-                    val uri = it.value.toURI()
-                    require(uri.fragment.isNullOrBlank()) { "CredentialIssuerId must not have a fragment" }
-                    require(uri.query.isNullOrBlank()) { "CredentialIssuerId must not have query parameters " }
+                    require(it.value.fragment.isNullOrBlank()) { "CredentialIssuerId must not have a fragment" }
+                    require(it.value.query.isNullOrBlank()) { "CredentialIssuerId must not have query parameters " }
                     CredentialIssuerId(it)
                 }
     }
