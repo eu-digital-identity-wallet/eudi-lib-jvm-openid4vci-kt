@@ -20,6 +20,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
+import java.time.Duration
 
 typealias Json = String
 
@@ -58,7 +59,7 @@ data class UnvalidatedCredentialOffer(
 data class ResolvedCredentialOffer(
     val credentialIssuerIdentifier: CredentialIssuerId,
     val credentials: List<Credential>,
-    val grants: List<GrantType>,
+    val grants: GrantType,
 )
 
 @Serializable
@@ -101,14 +102,17 @@ typealias CredentialSupported = String
 
 sealed interface GrantType {
     data class AuthorizationCode(
+        val code: String,
         val issuerState: String? = null,
     ) : GrantType
 
     data class PreAuthorizedCode(
         val preAuthorizedCode: String,
         val pinRequired: Boolean,
-        val interval: Long = 5,
+        val interval: Duration = Duration.ofSeconds(5L),
     ) : GrantType
+
+    data class Both(val authorizationCode: AuthorizationCode, val preAuthorizedCode: PreAuthorizedCode) : GrantType
 }
 
 sealed interface Credential {
