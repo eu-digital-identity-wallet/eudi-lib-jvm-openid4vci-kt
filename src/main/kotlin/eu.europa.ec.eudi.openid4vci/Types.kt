@@ -21,6 +21,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
 
+typealias Json = String
+
 /**
  * A [URL] that strictly uses the 'https' protocol.
  */

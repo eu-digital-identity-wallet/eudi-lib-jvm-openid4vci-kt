@@ -27,7 +27,7 @@ sealed interface CredentialOfferRequest : Serializable {
      * A Credential Offer request that was passed using the 'credential_offer' query parameter.
      */
     @JvmInline
-    value class PassByValue(val value: String) : CredentialOfferRequest
+    value class PassByValue(val value: Json) : CredentialOfferRequest
 
     /**
      * A Credential Offer request that must be resolved using the 'credential_offer_uri' parameter.
