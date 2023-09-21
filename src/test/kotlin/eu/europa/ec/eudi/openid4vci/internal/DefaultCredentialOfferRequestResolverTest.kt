@@ -1,0 +1,72 @@
+/*
+ * Copyright (c) 2023 European Commission
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package eu.europa.ec.eudi.openid4vci.internal
+
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
+import eu.europa.ec.eudi.openid4vci.CredentialOffer
+import eu.europa.ec.eudi.openid4vci.Grants
+import kotlinx.coroutines.runBlocking
+import org.apache.http.client.utils.URIBuilder
+import org.junit.jupiter.api.Assertions
+import kotlin.test.Test
+
+internal class DefaultCredentialOfferRequestResolverTest {
+
+    @Test
+    internal fun `resolve success`() = runBlocking {
+        val credentialOffer =
+            """
+                {
+                   "credential_issuer": "https://credential-issuer.example.com",
+                   "credentials": [
+                      "UniversityDegree_JWT",
+                      {
+                         "format": "mso_mdoc",
+                         "doctype": "org.iso.18013.5.1.mDL"
+                      }
+                   ],
+                   "grants": {
+                      "authorization_code": {
+                         "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
+                      },
+                      "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+                         "pre-authorized_code": "adhjhdjajkdkhjhdj",
+                         "user_pin_required": true
+                      }
+                   }
+                }
+            """.trimIndent()
+
+        val expected = CredentialOffer(
+            CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+            emptyList(),
+            Grants.Both(
+                Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
+                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true),
+            ),
+        )
+
+        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer", credentialOffer)
+            .build()
+
+        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+            .fold(
+                { Assertions.assertEquals(expected, it) },
+                { Assertions.fail("Credential Offer resolution should have succeeded") },
+            )
+    }
+}

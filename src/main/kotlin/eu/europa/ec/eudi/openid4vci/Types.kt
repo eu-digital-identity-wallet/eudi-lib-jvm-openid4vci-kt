@@ -15,18 +15,18 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.net.URL
-import java.time.Duration
 
-typealias Json = String
+typealias JsonString = String
 
 /**
- * A [URL] that strictly uses the 'https' protocol.
+ * A [URI] that strictly uses the 'https' protocol.
  */
 @JvmInline
 value class HttpsUrl private constructor(val value: URI) {
@@ -44,18 +44,138 @@ value class HttpsUrl private constructor(val value: URI) {
     }
 }
 
+/**
+ * The unvalidated data of a Credential Offer.
+ */
 @Serializable
-data class UnvalidatedCredentialOffer(
-    @SerialName("credential_issuer") val credentialIssuerIdentifier: String,
-    @SerialName("credentials") val credentials: List<JsonElement>,
-    @SerialName("grants") val grants: List<JsonObject>,
+data class CredentialOfferRequestObject(
+    @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
+    @SerialName("credentials") @Required val credentials: List<JsonElement>,
+    @SerialName("grants") val grants: GrantsObject? = null,
 )
 
-data class ResolvedCredentialOffer(
+/**
+ * Data of the Grant Types the Credential Issuer is prepared to process for a Credential Offer.
+ */
+@Serializable
+data class GrantsObject(
+    @SerialName("authorization_code") val authorizationCode: AuthorizationCodeObject? = null,
+    @SerialName("urn:ietf:params:oauth:grant-type:pre-authorized_code") val preAuthorizedCode: PreAuthorizedCodeObject? = null,
+) {
+
+    /**
+     * Data for an Authorization Code Grant Type.
+     */
+    @Serializable
+    data class AuthorizationCodeObject(
+        @SerialName("issuer_state") val issuerState: String? = null,
+    )
+
+    /**
+     * Data for a Pre-Authorized Code Grant Type.
+     */
+    @Serializable
+    data class PreAuthorizedCodeObject(
+        @SerialName("pre-authorized_code") @Required val preAuthorizedCode: String,
+        @SerialName("user_pin_required") val userPinRequired: Boolean? = null,
+    )
+}
+
+/**
+ * A Credential Offer.
+ */
+data class CredentialOffer(
     val credentialIssuerIdentifier: CredentialIssuerId,
     val credentials: List<Credential>,
-    val grants: GrantType,
-)
+    val grants: Grants? = null,
+) : java.io.Serializable
+
+/**
+ * The Id of a Credential Issuer. An [HttpsUrl] that has no fragment or query parameters.
+ */
+@JvmInline
+value class CredentialIssuerId private constructor(val value: HttpsUrl) {
+
+    companion object {
+
+        /**
+         * Parses the provided [value] as an [HttpsUrl] and tries to create a [CredentialIssuerId].
+         */
+        operator fun invoke(value: String): Result<CredentialIssuerId> =
+            HttpsUrl(value)
+                .mapCatching {
+                    require(it.value.fragment.isNullOrBlank()) { "CredentialIssuerId must not have a fragment" }
+                    require(it.value.query.isNullOrBlank()) { "CredentialIssuerId must not have query parameters " }
+                    CredentialIssuerId(it)
+                }
+    }
+}
+
+/**
+ * Credentials offered in a Credential Offer Request.
+ */
+sealed interface Credential {
+
+    /**
+     * A Credential identified by its Scope.
+     */
+    data class ScopedCredential(
+        val scope: String,
+    ) : Credential
+
+    /**
+     * A Credential format not identified by a Scope.
+     */
+    sealed interface UnscopedCredential : Credential {
+
+        val format: String
+
+        /**
+         * An MSO MDOC credential.
+         */
+        data class MsoMdocCredential(
+            override val format: String,
+            val docType: String,
+        ) : UnscopedCredential
+
+        /**
+         * A W3C Verifiable Credential.
+         */
+        data class W3CVerifiableCredential(
+            override val format: String,
+            val credentialDefinition: String,
+        ) : UnscopedCredential
+    }
+}
+
+/**
+ * The Grant Types a Credential Issuer can process for a Credential Offer.
+ */
+sealed interface Grants : java.io.Serializable {
+
+    /**
+     * Data for an Authorization Code Grant.
+     */
+    data class AuthorizationCode(
+        val issuerState: String? = null,
+    ) : Grants
+
+    /**
+     * Data for a Pre-Authorized Code Grant.
+     */
+    data class PreAuthorizedCode(
+        val preAuthorizedCode: String,
+        val pinRequired: Boolean = false,
+    ) : Grants
+
+    /**
+     * Data for either an Authorization Code Grant or a Pre-Authorized Code Grant.
+     */
+    data class Both(
+        val authorizationCode: AuthorizationCode,
+        val preAuthorizedCode: PreAuthorizedCode,
+    ) : Grants
+}
 
 @Serializable
 data class UnvalidatedCredentialIssuerMetaData(
@@ -92,62 +212,4 @@ data class CredentialIssuerMetaData(
     val credentialsSupported: List<CredentialSupported>,
 ) : java.io.Serializable
 
-/**
- * The Id of a Credential Issuer. An [HttpsUrl] that has no fragment or query parameters.
- */
-@JvmInline
-value class CredentialIssuerId private constructor(val value: HttpsUrl) {
-
-    companion object {
-
-        /**
-         * Parses the provided [value] as an [HttpsUrl] and tries to create a [CredentialIssuerId].
-         */
-        operator fun invoke(value: String): Result<CredentialIssuerId> =
-            HttpsUrl(value)
-                .mapCatching {
-                    require(it.value.fragment.isNullOrBlank()) { "CredentialIssuerId must not have a fragment" }
-                    require(it.value.query.isNullOrBlank()) { "CredentialIssuerId must not have query parameters " }
-                    CredentialIssuerId(it)
-                }
-    }
-}
-
 typealias CredentialSupported = String
-
-sealed interface GrantType {
-    data class AuthorizationCode(
-        val code: String,
-        val issuerState: String? = null,
-    ) : GrantType
-
-    data class PreAuthorizedCode(
-        val preAuthorizedCode: String,
-        val pinRequired: Boolean,
-        val interval: Duration = Duration.ofSeconds(5L),
-    ) : GrantType
-
-    data class Both(val authorizationCode: AuthorizationCode, val preAuthorizedCode: PreAuthorizedCode) : GrantType
-}
-
-sealed interface Credential {
-
-    data class ScopedCredential(
-        val scope: String,
-    ) : Credential
-
-    sealed interface UnscopedCredential : Credential {
-
-        val format: String
-
-        data class MsoMdocCredential(
-            override val format: String,
-            val docType: String,
-        ) : UnscopedCredential
-
-        data class W3CVerifiableCredential(
-            override val format: String,
-            val credentialDefinition: String,
-        ) : UnscopedCredential
-    }
-}

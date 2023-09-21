@@ -27,7 +27,7 @@ sealed interface CredentialOfferRequest : Serializable {
      * A Credential Offer request that was passed using the 'credential_offer' query parameter.
      */
     @JvmInline
-    value class PassByValue(val value: Json) : CredentialOfferRequest
+    value class PassByValue(val value: JsonString) : CredentialOfferRequest
 
     /**
      * A Credential Offer request that must be resolved using the 'credential_offer_uri' parameter.
@@ -100,6 +100,21 @@ sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestE
     data class InvalidCredentialOfferUri(val reason: Throwable) : CredentialOfferRequestValidationError
 
     /**
+     * The Credential Offer object could not be parsed.
+     */
+    data class NonParseableCredentialOffer(val reason: Throwable) : CredentialOfferRequestValidationError
+
+    /**
+     * The Id of the Credential Issuer is not valid.
+     */
+    data class InvalidCredentialIssuerId(val reason: Throwable) : CredentialOfferRequestValidationError
+
+    /**
+     * The Grants of a Credential Offer are not valid.
+     */
+    data class InvalidGrants(val reason: Throwable) : CredentialOfferRequestValidationError
+
+    /**
      * Wraps this [CredentialOfferRequestValidationError] into a [CredentialOfferRequestException].
      */
     fun toException(): CredentialOfferRequestException = CredentialOfferRequestException(this)
@@ -109,3 +124,24 @@ sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestE
  * A exception indicating a [CredentialOfferRequestError] occurred while trying to validate or resolve a [CredentialOfferRequest].
  */
 data class CredentialOfferRequestException(val error: CredentialOfferRequestError) : Exception()
+
+/**
+ * Service for parsing, extracting and validating a [CredentialOfferRequest].
+ */
+fun interface CredentialOfferRequestResolver {
+
+    /**
+     * Tries to parse a Credential Offer Endpoint [URL][uri], extract and validate a Credential Offer Request.
+     */
+    suspend fun resolve(uri: String): Result<CredentialOffer> =
+        CredentialOfferRequest(uri)
+            .fold(
+                { resolve(it) },
+                { Result.failure(it) },
+            )
+
+    /**
+     * Tries to validate and resolve a [Credential Offer Request][request].
+     */
+    suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer>
+}
