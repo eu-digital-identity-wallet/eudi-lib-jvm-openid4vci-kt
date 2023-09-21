@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import org.apache.http.client.utils.URIBuilder
 import org.junit.jupiter.api.Assertions
 import kotlin.test.Test
 
@@ -52,7 +53,11 @@ internal class CredentialOfferRequestTest {
 
     @Test
     internal fun `Fails when both 'credential_offer' and 'credential_offer_uri' are provided `() {
-        CredentialOfferRequest("wallet://credential_offer?credential_offer={}&credential_offer_uri=https://credential.offer/1")
+        val uri = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer", "{}")
+            .addParameter("credential_offer_uri", "https://credential.offer/1")
+            .build()
+        CredentialOfferRequest(uri.toString())
             .fold(
                 { Assertions.fail("Credential Offer Endpoint URL should not have been parsed") },
                 {
@@ -87,11 +92,13 @@ internal class CredentialOfferRequestTest {
                   }
                }
             }
-        """.filterNot {
-            it.isWhitespace()
-        }
+        """.trimIndent()
 
-        CredentialOfferRequest("wallet://credential_offer?credential_offer=$credentialOffer")
+        val credentialOfferEndpointUri = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer", credentialOffer)
+            .build()
+
+        CredentialOfferRequest(credentialOfferEndpointUri.toString())
             .fold(
                 {
                     val passByValue = Assertions.assertInstanceOf(CredentialOfferRequest.PassByValue::class.java, it)
@@ -104,7 +111,10 @@ internal class CredentialOfferRequestTest {
     @Test
     internal fun `PassByReference cannot be created when 'credential_offer_uri' is not an HTTPS URL`() {
         val credentialOfferUri = "http://credential.offer/1"
-        CredentialOfferRequest("wallet://credential_offer?credential_offer_uri=$credentialOfferUri")
+        val credentialOfferEndpointUri = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer_uri", credentialOfferUri)
+            .build()
+        CredentialOfferRequest(credentialOfferEndpointUri.toString())
             .fold(
                 { Assertions.fail("Credential Offer Endpoint URL should not have been parsed") },
                 {
@@ -120,7 +130,10 @@ internal class CredentialOfferRequestTest {
     @Test
     internal fun `PassByReference is be created when 'credential_offer_uri' is an HTTPS URL`() {
         val credentialOfferUri = "https://credential.offer/1"
-        CredentialOfferRequest("wallet://credential_offer?credential_offer_uri=$credentialOfferUri")
+        val credentialOfferEndpointUri = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer_uri", credentialOfferUri)
+            .build()
+        CredentialOfferRequest(credentialOfferEndpointUri.toString())
             .fold(
                 {
                     val passByReference =
