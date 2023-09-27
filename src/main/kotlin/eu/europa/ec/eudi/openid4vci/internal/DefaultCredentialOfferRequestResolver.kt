@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
 import kotlinx.serialization.json.Json
+import java.time.Duration
 
 /**
  * A default implementation for [CredentialOfferRequestResolver].
@@ -40,37 +41,43 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
             CredentialOffer(credentialIssuerId, emptyList(), grants)
         }
 
-    /**
-     * Tries to decode a [JsonString] to a [CredentialOfferRequestObject].
-     */
-    private fun deserialize(value: JsonString): Result<CredentialOfferRequestObject> =
-        runCatching {
-            Json.decodeFromString<CredentialOfferRequestObject>(value)
-        }.recoverCatching { throw CredentialOfferRequestValidationError.NonParseableCredentialOffer(it).toException() }
+    companion object {
 
-    /**
-     * Tries to parse a [GrantsObject] to a [Grants] instance.
-     */
-    private fun GrantsObject.grants(): Result<Grants?> = runCatching {
-        val maybeAuthorizationCodeGrant =
-            authorizationCode?.let { Grants.AuthorizationCode(it.issuerState) }
-        val maybePreAuthorizedCodeGrant =
-            preAuthorizedCode?.let {
-                Grants.PreAuthorizedCode(
-                    it.preAuthorizedCode,
-                    it.userPinRequired ?: false,
-                )
+        /**
+         * Tries to decode a [JsonString] to a [CredentialOfferRequestObject].
+         */
+        private fun deserialize(value: JsonString): Result<CredentialOfferRequestObject> =
+            runCatching {
+                Json.decodeFromString<CredentialOfferRequestObject>(value)
+            }.recoverCatching {
+                throw CredentialOfferRequestValidationError.NonParseableCredentialOffer(it).toException()
             }
 
-        when {
-            maybeAuthorizationCodeGrant != null && maybePreAuthorizedCodeGrant != null -> Grants.Both(
-                maybeAuthorizationCodeGrant,
-                maybePreAuthorizedCodeGrant,
-            )
+        /**
+         * Tries to parse a [GrantsObject] to a [Grants] instance.
+         */
+        private fun GrantsObject.grants(): Result<Grants?> = runCatching {
+            val maybeAuthorizationCodeGrant =
+                authorizationCode?.let { Grants.AuthorizationCode(it.issuerState) }
+            val maybePreAuthorizedCodeGrant =
+                preAuthorizedCode?.let {
+                    Grants.PreAuthorizedCode(
+                        it.preAuthorizedCode,
+                        it.pinRequired ?: false,
+                        it.interval?.let { interval -> Duration.ofSeconds(interval) } ?: Duration.ofSeconds(5L),
+                    )
+                }
 
-            maybeAuthorizationCodeGrant == null && maybePreAuthorizedCodeGrant == null -> null
-            maybeAuthorizationCodeGrant != null -> maybeAuthorizationCodeGrant
-            else -> maybePreAuthorizedCodeGrant
+            when {
+                maybeAuthorizationCodeGrant != null && maybePreAuthorizedCodeGrant != null -> Grants.Both(
+                    maybeAuthorizationCodeGrant,
+                    maybePreAuthorizedCodeGrant,
+                )
+
+                maybeAuthorizationCodeGrant == null && maybePreAuthorizedCodeGrant == null -> null
+                maybeAuthorizationCodeGrant != null -> maybeAuthorizationCodeGrant
+                else -> maybePreAuthorizedCodeGrant
+            }
         }
     }
 }

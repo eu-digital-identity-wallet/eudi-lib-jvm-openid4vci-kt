@@ -22,6 +22,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.net.URL
+import java.time.Duration
 
 typealias JsonString = String
 
@@ -77,7 +78,8 @@ data class GrantsObject(
     @Serializable
     data class PreAuthorizedCodeObject(
         @SerialName("pre-authorized_code") @Required val preAuthorizedCode: String,
-        @SerialName("user_pin_required") val userPinRequired: Boolean? = null,
+        @SerialName("user_pin_required") val pinRequired: Boolean? = null,
+        @SerialName("interval") val interval: Long? = null,
     )
 }
 
@@ -166,6 +168,7 @@ sealed interface Grants : java.io.Serializable {
     data class PreAuthorizedCode(
         val preAuthorizedCode: String,
         val pinRequired: Boolean = false,
+        val interval: Duration = Duration.ofSeconds(5L),
     ) : Grants
 
     /**
