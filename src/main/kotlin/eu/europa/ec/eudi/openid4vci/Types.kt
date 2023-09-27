@@ -285,7 +285,7 @@ data class MsoMdocObject(
     @SerialName("proof_types_supported") val proofTypesSupported: List<String> = emptyList(),
     @SerialName("display") val display: List<DisplayObject> = emptyList(),
     @SerialName("doctype") @Required val docType: String,
-    @SerialName("claims") val claims: Map<Namespace, Map<ClaimName, JsonObject>> = emptyMap(),
+    @SerialName("claims") val claims: Map<Namespace, Map<ClaimName, ClaimObject>> = emptyMap(),
     @SerialName("order") val order: List<String> = emptyList(),
 ) {
 
