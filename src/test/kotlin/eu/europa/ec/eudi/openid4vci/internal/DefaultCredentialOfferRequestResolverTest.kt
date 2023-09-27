@@ -21,34 +21,14 @@ import eu.europa.ec.eudi.openid4vci.Credential.UnscopedCredential.MsoMdocCredent
 import kotlinx.coroutines.runBlocking
 import org.apache.http.client.utils.URIBuilder
 import org.junit.jupiter.api.Assertions
+import java.io.File
 import kotlin.test.Test
 
 internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
     internal fun `resolve success`() = runBlocking {
-        val credentialOffer =
-            """
-                {
-                   "credential_issuer": "https://credential-issuer.example.com",
-                   "credentials": [
-                      "UniversityDegree_JWT",
-                      {
-                         "format": "mso_mdoc",
-                         "doctype": "org.iso.18013.5.1.mDL"
-                      }
-                   ],
-                   "grants": {
-                      "authorization_code": {
-                         "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
-                      },
-                      "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
-                         "pre-authorized_code": "adhjhdjajkdkhjhdj",
-                         "user_pin_required": true
-                      }
-                   }
-                }
-            """.trimIndent()
+        val credentialOffer = getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer.json")
 
         val expected = CredentialOffer(
             CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
@@ -75,123 +55,64 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
     fun `resolve success with mos_mdoc`() = runBlocking {
-        val credentialOffer =
-            """
-            {
-            	"credential_issuer": "https://credential-issuer.example.com",
-            	"credentials": [
-            		"UniversityDegree_JWT",
-            		{
-            			"format": "mso_mdoc",
-            			"doctype": "org.iso.18013.5.1.mDL",
-            			"cryptographic_binding_methods_supported": [
-            				"mso"
-            			],
-            			"cryptographic_suites_supported": [
-            				"ES256", "ES384", "ES512"
-            			],
-            			"display": [{
-            					"name": "Mobile Driving License",
-            					"locale": "en-US",
-            					"logo": {
-            						"url": "https://examplestate.com/public/mdl.png",
-            						"alt_text": "a square figure of a mobile driving license"
-            					},
-            					"background_color": "#12107c",
-            					"text_color": "#FFFFFF"
-            				}
-            			],
-            			"claims": {
-            				"org.iso.18013.5.1": {
-            					"given_name": {
-            						"display": [{
-            								"name": "Given Name",
-            								"locale": "en-US"
-            							},
-            							{
-            								"name": "名前",
-            								"locale": "ja-JP"
-            							}
-            						]
-            					},
-            					"family_name": {
-            						"display": [{
-            							"name": "Surname",
-            							"locale": "en-US"
-            						}]
-            					},
-            					"birth_date": {}
-            				},
-            				"org.iso.18013.5.1.aamva": {
-            					"organ_donor": {}
-            				}
-            			}
-            		}
-            	],
-            	"grants": {
-            		"authorization_code": {
-            			"issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
-            		},
-            		"urn:ietf:params:oauth:grant-type:pre-authorized_code": {
-            			"pre-authorized_code": "adhjhdjajkdkhjhdj",
-            			"user_pin_required": true
-            		}
-            	}
-            }
-            """.trimIndent()
+        val credentialOffer = getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/mso_mdoc_credential_offer.json")
 
         val expected = CredentialOffer(
             CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
             listOf(
                 ScopedCredential("UniversityDegree_JWT"),
-                MsoMdocCredential(MsoMdocObject(
-                    format = "mso_mdoc",
-                    docType = "org.iso.18013.5.1.mDL",
-                    cryptographicBindingMethodsSupported = listOf("mso"),
-                    cryptographicSuitesSupported = listOf(
-                        "ES256", "ES384", "ES512"
-                    ),
-                    display = listOf(
-                        MsoMdocObject.DisplayObject(
-                            name = "Mobile Driving License",
-                            locale = "en-US",
-                            logo = MsoMdocObject.DisplayObject.Logo(
-                                url = "https://examplestate.com/public/mdl.png",
-                                alternativeText = "a square figure of a mobile driving license"
-                            ),
-                            backgroundColor = "#12107c",
-                            textColor = "#FFFFFF"
-                        )
-                    ),
-                    claims = mapOf(
-                        "org.iso.18013.5.1" to mapOf(
-                            "given_name" to MsoMdocObject.ClaimObject(
-                                display = listOf(
-                                    MsoMdocObject.ClaimObject.DisplayObject(
-                                        name = "Given Name",
-                                        locale = "en-US"
-                                    ),
-                                    MsoMdocObject.ClaimObject.DisplayObject(
-                                        name = "名前",
-                                        locale = "ja-JP"
-                                    )
-                                )
-                            ),
-                            "family_name" to MsoMdocObject.ClaimObject(
-                                display = listOf(
-                                    MsoMdocObject.ClaimObject.DisplayObject(
-                                        name = "Surname",
-                                        locale = "en-US"
-                                    )
-                                )
-                            ),
-                            "birth_date" to MsoMdocObject.ClaimObject()
+                MsoMdocCredential(
+                    MsoMdocObject(
+                        format = "mso_mdoc",
+                        docType = "org.iso.18013.5.1.mDL",
+                        cryptographicBindingMethodsSupported = listOf("mso"),
+                        cryptographicSuitesSupported = listOf(
+                            "ES256",
+                            "ES384",
+                            "ES512",
                         ),
-                        "org.iso.18013.5.1.aamva" to mapOf(
-                            "organ_donor" to MsoMdocObject.ClaimObject()
-                        )
-                    )
-                )),
+                        display = listOf(
+                            MsoMdocObject.DisplayObject(
+                                name = "Mobile Driving License",
+                                locale = "en-US",
+                                logo = MsoMdocObject.DisplayObject.Logo(
+                                    url = "https://examplestate.com/public/mdl.png",
+                                    alternativeText = "a square figure of a mobile driving license",
+                                ),
+                                backgroundColor = "#12107c",
+                                textColor = "#FFFFFF",
+                            ),
+                        ),
+                        claims = mapOf(
+                            "org.iso.18013.5.1" to mapOf(
+                                "given_name" to MsoMdocObject.ClaimObject(
+                                    display = listOf(
+                                        MsoMdocObject.ClaimObject.DisplayObject(
+                                            name = "Given Name",
+                                            locale = "en-US",
+                                        ),
+                                        MsoMdocObject.ClaimObject.DisplayObject(
+                                            name = "名前",
+                                            locale = "ja-JP",
+                                        ),
+                                    ),
+                                ),
+                                "family_name" to MsoMdocObject.ClaimObject(
+                                    display = listOf(
+                                        MsoMdocObject.ClaimObject.DisplayObject(
+                                            name = "Surname",
+                                            locale = "en-US",
+                                        ),
+                                    ),
+                                ),
+                                "birth_date" to MsoMdocObject.ClaimObject(),
+                            ),
+                            "org.iso.18013.5.1.aamva" to mapOf(
+                                "organ_donor" to MsoMdocObject.ClaimObject(),
+                            ),
+                        ),
+                    ),
+                ),
             ),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
@@ -208,5 +129,10 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 { Assertions.assertEquals(expected, it) },
                 { Assertions.fail("Credential Offer resolution should have succeeded", it) },
             )
+    }
+
+    companion object {
+        private fun getResourceAsText(resource: String): String =
+            File(ClassLoader.getSystemResource(resource).path).readText()
     }
 }
