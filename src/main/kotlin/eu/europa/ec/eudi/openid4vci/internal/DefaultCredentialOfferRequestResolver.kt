@@ -116,7 +116,7 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
          * Tries to parse a [JsonObject] to an [Credential.UnscopedCredential].
          */
         private fun JsonObject.toUnscopedCredential(): Result<UnscopedCredential> = runCatching {
-            fun format(): String =
+            val format =
                 getOrDefault("format", JsonNull)
                     .let {
                         if (it is JsonPrimitive && it.isString) {
@@ -128,7 +128,7 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
                         }
                     }
 
-            when (val format = format()) {
+            when (format) {
                 "mso_mdoc" -> UnscopedCredential.MsoMdocCredential(
                     deserialize { CredentialOfferRequestValidationError.InvalidCredential(it).toException() },
                 )
