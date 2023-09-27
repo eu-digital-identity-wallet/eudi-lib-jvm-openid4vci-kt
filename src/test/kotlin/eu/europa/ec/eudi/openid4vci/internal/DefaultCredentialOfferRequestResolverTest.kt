@@ -15,9 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
-import eu.europa.ec.eudi.openid4vci.CredentialOffer
-import eu.europa.ec.eudi.openid4vci.Grants
+import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.Credential.ScopedCredential
+import eu.europa.ec.eudi.openid4vci.Credential.UnscopedCredential.MsoMdocCredential
 import kotlinx.coroutines.runBlocking
 import org.apache.http.client.utils.URIBuilder
 import org.junit.jupiter.api.Assertions
@@ -52,7 +52,10 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
         val expected = CredentialOffer(
             CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
-            emptyList(),
+            listOf(
+                ScopedCredential("UniversityDegree_JWT"),
+                MsoMdocCredential(MsoMdocObject(format = "mso_mdoc", docType = "org.iso.18013.5.1.mDL")),
+            ),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
                 Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true),
@@ -66,7 +69,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
         DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
             .fold(
                 { Assertions.assertEquals(expected, it) },
-                { Assertions.fail("Credential Offer resolution should have succeeded") },
+                { Assertions.fail("Credential Offer resolution should have succeeded", it) },
             )
     }
 }
