@@ -76,15 +76,16 @@ internal class DefaultCredentialOfferRequestResolverTest {
                             "ES512",
                         ),
                         display = listOf(
-                            MsoMdocObject.DisplayObject(
-                                name = "Mobile Driving License",
-                                locale = "en-US",
-                                logo = MsoMdocObject.DisplayObject.Logo(
-                                    url = "https://examplestate.com/public/mdl.png",
-                                    alternativeText = "a square figure of a mobile driving license",
+                            DisplayObject(
+                                "Mobile Driving License",
+                                "en-US",
+                                DisplayObject.Logo(
+                                    "https://examplestate.com/public/mdl.png",
+                                    "a square figure of a mobile driving license",
                                 ),
-                                backgroundColor = "#12107c",
-                                textColor = "#FFFFFF",
+                                null,
+                                "#12107c",
+                                "#FFFFFF",
                             ),
                         ),
                         claims = mapOf(
@@ -92,20 +93,20 @@ internal class DefaultCredentialOfferRequestResolverTest {
                                 "given_name" to MsoMdocObject.ClaimObject(
                                     display = listOf(
                                         MsoMdocObject.ClaimObject.DisplayObject(
-                                            name = "Given Name",
-                                            locale = "en-US",
+                                            "Given Name",
+                                            "en-US",
                                         ),
                                         MsoMdocObject.ClaimObject.DisplayObject(
-                                            name = "名前",
-                                            locale = "ja-JP",
+                                            "名前",
+                                            "ja-JP",
                                         ),
                                     ),
                                 ),
                                 "family_name" to MsoMdocObject.ClaimObject(
                                     display = listOf(
                                         MsoMdocObject.ClaimObject.DisplayObject(
-                                            name = "Surname",
-                                            locale = "en-US",
+                                            "Surname",
+                                            "en-US",
                                         ),
                                     ),
                                 ),
@@ -151,10 +152,10 @@ internal class DefaultCredentialOfferRequestResolverTest {
                         listOf("ES256K"),
                         listOf("jwt"),
                         listOf(
-                            W3CVerifiableCredentialSignedJwtObject.DisplayObject(
+                            DisplayObject(
                                 "University Credential",
                                 "en-US",
-                                W3CVerifiableCredentialSignedJwtObject.DisplayObject.Logo(
+                                DisplayObject.Logo(
                                     "https://exampleuniversity.com/public/logo.png",
                                     "a square logo of a university",
                                 ),
@@ -259,10 +260,10 @@ internal class DefaultCredentialOfferRequestResolverTest {
                         listOf("Ed25519Signature2018"),
                         emptyList(),
                         listOf(
-                            W3CVerifiableCredentialsJsonLdDataIntegrityObject.DisplayObject(
+                            DisplayObject(
                                 "University Credential",
                                 "en-US",
-                                W3CVerifiableCredentialsJsonLdDataIntegrityObject.DisplayObject.Logo(
+                                DisplayObject.Logo(
                                     "https://exampleuniversity.com/public/logo.png",
                                     "a square logo of a university",
                                 ),

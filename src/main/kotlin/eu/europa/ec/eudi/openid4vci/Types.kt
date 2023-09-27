@@ -114,6 +114,29 @@ value class CredentialIssuerId private constructor(val value: HttpsUrl) {
 }
 
 /**
+ * Display properties of a supported credential type for a certain language.
+ */
+@Serializable
+data class DisplayObject(
+    @SerialName("name") @Required val name: String,
+    @SerialName("locale") val locale: String? = null,
+    @SerialName("logo") val logo: Logo? = null,
+    @SerialName("description") val description: String? = null,
+    @SerialName("background_color") val backgroundColor: String? = null,
+    @SerialName("text_color") val textColor: String? = null,
+) {
+
+    /**
+     * Logo information.
+     */
+    @Serializable
+    data class Logo(
+        @SerialName("url") val url: String? = null,
+        @SerialName("alt_text") val alternativeText: String? = null,
+    )
+}
+
+/**
  * The data of a supported credentials type.
  */
 @Serializable
@@ -124,31 +147,7 @@ data class SupportedCredentialObject(
     @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: List<String> = emptyList(),
     @SerialName("proof_types_supported") val proofTypesSupported: List<String> = emptyList(),
     @SerialName("display") val display: List<DisplayObject> = emptyList(),
-) {
-
-    /**
-     * Display properties of a supported credential type for a certain language.
-     */
-    @Serializable
-    data class DisplayObject(
-        @SerialName("name") @Required val name: String,
-        @SerialName("locale") val locale: String? = null,
-        @SerialName("logo") val logo: Logo? = null,
-        @SerialName("description") val description: String? = null,
-        @SerialName("background_color") val backgroundColor: String? = null,
-        @SerialName("text_color") val textColor: String? = null,
-    ) {
-
-        /**
-         * Logo information.
-         */
-        @Serializable
-        data class Logo(
-            @SerialName("url") val url: String? = null,
-            @SerialName("alt_text") val alternativeText: String? = null,
-        )
-    }
-}
+)
 
 /**
  * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
@@ -164,31 +163,7 @@ data class W3CVerifiableCredentialJsonLdSignedJwtObject(
     @SerialName("@context") val context: List<String> = emptyList(),
     @SerialName("credential_definition") @Required val credentialDefinition: JsonObject,
     @SerialName("order") val order: List<String> = emptyList(),
-) {
-
-    /**
-     * Display properties of a supported credential type for a certain language.
-     */
-    @Serializable
-    data class DisplayObject(
-        @SerialName("name") @Required val name: String,
-        @SerialName("locale") val locale: String? = null,
-        @SerialName("logo") val logo: Logo? = null,
-        @SerialName("description") val description: String? = null,
-        @SerialName("background_color") val backgroundColor: String? = null,
-        @SerialName("text_color") val textColor: String? = null,
-    ) {
-
-        /**
-         * Logo information.
-         */
-        @Serializable
-        data class Logo(
-            @SerialName("url") val url: String? = null,
-            @SerialName("alt_text") val alternativeText: String? = null,
-        )
-    }
-}
+)
 
 /**
  * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
@@ -203,31 +178,7 @@ data class W3CVerifiableCredentialSignedJwtObject(
     @SerialName("display") val display: List<DisplayObject> = emptyList(),
     @SerialName("credential_definition") @Required val credentialDefinition: JsonObject,
     @SerialName("order") val order: List<String> = emptyList(),
-) {
-
-    /**
-     * Display properties of a supported credential type for a certain language.
-     */
-    @Serializable
-    data class DisplayObject(
-        @SerialName("name") @Required val name: String,
-        @SerialName("locale") val locale: String? = null,
-        @SerialName("logo") val logo: Logo? = null,
-        @SerialName("description") val description: String? = null,
-        @SerialName("background_color") val backgroundColor: String? = null,
-        @SerialName("text_color") val textColor: String? = null,
-    ) {
-
-        /**
-         * Logo information.
-         */
-        @Serializable
-        data class Logo(
-            @SerialName("url") val url: String? = null,
-            @SerialName("alt_text") val alternativeText: String? = null,
-        )
-    }
-}
+)
 
 /**
  * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
@@ -244,31 +195,7 @@ data class W3CVerifiableCredentialsJsonLdDataIntegrityObject(
     @SerialName("@context") val context: List<String> = emptyList(),
     @SerialName("credential_definition") @Required val credentialDefinition: JsonObject,
     @SerialName("order") val order: List<String> = emptyList(),
-) {
-
-    /**
-     * Display properties of a supported credential type for a certain language.
-     */
-    @Serializable
-    data class DisplayObject(
-        @SerialName("name") @Required val name: String,
-        @SerialName("locale") val locale: String? = null,
-        @SerialName("logo") val logo: Logo? = null,
-        @SerialName("description") val description: String? = null,
-        @SerialName("background_color") val backgroundColor: String? = null,
-        @SerialName("text_color") val textColor: String? = null,
-    ) {
-
-        /**
-         * Logo information.
-         */
-        @Serializable
-        data class Logo(
-            @SerialName("url") val url: String? = null,
-            @SerialName("alt_text") val alternativeText: String? = null,
-        )
-    }
-}
+)
 
 typealias Namespace = String
 typealias ClaimName = String
@@ -288,30 +215,6 @@ data class MsoMdocObject(
     @SerialName("claims") val claims: Map<Namespace, Map<ClaimName, ClaimObject>> = emptyMap(),
     @SerialName("order") val order: List<String> = emptyList(),
 ) {
-
-    /**
-     * Display properties of a supported credential type for a certain language.
-     */
-    @Serializable
-    data class DisplayObject(
-        @SerialName("name") @Required val name: String,
-        @SerialName("locale") val locale: String? = null,
-        @SerialName("logo") val logo: Logo? = null,
-        @SerialName("description") val description: String? = null,
-        @SerialName("background_color") val backgroundColor: String? = null,
-        @SerialName("text_color") val textColor: String? = null,
-    ) {
-
-        /**
-         * Logo information.
-         */
-        @Serializable
-        data class Logo(
-            @SerialName("url") val url: String? = null,
-            @SerialName("alt_text") val alternativeText: String? = null,
-        )
-    }
-
     /**
      * The details of a Claim.
      */
