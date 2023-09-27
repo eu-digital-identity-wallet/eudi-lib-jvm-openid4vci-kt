@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import org.junit.jupiter.api.Assertions
-import java.net.URL
+import java.net.URI
 import kotlin.test.Test
 
 internal class CredentialIssuerIdTest {
@@ -41,8 +41,8 @@ internal class CredentialIssuerIdTest {
 
     @Test
     internal fun `Parsing succeeds`() {
-        val value = URL("https://issuer")
-        val maybeId = CredentialIssuerId(value.toExternalForm())
+        val value = URI("https://issuer")
+        val maybeId = CredentialIssuerId(value.toString())
         Assertions.assertTrue(maybeId.isSuccess, "Parsing CredentialIssuerId should have succeeded")
         Assertions.assertEquals(value, maybeId.getOrThrow().value.value)
     }
