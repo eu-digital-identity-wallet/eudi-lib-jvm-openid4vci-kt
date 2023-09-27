@@ -233,7 +233,7 @@ data class W3CVerifiableCredentialSignedJwtObject(
  * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
  */
 @Serializable
-data class W3CVerifiableCredentiasJsonLdDataIntegrityObject(
+data class W3CVerifiableCredentialsJsonLdDataIntegrityObject(
     @SerialName("format") @Required val format: String,
     @SerialName("type") val type: List<String> = emptyList(),
     @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: List<String> = emptyList(),
@@ -382,7 +382,7 @@ sealed interface Credential : java.io.Serializable {
              *
              * Format: ldp_vc
              */
-            data class JsonLdDataIntegrity(val format: W3CVerifiableCredentiasJsonLdDataIntegrityObject) :
+            data class JsonLdDataIntegrity(val format: W3CVerifiableCredentialsJsonLdDataIntegrityObject) :
                 W3CVerifiableCredential
         }
 

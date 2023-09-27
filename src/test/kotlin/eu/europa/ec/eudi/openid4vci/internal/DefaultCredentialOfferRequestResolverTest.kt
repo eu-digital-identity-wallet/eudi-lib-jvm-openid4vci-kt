@@ -18,7 +18,11 @@ package eu.europa.ec.eudi.openid4vci.internal
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.Credential.ScopedCredential
 import eu.europa.ec.eudi.openid4vci.Credential.UnscopedCredential.MsoMdocCredential
+import eu.europa.ec.eudi.openid4vci.Credential.UnscopedCredential.W3CVerifiableCredential
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.apache.http.client.utils.URIBuilder
 import org.junit.jupiter.api.Assertions
 import java.io.File
@@ -111,6 +115,230 @@ internal class DefaultCredentialOfferRequestResolverTest {
                                 "organ_donor" to MsoMdocObject.ClaimObject(),
                             ),
                         ),
+                    ),
+                ),
+            ),
+            Grants.Both(
+                Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
+                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true),
+            ),
+        )
+
+        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer", credentialOffer)
+            .build()
+
+        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+            .fold(
+                { Assertions.assertEquals(expected, it) },
+                { Assertions.fail("Credential Offer resolution should have succeeded", it) },
+            )
+    }
+
+    @Test
+    internal fun `resolve success with jwt_vc_json`() = runBlocking {
+        val credentialOffer =
+            getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/jwt_vc_json_credential_offer.json")
+
+        val expected = CredentialOffer(
+            CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+            listOf(
+                W3CVerifiableCredential.SignedJwt(
+                    W3CVerifiableCredentialSignedJwtObject(
+                        "jwt_vc_json",
+                        "UniversityDegree_JWT",
+                        listOf("did:example"),
+                        listOf("ES256K"),
+                        listOf("jwt"),
+                        listOf(
+                            W3CVerifiableCredentialSignedJwtObject.DisplayObject(
+                                "University Credential",
+                                "en-US",
+                                W3CVerifiableCredentialSignedJwtObject.DisplayObject.Logo(
+                                    "https://exampleuniversity.com/public/logo.png",
+                                    "a square logo of a university",
+                                ),
+                                null,
+                                "#12107c",
+                                "#FFFFFF",
+                            ),
+                        ),
+                        JsonObject(
+                            mapOf(
+                                "type" to JsonArray(
+                                    listOf(
+                                        JsonPrimitive("VerifiableCredential"),
+                                        JsonPrimitive("UniversityDegreeCredential"),
+                                    ),
+                                ),
+                                "credentialSubject" to JsonObject(
+                                    mapOf(
+                                        "given_name" to JsonObject(
+                                            mapOf(
+                                                "display" to JsonArray(
+                                                    listOf(
+                                                        JsonObject(
+                                                            mapOf(
+                                                                "name" to JsonPrimitive("Given Name"),
+                                                                "locale" to JsonPrimitive("en-US"),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                        "family_name" to JsonObject(
+                                            mapOf(
+                                                "display" to JsonArray(
+                                                    listOf(
+                                                        JsonObject(
+                                                            mapOf(
+                                                                "name" to JsonPrimitive("Surname"),
+                                                                "locale" to JsonPrimitive("en-US"),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                        "degree" to JsonObject(emptyMap()),
+                                        "gpa" to JsonObject(
+                                            mapOf(
+                                                "display" to JsonArray(
+                                                    listOf(
+                                                        JsonObject(
+                                                            mapOf(
+                                                                "name" to JsonPrimitive("GPA"),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        emptyList(),
+                    ),
+                ),
+            ),
+            Grants.Both(
+                Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
+                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true),
+            ),
+        )
+
+        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer", credentialOffer)
+            .build()
+
+        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+            .fold(
+                { Assertions.assertEquals(expected, it) },
+                { Assertions.fail("Credential Offer resolution should have succeeded", it) },
+            )
+    }
+
+    @Test
+    internal fun `resolve success with ldp_vc`() = runBlocking {
+        val credentialOffer =
+            getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/ldp_vc_credential_offer.json")
+
+        val expected = CredentialOffer(
+            CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+            listOf(
+                W3CVerifiableCredential.JsonLdDataIntegrity(
+                    W3CVerifiableCredentialsJsonLdDataIntegrityObject(
+                        "ldp_vc",
+                        listOf(
+                            "VerifiableCredential",
+                            "UniversityDegreeCredential",
+                        ),
+                        listOf("did:example"),
+                        listOf("Ed25519Signature2018"),
+                        emptyList(),
+                        listOf(
+                            W3CVerifiableCredentialsJsonLdDataIntegrityObject.DisplayObject(
+                                "University Credential",
+                                "en-US",
+                                W3CVerifiableCredentialsJsonLdDataIntegrityObject.DisplayObject.Logo(
+                                    "https://exampleuniversity.com/public/logo.png",
+                                    "a square logo of a university",
+                                ),
+                                null,
+                                "#12107c",
+                                "#FFFFFF",
+                            ),
+                        ),
+                        null,
+                        listOf(
+                            "https://www.w3.org/2018/credentials/v1",
+                            "https://www.w3.org/2018/credentials/examples/v1",
+                        ),
+                        JsonObject(
+                            mapOf(
+                                "@context" to JsonArray(
+                                    listOf(
+                                        JsonPrimitive("https://www.w3.org/2018/credentials/v1"),
+                                        JsonPrimitive("https://www.w3.org/2018/credentials/examples/v1"),
+                                    ),
+                                ),
+                                "type" to JsonArray(
+                                    listOf(
+                                        JsonPrimitive("VerifiableCredential"),
+                                        JsonPrimitive("UniversityDegreeCredential"),
+                                    ),
+                                ),
+                                "credentialSubject" to JsonObject(
+                                    mapOf(
+                                        "given_name" to JsonObject(
+                                            mapOf(
+                                                "display" to JsonArray(
+                                                    listOf(
+                                                        JsonObject(
+                                                            mapOf(
+                                                                "name" to JsonPrimitive("Given Name"),
+                                                                "locale" to JsonPrimitive("en-US"),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                        "family_name" to JsonObject(
+                                            mapOf(
+                                                "display" to JsonArray(
+                                                    listOf(
+                                                        JsonObject(
+                                                            mapOf(
+                                                                "name" to JsonPrimitive("Surname"),
+                                                                "locale" to JsonPrimitive("en-US"),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                        "degree" to JsonObject(emptyMap()),
+                                        "gpa" to JsonObject(
+                                            mapOf(
+                                                "display" to JsonArray(
+                                                    listOf(
+                                                        JsonObject(
+                                                            mapOf(
+                                                                "name" to JsonPrimitive("GPA"),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        emptyList(),
                     ),
                 ),
             ),
