@@ -28,11 +28,18 @@ fun interface HttpGet<out R> {
 }
 
 /**
- * An abstraction of an HTP Post operation
- * to obtain [R]
+ * An abstraction of an HTTP Post operation with application/x-www-form-urlencoded media type
+ * parsing response as [R].
  */
 fun interface HttpFormPost<out R> {
     suspend fun post(url: URL, formParameters: Map<String, String>): R
+}
+
+/**
+ * An abstraction of an HTP Post operation of payload [T] parsing response as [R].
+ */
+fun interface HttpPost<in T, out R> {
+    suspend fun post(url: URL, payload: T): R
 }
 
 /**

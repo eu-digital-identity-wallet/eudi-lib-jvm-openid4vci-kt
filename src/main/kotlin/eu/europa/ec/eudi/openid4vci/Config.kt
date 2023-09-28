@@ -15,11 +15,13 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import java.net.URI
+
+typealias ClientId = String
+typealias ClientSecret = String
+
 data class WalletOpenId4VCIConfig(
-
-    val authorizationServerPAREndpoint: HttpsUrl,
-    val authorizationServerAuthorizeEndpoint: HttpsUrl,
-    val authorizationServerTokenEndpoint: HttpsUrl,
-    val credentialIssuerCredentialsEndpointMetadata: HttpsUrl,
-
+    val clientId: ClientId,
+    val clientSecret: ClientSecret,
+    val authFlowRedirectionURI: URI,
 )
