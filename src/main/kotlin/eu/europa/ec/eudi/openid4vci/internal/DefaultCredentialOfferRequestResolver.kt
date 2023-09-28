@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.Credential.UnscopedCredential
+import eu.europa.ec.eudi.openid4vci.Credential.UnscopedCredential.MsoMdocCredential
 import eu.europa.ec.eudi.openid4vci.Credential.UnscopedCredential.W3CVerifiableCredential
 import kotlinx.serialization.json.*
 import java.time.Duration
@@ -116,6 +117,25 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
          * Tries to parse a [JsonObject] to an [Credential.UnscopedCredential].
          */
         private fun JsonObject.toUnscopedCredential(): Result<UnscopedCredential> = runCatching {
+            fun toMsoMdocCredential(): MsoMdocCredential = MsoMdocCredential(
+                deserialize<MsoMdocCredentialObject, CredentialOfferRequestException> {
+                    CredentialOfferRequestValidationError.InvalidCredential(
+                        it,
+                    ).toException()
+                }.docType,
+            )
+
+            fun toW3CVerifiableCredential(constructor: (CredentialDefinition) -> W3CVerifiableCredential): W3CVerifiableCredential {
+                val credentialDefinition =
+                    deserialize<W3CVerifiableCredentialCredentialObject, CredentialOfferRequestException> {
+                        CredentialOfferRequestValidationError.InvalidCredential(
+                            it,
+                        ).toException()
+                    }.credentialDefinition
+
+                return constructor(credentialDefinition)
+            }
+
             val format =
                 getOrDefault("format", JsonNull)
                     .let {
@@ -129,22 +149,10 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
                     }
 
             when (format) {
-                "mso_mdoc" -> UnscopedCredential.MsoMdocCredential(
-                    deserialize { CredentialOfferRequestValidationError.InvalidCredential(it).toException() },
-                )
-
-                "jwt_vc_json" -> W3CVerifiableCredential.SignedJwt(
-                    deserialize { CredentialOfferRequestValidationError.InvalidCredential(it).toException() },
-                )
-
-                "jwt_vc_json-ld" -> W3CVerifiableCredential.JsonLdSignedJwt(
-                    deserialize { CredentialOfferRequestValidationError.InvalidCredential(it).toException() },
-                )
-
-                "ldp_vc" -> W3CVerifiableCredential.JsonLdDataIntegrity(
-                    deserialize { CredentialOfferRequestValidationError.InvalidCredential(it).toException() },
-                )
-
+                "mso_mdoc" -> toMsoMdocCredential()
+                "jwt_vc_json" -> toW3CVerifiableCredential(W3CVerifiableCredential::SignedJwt)
+                "jwt_vc_json-ld" -> toW3CVerifiableCredential(W3CVerifiableCredential::JsonLdSignedJwt)
+                "ldp_vc" -> toW3CVerifiableCredential(W3CVerifiableCredential::JsonLdDataIntegrity)
                 else -> UnscopedCredential.UnknownCredential(format, this)
             }
         }
