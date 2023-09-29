@@ -132,7 +132,6 @@ value class CredentialIssuerId private constructor(val value: HttpsUrl) {
 }
 
 typealias CredentialDefinition = JsonObject
-typealias CredentialObject = JsonObject
 
 /**
  * Credentials offered in a Credential Offer Request.
@@ -199,20 +198,28 @@ sealed interface Credential : java.io.Serializable {
 sealed interface Grants : java.io.Serializable {
 
     /**
-     * Data for an Authorization Code Grant.
+     * Data for an Authorization Code Grant. [issuerState], if provided, must not be blank.
      */
     data class AuthorizationCode(
         val issuerState: String? = null,
-    ) : Grants
+    ) : Grants {
+        init {
+            require(!(issuerState?.isBlank() ?: false)) { "issuerState cannot be blank" }
+        }
+    }
 
     /**
-     * Data for a Pre-Authorized Code Grant.
+     * Data for a Pre-Authorized Code Grant. [preAuthorizedCode] must not be blank.
      */
     data class PreAuthorizedCode(
         val preAuthorizedCode: String,
         val pinRequired: Boolean = false,
         val interval: Duration = Duration.ofSeconds(5L),
-    ) : Grants
+    ) : Grants {
+        init {
+            require(preAuthorizedCode.isNotBlank()) { "preAuthorizedCode cannot be blank" }
+        }
+    }
 
     /**
      * Data for either an Authorization Code Grant or a Pre-Authorized Code Grant.

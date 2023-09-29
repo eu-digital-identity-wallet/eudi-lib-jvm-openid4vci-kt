@@ -187,6 +187,50 @@ internal class DefaultCredentialOfferRequestResolverTest {
             )
     }
 
+    @Test
+    internal fun `resolve failure with blank issuer_state in grant`() = runBlocking {
+        val credentialOffer =
+            getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_offer_with_blank_issuer_state.json")
+
+        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer", credentialOffer)
+            .build()
+
+        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+            .fold(
+                { Assertions.fail("Credential Offer resolution should have failed") },
+                {
+                    val exception = Assertions.assertInstanceOf(CredentialOfferRequestException::class.java, it)
+                    Assertions.assertInstanceOf(
+                        CredentialOfferRequestValidationError.InvalidGrants::class.java,
+                        exception.error,
+                    )
+                },
+            )
+    }
+
+    @Test
+    internal fun `resolve failure with blank pre-authorized_code in grant`() = runBlocking {
+        val credentialOffer =
+            getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_offer_with_blank_pre_authorized_code.json")
+
+        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer", credentialOffer)
+            .build()
+
+        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+            .fold(
+                { Assertions.fail("Credential Offer resolution should have failed") },
+                {
+                    val exception = Assertions.assertInstanceOf(CredentialOfferRequestException::class.java, it)
+                    Assertions.assertInstanceOf(
+                        CredentialOfferRequestValidationError.InvalidGrants::class.java,
+                        exception.error,
+                    )
+                },
+            )
+    }
+
     companion object {
         private fun getResourceAsText(resource: String): String =
             File(ClassLoader.getSystemResource(resource).path).readText()
