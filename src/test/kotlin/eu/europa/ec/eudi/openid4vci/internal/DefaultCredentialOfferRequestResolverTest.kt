@@ -15,12 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.Credential.ScopedCredential
 import eu.europa.ec.eudi.openid4vci.Credential.UnscopedCredential.MsoMdocCredential
 import eu.europa.ec.eudi.openid4vci.Credential.UnscopedCredential.W3CVerifiableCredential
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
-import eu.europa.ec.eudi.openid4vci.CredentialOffer
-import eu.europa.ec.eudi.openid4vci.Grants
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -164,6 +162,28 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .fold(
                 { Assertions.assertEquals(expected, it) },
                 { Assertions.fail("Credential Offer resolution should have succeeded", it) },
+            )
+    }
+
+    @Test
+    internal fun `resolve failure with unknown credential format`() = runBlocking {
+        val credentialOffer =
+            getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_offer_with_unknown_format.json")
+
+        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer", credentialOffer)
+            .build()
+
+        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+            .fold(
+                { Assertions.fail("Credential Offer resolution should have failed") },
+                {
+                    val exception = Assertions.assertInstanceOf(CredentialOfferRequestException::class.java, it)
+                    Assertions.assertInstanceOf(
+                        CredentialOfferRequestValidationError.InvalidCredentials::class.java,
+                        exception.error,
+                    )
+                },
             )
     }
 

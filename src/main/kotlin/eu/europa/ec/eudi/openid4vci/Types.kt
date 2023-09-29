@@ -190,14 +190,6 @@ sealed interface Credential : java.io.Serializable {
                 val credentialDefinition: CredentialDefinition,
             ) : W3CVerifiableCredential
         }
-
-        /**
-         * An unknown [UnscopedCredential].
-         */
-        data class UnknownCredential(
-            val format: String,
-            val content: CredentialObject,
-        ) : UnscopedCredential
     }
 }
 

@@ -116,7 +116,7 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
                 "jwt_vc_json" -> toW3CVerifiableCredential(W3CVerifiableCredential::SignedJwt)
                 "jwt_vc_json-ld" -> toW3CVerifiableCredential(W3CVerifiableCredential::JsonLdSignedJwt)
                 "ldp_vc" -> toW3CVerifiableCredential(W3CVerifiableCredential::JsonLdDataIntegrity)
-                else -> UnscopedCredential.UnknownCredential(format, this)
+                else -> throw IllegalArgumentException("Unknown Credential format '$format'")
             }
         }
     }
