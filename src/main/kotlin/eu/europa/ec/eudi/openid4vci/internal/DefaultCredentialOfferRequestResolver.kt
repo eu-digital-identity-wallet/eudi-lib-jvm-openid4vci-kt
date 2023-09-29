@@ -40,12 +40,12 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
                 .getOrElse { throw CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).toException() }
 
             val credentials = runCatching {
-                credentialOfferRequestObject.credentials.map { it.toCredential().getOrThrow() }
+                credentialOfferRequestObject.credentials.map { it.toCredential() }
             }.getOrElse { throw CredentialOfferRequestValidationError.InvalidCredentials(it).toException() }
 
-            val grants = credentialOfferRequestObject.grants
-                ?.grants()
-                ?.getOrElse { throw CredentialOfferRequestValidationError.InvalidGrants(it).toException() }
+            val grants = runCatching {
+                credentialOfferRequestObject.grants?.toGrants()
+            }.getOrElse { throw CredentialOfferRequestValidationError.InvalidGrants(it).toException() }
 
             CredentialOffer(credentialIssuerId, credentials, grants)
         }
@@ -55,7 +55,7 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
         /**
          * Tries to parse a [GrantsObject] to a [Grants] instance.
          */
-        private fun GrantsObject.grants(): Result<Grants?> = runCatching {
+        private fun GrantsObject.toGrants(): Grants? {
             val maybeAuthorizationCodeGrant =
                 authorizationCode?.let { Grants.AuthorizationCode(it.issuerState) }
             val maybePreAuthorizedCodeGrant =
@@ -67,7 +67,7 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
                     )
                 }
 
-            when {
+            return when {
                 maybeAuthorizationCodeGrant != null && maybePreAuthorizedCodeGrant != null -> Grants.Both(
                     maybeAuthorizationCodeGrant,
                     maybePreAuthorizedCodeGrant,
@@ -82,51 +82,24 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
         /**
          * Tries to parse a [JsonElement] to a [Credential] instance.
          */
-        private fun JsonElement.toCredential(): Result<Credential> = runCatching {
+        private fun JsonElement.toCredential(): Credential =
             if (this is JsonPrimitive && isString) {
                 Credential.ScopedCredential(content)
             } else if (this is JsonObject) {
-                toUnscopedCredential().getOrThrow()
+                toUnscopedCredential()
             } else {
-                throw CredentialOfferRequestValidationError.InvalidCredential(
-                    IllegalArgumentException("Invalid JsonElement for Credential. Found '$javaClass'"),
-                ).toException()
+                throw IllegalArgumentException("Invalid JsonElement for Credential. Found '$javaClass'")
             }
-        }
-
-        /**
-         * Tries to deserialize a [JsonElement] as a [T].
-         * In case of failure an exception mapped by [errorMapper] is thrown.
-         */
-        private inline fun <reified T, E : Exception> JsonElement.deserialize(errorMapper: (Throwable) -> E): T =
-            runCatching {
-                Json.decodeFromJsonElement<T>(this)
-            }.recoverCatching {
-                throw errorMapper(it)
-            }.getOrThrow()
 
         /**
          * Tries to parse a [JsonObject] to an [Credential.UnscopedCredential].
          */
-        private fun JsonObject.toUnscopedCredential(): Result<UnscopedCredential> = runCatching {
-            fun toMsoMdocCredential(): MsoMdocCredential = MsoMdocCredential(
-                deserialize<MsoMdocCredentialObject, CredentialOfferRequestException> {
-                    CredentialOfferRequestValidationError.InvalidCredential(
-                        it,
-                    ).toException()
-                }.docType,
-            )
+        private fun JsonObject.toUnscopedCredential(): UnscopedCredential {
+            fun toMsoMdocCredential(): MsoMdocCredential =
+                MsoMdocCredential(Json.decodeFromJsonElement<MsoMdocCredentialObject>(this).docType)
 
-            fun toW3CVerifiableCredential(constructor: (CredentialDefinition) -> W3CVerifiableCredential): W3CVerifiableCredential {
-                val credentialDefinition =
-                    deserialize<W3CVerifiableCredentialCredentialObject, CredentialOfferRequestException> {
-                        CredentialOfferRequestValidationError.InvalidCredential(
-                            it,
-                        ).toException()
-                    }.credentialDefinition
-
-                return constructor(credentialDefinition)
-            }
+            fun toW3CVerifiableCredential(constructor: (CredentialDefinition) -> W3CVerifiableCredential): W3CVerifiableCredential =
+                constructor(Json.decodeFromJsonElement<W3CVerifiableCredentialCredentialObject>(this).credentialDefinition)
 
             val format =
                 getOrDefault("format", JsonNull)
@@ -134,13 +107,11 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
                         if (it is JsonPrimitive && it.isString) {
                             it.content
                         } else {
-                            throw CredentialOfferRequestValidationError.InvalidCredential(
-                                IllegalArgumentException("Invalid 'format'"),
-                            ).toException()
+                            throw IllegalArgumentException("Invalid 'format'")
                         }
                     }
 
-            when (format) {
+            return when (format) {
                 "mso_mdoc" -> toMsoMdocCredential()
                 "jwt_vc_json" -> toW3CVerifiableCredential(W3CVerifiableCredential::SignedJwt)
                 "jwt_vc_json-ld" -> toW3CVerifiableCredential(W3CVerifiableCredential::JsonLdSignedJwt)
