@@ -29,10 +29,12 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
 
     override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> =
         runCatching {
-            val credentialOfferRequestObject = when (request) {
-                is CredentialOfferRequest.PassByValue -> deserialize(request.value)
-                is CredentialOfferRequest.PassByReference -> TODO()
-            }.getOrThrow()
+            val credentialOfferRequestObject = runCatching {
+                when (request) {
+                    is CredentialOfferRequest.PassByValue -> Json.decodeFromString<CredentialOfferRequestObject>(request.value)
+                    is CredentialOfferRequest.PassByReference -> TODO()
+                }
+            }.getOrElse { throw CredentialOfferRequestValidationError.NonParseableCredentialOffer(it).toException() }
 
             val credentialIssuerId = CredentialIssuerId(credentialOfferRequestObject.credentialIssuerIdentifier)
                 .getOrElse { throw CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).toException() }
@@ -49,16 +51,6 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
         }
 
     companion object {
-
-        /**
-         * Tries to decode a [JsonString] to a [CredentialOfferRequestObject].
-         */
-        private fun deserialize(value: JsonString): Result<CredentialOfferRequestObject> =
-            runCatching {
-                Json.decodeFromString<CredentialOfferRequestObject>(value)
-            }.recoverCatching {
-                throw CredentialOfferRequestValidationError.NonParseableCredentialOffer(it).toException()
-            }
 
         /**
          * Tries to parse a [GrantsObject] to a [Grants] instance.
