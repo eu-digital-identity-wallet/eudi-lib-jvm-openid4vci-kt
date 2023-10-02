@@ -23,11 +23,6 @@ import java.io.Serializable
 sealed interface CredentialIssuerMetadataError : Serializable {
 
     /**
-     * Indicates that the URL used to fetch the Credential Issuer metadata is not valid.
-     */
-    data class InvalidCredentialIssuerMetadataUrl(val cause: Throwable) : CredentialIssuerMetadataError
-
-    /**
      * Indicates the Credential Issuer metadata could not be fetched.
      */
     data class UnableToFetchCredentialIssuerMetadata(val cause: Throwable) : CredentialIssuerMetadataError
@@ -129,5 +124,4 @@ fun interface CredentialIssuerMetadataResolver {
      * Tries to fetch and validate the metadata of a Credential Issuer.
      */
     suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata>
-
 }
