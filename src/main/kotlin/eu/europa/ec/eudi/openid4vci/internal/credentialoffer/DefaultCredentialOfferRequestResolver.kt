@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal
+package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.Credential.UnscopedCredential
-import eu.europa.ec.eudi.openid4vci.Credential.UnscopedCredential.MsoMdocCredential
-import eu.europa.ec.eudi.openid4vci.Credential.UnscopedCredential.W3CVerifiableCredential
+import eu.europa.ec.eudi.openid4vci.OfferedCredential.UnscopedCredential
+import eu.europa.ec.eudi.openid4vci.OfferedCredential.UnscopedCredential.MsoMdocCredential
+import eu.europa.ec.eudi.openid4vci.OfferedCredential.UnscopedCredential.W3CVerifiableCredential
 import kotlinx.serialization.json.*
 import java.time.Duration
 
@@ -80,11 +80,11 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
         }
 
         /**
-         * Tries to parse a [JsonElement] to a [Credential] instance.
+         * Tries to parse a [JsonElement] to a [OfferedCredential] instance.
          */
-        private fun JsonElement.toCredential(): Credential =
+        private fun JsonElement.toCredential(): OfferedCredential =
             if (this is JsonPrimitive && isString) {
-                Credential.ScopedCredential(content)
+                OfferedCredential.ScopedCredential(content)
             } else if (this is JsonObject) {
                 toUnscopedCredential()
             } else {
@@ -92,7 +92,7 @@ internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestRes
             }
 
         /**
-         * Tries to parse a [JsonObject] to an [Credential.UnscopedCredential].
+         * Tries to parse a [JsonObject] to an [OfferedCredential.UnscopedCredential].
          */
         private fun JsonObject.toUnscopedCredential(): UnscopedCredential {
             fun toMsoMdocCredential(): MsoMdocCredential =
