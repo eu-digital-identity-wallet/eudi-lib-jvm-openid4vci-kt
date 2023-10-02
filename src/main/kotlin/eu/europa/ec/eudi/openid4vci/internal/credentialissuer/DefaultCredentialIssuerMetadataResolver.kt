@@ -158,7 +158,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                     if (it is JsonPrimitive && it.isString) {
                         it.content
                     } else {
-                        IllegalArgumentException("'format' must be a JsonPrimitive that contains a string")
+                        throw IllegalArgumentException("'format' must be a JsonPrimitive that contains a string")
                     }
                 }
 
