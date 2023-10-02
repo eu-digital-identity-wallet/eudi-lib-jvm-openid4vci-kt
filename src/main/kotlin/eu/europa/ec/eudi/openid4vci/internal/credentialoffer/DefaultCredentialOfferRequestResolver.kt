@@ -53,6 +53,9 @@ internal class DefaultCredentialOfferRequestResolver(
             val credentialIssuerId = CredentialIssuerId(credentialOfferRequestObject.credentialIssuerIdentifier)
                 .getOrElse { throw CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).toException() }
 
+            val credentialIssuerMetadata = credentialIssuerMetadataResolver.resolve(credentialIssuerId)
+                .getOrElse { throw CredentialOfferRequestValidationError.UnableToResolveCredentialIssuerMetadata(it).toException() }
+
             val credentials = runCatching {
                 credentialOfferRequestObject.credentials.map { it.toCredential() }
             }.getOrElse { throw CredentialOfferRequestValidationError.InvalidCredentials(it).toException() }

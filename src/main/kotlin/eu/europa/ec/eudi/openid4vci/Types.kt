@@ -241,11 +241,13 @@ data class CredentialIssuerMetadataObject(
     @SerialName("credential_endpoint") @Required val credentialEndpoint: String,
     @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
     @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
-    @SerialName("credential_response_encryption_alg_values_supported") val credentialResponseEncryptionAlgorithmsSupported: List<String>,
-    @SerialName("credential_response_encryption_enc_values_supported") val credentialResponseEncryptionMethodsSupported: List<String>,
+    @SerialName("credential_response_encryption_alg_values_supported") val credentialResponseEncryptionAlgorithmsSupported: List<String> =
+        emptyList(),
+    @SerialName("credential_response_encryption_enc_values_supported") val credentialResponseEncryptionMethodsSupported: List<String> =
+        emptyList(),
     @SerialName("require_credential_response_encryption") val requireCredentialResponseEncryption: Boolean? = null,
-    @SerialName("credentials_supported") val credentialsSupported: List<JsonObject>,
-    @SerialName("display") val display: List<DisplayObject>,
+    @SerialName("credentials_supported") val credentialsSupported: List<JsonObject> = emptyList(),
+    @SerialName("display") val display: List<DisplayObject> = emptyList(),
 ) {
 
     /**

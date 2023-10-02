@@ -121,6 +121,11 @@ sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestE
     data class InvalidCredentialIssuerId(val reason: Throwable) : CredentialOfferRequestValidationError
 
     /**
+     * The metadata of the Credential Issuer could not be resolved.
+     */
+    data class UnableToResolveCredentialIssuerMetadata(val reason: Throwable) : CredentialOfferRequestValidationError
+
+    /**
      * The Credentials of a Credential Offer are not valid.
      */
     data class InvalidCredentials(val reason: Throwable) : CredentialOfferRequestValidationError
