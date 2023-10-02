@@ -20,6 +20,7 @@ import eu.europa.ec.eudi.openid4vci.OfferedCredential.ScopedCredential
 import eu.europa.ec.eudi.openid4vci.OfferedCredential.UnscopedCredential.MsoMdocCredential
 import eu.europa.ec.eudi.openid4vci.OfferedCredential.UnscopedCredential.W3CVerifiableCredential
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialOfferRequestResolver
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -51,7 +52,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+        DefaultCredentialOfferRequestResolver(Dispatchers.IO) { Assertions.fail("Did not expect CredentialOfferRequest.PassByReference") }
+            .resolve(credentialEndpointUrl.toString())
             .fold(
                 { Assertions.assertEquals(expected, it) },
                 { Assertions.fail("Credential Offer resolution should have succeeded", it) },
@@ -77,7 +79,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+        DefaultCredentialOfferRequestResolver(Dispatchers.IO) { Assertions.fail("Did not expect CredentialOfferRequest.PassByReference") }
+            .resolve(credentialEndpointUrl.toString())
             .fold(
                 { Assertions.assertEquals(expected, it) },
                 { Assertions.fail("Credential Offer resolution should have succeeded", it) },
@@ -115,7 +118,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+        DefaultCredentialOfferRequestResolver(Dispatchers.IO) { Assertions.fail("Did not expect CredentialOfferRequest.PassByReference") }
+            .resolve(credentialEndpointUrl.toString())
             .fold(
                 { Assertions.assertEquals(expected, it) },
                 { Assertions.fail("Credential Offer resolution should have succeeded", it) },
@@ -159,7 +163,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+        DefaultCredentialOfferRequestResolver(Dispatchers.IO) { Assertions.fail("Did not expect CredentialOfferRequest.PassByReference") }
+            .resolve(credentialEndpointUrl.toString())
             .fold(
                 { Assertions.assertEquals(expected, it) },
                 { Assertions.fail("Credential Offer resolution should have succeeded", it) },
@@ -175,7 +180,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+        DefaultCredentialOfferRequestResolver(Dispatchers.IO) { Assertions.fail("Did not expect CredentialOfferRequest.PassByReference") }
+            .resolve(credentialEndpointUrl.toString())
             .fold(
                 { Assertions.fail("Credential Offer resolution should have failed") },
                 {
@@ -197,7 +203,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+        DefaultCredentialOfferRequestResolver(Dispatchers.IO) { Assertions.fail("Did not expect CredentialOfferRequest.PassByReference") }
+            .resolve(credentialEndpointUrl.toString())
             .fold(
                 { Assertions.fail("Credential Offer resolution should have failed") },
                 {
@@ -219,7 +226,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver().resolve(credentialEndpointUrl.toString())
+        DefaultCredentialOfferRequestResolver(Dispatchers.IO) { Assertions.fail("Did not expect CredentialOfferRequest.PassByReference") }
+            .resolve(credentialEndpointUrl.toString())
             .fold(
                 { Assertions.fail("Credential Offer resolution should have failed") },
                 {

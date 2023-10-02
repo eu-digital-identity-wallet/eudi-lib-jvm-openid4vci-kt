@@ -19,21 +19,35 @@ import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.OfferedCredential.UnscopedCredential
 import eu.europa.ec.eudi.openid4vci.OfferedCredential.UnscopedCredential.MsoMdocCredential
 import eu.europa.ec.eudi.openid4vci.OfferedCredential.UnscopedCredential.W3CVerifiableCredential
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import java.time.Duration
 
 /**
  * A default implementation for [CredentialOfferRequestResolver].
  */
-internal class DefaultCredentialOfferRequestResolver : CredentialOfferRequestResolver {
+internal class DefaultCredentialOfferRequestResolver(
+    private val ioCoroutineDispatcher: CoroutineDispatcher,
+    private val httpGet: HttpGet<String>,
+) : CredentialOfferRequestResolver {
+
+    private val credentialIssuerMetadataResolver = CredentialIssuerMetadataResolver(ioCoroutineDispatcher, httpGet)
 
     override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> =
         runCatching {
+            val credentialOfferRequestObjectString: String = when (request) {
+                is CredentialOfferRequest.PassByValue -> request.value
+                is CredentialOfferRequest.PassByReference ->
+                    withContext(ioCoroutineDispatcher + CoroutineName("credential-offer-request-object")) {
+                        httpGet.get(request.value.value.toURL()).getOrElse {
+                            throw CredentialOfferRequestValidationError.UnableToFetchCredentialOffer(it).toException()
+                        }
+                    }
+            }
             val credentialOfferRequestObject = runCatching {
-                when (request) {
-                    is CredentialOfferRequest.PassByValue -> Json.decodeFromString<CredentialOfferRequestObject>(request.value)
-                    is CredentialOfferRequest.PassByReference -> TODO()
-                }
+                Json.decodeFromString<CredentialOfferRequestObject>(credentialOfferRequestObjectString)
             }.getOrElse { throw CredentialOfferRequestValidationError.NonParseableCredentialOffer(it).toException() }
 
             val credentialIssuerId = CredentialIssuerId(credentialOfferRequestObject.credentialIssuerIdentifier)
