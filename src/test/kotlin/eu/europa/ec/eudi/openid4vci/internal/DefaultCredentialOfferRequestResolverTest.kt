@@ -20,6 +20,13 @@ import eu.europa.ec.eudi.openid4vci.OfferedCredential.ScopedCredential
 import eu.europa.ec.eudi.openid4vci.OfferedCredential.UnscopedCredential.MsoMdocCredential
 import eu.europa.ec.eudi.openid4vci.OfferedCredential.UnscopedCredential.W3CVerifiableCredential
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialOfferRequestResolver
+import io.ktor.client.*
+import io.ktor.client.engine.mock.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
@@ -237,6 +244,65 @@ internal class DefaultCredentialOfferRequestResolverTest {
                         exception.error,
                     )
                 },
+            )
+    }
+
+    @Test
+    internal fun `resolve success with credential_offer_uri`() = runBlocking {
+        val credentialOffer = getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer.json")
+
+        val expected = CredentialOffer(
+            CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+            listOf(
+                ScopedCredential("UniversityDegree_JWT"),
+                MsoMdocCredential("org.iso.18013.5.1.mDL"),
+            ),
+            Grants.Both(
+                Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
+                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true),
+            ),
+        )
+
+        val credentialOfferUri = HttpsUrl("https://credential_offer/1").getOrThrow()
+        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer_uri", credentialOfferUri.value.toString())
+            .build()
+
+        val mockEngine = MockEngine {
+            if (it.url.toURI() == credentialOfferUri.value) {
+                respond(
+                    content = credentialOffer,
+                    headers = headersOf(
+                        HttpHeaders.ContentType to listOf("application/json"),
+                    ),
+                )
+            } else {
+                Assertions.fail("Did not expect call to ${it.url.toURI()}")
+            }
+        }
+
+        val httpClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json()
+            }
+        }
+
+        DefaultCredentialOfferRequestResolver(Dispatchers.IO) {
+            runCatching {
+                httpClient.get(it.toURI().toURL()).bodyAsText()
+            }
+        }
+            .resolve(credentialEndpointUrl.toString())
+            .fold(
+                {
+                    Assertions.assertEquals(expected, it)
+                    Assertions.assertEquals(
+                        1,
+                        mockEngine.requestHistory.size,
+                        "Expected exactly 1 request during Credential Offer resolution",
+                    )
+                },
+                { Assertions.fail("Credential Offer resolution should have succeeded", it) },
             )
     }
 
