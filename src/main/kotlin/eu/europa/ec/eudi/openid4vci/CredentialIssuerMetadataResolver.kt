@@ -126,17 +126,8 @@ data class CredentialIssuerMetadataException(val error: CredentialIssuerMetadata
 fun interface CredentialIssuerMetadataResolver {
 
     /**
-     * Tries to fetch and validates the metadata of a Credential Issuer.
+     * Tries to fetch and validate the metadata of a Credential Issuer.
      */
-    suspend fun resolve(url: String): Result<CredentialIssuerMetadata> =
-        HttpsUrl(url)
-            .fold(
-                { resolve(it) },
-                { Result.failure(CredentialIssuerMetadataError.InvalidCredentialIssuerMetadataUrl(it).toException()) },
-            )
+    suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata>
 
-    /**
-     * Tries to fetch and validates the metadata of a Credential Issuer.
-     */
-    suspend fun resolve(url: HttpsUrl): Result<CredentialIssuerMetadata>
 }

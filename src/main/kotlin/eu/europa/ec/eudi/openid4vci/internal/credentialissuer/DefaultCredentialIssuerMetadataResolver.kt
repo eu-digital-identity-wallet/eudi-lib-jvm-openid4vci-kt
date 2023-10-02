@@ -19,11 +19,13 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.*
+import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
+import java.net.URL
 
 /**
  * Default implementation of [CredentialIssuerMetadataResolver].
@@ -33,8 +35,14 @@ internal class DefaultCredentialIssuerMetadataResolver(
     private val httpGet: HttpGet<String>,
 ) : CredentialIssuerMetadataResolver {
 
-    override suspend fun resolve(url: HttpsUrl): Result<CredentialIssuerMetadata> = runCatching {
+    override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> = runCatching {
         val credentialIssuerMetadataContent = runCatching {
+            val url =
+                URLBuilder(issuer.value.value.toString())
+                    .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
+                    .build()
+                    .toURI()
+                    .toURL()
             fetch(url)
         }.getOrElse { CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(it).raise() }
 
@@ -43,14 +51,21 @@ internal class DefaultCredentialIssuerMetadataResolver(
         }.getOrElse { CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(it).raise() }
 
         credentialIssuerMetadataObject.toDomain()
+            .also {
+                if (it.credentialIssuerIdentifier != issuer) {
+                    CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId(
+                        IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
+                    ).raise()
+                }
+            }
     }
 
     /**
      * Tries to fetch the content of the provided [url] as a [String] using the configured [httpGet] using [ioCoroutineDispatcher].
      */
-    private suspend fun fetch(url: HttpsUrl): String =
-        withContext(ioCoroutineDispatcher + CoroutineName("fetch($url)")) {
-            httpGet.get(url.value.toURL()).getOrThrow()
+    private suspend fun fetch(url: URL): String =
+        withContext(ioCoroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
+            httpGet.get(url).getOrThrow()
         }
 
     companion object {
@@ -59,7 +74,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
          * Converts and validates  a [CredentialIssuerMetadataObject] as a [CredentialIssuerMetadata] instance.
          */
         private fun CredentialIssuerMetadataObject.toDomain(): CredentialIssuerMetadata {
-            val credentialIssuer = CredentialIssuerId(credentialIssuerIdentifier)
+            val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
                 .getOrElse { CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId(it).raise() }
 
             val authorizationServer =
@@ -69,7 +84,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                             CredentialIssuerMetadataValidationError.InvalidAuthorizationServer(error).raise()
                         }
                     }
-                    ?: credentialIssuer.value
+                    ?: credentialIssuerIdentifier.value
 
             val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
                 .getOrElse { CredentialIssuerMetadataValidationError.InvalidCredentialEndpoint(it).raise() }
@@ -121,7 +136,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
             }.getOrElse { CredentialIssuerMetadataValidationError.InvalidDisplay(it).raise() }
 
             return CredentialIssuerMetadata(
-                credentialIssuer,
+                credentialIssuerIdentifier,
                 authorizationServer,
                 credentialEndpoint,
                 batchCredentialEndpoint,
