@@ -106,7 +106,7 @@ data class GrantsObject(
  */
 data class CredentialOffer(
     val credentialIssuerIdentifier: CredentialIssuerId,
-    val credentials: List<Credential>,
+    val credentials: List<OfferedCredential>,
     val grants: Grants? = null,
 ) : java.io.Serializable
 
@@ -136,19 +136,19 @@ typealias CredentialDefinition = JsonObject
 /**
  * Credentials offered in a Credential Offer Request.
  */
-sealed interface Credential : java.io.Serializable {
+sealed interface OfferedCredential : java.io.Serializable {
 
     /**
      * A Credential identified by its Scope.
      */
     data class ScopedCredential(
         val scope: String,
-    ) : Credential
+    ) : OfferedCredential
 
     /**
      * A Credential format not identified by a Scope.
      */
-    sealed interface UnscopedCredential : Credential {
+    sealed interface UnscopedCredential : OfferedCredential {
 
         /**
          * An MSO MDOC credential.
@@ -255,7 +255,7 @@ data class UnvalidatedCredentialSupported(
 
 data class CredentialIssuerMetaData(
     val credentialIssuerIdentifier: CredentialIssuerId,
-    val authorizationServer: String?,
+    val authorizationServer: URL?,
     val credentialEndpoint: URL,
     val batchCredentialEndpoint: URL? = null,
     val deferredCredentialEndpoint: URL? = null,
