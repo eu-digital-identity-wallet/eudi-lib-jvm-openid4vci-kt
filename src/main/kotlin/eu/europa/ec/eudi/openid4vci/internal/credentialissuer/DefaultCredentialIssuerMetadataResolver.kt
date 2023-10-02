@@ -125,7 +125,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
             }
 
             val credentialsSupported = runCatching {
-                credentialsSupported.map { it.toSupportedCredentialObject() }
+                credentialsSupported.map { it.toCredentialSupportedObject() }
             }.getOrElse { CredentialIssuerMetadataValidationError.InvalidCredentialsSupported(it).raise() }
             if (credentialsSupported.isEmpty()) {
                 CredentialIssuerMetadataValidationError.CredentialsSupportedRequired.raise()
@@ -152,7 +152,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
         /**
          * Converts a [JsonObject] to a [CredentialSupportedObject].
          */
-        private fun JsonObject.toSupportedCredentialObject(): CredentialSupportedObject {
+        private fun JsonObject.toCredentialSupportedObject(): CredentialSupportedObject {
             val format =
                 getOrDefault("format", JsonNull).let {
                     if (it is JsonPrimitive && it.isString) {
