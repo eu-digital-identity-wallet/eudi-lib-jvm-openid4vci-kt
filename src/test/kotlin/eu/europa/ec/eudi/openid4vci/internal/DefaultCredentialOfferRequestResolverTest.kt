@@ -33,7 +33,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
         runBlocking {
             mockEngine(
                 RequestMocker(
-                    match("https://credential-issuer.example.com/.well-known/openid-credential-issuer"),
+                    match(credentialIssuerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(1, it.size) },
@@ -42,7 +42,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer.json")
 
                 val expected = CredentialOffer(
-                    CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+                    credentialIssuerId(),
                     credentialIssuerMetadata(),
                     listOf(
                         OfferedCredential.W3CVerifiableCredential.SignedJwt(
@@ -76,7 +76,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
         runBlocking {
             mockEngine(
                 RequestMocker(
-                    match("https://credential-issuer.example.com/.well-known/openid-credential-issuer"),
+                    match(credentialIssuerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(1, it.size) },
@@ -85,7 +85,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/mso_mdoc_credential_offer.json")
 
                 val expected = CredentialOffer(
-                    CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+                    credentialIssuerId(),
                     credentialIssuerMetadata(),
                     listOf(
                         OfferedCredential.MsoMdocCredential("org.iso.18013.5.1.mDL"),
@@ -115,7 +115,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
         runBlocking {
             mockEngine(
                 RequestMocker(
-                    match("https://credential-issuer.example.com/.well-known/openid-credential-issuer"),
+                    match(credentialIssuerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(1, it.size) },
@@ -124,7 +124,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/jwt_vc_json_credential_offer.json")
 
                 val expected = CredentialOffer(
-                    CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+                    credentialIssuerId(),
                     credentialIssuerMetadata(),
                     listOf(
                         OfferedCredential.W3CVerifiableCredential.SignedJwt(
@@ -165,7 +165,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
         runBlocking {
             mockEngine(
                 RequestMocker(
-                    match("https://credential-issuer.example.com/.well-known/openid-credential-issuer"),
+                    match(credentialIssuerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(1, it.size) },
@@ -174,7 +174,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/ldp_vc_credential_offer.json")
 
                 val expected = CredentialOffer(
-                    CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+                    credentialIssuerId(),
                     credentialIssuerMetadata(),
                     listOf(
                         OfferedCredential.W3CVerifiableCredential.JsonLdDataIntegrity(
@@ -221,7 +221,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
         runBlocking {
             mockEngine(
                 RequestMocker(
-                    match("https://credential-issuer.example.com/.well-known/openid-credential-issuer"),
+                    match(credentialIssuerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(1, it.size) },
@@ -254,7 +254,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
         runBlocking {
             mockEngine(
                 RequestMocker(
-                    match("https://credential-issuer.example.com/.well-known/openid-credential-issuer"),
+                    match(credentialIssuerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(1, it.size) },
@@ -287,7 +287,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
         runBlocking {
             mockEngine(
                 RequestMocker(
-                    match("https://credential-issuer.example.com/.well-known/openid-credential-issuer"),
+                    match(credentialIssuerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(1, it.size) },
@@ -322,7 +322,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
             mockEngine(
                 RequestMocker(
-                    match("https://credential-issuer.example.com/.well-known/openid-credential-issuer"),
+                    match(credentialIssuerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 RequestMocker(
@@ -336,7 +336,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     .build()
 
                 val expected = CredentialOffer(
-                    CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+                    credentialIssuerId(),
                     credentialIssuerMetadata(),
                     listOf(
                         OfferedCredential.W3CVerifiableCredential.SignedJwt(
@@ -359,100 +359,5 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     )
             }
         }
-    }
-
-    companion object {
-
-        /**
-         * Gets the 'UniversityDegree_JWT' scoped credential used throughout these tests.
-         */
-        private fun universityDegreeJwt() =
-            CredentialSupportedObject.W3CVerifiableCredentialSignedJwtCredentialSupportedObject(
-                "jwt_vc_json",
-                "UniversityDegree_JWT",
-                listOf("did:example"),
-                listOf("ES256K"),
-                listOf("jwt"),
-                listOf(
-                    DisplayObject(
-                        "University Credential",
-                        "en-US",
-                        DisplayObject.LogoObject(
-                            "https://exampleuniversity.com/public/logo.png",
-                            "a square logo of a university",
-                        ),
-                        null,
-                        "#12107c",
-                        "#FFFFFF",
-                    ),
-                ),
-                JsonObject(
-                    mapOf(
-                        "type" to JsonArray(
-                            listOf(
-                                JsonPrimitive("VerifiableCredential"),
-                                JsonPrimitive("UniversityDegreeCredential"),
-                            ),
-                        ),
-                        "credentialSubject" to JsonObject(
-                            mapOf(
-                                "given_name" to JsonObject(
-                                    mapOf(
-                                        "display" to JsonArray(
-                                            listOf(
-                                                JsonObject(
-                                                    mapOf(
-                                                        "name" to JsonPrimitive("Given Name"),
-                                                        "locale" to JsonPrimitive("en-US"),
-                                                    ),
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                                "family_name" to JsonObject(
-                                    mapOf(
-                                        "display" to JsonArray(
-                                            listOf(
-                                                JsonObject(
-                                                    mapOf(
-                                                        "name" to JsonPrimitive("Surname"),
-                                                        "locale" to JsonPrimitive("en-US"),
-                                                    ),
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                                "degree" to JsonObject(emptyMap()),
-                                "gpa" to JsonObject(
-                                    mapOf(
-                                        "display" to JsonArray(
-                                            listOf(
-                                                JsonObject(
-                                                    mapOf(
-                                                        "name" to JsonPrimitive("GPA"),
-                                                    ),
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-                emptyList(),
-            )
-
-        /**
-         * Gets the [CredentialIssuerMetadata] used throughout these tests.
-         */
-        private fun credentialIssuerMetadata() =
-            CredentialIssuerMetadata(
-                CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
-                credentialEndpoint = CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials").getOrThrow(),
-                credentialsSupported = listOf(universityDegreeJwt()),
-            )
     }
 }
