@@ -72,27 +72,27 @@ internal suspend fun mockEngine(
     verifier: (List<HttpRequestData>) -> Unit = {},
     action: suspend (HttpGet<String>) -> Unit,
 ) {
-    val mockEngine = MockEngine { request ->
+    MockEngine { request ->
         mocks
             .firstOrNull { it.requestMatcher(request) }
             ?.responseBuilder
             ?.invoke(this)
             ?: respond("404/Not Found", HttpStatusCode.NotFound)
-    }
+    }.use { mockEngine ->
+        HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json()
+            }
+            expectSuccess = true
+        }.use { httpClient ->
+            val httpGet = HttpGet {
+                runCatching {
+                    httpClient.get(it).bodyAsText()
+                }
+            }
 
-    val httpClient = HttpClient(mockEngine) {
-        install(ContentNegotiation) {
-            json()
+            action(httpGet)
+            verifier(mockEngine.requestHistory)
         }
     }
-
-    val httpGet = HttpGet {
-        runCatching {
-            httpClient.get(it).bodyAsText()
-        }
-    }
-
-    action(httpGet)
-
-    verifier(mockEngine.requestHistory)
 }
