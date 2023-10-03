@@ -317,6 +317,11 @@ value class CredentialIssuerEndpoint private constructor(val value: HttpsUrl) {
 sealed interface CredentialSupportedObject {
 
     /**
+     * The format of the supported credential.
+     */
+    val format: String
+
+    /**
      * The scope of a supported credential.
      */
     val scope: String?
@@ -326,7 +331,7 @@ sealed interface CredentialSupportedObject {
      */
     @Serializable
     data class W3CVerifiableCredentialSignedJwtCredentialSupportedObject(
-        @SerialName("format") @Required val format: String,
+        @SerialName("format") @Required override val format: String,
         @SerialName("scope") override val scope: String? = null,
         @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: List<String> = emptyList(),
         @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: List<String> = emptyList(),
@@ -334,14 +339,18 @@ sealed interface CredentialSupportedObject {
         @SerialName("display") val display: List<DisplayObject> = emptyList(),
         @SerialName("credential_definition") @Required val credentialDefinition: JsonObject,
         @SerialName("order") val order: List<String> = emptyList(),
-    ) : CredentialSupportedObject
+    ) : CredentialSupportedObject {
+        init {
+            require(format == "jwt_vc_json") { "invalid format '$format'" }
+        }
+    }
 
     /**
      * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
      */
     @Serializable
     data class W3CVerifiableCredentialJsonLdSignedJwtCredentialSupportedObject(
-        @SerialName("format") @Required val format: String,
+        @SerialName("format") @Required override val format: String,
         @SerialName("scope") override val scope: String? = null,
         @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: List<String> = emptyList(),
         @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: List<String> = emptyList(),
@@ -350,14 +359,18 @@ sealed interface CredentialSupportedObject {
         @SerialName("@context") val context: List<String> = emptyList(),
         @SerialName("credential_definition") @Required val credentialDefinition: JsonObject,
         @SerialName("order") val order: List<String> = emptyList(),
-    ) : CredentialSupportedObject
+    ) : CredentialSupportedObject {
+        init {
+            require(format == "jwt_vc_json-ld") { "invalid format '$format'" }
+        }
+    }
 
     /**
      * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
      */
     @Serializable
     data class W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupportedObject(
-        @SerialName("format") @Required val format: String,
+        @SerialName("format") @Required override val format: String,
         @SerialName("scope") override val scope: String? = null,
         @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: List<String> = emptyList(),
         @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: List<String> = emptyList(),
@@ -367,14 +380,18 @@ sealed interface CredentialSupportedObject {
         @SerialName("type") val type: List<String> = emptyList(),
         @SerialName("credential_definition") @Required val credentialDefinition: JsonObject,
         @SerialName("order") val order: List<String> = emptyList(),
-    ) : CredentialSupportedObject
+    ) : CredentialSupportedObject {
+        init {
+            require(format == "ldp_vc") { "invalid format '$format'" }
+        }
+    }
 
     /**
      * The data of a Verifiable Credentials issued as an ISO mDL.
      */
     @Serializable
     data class MsoMdocCredentialSupportedObject(
-        @SerialName("format") @Required val format: String,
+        @SerialName("format") @Required override val format: String,
         @SerialName("scope") override val scope: String? = null,
         @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: List<String> = emptyList(),
         @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: List<String> = emptyList(),
@@ -384,6 +401,10 @@ sealed interface CredentialSupportedObject {
         @SerialName("claims") val claims: Map<String, Map<String, ClaimObject>> = emptyMap(),
         @SerialName("order") val order: List<String> = emptyList(),
     ) : CredentialSupportedObject {
+        init {
+            require(format == "mso_mdoc") { "invalid format '$format'" }
+        }
+
         /**
          * The details of a Claim.
          */

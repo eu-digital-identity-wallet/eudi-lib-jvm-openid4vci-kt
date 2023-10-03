@@ -15,7 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
+import io.ktor.http.*
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -28,8 +31,12 @@ internal fun credentialIssuerId() = CredentialIssuerId("https://credential-issue
 /**
  * Get the URL for fetching the metadata of the Credential Issuer used throughout the tests.
  */
-internal fun credentialIssuerMetadataUrl() =
-    HttpsUrl("https://credential-issuer.example.com/.well-known/openid-credential-issuer").getOrThrow()
+internal fun credentialIssuerMetadataUrl(credentialIssuerId: CredentialIssuerId = credentialIssuerId()) =
+    HttpsUrl(
+        URLBuilder(credentialIssuerId.value.value.toString())
+            .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
+            .buildString(),
+    ).getOrThrow()
 
 /**
  * Gets the 'UniversityDegree_JWT' scoped credential used throughout the tests.
@@ -119,6 +126,13 @@ internal fun universityDegreeJwt() =
 internal fun credentialIssuerMetadata() =
     CredentialIssuerMetadata(
         credentialIssuerId(),
-        credentialEndpoint = CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials").getOrThrow(),
-        credentialsSupported = listOf(universityDegreeJwt()),
+        HttpsUrl("https://credential-issuer.example.com/authorization").getOrThrow(),
+        CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials").getOrThrow(),
+        CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/batch").getOrThrow(),
+        CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/deferred").getOrThrow(),
+        listOf(JWEAlgorithm.PBES2_HS512_A256KW, JWEAlgorithm.PBES2_HS384_A192KW, JWEAlgorithm.PBES2_HS256_A128KW),
+        listOf(EncryptionMethod.XC20P),
+        true,
+        listOf(universityDegreeJwt()),
+        listOf(CredentialIssuerMetadata.Display("credential-issuer.example.com", "en-US")),
     )
