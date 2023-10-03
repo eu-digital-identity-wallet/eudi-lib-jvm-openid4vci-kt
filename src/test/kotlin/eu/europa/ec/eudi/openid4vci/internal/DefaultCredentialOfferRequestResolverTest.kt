@@ -16,9 +16,6 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.OfferedCredential.ScopedCredential
-import eu.europa.ec.eudi.openid4vci.OfferedCredential.UnscopedCredential.MsoMdocCredential
-import eu.europa.ec.eudi.openid4vci.OfferedCredential.UnscopedCredential.W3CVerifiableCredential
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialOfferRequestResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -47,8 +44,66 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 val expected = CredentialOffer(
                     CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
                     listOf(
-                        ScopedCredential("UniversityDegree_JWT"),
-                        MsoMdocCredential("org.iso.18013.5.1.mDL"),
+                        OfferedCredential.W3CVerifiableCredential.SignedJwt(
+                            JsonObject(
+                                mapOf(
+                                    "type" to JsonArray(
+                                        listOf(
+                                            JsonPrimitive("VerifiableCredential"),
+                                            JsonPrimitive("UniversityDegreeCredential"),
+                                        ),
+                                    ),
+                                    "credentialSubject" to JsonObject(
+                                        mapOf(
+                                            "given_name" to JsonObject(
+                                                mapOf(
+                                                    "display" to JsonArray(
+                                                        listOf(
+                                                            JsonObject(
+                                                                mapOf(
+                                                                    "name" to JsonPrimitive("Given Name"),
+                                                                    "locale" to JsonPrimitive("en-US"),
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                            "family_name" to JsonObject(
+                                                mapOf(
+                                                    "display" to JsonArray(
+                                                        listOf(
+                                                            JsonObject(
+                                                                mapOf(
+                                                                    "name" to JsonPrimitive("Surname"),
+                                                                    "locale" to JsonPrimitive("en-US"),
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                            "degree" to JsonObject(emptyMap()),
+                                            "gpa" to JsonObject(
+                                                mapOf(
+                                                    "display" to JsonArray(
+                                                        listOf(
+                                                            JsonObject(
+                                                                mapOf(
+                                                                    "name" to JsonPrimitive("GPA"),
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            "UniversityDegree_JWT",
+                        ),
+                        OfferedCredential.MsoMdocCredential("org.iso.18013.5.1.mDL"),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
@@ -86,7 +141,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 val expected = CredentialOffer(
                     CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
                     listOf(
-                        MsoMdocCredential("org.iso.18013.5.1.mDL"),
+                        OfferedCredential.MsoMdocCredential("org.iso.18013.5.1.mDL"),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
@@ -124,7 +179,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 val expected = CredentialOffer(
                     CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
                     listOf(
-                        W3CVerifiableCredential.SignedJwt(
+                        OfferedCredential.W3CVerifiableCredential.SignedJwt(
                             JsonObject(
                                 mapOf(
                                     "type" to JsonArray(
@@ -173,7 +228,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 val expected = CredentialOffer(
                     CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
                     listOf(
-                        W3CVerifiableCredential.JsonLdDataIntegrity(
+                        OfferedCredential.W3CVerifiableCredential.JsonLdDataIntegrity(
                             JsonObject(
                                 mapOf(
                                     "@context" to JsonArray(
@@ -334,8 +389,66 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 val expected = CredentialOffer(
                     CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
                     listOf(
-                        ScopedCredential("UniversityDegree_JWT"),
-                        MsoMdocCredential("org.iso.18013.5.1.mDL"),
+                        OfferedCredential.W3CVerifiableCredential.SignedJwt(
+                            JsonObject(
+                                mapOf(
+                                    "type" to JsonArray(
+                                        listOf(
+                                            JsonPrimitive("VerifiableCredential"),
+                                            JsonPrimitive("UniversityDegreeCredential"),
+                                        ),
+                                    ),
+                                    "credentialSubject" to JsonObject(
+                                        mapOf(
+                                            "given_name" to JsonObject(
+                                                mapOf(
+                                                    "display" to JsonArray(
+                                                        listOf(
+                                                            JsonObject(
+                                                                mapOf(
+                                                                    "name" to JsonPrimitive("Given Name"),
+                                                                    "locale" to JsonPrimitive("en-US"),
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                            "family_name" to JsonObject(
+                                                mapOf(
+                                                    "display" to JsonArray(
+                                                        listOf(
+                                                            JsonObject(
+                                                                mapOf(
+                                                                    "name" to JsonPrimitive("Surname"),
+                                                                    "locale" to JsonPrimitive("en-US"),
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                            "degree" to JsonObject(emptyMap()),
+                                            "gpa" to JsonObject(
+                                                mapOf(
+                                                    "display" to JsonArray(
+                                                        listOf(
+                                                            JsonObject(
+                                                                mapOf(
+                                                                    "name" to JsonPrimitive("GPA"),
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            "UniversityDegree_JWT",
+                        ),
+                        OfferedCredential.MsoMdocCredential("org.iso.18013.5.1.mDL"),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
