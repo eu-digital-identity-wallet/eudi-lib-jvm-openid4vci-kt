@@ -43,64 +43,10 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
                 val expected = CredentialOffer(
                     CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+                    credentialIssuerMetadata(),
                     listOf(
                         OfferedCredential.W3CVerifiableCredential.SignedJwt(
-                            JsonObject(
-                                mapOf(
-                                    "type" to JsonArray(
-                                        listOf(
-                                            JsonPrimitive("VerifiableCredential"),
-                                            JsonPrimitive("UniversityDegreeCredential"),
-                                        ),
-                                    ),
-                                    "credentialSubject" to JsonObject(
-                                        mapOf(
-                                            "given_name" to JsonObject(
-                                                mapOf(
-                                                    "display" to JsonArray(
-                                                        listOf(
-                                                            JsonObject(
-                                                                mapOf(
-                                                                    "name" to JsonPrimitive("Given Name"),
-                                                                    "locale" to JsonPrimitive("en-US"),
-                                                                ),
-                                                            ),
-                                                        ),
-                                                    ),
-                                                ),
-                                            ),
-                                            "family_name" to JsonObject(
-                                                mapOf(
-                                                    "display" to JsonArray(
-                                                        listOf(
-                                                            JsonObject(
-                                                                mapOf(
-                                                                    "name" to JsonPrimitive("Surname"),
-                                                                    "locale" to JsonPrimitive("en-US"),
-                                                                ),
-                                                            ),
-                                                        ),
-                                                    ),
-                                                ),
-                                            ),
-                                            "degree" to JsonObject(emptyMap()),
-                                            "gpa" to JsonObject(
-                                                mapOf(
-                                                    "display" to JsonArray(
-                                                        listOf(
-                                                            JsonObject(
-                                                                mapOf(
-                                                                    "name" to JsonPrimitive("GPA"),
-                                                                ),
-                                                            ),
-                                                        ),
-                                                    ),
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
+                            universityDegreeJwt().credentialDefinition,
                             "UniversityDegree_JWT",
                         ),
                         OfferedCredential.MsoMdocCredential("org.iso.18013.5.1.mDL"),
@@ -140,6 +86,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
                 val expected = CredentialOffer(
                     CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+                    credentialIssuerMetadata(),
                     listOf(
                         OfferedCredential.MsoMdocCredential("org.iso.18013.5.1.mDL"),
                     ),
@@ -178,6 +125,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
                 val expected = CredentialOffer(
                     CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+                    credentialIssuerMetadata(),
                     listOf(
                         OfferedCredential.W3CVerifiableCredential.SignedJwt(
                             JsonObject(
@@ -227,6 +175,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
                 val expected = CredentialOffer(
                     CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+                    credentialIssuerMetadata(),
                     listOf(
                         OfferedCredential.W3CVerifiableCredential.JsonLdDataIntegrity(
                             JsonObject(
@@ -388,64 +337,10 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
                 val expected = CredentialOffer(
                     CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+                    credentialIssuerMetadata(),
                     listOf(
                         OfferedCredential.W3CVerifiableCredential.SignedJwt(
-                            JsonObject(
-                                mapOf(
-                                    "type" to JsonArray(
-                                        listOf(
-                                            JsonPrimitive("VerifiableCredential"),
-                                            JsonPrimitive("UniversityDegreeCredential"),
-                                        ),
-                                    ),
-                                    "credentialSubject" to JsonObject(
-                                        mapOf(
-                                            "given_name" to JsonObject(
-                                                mapOf(
-                                                    "display" to JsonArray(
-                                                        listOf(
-                                                            JsonObject(
-                                                                mapOf(
-                                                                    "name" to JsonPrimitive("Given Name"),
-                                                                    "locale" to JsonPrimitive("en-US"),
-                                                                ),
-                                                            ),
-                                                        ),
-                                                    ),
-                                                ),
-                                            ),
-                                            "family_name" to JsonObject(
-                                                mapOf(
-                                                    "display" to JsonArray(
-                                                        listOf(
-                                                            JsonObject(
-                                                                mapOf(
-                                                                    "name" to JsonPrimitive("Surname"),
-                                                                    "locale" to JsonPrimitive("en-US"),
-                                                                ),
-                                                            ),
-                                                        ),
-                                                    ),
-                                                ),
-                                            ),
-                                            "degree" to JsonObject(emptyMap()),
-                                            "gpa" to JsonObject(
-                                                mapOf(
-                                                    "display" to JsonArray(
-                                                        listOf(
-                                                            JsonObject(
-                                                                mapOf(
-                                                                    "name" to JsonPrimitive("GPA"),
-                                                                ),
-                                                            ),
-                                                        ),
-                                                    ),
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
+                            universityDegreeJwt().credentialDefinition,
                             "UniversityDegree_JWT",
                         ),
                         OfferedCredential.MsoMdocCredential("org.iso.18013.5.1.mDL"),
@@ -464,5 +359,100 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     )
             }
         }
+    }
+
+    companion object {
+
+        /**
+         * Gets the 'UniversityDegree_JWT' scoped credential used throughout these tests.
+         */
+        private fun universityDegreeJwt() =
+            CredentialSupportedObject.W3CVerifiableCredentialSignedJwtCredentialSupportedObject(
+                "jwt_vc_json",
+                "UniversityDegree_JWT",
+                listOf("did:example"),
+                listOf("ES256K"),
+                listOf("jwt"),
+                listOf(
+                    DisplayObject(
+                        "University Credential",
+                        "en-US",
+                        DisplayObject.LogoObject(
+                            "https://exampleuniversity.com/public/logo.png",
+                            "a square logo of a university",
+                        ),
+                        null,
+                        "#12107c",
+                        "#FFFFFF",
+                    ),
+                ),
+                JsonObject(
+                    mapOf(
+                        "type" to JsonArray(
+                            listOf(
+                                JsonPrimitive("VerifiableCredential"),
+                                JsonPrimitive("UniversityDegreeCredential"),
+                            ),
+                        ),
+                        "credentialSubject" to JsonObject(
+                            mapOf(
+                                "given_name" to JsonObject(
+                                    mapOf(
+                                        "display" to JsonArray(
+                                            listOf(
+                                                JsonObject(
+                                                    mapOf(
+                                                        "name" to JsonPrimitive("Given Name"),
+                                                        "locale" to JsonPrimitive("en-US"),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                                "family_name" to JsonObject(
+                                    mapOf(
+                                        "display" to JsonArray(
+                                            listOf(
+                                                JsonObject(
+                                                    mapOf(
+                                                        "name" to JsonPrimitive("Surname"),
+                                                        "locale" to JsonPrimitive("en-US"),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                                "degree" to JsonObject(emptyMap()),
+                                "gpa" to JsonObject(
+                                    mapOf(
+                                        "display" to JsonArray(
+                                            listOf(
+                                                JsonObject(
+                                                    mapOf(
+                                                        "name" to JsonPrimitive("GPA"),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                emptyList(),
+            )
+
+        /**
+         * Gets the [CredentialIssuerMetadata] used throughout these tests.
+         */
+        private fun credentialIssuerMetadata() =
+            CredentialIssuerMetadata(
+                CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
+                credentialEndpoint = CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials").getOrThrow(),
+                credentialsSupported = listOf(universityDegreeJwt()),
+            )
     }
 }

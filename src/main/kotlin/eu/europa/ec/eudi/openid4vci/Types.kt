@@ -107,9 +107,14 @@ data class GrantsObject(
  */
 data class CredentialOffer(
     val credentialIssuerIdentifier: CredentialIssuerId,
+    val credentialIssuerMetadata: CredentialIssuerMetadata,
     val credentials: List<OfferedCredential>,
     val grants: Grants? = null,
-) : java.io.Serializable
+) : java.io.Serializable {
+    init {
+        require(credentials.isNotEmpty()) { "credentials must not be empty" }
+    }
+}
 
 /**
  * The Id of a Credential Issuer. An [HttpsUrl] that has no fragment or query parameters.
@@ -264,7 +269,7 @@ data class CredentialIssuerMetadata(
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val credentialResponseEncryptionAlgorithmsSupported: List<JWEAlgorithm> = emptyList(),
     val credentialResponseEncryptionMethodsSupported: List<EncryptionMethod> = emptyList(),
-    val requireCredentialResponseEncryption: Boolean,
+    val requireCredentialResponseEncryption: Boolean = false,
     val credentialsSupported: List<CredentialSupportedObject>,
     val display: List<Display> = emptyList(),
 ) : java.io.Serializable {

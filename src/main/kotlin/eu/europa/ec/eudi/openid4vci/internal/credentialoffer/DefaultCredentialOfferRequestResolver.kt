@@ -71,13 +71,16 @@ internal class DefaultCredentialOfferRequestResolver(
                             is UnresolvedUnscopedCredential -> it.toOfferedCredential()
                         }
                     }
+                    .also {
+                        require(it.isNotEmpty()) { "credentials are required" }
+                    }
             }.getOrElse { throw CredentialOfferRequestValidationError.InvalidCredentials(it).toException() }
 
             val grants = runCatching {
                 credentialOfferRequestObject.grants?.toGrants()
             }.getOrElse { throw CredentialOfferRequestValidationError.InvalidGrants(it).toException() }
 
-            CredentialOffer(credentialIssuerId, credentials, grants)
+            CredentialOffer(credentialIssuerId, credentialIssuerMetadata, credentials, grants)
         }
 
     companion object {
