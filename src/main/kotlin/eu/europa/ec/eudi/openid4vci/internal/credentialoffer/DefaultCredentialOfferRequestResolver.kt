@@ -45,22 +45,19 @@ internal class DefaultCredentialOfferRequestResolver(
                 is CredentialOfferRequest.PassByReference ->
                     withContext(ioCoroutineDispatcher + CoroutineName("credential-offer-request-object")) {
                         httpGet.get(request.value.value.toURL()).getOrElse {
-                            throw CredentialOfferRequestValidationError.UnableToFetchCredentialOffer(it).toException()
+                            CredentialOfferRequestError.UnableToFetchCredentialOffer(it).raise()
                         }
                     }
             }
             val credentialOfferRequestObject = runCatching {
                 Json.decodeFromString<CredentialOfferRequestObject>(credentialOfferRequestObjectString)
-            }.getOrElse { throw CredentialOfferRequestValidationError.NonParseableCredentialOffer(it).toException() }
+            }.getOrElse { CredentialOfferRequestError.NonParseableCredentialOffer(it).raise() }
 
             val credentialIssuerId = CredentialIssuerId(credentialOfferRequestObject.credentialIssuerIdentifier)
-                .getOrElse { throw CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).toException() }
+                .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).raise() }
 
             val credentialIssuerMetadata = credentialIssuerMetadataResolver.resolve(credentialIssuerId)
-                .getOrElse {
-                    throw CredentialOfferRequestValidationError.UnableToResolveCredentialIssuerMetadata(it)
-                        .toException()
-                }
+                .getOrElse { CredentialOfferRequestError.UnableToResolveCredentialIssuerMetadata(it).raise() }
 
             val credentials = runCatching {
                 credentialOfferRequestObject.credentials
@@ -74,11 +71,11 @@ internal class DefaultCredentialOfferRequestResolver(
                     .also {
                         require(it.isNotEmpty()) { "credentials are required" }
                     }
-            }.getOrElse { throw CredentialOfferRequestValidationError.InvalidCredentials(it).toException() }
+            }.getOrElse { CredentialOfferRequestValidationError.InvalidCredentials(it).raise() }
 
             val grants = runCatching {
                 credentialOfferRequestObject.grants?.toGrants()
-            }.getOrElse { throw CredentialOfferRequestValidationError.InvalidGrants(it).toException() }
+            }.getOrElse { CredentialOfferRequestValidationError.InvalidGrants(it).raise() }
 
             CredentialOffer(credentialIssuerId, credentialIssuerMetadata, credentials, grants)
         }

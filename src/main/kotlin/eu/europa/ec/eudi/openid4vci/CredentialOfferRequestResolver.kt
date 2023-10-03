@@ -48,9 +48,7 @@ sealed interface CredentialOfferRequest : Serializable {
         operator fun invoke(url: String): Result<CredentialOfferRequest> = runCatching {
             val builder = runCatching {
                 URLBuilder(url)
-            }.getOrElse {
-                throw CredentialOfferRequestValidationError.NonParsableCredentialOfferEndpointUrl(it).toException()
-            }
+            }.getOrElse { CredentialOfferRequestError.NonParsableCredentialOfferEndpointUrl(it).raise() }
 
             val parameters = builder.parameters
             val maybeByValue = parameters["credential_offer"]
@@ -58,17 +56,15 @@ sealed interface CredentialOfferRequest : Serializable {
 
             when {
                 !maybeByValue.isNullOrBlank() && !maybeByReference.isNullOrBlank() ->
-                    throw CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri.toException()
+                    CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri.raise()
 
                 !maybeByValue.isNullOrBlank() -> PassByValue(maybeByValue)
 
                 !maybeByReference.isNullOrBlank() -> HttpsUrl(maybeByReference)
                     .map { PassByReference(it) }
-                    .getOrElse {
-                        throw CredentialOfferRequestValidationError.InvalidCredentialOfferUri(it).toException()
-                    }
+                    .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialOfferUri(it).raise() }
 
-                else -> throw CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri.toException()
+                else -> CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri.raise()
             }
         }
     }
@@ -77,17 +73,43 @@ sealed interface CredentialOfferRequest : Serializable {
 /**
  * Errors that can occur while trying to validate and resolve a [CredentialOfferRequest].
  */
-sealed interface CredentialOfferRequestError : Serializable
+sealed interface CredentialOfferRequestError : Serializable {
+
+    /**
+     * The Credential Offer Endpoint URL could not be parsed.
+     */
+    data class NonParsableCredentialOfferEndpointUrl(val reason: Throwable) : CredentialOfferRequestError
+
+    /**
+     * The Credential Offer object could not be fetched.
+     */
+    data class UnableToFetchCredentialOffer(val reason: Throwable) : CredentialOfferRequestError
+
+    /**
+     * The Credential Offer object could not be parsed.
+     */
+    data class NonParseableCredentialOffer(val reason: Throwable) : CredentialOfferRequestValidationError
+
+    /**
+     * The metadata of the Credential Issuer could not be resolved.
+     */
+    data class UnableToResolveCredentialIssuerMetadata(val reason: Throwable) : CredentialOfferRequestValidationError
+
+    /**
+     * Wraps this [CredentialOfferRequestError] to a [CredentialOfferRequestException].
+     */
+    fun toException(): CredentialOfferRequestException = CredentialOfferRequestException(this)
+
+    /**
+     * Wraps this [CredentialOfferRequestError] to a [CredentialOfferRequestException] and throws it.
+     */
+    fun raise(): Nothing = throw toException()
+}
 
 /**
  * Validation error that can occur while trying to validate a [CredentialOfferRequest].
  */
 sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestError {
-
-    /**
-     * The Credential Offer Endpoint URL could not be parsed.
-     */
-    data class NonParsableCredentialOfferEndpointUrl(val reason: Throwable) : CredentialOfferRequestValidationError
 
     /**
      * The Credential Offer Endpoint URL either contained neither the 'credential_offer' nor the 'credential_offer_uri'
@@ -106,24 +128,9 @@ sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestE
     data class InvalidCredentialOfferUri(val reason: Throwable) : CredentialOfferRequestValidationError
 
     /**
-     * The Credential Offer object could not be fetched.
-     */
-    data class UnableToFetchCredentialOffer(val reason: Throwable) : CredentialOfferRequestValidationError
-
-    /**
-     * The Credential Offer object could not be parsed.
-     */
-    data class NonParseableCredentialOffer(val reason: Throwable) : CredentialOfferRequestValidationError
-
-    /**
      * The Id of the Credential Issuer is not valid.
      */
     data class InvalidCredentialIssuerId(val reason: Throwable) : CredentialOfferRequestValidationError
-
-    /**
-     * The metadata of the Credential Issuer could not be resolved.
-     */
-    data class UnableToResolveCredentialIssuerMetadata(val reason: Throwable) : CredentialOfferRequestValidationError
 
     /**
      * The Credentials of a Credential Offer are not valid.
@@ -134,11 +141,6 @@ sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestE
      * The Grants of a Credential Offer are not valid.
      */
     data class InvalidGrants(val reason: Throwable) : CredentialOfferRequestValidationError
-
-    /**
-     * Wraps this [CredentialOfferRequestValidationError] into a [CredentialOfferRequestException].
-     */
-    fun toException(): CredentialOfferRequestException = CredentialOfferRequestException(this)
 }
 
 /**
