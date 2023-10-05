@@ -159,13 +159,15 @@ sealed interface OfferedCredential : java.io.Serializable {
      */
     sealed interface W3CVerifiableCredential : OfferedCredential {
 
+        val credentialDefinition: CredentialDefinition
+
         /**
          * A signed JWT not using JSON-LD.
          *
          * Format: jwt_vc_json
          */
         data class SignedJwt(
-            val credentialDefinition: CredentialDefinition,
+            override val credentialDefinition: CredentialDefinition,
             override val scope: String? = null,
         ) : W3CVerifiableCredential
 
@@ -175,7 +177,7 @@ sealed interface OfferedCredential : java.io.Serializable {
          * Format: jwt_vc_json-ld
          */
         data class JsonLdSignedJwt(
-            val credentialDefinition: CredentialDefinition,
+            override val credentialDefinition: CredentialDefinition,
             override val scope: String? = null,
         ) : W3CVerifiableCredential
 
@@ -185,7 +187,7 @@ sealed interface OfferedCredential : java.io.Serializable {
          * Format: ldp_vc
          */
         data class JsonLdDataIntegrity(
-            val credentialDefinition: CredentialDefinition,
+            override val credentialDefinition: CredentialDefinition,
             override val scope: String? = null,
         ) : W3CVerifiableCredential
     }
