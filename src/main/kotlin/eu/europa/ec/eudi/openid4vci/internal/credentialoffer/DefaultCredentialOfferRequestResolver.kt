@@ -17,11 +17,8 @@ package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.*
+import eu.europa.ec.eudi.openid4vci.OfferedCredential.MsoMdocCredential
 import eu.europa.ec.eudi.openid4vci.OfferedCredential.W3CVerifiableCredential
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.UnresolvedCredential.UnresolvedScopedCredential
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.UnresolvedCredential.UnresolvedUnscopedCredential
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.UnresolvedCredential.UnresolvedUnscopedCredential.UnresolvedMsoMdocCredential
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.UnresolvedCredential.UnresolvedUnscopedCredential.UnresolvedW3CVerifiableCredential
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withContext
@@ -61,13 +58,7 @@ internal class DefaultCredentialOfferRequestResolver(
 
             val credentials = runCatching {
                 credentialOfferRequestObject.credentials
-                    .map { it.toUnresolvedCredential() }
-                    .map {
-                        when (it) {
-                            is UnresolvedScopedCredential -> it.toOfferedCredential(credentialIssuerMetadata)
-                            is UnresolvedUnscopedCredential -> it.toOfferedCredential()
-                        }
-                    }
+                    .map { it.toOfferedCredential(credentialIssuerMetadata) }
                     .also {
                         require(it.isNotEmpty()) { "credentials are required" }
                     }
@@ -110,73 +101,26 @@ internal class DefaultCredentialOfferRequestResolver(
         }
 
         /**
-         * Tries to parse a [JsonElement] to a [UnresolvedCredential] instance.
+         * Tries to parse a [JsonElement] as an [OfferedCredential].
          */
-        private fun JsonElement.toUnresolvedCredential(): UnresolvedCredential =
+        private fun JsonElement.toOfferedCredential(metadata: CredentialIssuerMetadata): OfferedCredential =
             if (this is JsonPrimitive && isString) {
-                UnresolvedScopedCredential(content)
+                metadata.getOfferedCredentialByScope(content)
             } else if (this is JsonObject) {
-                toUnresolvedUnscopedCredential()
+                toOfferedCredential()
             } else {
                 throw IllegalArgumentException("Invalid JsonElement for Credential. Found '$javaClass'")
             }
 
         /**
-         * Tries to parse a [JsonObject] to an [UnresolvedCredential.UnresolvedUnscopedCredential].
+         * Gets an [OfferedCredential] by its scope.
          */
-        private fun JsonObject.toUnresolvedUnscopedCredential(): UnresolvedUnscopedCredential {
-            fun toMsoMdocCredential() =
-                UnresolvedMsoMdocCredential(
-                    Json.decodeFromJsonElement<MsoMdocCredentialObject>(
-                        this,
-                    ).docType,
-                )
-
-            fun toW3CVerifiableCredential(constructor: (CredentialDefinition) -> UnresolvedW3CVerifiableCredential) =
-                constructor(Json.decodeFromJsonElement<W3CVerifiableCredentialCredentialObject>(this).credentialDefinition)
-
-            val format =
-                getOrDefault("format", JsonNull)
-                    .let {
-                        if (it is JsonPrimitive && it.isString) {
-                            it.content
-                        } else {
-                            throw IllegalArgumentException("Invalid 'format'")
-                        }
-                    }
-
-            return when (format) {
-                "mso_mdoc" -> toMsoMdocCredential()
-                "jwt_vc_json" -> toW3CVerifiableCredential(UnresolvedW3CVerifiableCredential::SignedJwt)
-                "jwt_vc_json-ld" -> toW3CVerifiableCredential(UnresolvedW3CVerifiableCredential::JsonLdSignedJwt)
-                "ldp_vc" -> toW3CVerifiableCredential(UnresolvedW3CVerifiableCredential::JsonLdDataIntegrity)
-                else -> throw IllegalArgumentException("Unknown Credential format '$format'")
-            }
-        }
-    }
-}
-
-/**
- * Credentials offered in a Credential Offer Request.
- */
-private sealed interface UnresolvedCredential {
-
-    /**
-     * A Credential identified by its Scope.
-     */
-    data class UnresolvedScopedCredential(
-        val scope: String,
-    ) : UnresolvedCredential {
-
-        /**
-         * Resolves and converts this [UnresolvedScopedCredential] to an [OfferedCredential].
-         */
-        fun toOfferedCredential(metadata: CredentialIssuerMetadata): OfferedCredential =
-            metadata.credentialsSupported
+        private fun CredentialIssuerMetadata.getOfferedCredentialByScope(scope: String): OfferedCredential =
+            credentialsSupported
                 .firstOrNull { it.scope == scope }
                 ?.let {
                     when (it) {
-                        is MsoMdocCredentialSupportedObject -> OfferedCredential.MsoMdocCredential(it.docType, it.scope)
+                        is MsoMdocCredentialSupportedObject -> MsoMdocCredential(it.docType, it.scope)
                         is W3CVerifiableCredentialSignedJwtCredentialSupportedObject ->
                             W3CVerifiableCredential.SignedJwt(
                                 it.credentialDefinition,
@@ -197,63 +141,37 @@ private sealed interface UnresolvedCredential {
                     }
                 }
                 ?: throw IllegalArgumentException("Unknown scope '$scope")
-    }
-
-    /**
-     * A Credential format not identified by a Scope.
-     */
-    sealed interface UnresolvedUnscopedCredential : UnresolvedCredential {
 
         /**
-         * Converts this [UnresolvedUnscopedCredential] to an [UnresolvedCredential].
+         * Converts this [JsonObject] to an [OfferedCredential].
          */
-        fun toOfferedCredential(): OfferedCredential
+        private fun JsonObject.toOfferedCredential(): OfferedCredential {
+            fun toMsoMdocCredential() =
+                MsoMdocCredential(
+                    Json.decodeFromJsonElement<MsoMdocCredentialObject>(
+                        this,
+                    ).docType,
+                )
 
-        /**
-         * An MSO MDOC credential.
-         */
-        data class UnresolvedMsoMdocCredential(
-            val docType: String,
-        ) : UnresolvedUnscopedCredential {
-            override fun toOfferedCredential() = OfferedCredential.MsoMdocCredential(docType)
-        }
+            fun toW3CVerifiableCredential(constructor: (CredentialDefinition) -> W3CVerifiableCredential) =
+                constructor(Json.decodeFromJsonElement<W3CVerifiableCredentialCredentialObject>(this).credentialDefinition)
 
-        /**
-         * A W3C Verifiable Credential.
-         */
-        sealed interface UnresolvedW3CVerifiableCredential : UnresolvedUnscopedCredential {
+            val format =
+                getOrDefault("format", JsonNull)
+                    .let {
+                        if (it is JsonPrimitive && it.isString) {
+                            it.content
+                        } else {
+                            throw IllegalArgumentException("Invalid 'format'")
+                        }
+                    }
 
-            /**
-             * A signed JWT not using JSON-LD.
-             *
-             * Format: jwt_vc_json
-             */
-            data class SignedJwt(
-                val credentialDefinition: CredentialDefinition,
-            ) : UnresolvedW3CVerifiableCredential {
-                override fun toOfferedCredential() = W3CVerifiableCredential.SignedJwt(credentialDefinition)
-            }
-
-            /**
-             * A signed JWT using JSON-LD.
-             *
-             * Format: jwt_vc_json-ld
-             */
-            data class JsonLdSignedJwt(
-                val credentialDefinition: CredentialDefinition,
-            ) : UnresolvedW3CVerifiableCredential {
-                override fun toOfferedCredential() = W3CVerifiableCredential.JsonLdSignedJwt(credentialDefinition)
-            }
-
-            /**
-             * Data Integrity using JSON-LD.
-             *
-             * Format: ldp_vc
-             */
-            data class JsonLdDataIntegrity(
-                val credentialDefinition: CredentialDefinition,
-            ) : UnresolvedW3CVerifiableCredential {
-                override fun toOfferedCredential() = W3CVerifiableCredential.JsonLdDataIntegrity(credentialDefinition)
+            return when (format) {
+                "mso_mdoc" -> toMsoMdocCredential()
+                "jwt_vc_json" -> toW3CVerifiableCredential(W3CVerifiableCredential::SignedJwt)
+                "jwt_vc_json-ld" -> toW3CVerifiableCredential(W3CVerifiableCredential::JsonLdSignedJwt)
+                "ldp_vc" -> toW3CVerifiableCredential(W3CVerifiableCredential::JsonLdDataIntegrity)
+                else -> throw IllegalArgumentException("Unknown Credential format '$format'")
             }
         }
     }
