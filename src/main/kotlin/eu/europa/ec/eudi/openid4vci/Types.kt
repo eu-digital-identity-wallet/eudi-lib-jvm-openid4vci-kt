@@ -24,6 +24,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.time.Duration
+import java.util.*
 
 typealias JsonString = String
 
@@ -272,7 +273,7 @@ data class CredentialIssuerMetadata(
     val credentialResponseEncryptionAlgorithmsSupported: List<JWEAlgorithm> = emptyList(),
     val credentialResponseEncryptionMethodsSupported: List<EncryptionMethod> = emptyList(),
     val requireCredentialResponseEncryption: Boolean = false,
-    val credentialsSupported: List<CredentialSupportedObject>,
+    val credentialsSupported: List<CredentialSupported>,
     val display: List<Display> = emptyList(),
 ) : java.io.Serializable {
     init {
@@ -313,6 +314,174 @@ value class CredentialIssuerEndpoint private constructor(val value: HttpsUrl) {
     }
 }
 
+typealias Namespace = String
+typealias ClaimName = String
+typealias MsoMdocClaims = Map<Namespace, Map<ClaimName, CredentialSupported.MsoMdocCredentialCredentialSupported.Claim>>
+
+/**
+ * Credentials supported by an Issuer.
+ */
+sealed interface CredentialSupported : java.io.Serializable {
+
+    val scope: String?
+    val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod>
+    val cryptographicSuitesSupported: List<String>
+    val proofTypesSupported: List<ProofType>
+    val display: List<Display>
+
+    /**
+     * The data of a W3C Verifiable Credential.
+     */
+    sealed interface W3CVerifiableCredentialCredentialSupported : CredentialSupported {
+
+        val credentialDefinition: CredentialDefinition
+        val order: List<ClaimName>
+
+        /**
+         * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
+         */
+        data class W3CVerifiableCredentialSignedJwtCredentialSupported(
+            override val scope: String? = null,
+            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
+            override val cryptographicSuitesSupported: List<String> = emptyList(),
+            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
+            override val display: List<Display> = emptyList(),
+            override val credentialDefinition: CredentialDefinition,
+            override val order: List<ClaimName> = emptyList(),
+        ) : W3CVerifiableCredentialCredentialSupported
+
+        /**
+         * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
+         */
+        data class W3CVerifiableCredentialJsonLdSignedJwtCredentialSupported(
+            override val scope: String? = null,
+            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
+            override val cryptographicSuitesSupported: List<String> = emptyList(),
+            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
+            override val display: List<Display> = emptyList(),
+            val context: List<String> = emptyList(),
+            override val credentialDefinition: CredentialDefinition,
+            override val order: List<ClaimName> = emptyList(),
+        ) : W3CVerifiableCredentialCredentialSupported
+
+        /**
+         * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
+         */
+        data class W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupported(
+            override val scope: String? = null,
+            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
+            override val cryptographicSuitesSupported: List<String> = emptyList(),
+            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
+            override val display: List<Display> = emptyList(),
+            val context: List<String> = emptyList(),
+            val type: List<String> = emptyList(),
+            override val credentialDefinition: CredentialDefinition,
+            override val order: List<ClaimName> = emptyList(),
+        ) : W3CVerifiableCredentialCredentialSupported
+    }
+
+    /**
+     * The data of a Verifiable Credentials issued as an ISO mDL.
+     */
+    data class MsoMdocCredentialCredentialSupported(
+        override val scope: String? = null,
+        override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
+        override val cryptographicSuitesSupported: List<String> = emptyList(),
+        override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
+        override val display: List<Display> = emptyList(),
+        val docType: String,
+        val claims: MsoMdocClaims = emptyMap(),
+        val order: List<ClaimName> = emptyList(),
+    ) : CredentialSupported {
+
+        /**
+         * The details of a Claim.
+         */
+        data class Claim(
+            val mandatory: Boolean? = false,
+            val valueType: String? = null,
+            val display: List<Display> = emptyList(),
+        ) : java.io.Serializable {
+
+            /**
+             * Display properties of a Claim.
+             */
+            data class Display(
+                val name: String? = null,
+                val locale: Locale? = null,
+            ) : java.io.Serializable
+        }
+    }
+}
+
+/**
+ * Cryptographic Binding Methods for issued Credentials.
+ */
+sealed interface CryptographicBindingMethod : java.io.Serializable {
+
+    /**
+     * JWK format.
+     */
+    object JWK : CryptographicBindingMethod {
+        private fun readResolve(): Any = JWK
+        override fun toString(): String = "JWK"
+    }
+
+    /**
+     * COSE Key object.
+     */
+    object COSE : CryptographicBindingMethod {
+        private fun readResolve(): Any = COSE
+        override fun toString(): String = "COSE"
+    }
+
+    /**
+     * MSO.
+     */
+    object MSO : CryptographicBindingMethod {
+        private fun readResolve(): Any = MSO
+        override fun toString(): String = "MSO"
+    }
+
+    /**
+     * DID method.
+     */
+    data class DID(
+        val method: String,
+    ) : CryptographicBindingMethod
+}
+
+/**
+ * Proof types supported by a Credential Issuer.
+ */
+enum class ProofType : java.io.Serializable {
+    JWT,
+    CWT,
+}
+
+typealias CssColor = String
+
+/**
+ * Display properties of a supported credential type for a certain language.
+ */
+data class Display(
+    val name: String,
+    val locale: Locale? = null,
+    val logo: Logo? = null,
+    val description: String? = null,
+    val backgroundColor: CssColor? = null,
+    val textColor: CssColor? = null,
+) : java.io.Serializable {
+
+    /**
+     * Logo information.
+     */
+    data class Logo(
+        val url: HttpsUrl? = null,
+        val alternativeText: String? = null,
+    ) : java.io.Serializable
+}
+
 /**
  * The metadata of a Credentials that can be issued by a Credential Issuer.
  */
@@ -331,6 +500,7 @@ sealed interface CredentialSupportedObject {
     sealed interface W3CVerifiableCredentialCredentialSupportedObject : CredentialSupportedObject {
 
         val credentialDefinition: JsonObject
+        val order: List<String>
 
         /**
          * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
@@ -345,7 +515,7 @@ sealed interface CredentialSupportedObject {
             @SerialName("proof_types_supported") override val proofTypesSupported: List<String> = emptyList(),
             @SerialName("display") override val display: List<DisplayObject> = emptyList(),
             @SerialName("credential_definition") @Required override val credentialDefinition: JsonObject,
-            @SerialName("order") val order: List<String> = emptyList(),
+            @SerialName("order") override val order: List<String> = emptyList(),
         ) : W3CVerifiableCredentialCredentialSupportedObject {
             init {
                 require(format == "jwt_vc_json") { "invalid format '$format'" }
@@ -366,7 +536,7 @@ sealed interface CredentialSupportedObject {
             @SerialName("display") override val display: List<DisplayObject> = emptyList(),
             @SerialName("@context") val context: List<String> = emptyList(),
             @SerialName("credential_definition") @Required override val credentialDefinition: JsonObject,
-            @SerialName("order") val order: List<String> = emptyList(),
+            @SerialName("order") override val order: List<String> = emptyList(),
         ) : W3CVerifiableCredentialCredentialSupportedObject {
             init {
                 require(format == "jwt_vc_json-ld") { "invalid format '$format'" }
@@ -388,7 +558,7 @@ sealed interface CredentialSupportedObject {
             @SerialName("@context") val context: List<String> = emptyList(),
             @SerialName("type") val type: List<String> = emptyList(),
             @SerialName("credential_definition") @Required override val credentialDefinition: JsonObject,
-            @SerialName("order") val order: List<String> = emptyList(),
+            @SerialName("order") override val order: List<String> = emptyList(),
         ) : W3CVerifiableCredentialCredentialSupportedObject {
             init {
                 require(format == "ldp_vc") { "invalid format '$format'" }

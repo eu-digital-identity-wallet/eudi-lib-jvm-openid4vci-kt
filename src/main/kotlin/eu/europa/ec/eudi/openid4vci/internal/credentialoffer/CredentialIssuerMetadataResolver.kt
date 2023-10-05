@@ -18,7 +18,9 @@ package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.*
+import eu.europa.ec.eudi.openid4vci.CredentialSupported.MsoMdocCredentialCredentialSupported
+import eu.europa.ec.eudi.openid4vci.CredentialSupported.W3CVerifiableCredentialCredentialSupported.*
+import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.MsoMdocCredentialCredentialSupportedObject
 import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.W3CVerifiableCredentialCredentialSupportedObject.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
@@ -26,6 +28,7 @@ import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
+import java.util.*
 
 /**
  * Service for fetching, parsing, and validating the metadata of a Credential Issuer.
@@ -144,11 +147,13 @@ private class DefaultCredentialIssuerMetadataResolver(
             }
 
             val credentialsSupported = runCatching {
-                credentialsSupported.map { it.toCredentialSupportedObject() }
+                credentialsSupported
+                    .map { it.toCredentialSupportedObject() }
+                    .map { it.toCredentialSupported() }
             }.getOrElse { CredentialIssuerMetadataValidationError.InvalidCredentialsSupported(it).raise() }
-            if (credentialsSupported.isEmpty()) {
-                CredentialIssuerMetadataValidationError.CredentialsSupportedRequired.raise()
-            }
+                .ifEmpty {
+                    CredentialIssuerMetadataValidationError.CredentialsSupportedRequired.raise()
+                }
 
             val display = runCatching {
                 display.map { it.toDomain() }
@@ -199,6 +204,126 @@ private class DefaultCredentialIssuerMetadataResolver(
                 )
 
                 else -> throw IllegalArgumentException("Unsupported Credential format '$format'")
+            }
+        }
+
+        /**
+         * Converts a [CredentialSupportedObject] to a [CredentialSupported].
+         */
+        private fun CredentialSupportedObject.toCredentialSupported(): CredentialSupported {
+            val cryptographicBindingMethodsSupported =
+                cryptographicBindingMethodsSupported.map {
+                    when (it) {
+                        "jwk" -> CryptographicBindingMethod.JWK
+                        "cose_key" -> CryptographicBindingMethod.COSE
+                        "mso" -> CryptographicBindingMethod.MSO
+                        else ->
+                            if (it.startsWith("did")) {
+                                CryptographicBindingMethod.DID(it)
+                            } else {
+                                throw IllegalArgumentException("Unknown Cryptographic Binding Method '$it'")
+                            }
+                    }
+                }
+            val cryptographicSuitesSupported = cryptographicSuitesSupported
+            val proofTypesSupported =
+                proofTypesSupported
+                    .map {
+                        when (it) {
+                            "jwt" -> ProofType.JWT
+                            "cwt" -> ProofType.CWT
+                            else -> throw IllegalArgumentException("Unknown Proof Type '$it'")
+                        }
+                    }
+                    .ifEmpty {
+                        listOf(ProofType.JWT)
+                    }
+
+            fun DisplayObject.toDisplay(): Display {
+                fun DisplayObject.LogoObject.toLogo(): Display.Logo =
+                    Display.Logo(
+                        url?.let { HttpsUrl(it).getOrThrow() },
+                        alternativeText,
+                    )
+
+                return Display(
+                    name,
+                    locale?.let { Locale.forLanguageTag(it) },
+                    logo?.toLogo(),
+                    description,
+                    backgroundColor,
+                    textColor,
+                )
+            }
+
+            val display = display.map { it.toDisplay() }
+
+            fun MsoMdocCredentialCredentialSupportedObject.claims(): MsoMdocClaims =
+                claims.mapValues { namespaceAndClaims ->
+                    namespaceAndClaims.value.mapValues { claimNameAndClaim ->
+                        claimNameAndClaim.value.let { claimObject ->
+                            MsoMdocCredentialCredentialSupported.Claim(
+                                claimObject.mandatory ?: false,
+                                claimObject.valueType,
+                                claimObject.display.map { displayObject ->
+                                    MsoMdocCredentialCredentialSupported.Claim.Display(
+                                        displayObject.name,
+                                        displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+
+            return when (this) {
+                is W3CVerifiableCredentialSignedJwtCredentialSupportedObject ->
+                    W3CVerifiableCredentialSignedJwtCredentialSupported(
+                        scope,
+                        cryptographicBindingMethodsSupported,
+                        cryptographicSuitesSupported,
+                        proofTypesSupported,
+                        display,
+                        credentialDefinition,
+                        order,
+                    )
+
+                is W3CVerifiableCredentialJsonLdSignedJwtCredentialSupportedObject ->
+                    W3CVerifiableCredentialJsonLdSignedJwtCredentialSupported(
+                        scope,
+                        cryptographicBindingMethodsSupported,
+                        cryptographicSuitesSupported,
+                        proofTypesSupported,
+                        display,
+                        context,
+                        credentialDefinition,
+                        order,
+                    )
+
+                is W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupportedObject ->
+                    W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupported(
+                        scope,
+                        cryptographicBindingMethodsSupported,
+                        cryptographicSuitesSupported,
+                        proofTypesSupported,
+                        display,
+                        context,
+                        type,
+                        credentialDefinition,
+                        order,
+                    )
+
+                is MsoMdocCredentialCredentialSupportedObject ->
+                    MsoMdocCredentialCredentialSupported(
+                        scope,
+                        cryptographicBindingMethodsSupported,
+                        cryptographicSuitesSupported,
+                        proofTypesSupported,
+                        display,
+                        docType,
+                        claims(),
+                        order,
+                    )
             }
         }
 

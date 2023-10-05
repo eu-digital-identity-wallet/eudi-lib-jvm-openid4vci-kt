@@ -18,13 +18,14 @@ package eu.europa.ec.eudi.openid4vci.internal
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.MsoMdocCredentialCredentialSupportedObject
-import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.W3CVerifiableCredentialCredentialSupportedObject.W3CVerifiableCredentialSignedJwtCredentialSupportedObject
-import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.W3CVerifiableCredentialCredentialSupportedObject.W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupportedObject
+import eu.europa.ec.eudi.openid4vci.CredentialSupported.MsoMdocCredentialCredentialSupported
+import eu.europa.ec.eudi.openid4vci.CredentialSupported.W3CVerifiableCredentialCredentialSupported.W3CVerifiableCredentialSignedJwtCredentialSupported
+import eu.europa.ec.eudi.openid4vci.CredentialSupported.W3CVerifiableCredentialCredentialSupported.W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupported
 import io.ktor.http.*
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import java.util.*
 
 /**
  * Gets the [CredentialIssuerId] used throughout the tests.
@@ -45,18 +46,17 @@ internal fun credentialIssuerMetadataUrl(credentialIssuerId: CredentialIssuerId 
  * Gets the 'UniversityDegree_JWT' scoped credential used throughout the tests.
  */
 internal fun universityDegreeJwt() =
-    W3CVerifiableCredentialSignedJwtCredentialSupportedObject(
-        "jwt_vc_json",
+    W3CVerifiableCredentialSignedJwtCredentialSupported(
         "UniversityDegree_JWT",
-        listOf("did:example"),
+        listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("ES256K"),
-        listOf("jwt"),
+        listOf(ProofType.JWT),
         listOf(
-            DisplayObject(
+            Display(
                 "University Credential",
-                "en-US",
-                DisplayObject.LogoObject(
-                    "https://exampleuniversity.com/public/logo.png",
+                Locale.forLanguageTag("en-US"),
+                Display.Logo(
+                    HttpsUrl("https://exampleuniversity.com/public/logo.png").getOrThrow(),
                     "a square logo of a university",
                 ),
                 null,
@@ -127,18 +127,17 @@ internal fun universityDegreeJwt() =
  * Gets the 'UniversityDegree_LDP_VC' scoped credential used throughout the tests.
  */
 internal fun universityDegreeLdpVc() =
-    W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupportedObject(
-        "ldp_vc",
+    W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupported(
         "UniversityDegree_LDP_VC",
-        listOf("did:example"),
+        listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("Ed25519Signature2018"),
-        emptyList(),
+        listOf(ProofType.JWT),
         listOf(
-            DisplayObject(
+            Display(
                 "University Credential",
-                "en-US",
-                DisplayObject.LogoObject(
-                    "https://exampleuniversity.com/public/logo.png",
+                Locale.forLanguageTag("en-US"),
+                Display.Logo(
+                    HttpsUrl("https://exampleuniversity.com/public/logo.png").getOrThrow(),
                     "a square logo of a university",
                 ),
                 null,
@@ -223,18 +222,17 @@ internal fun universityDegreeLdpVc() =
  * Gets the 'mDL' scoped credential used throughout the tests.
  */
 internal fun mobileDrivingLicense() =
-    MsoMdocCredentialCredentialSupportedObject(
-        "mso_mdoc",
+    MsoMdocCredentialCredentialSupported(
         "mDL",
-        listOf("mso"),
+        listOf(CryptographicBindingMethod.MSO),
         listOf("ES256", "ES384", "ES512"),
-        emptyList(),
+        listOf(ProofType.JWT),
         listOf(
-            DisplayObject(
+            Display(
                 "Mobile Driving License",
-                "en-US",
-                DisplayObject.LogoObject(
-                    "https://examplestate.com/public/mdl.png",
+                Locale.forLanguageTag("en-US"),
+                Display.Logo(
+                    HttpsUrl("https://examplestate.com/public/mdl.png").getOrThrow(),
                     "a square figure of a mobile driving license",
                 ),
                 null,
@@ -245,26 +243,26 @@ internal fun mobileDrivingLicense() =
         "org.iso.18013.5.1.mDL",
         mapOf(
             "org.iso.18013.5.1" to mapOf(
-                "given_name" to MsoMdocCredentialCredentialSupportedObject.ClaimObject(
+                "given_name" to MsoMdocCredentialCredentialSupported.Claim(
                     display = listOf(
-                        MsoMdocCredentialCredentialSupportedObject.ClaimObject.DisplayObject(
+                        MsoMdocCredentialCredentialSupported.Claim.Display(
                             "Given Name",
-                            "en-US",
+                            Locale.forLanguageTag("en-US"),
                         ),
                     ),
                 ),
-                "family_name" to MsoMdocCredentialCredentialSupportedObject.ClaimObject(
+                "family_name" to MsoMdocCredentialCredentialSupported.Claim(
                     display = listOf(
-                        MsoMdocCredentialCredentialSupportedObject.ClaimObject.DisplayObject(
+                        MsoMdocCredentialCredentialSupported.Claim.Display(
                             "Surname",
-                            "en-US",
+                            Locale.forLanguageTag("en-US"),
                         ),
                     ),
                 ),
-                "birth_date" to MsoMdocCredentialCredentialSupportedObject.ClaimObject(),
+                "birth_date" to MsoMdocCredentialCredentialSupported.Claim(),
             ),
             "org.iso.18013.5.1.aamva" to mapOf(
-                "organ_donor" to MsoMdocCredentialCredentialSupportedObject.ClaimObject(),
+                "organ_donor" to MsoMdocCredentialCredentialSupported.Claim(),
             ),
         ),
     )

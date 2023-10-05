@@ -16,9 +16,9 @@
 package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.MsoMdocCredentialCredentialSupportedObject
-import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.W3CVerifiableCredentialCredentialSupportedObject
-import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.W3CVerifiableCredentialCredentialSupportedObject.*
+import eu.europa.ec.eudi.openid4vci.CredentialSupported.MsoMdocCredentialCredentialSupported
+import eu.europa.ec.eudi.openid4vci.CredentialSupported.W3CVerifiableCredentialCredentialSupported
+import eu.europa.ec.eudi.openid4vci.CredentialSupported.W3CVerifiableCredentialCredentialSupported.*
 import eu.europa.ec.eudi.openid4vci.OfferedCredential.MsoMdocCredential
 import eu.europa.ec.eudi.openid4vci.OfferedCredential.W3CVerifiableCredential
 import kotlinx.coroutines.CoroutineDispatcher
@@ -122,20 +122,20 @@ internal class DefaultCredentialOfferRequestResolver(
                 .firstOrNull { it.scope == scope }
                 ?.let {
                     when (it) {
-                        is MsoMdocCredentialCredentialSupportedObject -> MsoMdocCredential(it.docType, it.scope)
-                        is W3CVerifiableCredentialSignedJwtCredentialSupportedObject ->
+                        is MsoMdocCredentialCredentialSupported -> MsoMdocCredential(it.docType, it.scope)
+                        is W3CVerifiableCredentialSignedJwtCredentialSupported ->
                             W3CVerifiableCredential.SignedJwt(
                                 it.credentialDefinition,
                                 it.scope,
                             )
 
-                        is W3CVerifiableCredentialJsonLdSignedJwtCredentialSupportedObject ->
+                        is W3CVerifiableCredentialJsonLdSignedJwtCredentialSupported ->
                             W3CVerifiableCredential.JsonLdSignedJwt(
                                 it.credentialDefinition,
                                 it.scope,
                             )
 
-                        is W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupportedObject ->
+                        is W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupported ->
                             W3CVerifiableCredential.JsonLdDataIntegrity(
                                 it.credentialDefinition,
                                 it.scope,
@@ -170,12 +170,11 @@ internal class DefaultCredentialOfferRequestResolver(
 
                 return credentialsSupported
                     .firstOrNull {
-                        it.format == format &&
-                            it is MsoMdocCredentialCredentialSupportedObject &&
+                        it is MsoMdocCredentialCredentialSupported &&
                             it.docType == docType
                     }
                     ?.let {
-                        MsoMdocCredential(docType, (it as MsoMdocCredentialCredentialSupportedObject).scope)
+                        MsoMdocCredential(docType, (it as MsoMdocCredentialCredentialSupported).scope)
                     }
                     ?: fail()
             }
@@ -194,13 +193,13 @@ internal class DefaultCredentialOfferRequestResolver(
 
                 return credentialsSupported
                     .firstOrNull {
-                        it.format == format &&
-                            it is W3CVerifiableCredentialCredentialSupportedObject &&
+                        it is W3CVerifiableCredentialCredentialSupported &&
                             it.credentialDefinition == credentialDefinition
-                    }?.let {
+                    }
+                    ?.let {
                         constructor(
                             credentialDefinition,
-                            (it as W3CVerifiableCredentialCredentialSupportedObject).scope,
+                            (it as W3CVerifiableCredentialCredentialSupported).scope,
                         )
                     }
                     ?: fail()
