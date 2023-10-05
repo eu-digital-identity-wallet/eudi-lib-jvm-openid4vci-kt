@@ -19,6 +19,7 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.*
+import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.W3CVerifiableCredentialCredentialSupportedObject.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
@@ -193,7 +194,7 @@ private class DefaultCredentialIssuerMetadataResolver(
                     this,
                 )
 
-                "mso_mdoc" -> Json.decodeFromJsonElement<MsoMdocCredentialSupportedObject>(
+                "mso_mdoc" -> Json.decodeFromJsonElement<MsoMdocCredentialCredentialSupportedObject>(
                     this,
                 )
 
