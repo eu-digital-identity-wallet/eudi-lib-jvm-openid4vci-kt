@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.openid.connect.sdk.op.ReadOnlyOIDCProviderMetadata
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -328,3 +329,5 @@ sealed interface IssuanceAuthorization {
         }
     }
 }
+
+typealias CIAuthorizationServerMetadata = ReadOnlyOIDCProviderMetadata

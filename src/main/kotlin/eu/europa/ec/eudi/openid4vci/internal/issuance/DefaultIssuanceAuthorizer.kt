@@ -19,7 +19,6 @@ import com.nimbusds.oauth2.sdk.AuthorizationRequest
 import com.nimbusds.oauth2.sdk.PushedAuthorizationRequest
 import com.nimbusds.oauth2.sdk.ResponseType
 import com.nimbusds.oauth2.sdk.Scope
-import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import com.nimbusds.oauth2.sdk.id.ClientID
 import com.nimbusds.oauth2.sdk.id.State
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
@@ -34,7 +33,7 @@ import java.net.URLEncoder
 
 class DefaultIssuanceAuthorizer(
     val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    val authorizationServerMetadata: AuthorizationServerMetadata,
+    val authorizationServerMetadata: CIAuthorizationServerMetadata,
     val config: WalletOpenId4VCIConfig,
     val postPar: HttpFormPost<PushedAuthorizationRequestResponse>,
     val getAccessToken: HttpFormPost<AccessTokenRequestResponse>,

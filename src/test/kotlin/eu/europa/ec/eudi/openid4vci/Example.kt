@@ -80,12 +80,10 @@ private class Wallet(
         )
 
         val offer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
-
-        val asMetadata = resolveASMetadata(offer.credentialIssuerMetadata.authorizationServer.value.toURL())
-        val issuer = AuthorizationCodeFlowIssuer.ktor(asMetadata, vciWalletConfiguration)
+        val issuer = AuthorizationCodeFlowIssuer.ktor(offer.authorizationServerMetadata, vciWalletConfiguration)
 
         return with(issuer) {
-            println("--> Placing PAR to AS server's endpoint ${asMetadata.pushedAuthorizationRequestEndpointURI}")
+            println("--> Placing PAR to AS server's endpoint ${offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI}")
 
             val parPlaced = placePushedAuthorizationRequest(offer.credentials, null).getOrThrow()
 

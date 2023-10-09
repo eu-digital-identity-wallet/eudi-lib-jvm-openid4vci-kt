@@ -28,7 +28,7 @@ import java.time.Duration
 data class CredentialOffer(
     val credentialIssuerIdentifier: CredentialIssuerId,
     val credentialIssuerMetadata: CredentialIssuerMetadata,
-    val authorizationServerMetadata: AuthorizationServerMetadata,
+    val authorizationServerMetadata: CIAuthorizationServerMetadata,
     val credentials: List<OfferedCredential>,
     val grants: Grants? = null,
 ) : java.io.Serializable {

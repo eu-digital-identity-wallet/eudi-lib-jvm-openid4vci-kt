@@ -316,9 +316,9 @@ internal fun credentialIssuerMetadata() =
     )
 
 /**
- * Gets the [AuthorizationServerMetadata] used throughout the tests.
+ * Gets the [CIAuthorizationServerMetadata] used throughout the tests.
  */
-internal fun authorizationServerMetadata(): AuthorizationServerMetadata =
+internal fun authorizationServerMetadata(): CIAuthorizationServerMetadata =
     OIDCProviderMetadata(
         Issuer(authorizationServerIssuer().value),
         listOf(

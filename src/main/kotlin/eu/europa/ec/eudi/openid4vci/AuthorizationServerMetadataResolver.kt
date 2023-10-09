@@ -15,12 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.openid.connect.sdk.op.ReadOnlyOIDCProviderMetadata
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultAuthorizationServerMetadataResolver
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-
-typealias AuthorizationServerMetadata = ReadOnlyOIDCProviderMetadata
 
 /**
  * Indicates an error during the resolution of an Authorization Server's metadata.
@@ -35,7 +32,7 @@ internal fun interface AuthorizationServerMetadataResolver {
     /**
      * Resolves the metadata of an [issuer].
      */
-    suspend fun resolve(issuer: HttpsUrl): Result<AuthorizationServerMetadata>
+    suspend fun resolve(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata>
 
     companion object {
 

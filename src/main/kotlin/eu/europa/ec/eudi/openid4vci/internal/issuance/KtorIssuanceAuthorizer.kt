@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.issuance
 
-import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -70,7 +69,7 @@ internal class KtorIssuanceAuthorizer private constructor(
         }
 
         operator fun invoke(
-            authorizationServerMetadata: AuthorizationServerMetadata,
+            authorizationServerMetadata: CIAuthorizationServerMetadata,
             config: WalletOpenId4VCIConfig,
             coroutineDispatcher: CoroutineDispatcher,
             httpClientFactory: KtorHttpClientFactory,

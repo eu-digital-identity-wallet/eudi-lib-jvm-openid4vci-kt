@@ -7,7 +7,7 @@
   "pushed_authorization_request_endpoint": "https://as.example.com/ext/par/request",
   "device_authorization_endpoint": "https://as.example.com/auth/device",
   "backchannel_authentication_endpoint": "https://as.example.com/ext/ciba/auth",
-  "issuer": "https://keycloak.local/realms/eudiw",
+  "issuer": "https://as.example.com",
   "jwks_uri": "https://as.example.com/certs",
   "scopes_supported": [
     "openid",

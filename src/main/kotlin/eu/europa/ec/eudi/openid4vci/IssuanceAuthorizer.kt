@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceAuthorizer
 import eu.europa.ec.eudi.openid4vci.internal.issuance.KtorHttpClientFactory
 import eu.europa.ec.eudi.openid4vci.internal.issuance.KtorIssuanceAuthorizer
@@ -74,7 +73,7 @@ interface IssuanceAuthorizer {
 
     companion object {
         fun make(
-            authorizationServerMetadata: AuthorizationServerMetadata,
+            authorizationServerMetadata: CIAuthorizationServerMetadata,
             config: WalletOpenId4VCIConfig,
             postPar: HttpFormPost<PushedAuthorizationRequestResponse>,
             getAccessToken: HttpFormPost<AccessTokenRequestResponse>,
@@ -87,7 +86,7 @@ interface IssuanceAuthorizer {
             )
 
         fun ktor(
-            authorizationServerMetadata: AuthorizationServerMetadata,
+            authorizationServerMetadata: CIAuthorizationServerMetadata,
             config: WalletOpenId4VCIConfig,
             coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpClientFactory: KtorHttpClientFactory = KtorIssuanceAuthorizer.DefaultFactory,

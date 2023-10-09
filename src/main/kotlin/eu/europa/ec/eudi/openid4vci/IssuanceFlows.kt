@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultAuthorizationCodeFlowIssuer
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultPreAuthorizedCodeFlowIssuer
 import java.time.Instant
@@ -221,7 +220,7 @@ interface AuthorizationCodeFlowIssuer {
     companion object {
         fun make(authorizer: IssuanceAuthorizer) = DefaultAuthorizationCodeFlowIssuer(authorizer)
         fun ktor(
-            authorizationServerMetadata: AuthorizationServerMetadata,
+            authorizationServerMetadata: CIAuthorizationServerMetadata,
             config: WalletOpenId4VCIConfig,
         ) = DefaultAuthorizationCodeFlowIssuer(
             IssuanceAuthorizer.ktor(
@@ -244,7 +243,7 @@ interface PreAuthorizationCodeFlowIssuer {
         fun make(authorizer: IssuanceAuthorizer) = DefaultPreAuthorizedCodeFlowIssuer(authorizer)
 
         fun ktor(
-            authorizationServerMetadata: AuthorizationServerMetadata,
+            authorizationServerMetadata: CIAuthorizationServerMetadata,
             config: WalletOpenId4VCIConfig,
         ) = DefaultPreAuthorizedCodeFlowIssuer(
             IssuanceAuthorizer.ktor(

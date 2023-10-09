@@ -15,34 +15,69 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.internal.issuance.TokenEndpointForm
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
-import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.hamcrest.MatcherAssert.assertThat
 import org.junit.jupiter.api.Assertions.fail
 import java.io.File
 import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
-import java.util.UUID
+import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as KtorServerContentNegotiation
 
 class IssuanceFlowsTest {
+
+    private val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
+    private val AUTHORIZATION_SERVER_PUBLIC_URL = "https://as.example.com"
+
+    private val AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
+        {
+          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+          "credentials": ["PID_mso_mdoc", "UniversityDegree"],
+          "grants": {
+            "authorization_code": {
+              "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
+            }
+          }
+        }
+    """.trimIndent()
+
+    private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS = """
+        {
+          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+          "credentials": ["PID_mso_mdoc", "UniversityDegree"]          
+        }
+    """.trimIndent()
+
+    private val PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
+        {
+          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+          "credentials": ["PID_mso_mdoc", "UniversityDegree"],
+          "grants": {
+            "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+              "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
+              "user_pin_required": true
+            }
+          }
+        }
+    """.trimIndent()
 
     enum class IssuanceFlow {
         PRE_AUTHORIZED,
@@ -282,22 +317,22 @@ class IssuanceFlowsTest {
         getAccessToken: HttpFormPost<AccessTokenRequestResponse>,
         getAsMetadata: HttpGet<String>,
     ) = runBlocking {
-        // [WALLET] PID PROVIDER IS SELECTED FROM USER OR PRE-CONFIGURED IN WALLET
-        val credentialIssuerMetaData: CredentialIssuerMetadata = credentialIssuerMetaData()
+        val credentialOfferStr = when (issuanceFlow) {
+            IssuanceFlow.AUTHORIZED_WALLET_INITIATED -> AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS
+            IssuanceFlow.AUTHORIZED_ISSUER_INITIATED -> AUTH_CODE_GRANT_CREDENTIAL_OFFER
+            IssuanceFlow.PRE_AUTHORIZED -> fail("Wrong test data")
+        }
 
-        val asMetadata =
-            resolveASMetadata(credentialIssuerMetaData.authorizationServer.value.toURL(), getAsMetadata)
-
-        // [WALLET] PREPARES THE CREDENTIAL OFFER TO REQUEST
-        val credentialOffer: CredentialOffer = credentialOffer(
-            issuanceFlow,
-            credentialIssuerMetaData,
-        )
+        val offer = CredentialOfferRequestResolver(
+            httpGet = getAsMetadata,
+        ).resolve(
+            "https://localhost:8080/credentialoffer?credential_offer=$credentialOfferStr",
+        ).getOrThrow()
 
         // AUTHORIZATION CODE FLOW IS USED FOR ISSUANCE
         val issuer = AuthorizationCodeFlowIssuer.make(
             IssuanceAuthorizer.make(
-                asMetadata,
+                offer.authorizationServerMetadata,
                 vciWalletConfiguration,
                 postPar,
                 getAccessToken,
@@ -305,7 +340,7 @@ class IssuanceFlowsTest {
         )
 
         val issuerState =
-            when (val grants = credentialOffer.grants) {
+            when (val grants = offer.grants) {
                 is Grants.AuthorizationCode -> grants.issuerState
                 is Grants.Both -> grants.authorizationCode.issuerState
                 null -> null
@@ -314,7 +349,7 @@ class IssuanceFlowsTest {
 
         // Place PAR
         val parRequested =
-            issuer.placePushedAuthorizationRequest(credentialOffer.credentials, issuerState).getOrThrow()
+            issuer.placePushedAuthorizationRequest(offer.credentials, issuerState).getOrThrow()
                 .also { println(it) }
 
         // [WALLET] CONSTRUCTS url GET request opens it in browser window and authenticates user in issuer's side
@@ -335,21 +370,15 @@ class IssuanceFlowsTest {
         getAccessToken: HttpFormPost<AccessTokenRequestResponse>,
         getAsMetadata: HttpGet<String>,
     ) = runBlocking {
-        // User interacts with issuer's site, authenticates and a credential offer is presented as QR code
-        // [WALLET] Retrieves issuer's metadata
-        val credentialIssuerMetaData: CredentialIssuerMetadata = credentialIssuerMetaData()
-
-        val asMetadata = resolveASMetadata(credentialIssuerMetaData.authorizationServer.value.toURL(), getAsMetadata)
-
-        // [WALLET] User scans QR code via wallet scanner
-        val credentialOffer: CredentialOffer = credentialOffer(
-            IssuanceFlow.PRE_AUTHORIZED,
-            credentialIssuerMetaData,
-        )
+        val offer = CredentialOfferRequestResolver(
+            httpGet = getAsMetadata,
+        ).resolve(
+            "https://localhost:8080/credentialoffer?credential_offer=$PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER",
+        ).getOrThrow()
 
         val issuer = PreAuthorizationCodeFlowIssuer.make(
             IssuanceAuthorizer.make(
-                asMetadata,
+                offer.authorizationServerMetadata,
                 vciWalletConfiguration,
                 postPar,
                 getAccessToken,
@@ -357,7 +386,7 @@ class IssuanceFlowsTest {
         )
 
         val preAuthorizationCode =
-            when (val grants = credentialOffer.grants) {
+            when (val grants = offer.grants) {
                 is Grants.PreAuthorizedCode -> grants.preAuthorizedCode
                 is Grants.Both -> grants.preAuthorizedCode.preAuthorizedCode
                 else -> fail("Not expected offer grant type")
@@ -377,11 +406,32 @@ class IssuanceFlowsTest {
         tokenPostAssertions: (call: ApplicationCall) -> Unit,
     ) = testApplication {
         externalServices {
-            hosts("https://as.example.com") {
+            // Credential issuer server
+            hosts(CREDENTIAL_ISSUER_PUBLIC_URL) {
                 install(KtorServerContentNegotiation) {
                     json()
                 }
                 routing {
+                    get("/.well-known/openid-credential-issuer") {
+                        call.respond(
+                            HttpStatusCode.OK,
+                            credentialIssuerMetaData(),
+                        )
+                    }
+                }
+            }
+
+            // Authorization server
+            hosts(AUTHORIZATION_SERVER_PUBLIC_URL) {
+                install(KtorServerContentNegotiation) {
+                    json()
+                }
+                routing {
+                    get("/.well-known/openid-configuration") {
+                        val response = getResourceAsText("authorization-server/well_known_response.json")
+                        call.respond(HttpStatusCode.OK, response)
+                    }
+
                     post("/ext/par/request") {
                         parPostAssertions(call)
 
@@ -406,11 +456,6 @@ class IssuanceFlowsTest {
                             ),
                         )
                     }
-
-                    get("/.well-known/oauth-authorization-server") {
-                        val response = getResourceAsText("authorization-server/well_known_response.json")
-                        call.respond(HttpStatusCode.OK, response)
-                    }
                 }
             }
         }
@@ -423,72 +468,28 @@ class IssuanceFlowsTest {
         testBlock(managedHttpClient)
     }
 
-    private fun credentialIssuerMetaData(): CredentialIssuerMetadata {
-        return CredentialIssuerMetadata(
-            credentialIssuerIdentifier = CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
-            authorizationServer = HttpsUrl("https://as.example.com").getOrThrow(),
-            credentialEndpoint = CredentialIssuerEndpoint("https://credential-issuer.example.com/issue").getOrThrow(),
+    private fun credentialIssuerMetaData(): CredentialIssuerMetadataObject {
+        return CredentialIssuerMetadataObject(
+            credentialIssuerIdentifier = CREDENTIAL_ISSUER_PUBLIC_URL,
+            authorizationServer = AUTHORIZATION_SERVER_PUBLIC_URL,
+            credentialEndpoint = "$CREDENTIAL_ISSUER_PUBLIC_URL/issue",
             credentialsSupported = listOf(
-                CredentialSupported.MsoMdocCredentialCredentialSupported(
-                    scope = "UniversityDegree",
-                    docType = "org.iso.18013.5.1.mDL",
+                JsonObject(
+                    mapOf(
+                        "format" to JsonPrimitive("mso_mdoc"),
+                        "scope" to JsonPrimitive("UniversityDegree"),
+                        "doctype" to JsonPrimitive("eu.europa.ec.UniversityDegree"),
+                    ),
+                ),
+                JsonObject(
+                    mapOf(
+                        "format" to JsonPrimitive("mso_mdoc"),
+                        "scope" to JsonPrimitive("PID_mso_mdoc"),
+                        "doctype" to JsonPrimitive("eu.europa.ec.pid"),
+                    ),
                 ),
             ),
         )
-    }
-
-    private fun credentialOffer(
-        issuanceFlow: IssuanceFlow,
-        credentialIssuerMetaData: CredentialIssuerMetadata,
-    ): CredentialOffer {
-        return when (issuanceFlow) {
-            IssuanceFlow.AUTHORIZED_WALLET_INITIATED ->
-                CredentialOffer(
-                    CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
-                    credentialIssuerMetaData,
-                    listOf(
-                        OfferedCredential.MsoMdocCredential(
-                            "org.iso.18013.5.1.mDL",
-                            "UniversityDegree",
-                        ),
-                        OfferedCredential.MsoMdocCredential(
-                            "org.iso.18013.5.1.mDL",
-                            "PID_mso_mdoc",
-                        ),
-                    ),
-                    null,
-                )
-
-            IssuanceFlow.AUTHORIZED_ISSUER_INITIATED ->
-                CredentialOffer(
-                    CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
-                    credentialIssuerMetaData,
-                    listOf(
-                        OfferedCredential.MsoMdocCredential(
-                            "org.iso.18013.5.1.mDL",
-                            "UniversityDegree",
-                        ),
-                        OfferedCredential.MsoMdocCredential(
-                            "org.iso.18013.5.1.mDL",
-                            "PID_mso_mdoc",
-                        ),
-                    ),
-                    Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                )
-
-            IssuanceFlow.PRE_AUTHORIZED ->
-                CredentialOffer(
-                    CredentialIssuerId("https://credential-issuer.example.com").getOrThrow(),
-                    credentialIssuerMetaData,
-                    listOf(
-                        OfferedCredential.MsoMdocCredential(
-                            "org.iso.18013.5.1.mDL",
-                            "UniversityDegree",
-                        ),
-                    ),
-                    Grants.PreAuthorizedCode("eyJhbGciOiJSU0EtFYUaBy", true),
-                )
-        }
     }
 
     private fun createPostPar(managedHttpClient: HttpClient): HttpFormPost<PushedAuthorizationRequestResponse> =
@@ -534,22 +535,6 @@ class IssuanceFlowsTest {
                 managedHttpClient.get(url).body<String>()
             }
         }
-
-    private suspend fun resolveASMetadata(
-        authorizationServerUrl: URL,
-        getASMetadata: HttpGet<String>,
-    ): AuthorizationServerMetadata {
-        val asMetadataURL = authorizationServerUrl.toString().let {
-            if (it.endsWith("/")) {
-                URL(authorizationServerUrl.toString() + ".well-known/oauth-authorization-server")
-            } else {
-                URL(authorizationServerUrl.toString() + "/.well-known/oauth-authorization-server")
-            }
-        }
-
-        val metadata = getASMetadata.get(asMetadataURL).getOrThrow()
-        return AuthorizationServerMetadata.parse(metadata)
-    }
 
     private fun getResourceAsText(resource: String): String =
         File(ClassLoader.getSystemResource(resource).path).readText()
