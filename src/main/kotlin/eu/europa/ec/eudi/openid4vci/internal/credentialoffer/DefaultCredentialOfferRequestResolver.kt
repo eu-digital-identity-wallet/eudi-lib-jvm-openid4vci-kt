@@ -36,6 +36,7 @@ internal class DefaultCredentialOfferRequestResolver(
 ) : CredentialOfferRequestResolver {
 
     private val credentialIssuerMetadataResolver = CredentialIssuerMetadataResolver(ioCoroutineDispatcher, httpGet)
+    private val authorizationServerMetadataResolver = AuthorizationServerMetadataResolver(ioCoroutineDispatcher, httpGet)
 
     override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> =
         runCatching {
@@ -58,6 +59,9 @@ internal class DefaultCredentialOfferRequestResolver(
             val credentialIssuerMetadata = credentialIssuerMetadataResolver.resolve(credentialIssuerId)
                 .getOrElse { CredentialOfferRequestError.UnableToResolveCredentialIssuerMetadata(it).raise() }
 
+            val authorizationServerMetadata = authorizationServerMetadataResolver.resolve(credentialIssuerMetadata.authorizationServer)
+                .getOrElse { CredentialOfferRequestError.UnableToResolveAuthorizationServerMetadata(it).raise() }
+
             val credentials = runCatching {
                 credentialOfferRequestObject.credentials
                     .map { it.toOfferedCredential(credentialIssuerMetadata) }
@@ -70,7 +74,7 @@ internal class DefaultCredentialOfferRequestResolver(
                 credentialOfferRequestObject.grants?.toGrants()
             }.getOrElse { CredentialOfferRequestValidationError.InvalidGrants(it).raise() }
 
-            CredentialOffer(credentialIssuerId, credentialIssuerMetadata, credentials, grants)
+            CredentialOffer(credentialIssuerId, credentialIssuerMetadata, authorizationServerMetadata, credentials, grants)
         }
 
     companion object {

@@ -22,7 +22,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions
 import kotlin.test.Test
 
-internal class CredentialIssuerMetadataResolverTest {
+internal class DefaultCredentialIssuerMetadataResolverTest {
 
     @Test
     internal fun `fails when metadata cannot be fetched`() {
