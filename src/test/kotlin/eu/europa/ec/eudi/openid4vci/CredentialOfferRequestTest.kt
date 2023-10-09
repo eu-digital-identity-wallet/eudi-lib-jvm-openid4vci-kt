@@ -29,7 +29,7 @@ internal class CredentialOfferRequestTest {
                 {
                     val error = Assertions.assertInstanceOf(CredentialOfferRequestException::class.java, it)
                     Assertions.assertInstanceOf(
-                        CredentialOfferRequestValidationError.NonParsableCredentialOfferEndpointUrl::class.java,
+                        CredentialOfferRequestError.NonParsableCredentialOfferEndpointUrl::class.java,
                         error.error,
                     )
                 },
