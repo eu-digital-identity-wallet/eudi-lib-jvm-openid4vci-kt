@@ -109,13 +109,14 @@ data class CredentialIssuerMetadataObject(
     @SerialName("credential_endpoint") @Required val credentialEndpoint: String,
     @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
     @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
-    @SerialName("credential_response_encryption_alg_values_supported") val credentialResponseEncryptionAlgorithmsSupported: List<String> =
-        emptyList(),
-    @SerialName("credential_response_encryption_enc_values_supported") val credentialResponseEncryptionMethodsSupported: List<String> =
-        emptyList(),
-    @SerialName("require_credential_response_encryption") val requireCredentialResponseEncryption: Boolean? = null,
+    @SerialName("credential_response_encryption_alg_values_supported")
+    val credentialResponseEncryptionAlgorithmsSupported: List<String>? = null,
+    @SerialName("credential_response_encryption_enc_values_supported")
+    val credentialResponseEncryptionMethodsSupported: List<String>? = null,
+    @SerialName("require_credential_response_encryption")
+    val requireCredentialResponseEncryption: Boolean? = null,
     @SerialName("credentials_supported") val credentialsSupported: List<JsonObject> = emptyList(),
-    @SerialName("display") val display: List<DisplayObject> = emptyList(),
+    @SerialName("display") val display: List<DisplayObject>? = null,
 ) {
 
     /**
@@ -135,10 +136,10 @@ sealed interface CredentialSupportedObject {
 
     val format: String
     val scope: String?
-    val cryptographicBindingMethodsSupported: List<String>
-    val cryptographicSuitesSupported: List<String>
-    val proofTypesSupported: List<String>
-    val display: List<DisplayObject>
+    val cryptographicBindingMethodsSupported: List<String>?
+    val cryptographicSuitesSupported: List<String>?
+    val proofTypesSupported: List<String>?
+    val display: List<DisplayObject>?
 
     /**
      * The data of a W3C Verifiable Credential.
@@ -146,7 +147,7 @@ sealed interface CredentialSupportedObject {
     sealed interface W3CVerifiableCredentialCredentialSupportedObject : CredentialSupportedObject {
 
         val credentialDefinition: JsonObject
-        val order: List<String>
+        val order: List<String>?
 
         /**
          * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
@@ -155,13 +156,15 @@ sealed interface CredentialSupportedObject {
         data class W3CVerifiableCredentialSignedJwtCredentialSupportedObject(
             @SerialName("format") @Required override val format: String,
             @SerialName("scope") override val scope: String? = null,
-            @SerialName("cryptographic_binding_methods_supported") override val cryptographicBindingMethodsSupported: List<String> =
-                emptyList(),
-            @SerialName("cryptographic_suites_supported") override val cryptographicSuitesSupported: List<String> = emptyList(),
-            @SerialName("proof_types_supported") override val proofTypesSupported: List<String> = emptyList(),
-            @SerialName("display") override val display: List<DisplayObject> = emptyList(),
+            @SerialName("cryptographic_binding_methods_supported")
+            override val cryptographicBindingMethodsSupported: List<String>? = null,
+            @SerialName("cryptographic_suites_supported")
+            override val cryptographicSuitesSupported: List<String>? = null,
+            @SerialName("proof_types_supported")
+            override val proofTypesSupported: List<String>? = null,
+            @SerialName("display") override val display: List<DisplayObject>? = null,
             @SerialName("credential_definition") @Required override val credentialDefinition: JsonObject,
-            @SerialName("order") override val order: List<String> = emptyList(),
+            @SerialName("order") override val order: List<String>? = null,
         ) : W3CVerifiableCredentialCredentialSupportedObject {
             init {
                 require(format == "jwt_vc_json") { "invalid format '$format'" }
@@ -175,14 +178,16 @@ sealed interface CredentialSupportedObject {
         data class W3CVerifiableCredentialJsonLdSignedJwtCredentialSupportedObject(
             @SerialName("format") @Required override val format: String,
             @SerialName("scope") override val scope: String? = null,
-            @SerialName("cryptographic_binding_methods_supported") override val cryptographicBindingMethodsSupported: List<String> =
-                emptyList(),
-            @SerialName("cryptographic_suites_supported") override val cryptographicSuitesSupported: List<String> = emptyList(),
-            @SerialName("proof_types_supported") override val proofTypesSupported: List<String> = emptyList(),
-            @SerialName("display") override val display: List<DisplayObject> = emptyList(),
-            @SerialName("@context") val context: List<String> = emptyList(),
+            @SerialName("cryptographic_binding_methods_supported")
+            override val cryptographicBindingMethodsSupported: List<String>? = null,
+            @SerialName("cryptographic_suites_supported")
+            override val cryptographicSuitesSupported: List<String>? = null,
+            @SerialName("proof_types_supported")
+            override val proofTypesSupported: List<String>? = null,
+            @SerialName("display") override val display: List<DisplayObject>? = null,
+            @SerialName("@context") @Required val context: List<String> = emptyList(),
             @SerialName("credential_definition") @Required override val credentialDefinition: JsonObject,
-            @SerialName("order") override val order: List<String> = emptyList(),
+            @SerialName("order") override val order: List<String>? = null,
         ) : W3CVerifiableCredentialCredentialSupportedObject {
             init {
                 require(format == "jwt_vc_json-ld") { "invalid format '$format'" }
@@ -196,15 +201,17 @@ sealed interface CredentialSupportedObject {
         data class W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupportedObject(
             @SerialName("format") @Required override val format: String,
             @SerialName("scope") override val scope: String? = null,
-            @SerialName("cryptographic_binding_methods_supported") override val cryptographicBindingMethodsSupported: List<String> =
-                emptyList(),
-            @SerialName("cryptographic_suites_supported") override val cryptographicSuitesSupported: List<String> = emptyList(),
-            @SerialName("proof_types_supported") override val proofTypesSupported: List<String> = emptyList(),
-            @SerialName("display") override val display: List<DisplayObject> = emptyList(),
-            @SerialName("@context") val context: List<String> = emptyList(),
-            @SerialName("type") val type: List<String> = emptyList(),
+            @SerialName("cryptographic_binding_methods_supported")
+            override val cryptographicBindingMethodsSupported: List<String>? = null,
+            @SerialName("cryptographic_suites_supported")
+            override val cryptographicSuitesSupported: List<String>? = null,
+            @SerialName("proof_types_supported")
+            override val proofTypesSupported: List<String>? = null,
+            @SerialName("display") override val display: List<DisplayObject>? = null,
+            @SerialName("@context") @Required val context: List<String> = emptyList(),
+            @SerialName("type") @Required val type: List<String> = emptyList(),
             @SerialName("credential_definition") @Required override val credentialDefinition: JsonObject,
-            @SerialName("order") override val order: List<String> = emptyList(),
+            @SerialName("order") override val order: List<String>? = null,
         ) : W3CVerifiableCredentialCredentialSupportedObject {
             init {
                 require(format == "ldp_vc") { "invalid format '$format'" }
@@ -219,14 +226,16 @@ sealed interface CredentialSupportedObject {
     data class MsoMdocCredentialCredentialSupportedObject(
         @SerialName("format") @Required override val format: String,
         @SerialName("scope") override val scope: String? = null,
-        @SerialName("cryptographic_binding_methods_supported") override val cryptographicBindingMethodsSupported: List<String> =
-            emptyList(),
-        @SerialName("cryptographic_suites_supported") override val cryptographicSuitesSupported: List<String> = emptyList(),
-        @SerialName("proof_types_supported") override val proofTypesSupported: List<String> = emptyList(),
-        @SerialName("display") override val display: List<DisplayObject> = emptyList(),
+        @SerialName("cryptographic_binding_methods_supported")
+        override val cryptographicBindingMethodsSupported: List<String>? = null,
+        @SerialName("cryptographic_suites_supported")
+        override val cryptographicSuitesSupported: List<String>? = null,
+        @SerialName("proof_types_supported")
+        override val proofTypesSupported: List<String>? = null,
+        @SerialName("display") override val display: List<DisplayObject>? = null,
         @SerialName("doctype") @Required val docType: String,
-        @SerialName("claims") val claims: Map<String, Map<String, ClaimObject>> = emptyMap(),
-        @SerialName("order") val order: List<String> = emptyList(),
+        @SerialName("claims") val claims: Map<String, Map<String, ClaimObject>>? = null,
+        @SerialName("order") val order: List<String>? = null,
     ) : CredentialSupportedObject {
         init {
             require(format == "mso_mdoc") { "invalid format '$format'" }
@@ -237,9 +246,9 @@ sealed interface CredentialSupportedObject {
          */
         @Serializable
         data class ClaimObject(
-            @SerialName("mandatory") val mandatory: Boolean? = false,
+            @SerialName("mandatory") val mandatory: Boolean? = null,
             @SerialName("value_type") val valueType: String? = null,
-            @SerialName("display") val display: List<DisplayObject> = emptyList(),
+            @SerialName("display") val display: List<DisplayObject>? = null,
         ) {
 
             /**

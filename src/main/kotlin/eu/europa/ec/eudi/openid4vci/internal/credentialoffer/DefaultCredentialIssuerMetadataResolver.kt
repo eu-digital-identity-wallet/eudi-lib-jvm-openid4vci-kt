@@ -103,7 +103,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                     }
 
             val credentialResponseEncryptionAlgorithmsSupported = runCatching {
-                credentialResponseEncryptionAlgorithmsSupported.map { JWEAlgorithm.parse(it) }
+                credentialResponseEncryptionAlgorithmsSupported?.map { JWEAlgorithm.parse(it) } ?: emptyList()
             }.getOrElse {
                 CredentialIssuerMetadataValidationError.InvalidCredentialResponseEncryptionAlgorithmsSupported(
                     it,
@@ -111,7 +111,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
             }
 
             val credentialResponseEncryptionMethodsSupported = runCatching {
-                credentialResponseEncryptionMethodsSupported.map { EncryptionMethod.parse(it) }
+                credentialResponseEncryptionMethodsSupported?.map { EncryptionMethod.parse(it) } ?: emptyList()
             }.getOrElse {
                 CredentialIssuerMetadataValidationError.InvalidCredentialResponseEncryptionMethodsSupported(it).raise()
             }
@@ -131,7 +131,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 }
 
             val display = runCatching {
-                display.map { it.toDomain() }
+                display?.map { it.toDomain() } ?: emptyList()
             }.getOrElse { CredentialIssuerMetadataValidationError.InvalidDisplay(it).raise() }
 
             return CredentialIssuerMetadata(
@@ -187,7 +187,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
          */
         private fun CredentialSupportedObject.toCredentialSupported(): CredentialSupported {
             val cryptographicBindingMethodsSupported =
-                cryptographicBindingMethodsSupported.map {
+                cryptographicBindingMethodsSupported?.map {
                     when (it) {
                         "jwk" -> CryptographicBindingMethod.JWK
                         "cose_key" -> CryptographicBindingMethod.COSE
@@ -199,17 +199,17 @@ internal class DefaultCredentialIssuerMetadataResolver(
                                 throw IllegalArgumentException("Unknown Cryptographic Binding Method '$it'")
                             }
                     }
-                }
-            val cryptographicSuitesSupported = cryptographicSuitesSupported
+                } ?: emptyList()
+            val cryptographicSuitesSupported = cryptographicSuitesSupported ?: emptyList()
             val proofTypesSupported =
                 proofTypesSupported
-                    .map {
+                    ?.map {
                         when (it) {
                             "jwt" -> ProofType.JWT
                             "cwt" -> ProofType.CWT
                             else -> throw IllegalArgumentException("Unknown Proof Type '$it'")
                         }
-                    }
+                    } ?: emptyList<ProofType>()
                     .ifEmpty {
                         listOf(ProofType.JWT)
                     }
@@ -231,25 +231,25 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 )
             }
 
-            val display = display.map { it.toDisplay() }
+            val display = display?.map { it.toDisplay() } ?: emptyList()
 
             fun MsoMdocCredentialCredentialSupportedObject.claims(): MsoMdocClaims =
-                claims.mapValues { namespaceAndClaims ->
+                claims?.mapValues { namespaceAndClaims ->
                     namespaceAndClaims.value.mapValues { claimNameAndClaim ->
                         claimNameAndClaim.value.let { claimObject ->
                             MsoMdocCredentialCredentialSupported.Claim(
                                 claimObject.mandatory ?: false,
                                 claimObject.valueType,
-                                claimObject.display.map { displayObject ->
+                                claimObject.display?.map { displayObject ->
                                     MsoMdocCredentialCredentialSupported.Claim.Display(
                                         displayObject.name,
                                         displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
                                     )
-                                },
+                                } ?: emptyList(),
                             )
                         }
                     }
-                }
+                } ?: emptyMap()
 
             return when (this) {
                 is W3CVerifiableCredentialSignedJwtCredentialSupportedObject ->
@@ -260,7 +260,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                         proofTypesSupported,
                         display,
                         credentialDefinition,
-                        order,
+                        order ?: emptyList(),
                     )
 
                 is W3CVerifiableCredentialJsonLdSignedJwtCredentialSupportedObject ->
@@ -272,7 +272,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                         display,
                         context,
                         credentialDefinition,
-                        order,
+                        order ?: emptyList(),
                     )
 
                 is W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupportedObject ->
@@ -285,7 +285,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                         context,
                         type,
                         credentialDefinition,
-                        order,
+                        order ?: emptyList(),
                     )
 
                 is MsoMdocCredentialCredentialSupportedObject ->
@@ -297,7 +297,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                         display,
                         docType,
                         claims(),
-                        order,
+                        order ?: emptyList(),
                     )
             }
         }
