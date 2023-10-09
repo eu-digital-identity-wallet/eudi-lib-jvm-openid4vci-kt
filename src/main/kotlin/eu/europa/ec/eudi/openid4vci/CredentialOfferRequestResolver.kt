@@ -20,6 +20,134 @@ import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import java.io.Serializable
+import java.time.Duration
+
+/**
+ * A Credential Offer.
+ */
+data class CredentialOffer(
+    val credentialIssuerIdentifier: CredentialIssuerId,
+    val credentialIssuerMetadata: CredentialIssuerMetadata,
+    val credentials: List<OfferedCredential>,
+    val grants: Grants? = null,
+) : java.io.Serializable {
+    init {
+        require(credentials.isNotEmpty()) { "credentials must not be empty" }
+    }
+}
+
+/**
+ * The Id of a Credential Issuer. An [HttpsUrl] that has no fragment or query parameters.
+ */
+@JvmInline
+value class CredentialIssuerId private constructor(val value: HttpsUrl) {
+
+    companion object {
+
+        /**
+         * Parses the provided [value] as an [HttpsUrl] and tries to create a [CredentialIssuerId].
+         */
+        operator fun invoke(value: String): Result<CredentialIssuerId> =
+            HttpsUrl(value)
+                .mapCatching {
+                    require(it.value.fragment.isNullOrBlank()) { "CredentialIssuerId must not have a fragment" }
+                    require(it.value.query.isNullOrBlank()) { "CredentialIssuerId must not have query parameters " }
+                    CredentialIssuerId(it)
+                }
+    }
+}
+
+/**
+ * A Credential being offered in a Credential Offer.
+ */
+sealed interface OfferedCredential : java.io.Serializable {
+
+    val scope: String?
+
+    /**
+     * An MSO MDOC credential.
+     */
+    data class MsoMdocCredential(
+        val docType: String,
+        override val scope: String? = null,
+    ) : OfferedCredential
+
+    /**
+     * A W3C Verifiable Credential.
+     */
+    sealed interface W3CVerifiableCredential : OfferedCredential {
+
+        val credentialDefinition: CredentialDefinition
+
+        /**
+         * A signed JWT not using JSON-LD.
+         *
+         * Format: jwt_vc_json
+         */
+        data class SignedJwt(
+            override val credentialDefinition: CredentialDefinition,
+            override val scope: String? = null,
+        ) : W3CVerifiableCredential
+
+        /**
+         * A signed JWT using JSON-LD.
+         *
+         * Format: jwt_vc_json-ld
+         */
+        data class JsonLdSignedJwt(
+            override val credentialDefinition: CredentialDefinition,
+            override val scope: String? = null,
+        ) : W3CVerifiableCredential
+
+        /**
+         * Data Integrity using JSON-LD.
+         *
+         * Format: ldp_vc
+         */
+        data class JsonLdDataIntegrity(
+            override val credentialDefinition: CredentialDefinition,
+            override val scope: String? = null,
+        ) : W3CVerifiableCredential
+    }
+}
+
+/**
+ * The Grant Types a Credential Issuer can process for a Credential Offer.
+ */
+sealed interface Grants : java.io.Serializable {
+
+    /**
+     * Data for an Authorization Code Grant. [issuerState], if provided, must not be blank.
+     */
+    data class AuthorizationCode(
+        val issuerState: String? = null,
+    ) : Grants {
+        init {
+            require(!(issuerState?.isBlank() ?: false)) { "issuerState cannot be blank" }
+        }
+    }
+
+    /**
+     * Data for a Pre-Authorized Code Grant. [preAuthorizedCode] must not be blank.
+     */
+    data class PreAuthorizedCode(
+        val preAuthorizedCode: String,
+        val pinRequired: Boolean = false,
+        val interval: Duration = Duration.ofSeconds(5L),
+    ) : Grants {
+        init {
+            require(preAuthorizedCode.isNotBlank()) { "preAuthorizedCode cannot be blank" }
+        }
+    }
+
+    /**
+     * Data for either an Authorization Code Grant or a Pre-Authorized Code Grant.
+     */
+    data class Both(
+        val authorizationCode: AuthorizationCode,
+        val preAuthorizedCode: PreAuthorizedCode,
+    ) : Grants
+}
 
 /**
  * Credential Offer request.
@@ -30,7 +158,7 @@ sealed interface CredentialOfferRequest : Serializable {
      * A Credential Offer request that was passed using the 'credential_offer' query parameter.
      */
     @JvmInline
-    value class PassByValue(val value: JsonString) : CredentialOfferRequest
+    value class PassByValue(val value: String) : CredentialOfferRequest
 
     /**
      * A Credential Offer request that must be resolved using the 'credential_offer_uri' parameter.

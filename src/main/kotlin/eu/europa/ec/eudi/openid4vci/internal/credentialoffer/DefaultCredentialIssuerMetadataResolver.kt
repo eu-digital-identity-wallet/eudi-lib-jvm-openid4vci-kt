@@ -25,39 +25,14 @@ import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.W3CVerifiableCrede
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import java.util.*
 
 /**
- * Service for fetching, parsing, and validating the metadata of a Credential Issuer.
- */
-internal fun interface CredentialIssuerMetadataResolver {
-
-    /**
-     * Tries to fetch and validate the metadata of a Credential Issuer.
-     */
-    suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata>
-
-    companion object {
-
-        /**
-         * Creates a new [CredentialIssuerMetadataResolver] instance.
-         *
-         * [httpGet] execution are dispatched on [ioCoroutineDispatcher].
-         */
-        operator fun invoke(
-            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            httpGet: HttpGet<String>,
-        ): CredentialIssuerMetadataResolver = DefaultCredentialIssuerMetadataResolver(ioCoroutineDispatcher, httpGet)
-    }
-}
-
-/**
  * Default implementation of [CredentialIssuerMetadataResolver].
  */
-private class DefaultCredentialIssuerMetadataResolver(
+internal class DefaultCredentialIssuerMetadataResolver(
     private val ioCoroutineDispatcher: CoroutineDispatcher,
     private val httpGet: HttpGet<String>,
 ) : CredentialIssuerMetadataResolver {

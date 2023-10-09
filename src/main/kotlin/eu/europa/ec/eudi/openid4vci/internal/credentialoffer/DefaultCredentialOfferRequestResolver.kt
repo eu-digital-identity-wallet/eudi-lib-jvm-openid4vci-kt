@@ -199,7 +199,7 @@ internal class DefaultCredentialOfferRequestResolver(
                     ?.let {
                         constructor(
                             credentialDefinition,
-                            (it as W3CVerifiableCredentialCredentialSupported).scope,
+                            it.scope,
                         )
                     }
                     ?: fail()

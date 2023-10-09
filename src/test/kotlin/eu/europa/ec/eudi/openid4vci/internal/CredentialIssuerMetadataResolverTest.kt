@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.CredentialIssuerMetadataResolver
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataResolver
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions
