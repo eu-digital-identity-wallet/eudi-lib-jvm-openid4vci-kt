@@ -40,6 +40,7 @@ dependencies {
     api("io.ktor:ktor-client-serialization:$ktorVersion")
     api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     api("io.ktor:ktor-serialization-kotlinx-cbor:$ktorVersion")
+    testImplementation("org.jsoup:jsoup:1.14.3")
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-client-okhttp:$ktorVersion")
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")

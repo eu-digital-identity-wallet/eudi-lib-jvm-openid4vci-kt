@@ -15,8 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jwt.JWT
-import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -288,7 +286,6 @@ data class DisplayObject(
     )
 }
 
-
 data class PKCEVerifier(
     val codeVerifier: String,
     val codeVerifierMethod: String,
@@ -331,20 +328,3 @@ sealed interface IssuanceAuthorization {
         }
     }
 }
-
-//sealed interface ProofType {
-//
-//    val type: String
-//
-//    @Serializable
-//    data class JwtProof(
-//        @SerialName("proof_type") override val type: String = "jwt",
-//        @SerialName("jwt") val jwt: JWT,
-//    ) : ProofType
-//
-//    @Serializable
-//    data class CwtProof(
-//        @SerialName("proof_type") override val type: String = "cwt",
-//        @SerialName("cwt") val cwt: String,
-//    ) : ProofType
-//}

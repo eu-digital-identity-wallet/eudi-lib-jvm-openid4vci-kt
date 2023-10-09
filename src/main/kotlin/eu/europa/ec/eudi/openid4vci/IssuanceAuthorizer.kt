@@ -43,7 +43,7 @@ sealed interface AccessTokenRequestResponse {
     data class Success(
         @SerialName("access_token") val accessToken: String,
         @SerialName("expires_in") val expiresIn: Long,
-        @SerialName("scope") val scope: List<String>,
+        @SerialName("scope") val scope: String,
         // ?? refreshToken, tokenType ??
     ) : AccessTokenRequestResponse
 
@@ -58,6 +58,7 @@ interface IssuanceAuthorizer {
 
     suspend fun submitPushedAuthorizationRequest(
         scopes: List<String>,
+        state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>>
 

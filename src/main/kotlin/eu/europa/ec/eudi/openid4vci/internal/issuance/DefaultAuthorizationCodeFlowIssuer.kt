@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci.internal.issuance
 
 import eu.europa.ec.eudi.openid4vci.*
 import java.time.Instant
+import java.util.*
 
 class DefaultAuthorizationCodeFlowIssuer(
     val authorizer: IssuanceAuthorizer,
@@ -27,18 +28,19 @@ class DefaultAuthorizationCodeFlowIssuer(
         issuerState: String?,
     ): Result<AuthCodeFlowIssuance.ParRequested> =
         runCatching {
-            // Get scoped credentials only
-            val scopes = credentials.filterIsInstance<OfferedCredential.ScopedCredential>()
-                .map(OfferedCredential.ScopedCredential::scope)
+            // Get scopes from credentials
+            val scopes = credentials.map { it.scope }.filterNotNull()
 
+            val state = UUID.randomUUID().toString()
             // Place PAR
             val (codeVerifier, getAuthorizationCodeUrl) =
-                authorizer.submitPushedAuthorizationRequest(scopes, issuerState).getOrThrow()
+                authorizer.submitPushedAuthorizationRequest(scopes, state, issuerState).getOrThrow()
 
             // Transition state
             AuthCodeFlowIssuance.ParRequested(
                 getAuthorizationCodeURL = getAuthorizationCodeUrl,
                 pkceVerifier = codeVerifier,
+                state = state,
             )
         }
 

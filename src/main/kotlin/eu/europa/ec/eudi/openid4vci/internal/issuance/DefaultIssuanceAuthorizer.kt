@@ -20,10 +20,8 @@ import com.nimbusds.oauth2.sdk.PushedAuthorizationRequest
 import com.nimbusds.oauth2.sdk.ResponseType
 import com.nimbusds.oauth2.sdk.Scope
 import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
-import com.nimbusds.oauth2.sdk.auth.ClientAuthentication
-import com.nimbusds.oauth2.sdk.auth.ClientSecretBasic
-import com.nimbusds.oauth2.sdk.auth.Secret
 import com.nimbusds.oauth2.sdk.id.ClientID
+import com.nimbusds.oauth2.sdk.id.State
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import com.nimbusds.oauth2.sdk.pkce.CodeVerifier
 import eu.europa.ec.eudi.openid4vci.*
@@ -44,8 +42,11 @@ class DefaultIssuanceAuthorizer(
 
     override suspend fun submitPushedAuthorizationRequest(
         scopes: List<String>,
+        state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>> = runCatching {
+        require(scopes.isNotEmpty()) { "No scopes provided. Cannot submit par with no scopes." }
+
         val parEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
         val clientID = ClientID(config.clientId)
         val codeVerifier = CodeVerifier()
@@ -59,27 +60,27 @@ class DefaultIssuanceAuthorizer(
             redirectionURI(config.authFlowRedirectionURI)
             codeChallenge(codeVerifier, CodeChallengeMethod.S256)
             scope(Scope(*scopes.toTypedArray()))
+            state(State(state))
             issuerState?.let {
                 customParameter("issuer_state", issuerState)
             }
             build()
         }
 
-        val clientSecret = Secret(config.clientSecret)
-        val clientAuth: ClientAuthentication = ClientSecretBasic(clientID, clientSecret)
-        val pushedAuthorizationRequest = PushedAuthorizationRequest(parEndpoint, clientAuth, authzRequest)
+        val pushedAuthorizationRequest = PushedAuthorizationRequest(parEndpoint, authzRequest)
 
         val response =
             withContext(coroutineDispatcher) {
                 postPar.post(parEndpoint.toURL(), pushedAuthorizationRequest.asFormPostParams())
             }
 
-        response.toPair(clientID, codeVerifier)
+        response.toPair(clientID, codeVerifier, state)
     }
 
     private fun PushedAuthorizationRequestResponse.toPair(
         clientID: ClientID,
         codeVerifier: CodeVerifier,
+        state: String,
     ) = when (this) {
         is PushedAuthorizationRequestResponse.Success -> {
             val httpsUrl =
@@ -87,9 +88,10 @@ class DefaultIssuanceAuthorizer(
                     URLBuilder(Url(authorizationServerMetadata.authorizationEndpointURI.toString())),
                 ) {
                     parameters.append(GetAuthorizationCodeURL.PARAM_CLIENT_ID, clientID.value)
+                    parameters.append(GetAuthorizationCodeURL.PARAM_STATE, state)
                     parameters.append(
                         GetAuthorizationCodeURL.PARAM_REQUEST_URI,
-                        URLEncoder.encode(requestURI, "UTF-8"),
+                        requestURI,
                     )
                     build()
                 }

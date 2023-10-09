@@ -24,6 +24,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.serialization.json.Json
 import java.net.URL
 
 typealias KtorHttpClientFactory = () -> HttpClient
@@ -37,9 +38,10 @@ internal class KtorIssuanceAuthorizer private constructor(
 
     override suspend fun submitPushedAuthorizationRequest(
         scopes: List<String>,
+        state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>> =
-        delegate.submitPushedAuthorizationRequest(scopes, issuerState)
+        delegate.submitPushedAuthorizationRequest(scopes, state, issuerState)
 
     override suspend fun requestAccessTokenAuthFlow(authorizationCode: String, codeVerifier: String): Result<String> =
         delegate.requestAccessTokenAuthFlow(authorizationCode, codeVerifier)
@@ -58,7 +60,11 @@ internal class KtorIssuanceAuthorizer private constructor(
          */
         val DefaultFactory: KtorHttpClientFactory = {
             HttpClient {
-                install(ContentNegotiation) { json() }
+                install(ContentNegotiation) {
+                    json(
+                        json = Json { ignoreUnknownKeys = true },
+                    )
+                }
                 expectSuccess = true
             }
         }
@@ -92,7 +98,7 @@ internal class KtorIssuanceAuthorizer private constructor(
                             formParameters.entries.forEach { append(it.key, it.value) }
                         },
                     )
-                    return if (response.status == HttpStatusCode.OK) {
+                    return if (response.status.isSuccess()) {
                         response.body<PushedAuthorizationRequestResponse.Success>()
                     } else {
                         response.body<PushedAuthorizationRequestResponse.Failure>()
@@ -109,7 +115,7 @@ internal class KtorIssuanceAuthorizer private constructor(
                             formParameters.entries.forEach { append(it.key, it.value) }
                         },
                     )
-                    return if (response.status == HttpStatusCode.OK) {
+                    return if (response.status.isSuccess()) {
                         response.body<AccessTokenRequestResponse.Success>()
                     } else {
                         response.body<AccessTokenRequestResponse.Failure>()

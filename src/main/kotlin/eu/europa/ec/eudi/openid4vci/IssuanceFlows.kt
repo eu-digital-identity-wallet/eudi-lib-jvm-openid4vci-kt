@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultAuthorizationCodeFlowIssuer
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultPreAuthorizedCodeFlowIssuer
 import java.time.Instant
@@ -34,6 +35,7 @@ sealed interface AuthCodeFlowIssuance {
     data class ParRequested(
         val getAuthorizationCodeURL: GetAuthorizationCodeURL,
         val pkceVerifier: PKCEVerifier,
+        val state: String,
     ) : AuthCodeFlowIssuance
 
     /**
@@ -99,9 +101,11 @@ class GetAuthorizationCodeURL private constructor(
     override fun toString(): String {
         return url.toString()
     }
+
     companion object {
         val PARAM_CLIENT_ID = "client_id"
         val PARAM_REQUEST_URI = "request_uri"
+        val PARAM_STATE = "state"
         operator fun invoke(url: String): GetAuthorizationCodeURL {
             val httpsUrl = HttpsUrl(url).getOrThrow()
             require(
@@ -134,7 +138,7 @@ sealed interface CredentialIssuanceRequest {
         override val credentialResponseEncryptionAlg: JWEAlgorithm?,
         override val credentialResponseEncryptionMethod: EncryptionMethod?,
         val doctype: String,
-        val claims: Map<Namespace, Map<ClaimName, ClaimObject>>?,
+        val claims: Map<Namespace, Map<ClaimName, CredentialSupportedObject.MsoMdocCredentialCredentialSupportedObject.ClaimObject>>?,
     ) : CredentialIssuanceRequest {
 
         companion object {
@@ -144,7 +148,7 @@ sealed interface CredentialIssuanceRequest {
                 credentialResponseEncryptionAlg: JWEAlgorithm?,
                 credentialResponseEncryptionMethod: EncryptionMethod?,
                 doctype: String,
-                claims: Map<Namespace, Map<ClaimName, ClaimObject>>?,
+                claims: Map<Namespace, Map<ClaimName, CredentialSupportedObject.MsoMdocCredentialCredentialSupportedObject.ClaimObject>>?,
             ): MsoMdocIssuanceRequest {
                 var encryptionMethod = credentialResponseEncryptionMethod
                 if (credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null) {
@@ -216,6 +220,15 @@ interface AuthorizationCodeFlowIssuer {
 
     companion object {
         fun make(authorizer: IssuanceAuthorizer) = DefaultAuthorizationCodeFlowIssuer(authorizer)
+        fun ktor(
+            authorizationServerMetadata: AuthorizationServerMetadata,
+            config: WalletOpenId4VCIConfig,
+        ) = DefaultAuthorizationCodeFlowIssuer(
+            IssuanceAuthorizer.ktor(
+                authorizationServerMetadata = authorizationServerMetadata,
+                config = config,
+            ),
+        )
     }
 }
 
@@ -229,5 +242,15 @@ interface PreAuthorizationCodeFlowIssuer {
 
     companion object {
         fun make(authorizer: IssuanceAuthorizer) = DefaultPreAuthorizedCodeFlowIssuer(authorizer)
+
+        fun ktor(
+            authorizationServerMetadata: AuthorizationServerMetadata,
+            config: WalletOpenId4VCIConfig,
+        ) = DefaultPreAuthorizedCodeFlowIssuer(
+            IssuanceAuthorizer.ktor(
+                authorizationServerMetadata = authorizationServerMetadata,
+                config = config,
+            ),
+        )
     }
 }
