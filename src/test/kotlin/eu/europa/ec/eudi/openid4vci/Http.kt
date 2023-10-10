@@ -55,6 +55,14 @@ internal fun jsonResponse(resource: String, status: HttpStatusCode = HttpStatusC
     }
 
 /**
+ * Gets a [HttpResponseDataBuilder] that returns '404/Not Found'.
+ */
+internal fun notFound(): HttpResponseDataBuilder =
+    {
+        respondError(HttpStatusCode.NotFound)
+    }
+
+/**
  * A [requestMatcher] alongside the [responseBuilder] that must be invoked when it matches.
  */
 internal data class RequestMocker(
@@ -77,7 +85,7 @@ internal suspend fun mockEngine(
             .firstOrNull { it.requestMatcher(request) }
             ?.responseBuilder
             ?.invoke(this)
-            ?: respond("404/Not Found", HttpStatusCode.NotFound)
+            ?: respondError(HttpStatusCode.NotFound)
     }.use { mockEngine ->
         HttpClient(mockEngine) {
             install(ContentNegotiation) {

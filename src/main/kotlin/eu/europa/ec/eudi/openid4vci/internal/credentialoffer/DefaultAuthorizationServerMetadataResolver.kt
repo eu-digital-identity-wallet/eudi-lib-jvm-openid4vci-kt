@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 
+import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import com.nimbusds.oauth2.sdk.id.Issuer
 import com.nimbusds.oauth2.sdk.util.JSONObjectUtils
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
@@ -24,6 +25,8 @@ import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withContext
+import net.minidev.json.JSONObject
+import java.net.URL
 
 /**
  * Default implementation for [AuthorizationServerMetadataResolver].
@@ -34,23 +37,64 @@ internal class DefaultAuthorizationServerMetadataResolver(
 ) : AuthorizationServerMetadataResolver {
 
     override suspend fun resolve(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
-        runCatching {
-            withContext(ioCoroutineDispatcher + CoroutineName("/.well-known/openid-configuration")) {
-                val url =
-                    URLBuilder(issuer.value.toString())
-                        .appendPathSegments("/.well-known/openid-configuration", encodeSlash = false)
-                        .build()
-                        .toURI()
-                        .toURL()
+        fetchOidcServerMetadata(issuer)
+            .recoverCatching { fetchOauthServerMetadata(issuer).getOrThrow() }
+            .mapCatching { it.apply { expectIssuer(issuer) } }
+            .mapError(::AuthorizationServerMetadataResolutionException)
 
-                httpGet.get(url)
-                    .mapCatching { JSONObjectUtils.parse(it) }
-                    .mapCatching { OIDCProviderMetadata.parse(it) }
-                    .getOrThrow()
-            }.also {
-                if (it.issuer != Issuer(issuer.value)) {
-                    throw IllegalArgumentException("issuer does not match the expected value")
-                }
+    /**
+     * Tries to fetch the [CIAuthorizationServerMetadata] for the provided [OpenID Connect Authorization Server][issuer].
+     * The well known location __/.well-known/openid-configuration__ is used.
+     */
+    private suspend fun fetchOidcServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
+        runCatching {
+            val url =
+                URLBuilder(issuer.value.toString())
+                    .appendPathSegments("/.well-known/openid-configuration", encodeSlash = false)
+                    .build()
+                    .toURI()
+                    .toURL()
+
+            fetchAndParse(url, OIDCProviderMetadata::parse)
+        }
+
+    /**
+     * Tries to fetch the [CIAuthorizationServerMetadata] for the provided [OAuth2 Authorization Server][issuer].
+     * The well known location __/.well-known/oauth-authorization-server__ is used.
+     */
+    private suspend fun fetchOauthServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
+        runCatching {
+            val url =
+                URLBuilder(issuer.value.toString())
+                    .appendPathSegments("/.well-known/oauth-authorization-server", encodeSlash = false)
+                    .build()
+                    .toURI()
+                    .toURL()
+
+            fetchAndParse(url, AuthorizationServerMetadata::parse)
+        }
+
+    /**
+     * Fetches the content of the provided [url], parses it as a [JSONObject], and further parses it
+     * using the provided [parser].
+     */
+    private suspend fun <T> fetchAndParse(url: URL, parser: (JSONObject) -> T): T =
+        withContext(ioCoroutineDispatcher + CoroutineName("$url")) {
+            httpGet.get(url)
+                .mapCatching { JSONObjectUtils.parse(it) }
+                .mapCatching { parser(it) }
+                .getOrThrow()
+        }
+
+    companion object {
+
+        /**
+         * Verifies the issuer of this [CIAuthorizationServerMetadata] equals the [expected] one.
+         */
+        private fun CIAuthorizationServerMetadata.expectIssuer(expected: HttpsUrl) {
+            if (issuer != Issuer(expected.value)) {
+                throw IllegalArgumentException("issuer does not match the expected value")
             }
-        }.mapError(::AuthorizationServerMetadataResolutionException)
+        }
+    }
 }

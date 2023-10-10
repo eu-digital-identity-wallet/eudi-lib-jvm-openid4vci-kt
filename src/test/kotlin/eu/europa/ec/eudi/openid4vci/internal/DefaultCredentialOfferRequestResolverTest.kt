@@ -34,8 +34,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 RequestMocker(
-                    match(authorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/authorization_server_metadata.json"),
+                    match(oidcAuthorizationServerMetadataUrl().value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(2, it.size) },
             ) { httpGet ->
@@ -47,7 +47,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 val expected = CredentialOffer(
                     credentialIssuerId(),
                     credentialIssuerMetadata(),
-                    authorizationServerMetadata(),
+                    oidcAuthorizationServerMetadata(),
                     listOf(
                         OfferedCredential.W3CVerifiableCredential.SignedJwt(
                             universityDegreeJwt.credentialDefinition,
@@ -94,8 +94,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 RequestMocker(
-                    match(authorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/authorization_server_metadata.json"),
+                    match(oidcAuthorizationServerMetadataUrl().value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(2, it.size) },
             ) { httpGet ->
@@ -106,7 +106,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 val expected = CredentialOffer(
                     credentialIssuerId(),
                     credentialIssuerMetadata(),
-                    authorizationServerMetadata(),
+                    oidcAuthorizationServerMetadata(),
                     listOf(
                         OfferedCredential.MsoMdocCredential(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
@@ -149,8 +149,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 RequestMocker(
-                    match(authorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/authorization_server_metadata.json"),
+                    match(oidcAuthorizationServerMetadataUrl().value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(2, it.size) },
             ) { httpGet ->
@@ -161,7 +161,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 val expected = CredentialOffer(
                     credentialIssuerId(),
                     credentialIssuerMetadata(),
-                    authorizationServerMetadata(),
+                    oidcAuthorizationServerMetadata(),
                     listOf(
                         OfferedCredential.W3CVerifiableCredential.SignedJwt(
                             universityDegreeJwt.credentialDefinition,
@@ -207,8 +207,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 RequestMocker(
-                    match(authorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/authorization_server_metadata.json"),
+                    match(oidcAuthorizationServerMetadataUrl().value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(2, it.size) },
             ) { httpGet ->
@@ -219,7 +219,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 val expected = CredentialOffer(
                     credentialIssuerId(),
                     credentialIssuerMetadata(),
-                    authorizationServerMetadata(),
+                    oidcAuthorizationServerMetadata(),
                     listOf(
                         OfferedCredential.W3CVerifiableCredential.JsonLdDataIntegrity(
                             universityDegreeLdpVc.credentialDefinition,
@@ -265,8 +265,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 RequestMocker(
-                    match(authorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/authorization_server_metadata.json"),
+                    match(oidcAuthorizationServerMetadataUrl().value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(2, it.size) },
             ) { httpGet ->
@@ -302,8 +302,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 RequestMocker(
-                    match(authorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/authorization_server_metadata.json"),
+                    match(oidcAuthorizationServerMetadataUrl().value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(2, it.size) },
             ) { httpGet ->
@@ -339,8 +339,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 RequestMocker(
-                    match(authorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/authorization_server_metadata.json"),
+                    match(oidcAuthorizationServerMetadataUrl().value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
                 verifier = { Assertions.assertEquals(2, it.size) },
             ) { httpGet ->
@@ -378,8 +378,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 RequestMocker(
-                    match(authorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/authorization_server_metadata.json"),
+                    match(oidcAuthorizationServerMetadataUrl().value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
                 RequestMocker(
                     match(credentialOfferUri.value),
@@ -396,7 +396,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 val expected = CredentialOffer(
                     credentialIssuerId(),
                     credentialIssuerMetadata(),
-                    authorizationServerMetadata(),
+                    oidcAuthorizationServerMetadata(),
                     listOf(
                         OfferedCredential.W3CVerifiableCredential.SignedJwt(
                             universityDegreeJwt.credentialDefinition,
