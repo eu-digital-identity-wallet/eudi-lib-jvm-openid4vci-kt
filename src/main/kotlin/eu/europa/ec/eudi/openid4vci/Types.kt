@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.openid.connect.sdk.op.ReadOnlyOIDCProviderMetadata
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -285,3 +286,48 @@ data class DisplayObject(
         @SerialName("alt_text") val alternativeText: String? = null,
     )
 }
+
+data class PKCEVerifier(
+    val codeVerifier: String,
+    val codeVerifierMethod: String,
+) {
+    init {
+        require(codeVerifier.isNotEmpty()) { "Code verifier must not be empty" }
+        require(codeVerifierMethod.isNotEmpty()) { "Code verifier method must not be empty" }
+    }
+}
+
+data class IssuanceAccessToken(
+    val accessToken: String,
+) {
+    init {
+        require(accessToken.isNotEmpty()) { "Access Token must not be empty" }
+    }
+}
+
+data class IssuedCertificate(
+    val format: String,
+    val content: String,
+)
+
+sealed interface IssuanceAuthorization {
+
+    data class AuthorizationCode(
+        val authorizationCode: String,
+    ) : IssuanceAuthorization {
+        init {
+            require(authorizationCode.isNotEmpty()) { "Authorization code must not be empty" }
+        }
+    }
+
+    data class PreAuthorizationCode(
+        val preAuthorizedCode: String,
+        val pin: String,
+    ) : IssuanceAuthorization {
+        init {
+            require(preAuthorizedCode.isNotEmpty()) { "Pre-Authorization code must not be empty" }
+        }
+    }
+}
+
+typealias CIAuthorizationServerMetadata = ReadOnlyOIDCProviderMetadata

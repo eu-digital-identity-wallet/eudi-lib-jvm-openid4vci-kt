@@ -33,7 +33,7 @@ internal class DefaultAuthorizationServerMetadataResolver(
     private val httpGet: HttpGet<String>,
 ) : AuthorizationServerMetadataResolver {
 
-    override suspend fun resolve(issuer: HttpsUrl): Result<AuthorizationServerMetadata> =
+    override suspend fun resolve(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
         runCatching {
             withContext(ioCoroutineDispatcher + CoroutineName("/.well-known/openid-configuration")) {
                 val url =
