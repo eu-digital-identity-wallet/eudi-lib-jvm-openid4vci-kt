@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
+import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import eu.europa.ec.eudi.openid4vci.*
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions
@@ -27,16 +29,17 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
         runBlocking {
             mockEngine(
                 RequestMocker(
-                    match(authorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/authorization_server_metadata.json"),
+                    match(oidcAuthorizationServerMetadataUrl().value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
             ) { httpGet ->
                 AuthorizationServerMetadataResolver(httpGet = httpGet)
                     .resolve(authorizationServerIssuer())
                     .fold(
                         {
+                            Assertions.assertInstanceOf(OIDCProviderMetadata::class.java, it)
                             // equals not implemented by OIDCProviderMetadata
-                            Assertions.assertEquals(authorizationServerMetadata().toJSONObject(), it.toJSONObject())
+                            Assertions.assertEquals(oidcAuthorizationServerMetadata().toJSONObject(), it.toJSONObject())
                         },
                         { Assertions.fail("Authorization Server metadata resolution should have succeeded", it) },
                     )
@@ -48,12 +51,12 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
     internal fun `fails when issuer does not match`() {
         runBlocking {
             val issuer = HttpsUrl("https://keycloak.netcompany.com/realms/pid-issuer-realm").getOrThrow()
-            val metadataUrl = authorizationServerMetadataUrl(issuer)
+            val metadataUrl = oidcAuthorizationServerMetadataUrl(issuer)
 
             mockEngine(
                 RequestMocker(
                     match(metadataUrl.value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/authorization_server_metadata.json"),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
             ) { httpGet ->
                 AuthorizationServerMetadataResolver(httpGet = httpGet)
@@ -69,6 +72,33 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
                                 Assertions.assertInstanceOf(IllegalArgumentException::class.java, exception.cause)
                             Assertions.assertEquals("issuer does not match the expected value", cause.message)
                         },
+                    )
+            }
+        }
+    }
+
+    @Test
+    internal fun `falls back to oauth server metadata`() {
+        runBlocking {
+            mockEngine(
+                RequestMocker(
+                    match(oauthAuthorizationServerMetadataUrl().value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oauth_authorization_server_metadata.json"),
+                ),
+                verifier = { Assertions.assertEquals(2, it.size) },
+            ) { httpGet ->
+                AuthorizationServerMetadataResolver(httpGet = httpGet)
+                    .resolve(authorizationServerIssuer())
+                    .fold(
+                        {
+                            Assertions.assertInstanceOf(AuthorizationServerMetadata::class.java, it)
+                            // equals not implemented by AuthorizationServerMetadata
+                            Assertions.assertEquals(
+                                oauthAuthorizationServerMetadata().toJSONObject(),
+                                it.toJSONObject(),
+                            )
+                        },
+                        { Assertions.fail("Authorization Server metadata resolution should have succeeded", it) },
                     )
             }
         }
