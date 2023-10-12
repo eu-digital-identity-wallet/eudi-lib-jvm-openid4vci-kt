@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.mapError
+import io.ktor.client.statement.*
 import java.net.URI
 import java.net.URL
 
@@ -38,8 +39,8 @@ fun interface HttpFormPost<out R> {
 /**
  * An abstraction of an HTP Post operation of payload [T] parsing response as [R].
  */
-fun interface HttpPost<in T, out R> {
-    suspend fun post(url: URL, payload: T): R
+fun interface HttpPost<in T, in RESPONSE, out R> {
+    suspend fun post(url: URL, headers: Map<String, String>, payload: T, transform: suspend (response: HttpResponse) -> RESPONSE): R
 }
 
 /**

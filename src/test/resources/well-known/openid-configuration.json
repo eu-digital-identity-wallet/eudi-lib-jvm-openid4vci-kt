@@ -1,14 +1,14 @@
 {
-  "authorization_endpoint": "https://as.example.com/auth",
-  "token_endpoint": "https://as.example.com/token",
-  "registration_endpoint": "https://as.example.com/clients-registrations/openid-connect",
-  "introspection_endpoint": "https://as.example.com/token/introspect",
-  "revocation_endpoint": "https://as.example.com/revoke",
-  "pushed_authorization_request_endpoint": "https://as.example.com/ext/par/request",
-  "device_authorization_endpoint": "https://as.example.com/auth/device",
-  "backchannel_authentication_endpoint": "https://as.example.com/ext/ciba/auth",
-  "issuer": "https://as.example.com",
-  "jwks_uri": "https://as.example.com/certs",
+  "issuer": "https://auth-server.example.com",
+  "authorization_endpoint": "https://auth-server.example.com/auth",
+  "token_endpoint": "https://auth-server.example.com/token",
+  "registration_endpoint": "https://auth-server.example.com/clients-registrations/openid-connect",
+  "introspection_endpoint": "https://auth-server.example.com/token/introspect",
+  "revocation_endpoint": "https://auth-server.example.com/revoke",
+  "pushed_authorization_request_endpoint": "https://auth-server.example.com/ext/par/request",
+  "device_authorization_endpoint": "https://auth-server.example.com/auth/device",
+  "backchannel_authentication_endpoint": "https://auth-server.example.com/ext/ciba/auth",
+  "jwks_uri": "https://auth-server.example.com/certs",
   "scopes_supported": [
     "openid",
     "roles",
@@ -151,14 +151,14 @@
   "require_request_uri_registration": true,
   "authorization_response_iss_parameter_supported": true,
   "mtls_endpoint_aliases": {
-    "token_endpoint": "https://as.example.com/token",
+    "token_endpoint": "https://auth-server.example.com/token",
     "registration_endpoint": "https://keycloak.local/realms/eudiw/clients-registrations/openid-connect",
-    "introspection_endpoint": "https://as.example.com/token/introspect",
-    "revocation_endpoint": "https://as.example.com/revoke",
-    "pushed_authorization_request_endpoint": "https://as.example.com/ext/par/request",
-    "device_authorization_endpoint": "https://as.example.com/auth/device",
-    "backchannel_authentication_endpoint": "https://as.example.com/ext/ciba/auth",
-    "userinfo_endpoint": "https://as.example.com/userinfo"
+    "introspection_endpoint": "https://auth-server.example.com/token/introspect",
+    "revocation_endpoint": "https://auth-server.example.com/revoke",
+    "pushed_authorization_request_endpoint": "https://auth-server.example.com/ext/par/request",
+    "device_authorization_endpoint": "https://auth-server.example.com/auth/device",
+    "backchannel_authentication_endpoint": "https://auth-server.example.com/ext/ciba/auth",
+    "userinfo_endpoint": "https://auth-server.example.com/userinfo"
   },
   "tls_client_certificate_bound_access_tokens": true,
   "dpop_signing_alg_values_supported": [
@@ -218,9 +218,9 @@
     "public",
     "pairwise"
   ],
-  "userinfo_endpoint": "https://as.example.com/userinfo",
-  "check_session_iframe": "https://as.example.com/login-status-iframe.html",
-  "end_session_endpoint": "https://as.example.com/logout",
+  "userinfo_endpoint": "https://auth-server.example.com/userinfo",
+  "check_session_iframe": "https://auth-server.example.com/login-status-iframe.html",
+  "end_session_endpoint": "https://auth-server.example.com/logout",
   "acr_values_supported": [
     "0",
     "1"

@@ -16,11 +16,12 @@
 package eu.europa.ec.eudi.openid4vci.internal.issuance
 
 import eu.europa.ec.eudi.openid4vci.*
-import java.time.Instant
 import java.util.*
 
+@Suppress("ktlint")
 class DefaultAuthorizationCodeFlowIssuer(
     val authorizer: IssuanceAuthorizer,
+    val issuanceRequester: IssuanceRequester,
 ) : AuthorizationCodeFlowIssuer {
 
     override suspend fun placePushedAuthorizationRequest(
@@ -38,43 +39,146 @@ class DefaultAuthorizationCodeFlowIssuer(
 
             // Transition state
             AuthCodeFlowIssuance.ParRequested(
+                credentials = credentials,
                 getAuthorizationCodeURL = getAuthorizationCodeUrl,
                 pkceVerifier = codeVerifier,
                 state = state,
             )
         }
 
-    override suspend fun AuthCodeFlowIssuance.ParRequested.authorize(
+    override suspend fun AuthCodeFlowIssuance.ParRequested.completePar(
         authorizationCode: String,
-    ): Result<AuthCodeFlowIssuance.Authorized> =
-        Result.success(
-            AuthCodeFlowIssuance.Authorized(
+    ): Result<AuthCodeFlowIssuance.AuthorizationCodeRetrieved> =
+        runCatching {
+
+            require(authorizationCode.isNotEmpty()) { "Authorization code cannot be empty" }
+
+            AuthCodeFlowIssuance.AuthorizationCodeRetrieved(
+                credentials = credentials,
                 authorizationCode = IssuanceAuthorization.AuthorizationCode(authorizationCode),
                 pkceVerifier = this.pkceVerifier,
-            ),
-        )
+            )
 
-    override suspend fun AuthCodeFlowIssuance.Authorized.placeAccessTokenRequest(): Result<AuthCodeFlowIssuance.AccessTokenRetrieved> =
+        }
+
+    override suspend fun AuthCodeFlowIssuance.AuthorizationCodeRetrieved.placeAccessTokenRequest(): Result<AuthCodeFlowIssuance.Authorized> =
         runCatching {
-            val accessToken =
+            val (accessToken, nonce) =
                 authorizer.requestAccessTokenAuthFlow(
                     this.authorizationCode.authorizationCode,
                     this.pkceVerifier.codeVerifier,
                 ).getOrThrow()
 
-            AuthCodeFlowIssuance.AccessTokenRetrieved(
+            nonce?.let {
+                AuthCodeFlowIssuance.Authorized.ProofRequired(
+                    credentials = credentials,
+                    token = IssuanceAccessToken(accessToken),
+                    cNonce = nonce,
+                )
+            } ?: AuthCodeFlowIssuance.Authorized.NoProofRequired(
+                credentials = credentials,
                 token = IssuanceAccessToken(accessToken),
             )
         }
 
-    override suspend fun AuthCodeFlowIssuance.AccessTokenRetrieved.issueCredential(): Result<AuthCodeFlowIssuance.Issued> =
-        Result.success(
-            AuthCodeFlowIssuance.Issued(
-                issuedAt = Instant.now(), // Will be the issuer's issuance date
-                certificate = IssuedCertificate(
-                    format = "mso_mdoc",
-                    content = "TODO-IssuedCertificate.content",
-                ),
-            ),
+    override suspend fun AuthCodeFlowIssuance.Authorized.NoProofRequired.requestIssuance(claims: ClaimSet): Result<AuthCodeFlowIssuance.Requested> =
+        runCatching {
+
+            val credentialRequest = credentialRequest(null)
+
+            requestIssuance(credentialRequest, token) {
+                if (it is CredentialIssuanceException) {
+                    if (it.error is CredentialIssuanceError.InvalidProof) {
+                        AuthCodeFlowIssuance.Requested.NonceMissing(
+                            error = it.error,
+                            credentials = credentials,
+                            token = token,
+                        )
+                    } else
+                        AuthCodeFlowIssuance.Requested.GenericFailure(it.error)
+                } else
+                    throw it
+
+            }
+        }
+
+    override suspend fun AuthCodeFlowIssuance.Authorized.ProofRequired.requestIssuance(
+        proof: Proof,
+        claims: ClaimSet
+    ): Result<AuthCodeFlowIssuance.Requested> = runCatching {
+
+        val credentialRequest = credentialRequest(proof)
+
+        requestIssuance(credentialRequest, token) {
+            if (it is CredentialIssuanceException) {
+                AuthCodeFlowIssuance.Requested.GenericFailure(it.error)
+            } else {
+                throw it
+            }
+        }
+    }
+
+    override suspend fun AuthCodeFlowIssuance.Requested.NonceMissing.reProcess(): AuthCodeFlowIssuance.Authorized.ProofRequired =
+        AuthCodeFlowIssuance.Authorized.ProofRequired(
+            credentials = credentials,
+            token = token,
+            cNonce = cNonce,
         )
+
+    private suspend fun requestIssuance(
+        credentialRequest: CredentialIssuanceRequest,
+        token: IssuanceAccessToken,
+        handleFailure: (Throwable) -> AuthCodeFlowIssuance.Requested,
+    ): AuthCodeFlowIssuance.Requested =
+        when (credentialRequest) {
+            is CredentialIssuanceRequest.SingleCredential -> {
+                issuanceRequester.placeIssuanceRequest(token, credentialRequest)
+                    .fold(
+                        onSuccess = {
+                            AuthCodeFlowIssuance.Requested.Success(it)
+                        },
+                        onFailure = handleFailure
+                    )
+            }
+            is CredentialIssuanceRequest.BatchCredentials -> {
+                issuanceRequester.placeBatchIssuanceRequest(token, credentialRequest)
+                    .fold(
+                        onSuccess = {
+                            AuthCodeFlowIssuance.Requested.Success(it)
+                        },
+                        onFailure = handleFailure
+                    )
+            }
+        }
+
+
+    private fun AuthCodeFlowIssuance.Authorized.credentialRequest(proof: Proof?): CredentialIssuanceRequest =
+        when {
+            credentials.size == 1 -> {
+                issuanceRequester.issuerMetadata.credentialsSupported
+                    .firstOrNull { it.scope == credentials[0].scope }
+                    ?.let {
+                        when (it) {
+                            is CredentialSupported.MsoMdocCredentialCredentialSupported ->
+                                CredentialIssuanceRequest.SingleCredential.MsoMdocIssuanceRequest(
+                                    doctype = it.docType,
+                                    proof = proof,
+                                ).getOrThrow()
+
+                            else -> throw CredentialIssuanceException(
+                                CredentialIssuanceError.InvalidIssuanceRequest(
+                                    "Only mso_mdoc credential requests supported"
+                                )
+                            )
+                        }
+                    } ?: throw CredentialIssuanceException(
+                    CredentialIssuanceError.InvalidIssuanceRequest(
+                        "Offered credential scope does not match any of issuer's supported credentials"
+                    )
+                )
+            }
+
+            else -> TODO("Batch issuance requests not yet supported")
+        }
+
 }

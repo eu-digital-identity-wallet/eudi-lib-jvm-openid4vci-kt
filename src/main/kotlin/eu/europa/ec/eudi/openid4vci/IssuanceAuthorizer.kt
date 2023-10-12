@@ -16,8 +16,8 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceAuthorizer
-import eu.europa.ec.eudi.openid4vci.internal.issuance.KtorHttpClientFactory
-import eu.europa.ec.eudi.openid4vci.internal.issuance.KtorIssuanceAuthorizer
+import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorHttpClientFactory
+import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorIssuanceAuthorizer
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.SerialName
@@ -42,8 +42,8 @@ sealed interface AccessTokenRequestResponse {
     data class Success(
         @SerialName("access_token") val accessToken: String,
         @SerialName("expires_in") val expiresIn: Long,
-        @SerialName("scope") val scope: String,
-        // ?? refreshToken, tokenType ??
+        @SerialName("c_nonce") val cNonce: String? = null,
+        @SerialName("c_nonce_expires_in") val cNonceExpiresIn: Long? = null,
     ) : AccessTokenRequestResponse
 
     @Serializable
@@ -64,7 +64,7 @@ interface IssuanceAuthorizer {
     suspend fun requestAccessTokenAuthFlow(
         authorizationCode: String,
         codeVerifier: String,
-    ): Result<String>
+    ): Result<Pair<String, CNonce?>>
 
     suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: String,

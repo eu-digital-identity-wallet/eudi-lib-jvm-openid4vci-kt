@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal.issuance
+package eu.europa.ec.eudi.openid4vci.internal.issuance.ktor
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceAuthorizer
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -42,7 +43,7 @@ internal class KtorIssuanceAuthorizer private constructor(
     ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>> =
         delegate.submitPushedAuthorizationRequest(scopes, state, issuerState)
 
-    override suspend fun requestAccessTokenAuthFlow(authorizationCode: String, codeVerifier: String): Result<String> =
+    override suspend fun requestAccessTokenAuthFlow(authorizationCode: String, codeVerifier: String): Result<Pair<String, CNonce?>> =
         delegate.requestAccessTokenAuthFlow(authorizationCode, codeVerifier)
 
     override suspend fun requestAccessTokenPreAuthFlow(preAuthorizedCode: String, pin: String): Result<String> =

@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
-import eu.europa.ec.eudi.openid4vci.internal.issuance.KtorIssuanceAuthorizer
+import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorIssuanceAuthorizer
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -80,7 +80,11 @@ private class Wallet(
         )
 
         val offer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
-        val issuer = AuthorizationCodeFlowIssuer.ktor(offer.authorizationServerMetadata, vciWalletConfiguration)
+        val issuer = AuthorizationCodeFlowIssuer.ktor(
+            offer.authorizationServerMetadata,
+            offer.credentialIssuerMetadata,
+            vciWalletConfiguration,
+        )
 
         return with(issuer) {
             println("--> Placing PAR to AS server's endpoint ${offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI}")
@@ -97,7 +101,7 @@ private class Wallet(
             println("--> Authorization code retrieved: $authorizationCode")
 
             parPlaced
-                .authorize(authorizationCode).getOrThrow()
+                .completePar(authorizationCode).getOrThrow()
                 .placeAccessTokenRequest().getOrThrow()
                 .token.also {
                     println("--> Authorization code exchanged with access token : ${it.accessToken}")

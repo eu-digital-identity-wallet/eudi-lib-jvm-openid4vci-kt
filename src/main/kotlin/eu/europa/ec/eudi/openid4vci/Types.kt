@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
+import com.nimbusds.openid.connect.sdk.op.ReadOnlyOIDCProviderMetadata
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -330,4 +330,14 @@ sealed interface IssuanceAuthorization {
     }
 }
 
-typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata
+data class CNonce(
+    val value: String,
+    val expiresInSeconds: Long? = 5,
+) {
+    init {
+        require(value.isNotEmpty()) { "Value cannot be empty" }
+    }
+}
+
+typealias CIAuthorizationServerMetadata = ReadOnlyOIDCProviderMetadata
+typealias ClaimSet = List<String>
