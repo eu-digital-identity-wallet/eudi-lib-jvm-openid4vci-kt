@@ -9,6 +9,7 @@ jsoup = "1.14.3"
 cbor = "0.9"
 java = "17"
 ktlint = "0.50.0"
+dokka = "1.9.0"
 
 [libraries]
 nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
@@ -30,3 +31,4 @@ sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
