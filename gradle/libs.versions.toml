@@ -1,0 +1,32 @@
+[versions]
+dependency-check = "8.4.0"
+sonarqube = "4.3.0.3225"
+kotlin = "1.8.21"
+spotless = "6.20.0"
+nimbus-sdk = "10.13.2"
+ktor = "2.3.3"
+jsoup = "1.14.3"
+cbor = "0.9"
+java = "17"
+ktlint = "0.50.0"
+
+[libraries]
+nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-client-serialization = { module = "io.ktor:ktor-client-serialization", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-serialization-kotlinx-cbor = { module = "io.ktor:ktor-serialization-kotlinx-cbor", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+cbor = { module = "co.nstant.in:cbor", version.ref = "cbor" }
+
+[plugins]
+dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependency-check" }
+sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

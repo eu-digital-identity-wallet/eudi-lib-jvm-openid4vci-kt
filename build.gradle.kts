@@ -7,11 +7,11 @@ object Meta {
 }
 
 plugins {
-    id("org.owasp.dependencycheck") version "8.4.0"
-    id("org.sonarqube") version "4.3.0.3225"
-    kotlin("jvm") version "1.8.21"
-    kotlin("plugin.serialization") version "1.8.21"
-    id("com.diffplug.spotless") version "6.20.0"
+    alias(libs.plugins.dependency.check)
+    alias(libs.plugins.sonarqube)
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.spotless)
     `java-library`
     `maven-publish`
     signing
@@ -29,39 +29,43 @@ repositories {
     }
 }
 
-val ktorVersion = "2.3.3"
-
-val nimbusSdkVersion = "10.13.2"
-
 dependencies {
-    api("com.nimbusds:oauth2-oidc-sdk:$nimbusSdkVersion")
-    api("io.ktor:ktor-client-core:$ktorVersion")
-    api("io.ktor:ktor-client-content-negotiation:$ktorVersion")
-    api("io.ktor:ktor-client-serialization:$ktorVersion")
-    api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-    api("io.ktor:ktor-serialization-kotlinx-cbor:$ktorVersion")
-    testImplementation("org.jsoup:jsoup:1.14.3")
+    api(libs.nimbus.oauth2.oidc.sdk)
+    api(libs.ktor.client.core)
+    api(libs.ktor.client.content.negotiation)
+    api(libs.ktor.client.serialization)
+    api(libs.ktor.serialization.kotlinx.json)
+    api(libs.ktor.serialization.kotlinx.cbor)
+    testImplementation(libs.jsoup)
     testImplementation(kotlin("test"))
-    testImplementation("io.ktor:ktor-client-okhttp:$ktorVersion")
-    testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
-    testImplementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
-    testImplementation("io.ktor:ktor-client-mock:$ktorVersion")
-    testImplementation("co.nstant.in:cbor:0.9")
+    testImplementation(libs.ktor.client.okhttp)
+    testImplementation(libs.ktor.server.test.host)
+    testImplementation(libs.ktor.server.content.negotiation)
+    testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.cbor)
 }
 
 java {
+    sourceCompatibility = JavaVersion.toVersion(libs.versions.java.get())
+
     withSourcesJar()
     withJavadocJar()
 }
 
-tasks.jar {
-    manifest {
-        attributes(
-            mapOf(
-                "Implementation-Title" to project.name,
-                "Implementation-Version" to project.version,
-            ),
-        )
+kotlin {
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(libs.versions.java.get()))
+        vendor.set(JvmVendorSpec.ADOPTIUM)
+    }
+}
+
+spotless {
+    kotlin {
+        ktlint(libs.versions.ktlint.get())
+        licenseHeaderFile("FileHeader.txt")
+    }
+    kotlinGradle {
+        ktlint(libs.versions.ktlint.get())
     }
 }
 
@@ -73,27 +77,20 @@ testing {
     }
 }
 
-kotlin {
-    jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
-        vendor.set(JvmVendorSpec.ADOPTIUM)
-    }
-}
-
 tasks.jacocoTestReport {
     reports {
         xml.required.set(true)
     }
 }
 
-val ktlintVersion = "0.50.0"
-spotless {
-    kotlin {
-        ktlint(ktlintVersion)
-        licenseHeaderFile("FileHeader.txt")
-    }
-    kotlinGradle {
-        ktlint(ktlintVersion)
+tasks.jar {
+    manifest {
+        attributes(
+            mapOf(
+                "Implementation-Title" to project.name,
+                "Implementation-Version" to project.version,
+            ),
+        )
     }
 }
 
