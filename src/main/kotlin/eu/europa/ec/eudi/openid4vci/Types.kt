@@ -15,12 +15,14 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jwt.JWT
 import com.nimbusds.openid.connect.sdk.op.ReadOnlyOIDCProviderMetadata
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
 
 /**
@@ -310,6 +312,11 @@ data class IssuedCertificate(
     val content: String,
 )
 
+data class UnvalidatedCertificate(
+    val format: String,
+    val content: String,
+)
+
 sealed interface IssuanceAuthorization {
 
     data class AuthorizationCode(
@@ -336,6 +343,34 @@ data class CNonce(
 ) {
     init {
         require(value.isNotEmpty()) { "Value cannot be empty" }
+    }
+}
+
+sealed interface Proof {
+    fun toJsonObject(): JsonObject
+
+    data class Jwt(
+        val jwt: JWT,
+    ) : Proof {
+        override fun toJsonObject(): JsonObject =
+            JsonObject(
+                mapOf(
+                    "proof_type" to JsonPrimitive("jwt"),
+                    "jwt" to JsonPrimitive(jwt.serialize()),
+                ),
+            )
+    }
+
+    data class Cwt(
+        val cwt: String,
+    ) : Proof {
+        override fun toJsonObject(): JsonObject =
+            JsonObject(
+                mapOf(
+                    "proof_type" to JsonPrimitive("cwt"),
+                    "jwt" to JsonPrimitive(cwt),
+                ),
+            )
     }
 }
 

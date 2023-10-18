@@ -145,7 +145,7 @@ class DefaultIssuanceAuthorizer(
     override suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: String,
         pin: String,
-    ): Result<String> = runCatching {
+    ): Result<Pair<String, CNonce?>> = runCatching {
         val params = TokenEndpointForm.PreAuthCodeFlow.of(preAuthorizedCode, pin)
         val response =
             withContext(coroutineDispatcher) {
@@ -156,7 +156,10 @@ class DefaultIssuanceAuthorizer(
             }
 
         when (response) {
-            is AccessTokenRequestResponse.Success -> response.accessToken
+            is AccessTokenRequestResponse.Success -> {
+                val cnonce = response.cNonce?.let { CNonce(it, response.cNonceExpiresIn) }
+                Pair(response.accessToken, cnonce)
+            }
             is AccessTokenRequestResponse.Failure ->
                 throw CredentialIssuanceError.AccessTokenRequestFailed(
                     response.error,

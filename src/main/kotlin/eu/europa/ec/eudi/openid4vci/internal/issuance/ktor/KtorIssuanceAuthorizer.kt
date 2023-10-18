@@ -46,7 +46,7 @@ internal class KtorIssuanceAuthorizer private constructor(
     override suspend fun requestAccessTokenAuthFlow(authorizationCode: String, codeVerifier: String): Result<Pair<String, CNonce?>> =
         delegate.requestAccessTokenAuthFlow(authorizationCode, codeVerifier)
 
-    override suspend fun requestAccessTokenPreAuthFlow(preAuthorizedCode: String, pin: String): Result<String> =
+    override suspend fun requestAccessTokenPreAuthFlow(preAuthorizedCode: String, pin: String): Result<Pair<String, CNonce?>> =
         delegate.requestAccessTokenPreAuthFlow(preAuthorizedCode, pin)
 
     companion object {

@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.PlainJWT
 import eu.europa.ec.eudi.openid4vci.internal.issuance.CredentialRequestTO
-import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultAuthorizationCodeFlowIssuer
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -55,21 +54,20 @@ class IssuanceRequestTest {
         issuanceTestBed(
             { client ->
                 runBlocking {
-                    val (authorized, issuer) = initIssuerWithOfferAndAuthorize(
+                    val (authorizedRequest, issuer) = initIssuerWithOfferAndAuthorize(
                         client,
                         AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
                     )
                     with(issuer) {
-                        when (authorized) {
-                            is AuthCodeFlowIssuance.Authorized.NoProofRequired -> {
-                                val requestIssuance = authorized.requestIssuance(emptyList())
+                        when (authorizedRequest) {
+                            is AuthorizedRequest.NoProofRequired -> {
+                                val submittedRequest = authorizedRequest.submitRequest(emptyList())
                                 assertThat(
                                     "When no proof is provided while issuing result must be NonceMissing",
-                                    requestIssuance.getOrThrow() is AuthCodeFlowIssuance.Requested.NonceMissing,
+                                    submittedRequest.getOrThrow() is SubmittedRequest.NonceMissing,
                                 )
                             }
-
-                            is AuthCodeFlowIssuance.Authorized.ProofRequired ->
+                            is AuthorizedRequest.ProofRequired ->
                                 fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
                         }
                     }
@@ -122,19 +120,19 @@ class IssuanceRequestTest {
         issuanceTestBed(
             { client ->
                 runBlocking {
-                    val (authorized, issuer) = initIssuerWithOfferAndAuthorize(
+                    val (authorizedRequest, issuer) = initIssuerWithOfferAndAuthorize(
                         client,
                         AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
                     )
                     with(issuer) {
-                        when (authorized) {
-                            is AuthCodeFlowIssuance.Authorized.NoProofRequired -> {
-                                authorized.requestIssuance(emptyList())
+                        when (authorizedRequest) {
+                            is AuthorizedRequest.NoProofRequired -> {
+                                authorizedRequest.submitRequest(emptyList())
                                     .fold(
                                         onSuccess = {
                                             assertThat(
                                                 "Expected CredentialIssuanceException to be thrown but was not",
-                                                it is AuthCodeFlowIssuance.Requested.Failure &&
+                                                it is SubmittedRequest.Errored &&
                                                     it.error is CredentialIssuanceError.ResponseUnparsable,
                                             )
                                         },
@@ -143,8 +141,7 @@ class IssuanceRequestTest {
                                         },
                                     )
                             }
-
-                            is AuthCodeFlowIssuance.Authorized.ProofRequired ->
+                            is AuthorizedRequest.ProofRequired ->
                                 fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
                         }
                     }
@@ -196,33 +193,30 @@ class IssuanceRequestTest {
         issuanceTestBed(
             { client ->
                 runBlocking {
-                    val (authorized, issuer) =
+                    val (authorizedRequest, issuer) =
                         initIssuerWithOfferAndAuthorize(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
 
                     with(issuer) {
-                        when (authorized) {
-                            is AuthCodeFlowIssuance.Authorized.NoProofRequired -> {
-                                val requestIssuanceRequested = authorized.requestIssuance(emptyList()).getOrThrow()
-                                when (requestIssuanceRequested) {
-                                    is AuthCodeFlowIssuance.Requested.NonceMissing -> {
-                                        val proofRequired = requestIssuanceRequested.reProcess()
+                        when (authorizedRequest) {
+                            is AuthorizedRequest.NoProofRequired -> {
+                                val submittedRequest = authorizedRequest.submitRequest(emptyList()).getOrThrow()
+                                when (submittedRequest) {
+                                    is SubmittedRequest.NonceMissing -> {
+                                        val proofRequired = submittedRequest.reProcess()
                                         val proof = proofRequired.cNonce.toJwtProof()
-                                        val response = proofRequired.requestIssuance(proof, emptyList()).getOrThrow()
+                                        val response = proofRequired.submitRequest(proof, emptyList()).getOrThrow()
                                         assertThat(
                                             "Second attempt should be successful",
-                                            response is AuthCodeFlowIssuance.Requested.Success,
+                                            response is SubmittedRequest.Success,
                                         )
                                     }
-
-                                    is AuthCodeFlowIssuance.Requested.GenericFailure -> fail(
-                                        "Failed with error ${requestIssuanceRequested.error}",
+                                    is SubmittedRequest.Failed -> fail(
+                                        "Failed with error ${submittedRequest.error}",
                                     )
-
-                                    is AuthCodeFlowIssuance.Requested.Success -> fail("first attempt should be unsuccessful")
+                                    is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
                                 }
                             }
-
-                            is AuthCodeFlowIssuance.Authorized.ProofRequired ->
+                            is AuthorizedRequest.ProofRequired ->
                                 fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
                         }
                     }
@@ -268,14 +262,13 @@ class IssuanceRequestTest {
     private suspend fun initIssuerWithOfferAndAuthorize(
         client: HttpClient,
         credentialOfferStr: String,
-    ): Pair<AuthCodeFlowIssuance.Authorized, DefaultAuthorizationCodeFlowIssuer> {
+    ): Pair<AuthorizedRequest, Issuer> {
         val offer = CredentialOfferRequestResolver(
             httpGet = createGetASMetadata(client),
         ).resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
             .getOrThrow()
 
-        // AUTHORIZATION CODE FLOW IS USED FOR ISSUANCE
-        val issuer = AuthorizationCodeFlowIssuer.make(
+        val issuer = Issuer.make(
             IssuanceAuthorizer.make(
                 offer.authorizationServerMetadata,
                 vciWalletConfiguration,
@@ -287,11 +280,12 @@ class IssuanceRequestTest {
                 postIssueRequest = createPostIssuance(client),
             ),
         )
+
         val flowState = with(issuer) {
             val parRequested = issuer.placePushedAuthorizationRequest(offer.credentials, null).getOrThrow()
             val authorizationCode = UUID.randomUUID().toString()
             parRequested
-                .completePar(authorizationCode).getOrThrow()
+                .receiveAuthorizationCode(authorizationCode).getOrThrow()
                 .placeAccessTokenRequest().getOrThrow()
         }
         return Pair(flowState, issuer)

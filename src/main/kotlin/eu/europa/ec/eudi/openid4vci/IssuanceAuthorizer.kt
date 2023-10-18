@@ -69,7 +69,7 @@ interface IssuanceAuthorizer {
     suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: String,
         pin: String,
-    ): Result<String>
+    ): Result<Pair<String, CNonce?>>
 
     companion object {
         fun make(

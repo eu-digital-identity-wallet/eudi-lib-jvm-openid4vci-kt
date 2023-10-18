@@ -18,18 +18,11 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jwt.JWT
-import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultAuthorizationCodeFlowIssuer
-import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultPreAuthorizedCodeFlowIssuer
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import java.time.Instant
+import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuer
 
-/**
- * Sealed interface that defines the states of a credential issuance that follows the Authorization Code Flow
- * of OpenId4VCI specification.
- */
-sealed interface AuthCodeFlowIssuance {
+sealed interface UnauthorizedRequest {
+
+    sealed interface AuthorizationCodeFlow
 
     /**
      * State denoting that the pushed authorization request has been placed successfully and response processed
@@ -39,7 +32,7 @@ sealed interface AuthCodeFlowIssuance {
         val getAuthorizationCodeURL: GetAuthorizationCodeURL,
         val pkceVerifier: PKCEVerifier,
         val state: String,
-    ) : AuthCodeFlowIssuance
+    ) : AuthorizationCodeFlow
 
     /**
      * State denoting that caller has followed the [ParRequested.getAuthorizationCodeURL] URL and response received
@@ -49,110 +42,107 @@ sealed interface AuthCodeFlowIssuance {
         val credentials: List<OfferedCredential>,
         val authorizationCode: IssuanceAuthorization.AuthorizationCode,
         val pkceVerifier: PKCEVerifier,
-    ) : AuthCodeFlowIssuance
+    ) : AuthorizationCodeFlow
+
+    sealed interface PreAuthorizationCodeFlow
 
     /**
-     * State denoting that the access token was requested from authorization server and response received and processed successfully
+     * State denoting that caller has been already authorized against the credential issuer and a pre-authorized code was offered.
      */
-    sealed interface Authorized : AuthCodeFlowIssuance {
+    data class PreAuthorized(
+        val credentials: List<OfferedCredential>,
+        val authorizationCode: IssuanceAuthorization.PreAuthorizationCode,
+    ) : PreAuthorizationCodeFlow
+}
 
-        val credentials: List<OfferedCredential>
-        val token: IssuanceAccessToken
+sealed interface AuthorizedRequest {
 
-        /**
-         * Issuer authorized issuance
-         *
-         * @param token Access token authorizing certificate issuance
-         */
-        data class NoProofRequired(
-            override val credentials: List<OfferedCredential>,
-            override val token: IssuanceAccessToken,
-        ) : Authorized
+    val credentials: List<OfferedCredential>
+    val token: IssuanceAccessToken
 
-        /**
-         * Issuer authorized issuance and requires the provision of proof of holder's binding to be provided
-         * along with the request
-         *
-         * @param token  Access token authorizing certificate issuance
-         * @param cNonce Nonce value provided by issuer to be included in proof of holder's binding
-         */
-        data class ProofRequired(
-            override val credentials: List<OfferedCredential>,
-            override val token: IssuanceAccessToken,
-            val cNonce: CNonce,
-        ) : Authorized
+    /**
+     * Issuer authorized issuance
+     *
+     * @param token Access token authorizing certificate issuance
+     */
+    data class NoProofRequired(
+        override val credentials: List<OfferedCredential>,
+        override val token: IssuanceAccessToken,
+    ) : AuthorizedRequest
+
+    /**
+     * Issuer authorized issuance and requires the provision of proof of holder's binding to be provided
+     * along with the request
+     *
+     * @param token  Access token authorizing certificate issuance
+     * @param cNonce Nonce value provided by issuer to be included in proof of holder's binding
+     */
+    data class ProofRequired(
+        override val credentials: List<OfferedCredential>,
+        override val token: IssuanceAccessToken,
+        val cNonce: CNonce,
+    ) : AuthorizedRequest
+}
+
+sealed interface SubmittedRequest {
+
+    data class Success(
+        val response: IssuanceResponse,
+    ) : SubmittedRequest
+
+    sealed interface Errored : SubmittedRequest {
+        val error: CredentialIssuanceError
     }
 
-    sealed interface Requested {
+    data class Failed(
+        override val error: CredentialIssuanceError,
+    ) : Errored
 
-        data class Success(
-            val response: IssuanceResponse,
-        ) : Requested
+    class NonceMissing private constructor(
+        override val error: CredentialIssuanceError.InvalidProof,
+        val credentials: List<OfferedCredential>,
+        val token: IssuanceAccessToken,
+        val cNonce: CNonce,
+    ) : Errored {
 
-        sealed interface Failure : Requested {
-            val error: CredentialIssuanceError
-        }
+        companion object {
+            operator fun invoke(
+                error: CredentialIssuanceError.InvalidProof,
+                credentials: List<OfferedCredential>,
+                token: IssuanceAccessToken,
+            ): NonceMissing {
+                require(credentials.isNotEmpty()) { "Property credentials cannot be empty" }
 
-        data class GenericFailure(
-            override val error: CredentialIssuanceError,
-        ) : Failure
-
-        class NonceMissing private constructor(
-            override val error: CredentialIssuanceError.InvalidProof,
-            val credentials: List<OfferedCredential>,
-            val token: IssuanceAccessToken,
-            val cNonce: CNonce,
-        ) : Failure {
-
-            companion object {
-                operator fun invoke(
-                    error: CredentialIssuanceError.InvalidProof,
-                    credentials: List<OfferedCredential>,
-                    token: IssuanceAccessToken,
-                ): NonceMissing {
-                    require(credentials.isNotEmpty()) { "Property credentials cannot be empty" }
-
-                    return NonceMissing(
-                        error = error,
-                        credentials = credentials,
-                        token = token,
-                        cNonce = CNonce(
-                            error.cNonce,
-                            error.cNonceExpiresIn,
-                        ),
-                    )
-                }
+                return NonceMissing(
+                    error = error,
+                    credentials = credentials,
+                    token = token,
+                    cNonce = CNonce(
+                        error.cNonce,
+                        error.cNonceExpiresIn,
+                    ),
+                )
             }
         }
     }
 }
 
-/**
- * Sealed interface that defines the states of a credential's issuance that follows the Pre-Authorization Code Flow of OpenId4VCI specification.
- */
-sealed interface PreAuthCodeFlowIssuance {
+sealed interface ProcessedRequest {
 
-    /**
-     * State denoting that caller has been already authorized against the credential issuer and a pre-authorized code was offered.
-     */
-    data class Authorized(
-        val authorizationCode: IssuanceAuthorization.PreAuthorizationCode,
-    ) : PreAuthCodeFlowIssuance
+    sealed interface Unvalidated {
+        data class Responded(
+            val certificate: UnvalidatedCertificate,
+        ) : Unvalidated
 
-    /**
-     * State denoting that the access token was requested from authorization server and response received and processed successfully
-     */
-    data class AccessTokenRetrieved(
-        val token: IssuanceAccessToken,
-    ) : PreAuthCodeFlowIssuance
+        data class Deferred(
+            val transactionId: String,
+            val interval: Long? = 5,
+        ) : Unvalidated
+    }
 
-    /**
-     * State denoting that the certificate issuance was requested and certificate issued and received successfully
-     */
     data class Issued(
-        val issuedAt: Instant,
         val certificate: IssuedCertificate,
-    ) : PreAuthCodeFlowIssuance
+    ) : ProcessedRequest
 }
 
 /**
@@ -365,102 +355,71 @@ sealed interface IssuanceResponse {
     }
 }
 
-sealed interface Proof {
-    fun toJsonObject(): JsonObject
+interface AuthorizeIssuance {
 
-    data class Jwt(
-        val jwt: JWT,
-    ) : Proof {
-        override fun toJsonObject(): JsonObject =
-            JsonObject(
-                mapOf(
-                    "proof_type" to JsonPrimitive("jwt"),
-                    "jwt" to JsonPrimitive(jwt.serialize()),
-                ),
-            )
-    }
-
-    data class Cwt(
-        val cwt: String,
-    ) : Proof {
-        override fun toJsonObject(): JsonObject =
-            JsonObject(
-                mapOf(
-                    "proof_type" to JsonPrimitive("cwt"),
-                    "jwt" to JsonPrimitive(cwt),
-                ),
-            )
-    }
-}
-
-/**
- * Interface that defines the state transitions that are happening in a credential issuance process that follows
- * the Authorization Code Flow of OpenId4VCI specification.
- */
-interface AuthorizationCodeFlowIssuer {
+    /*** Authorized Code Flow transitions ***/
     suspend fun placePushedAuthorizationRequest(
         credentials: List<OfferedCredential>,
         issuerState: String?,
-    ): Result<AuthCodeFlowIssuance.ParRequested>
+    ): Result<UnauthorizedRequest.ParRequested>
 
-    suspend fun AuthCodeFlowIssuance.ParRequested.completePar(
+    suspend fun UnauthorizedRequest.ParRequested.receiveAuthorizationCode(
         authorizationCode: String,
-    ): Result<AuthCodeFlowIssuance.AuthorizationCodeRetrieved>
+    ): Result<UnauthorizedRequest.AuthorizationCodeRetrieved>
 
-    suspend fun AuthCodeFlowIssuance.AuthorizationCodeRetrieved.placeAccessTokenRequest(): Result<AuthCodeFlowIssuance.Authorized>
+    suspend fun UnauthorizedRequest.AuthorizationCodeRetrieved.placeAccessTokenRequest(): Result<AuthorizedRequest>
 
-    suspend fun AuthCodeFlowIssuance.Authorized.NoProofRequired.requestIssuance(
+    /*** Pre-Authorized Code Flow transitions ***/
+    suspend fun preAuthorize(
+        credentials: List<OfferedCredential>,
+        preAuthorizedCode: String,
+        pin: String,
+    ): Result<UnauthorizedRequest.PreAuthorized>
+
+    suspend fun UnauthorizedRequest.PreAuthorized.placeAccessTokenRequest(): Result<AuthorizedRequest>
+}
+
+interface RequestIssuance {
+    suspend fun AuthorizedRequest.NoProofRequired.submitRequest(
         claims: ClaimSet,
-    ): Result<AuthCodeFlowIssuance.Requested>
+    ): Result<SubmittedRequest>
 
-    suspend fun AuthCodeFlowIssuance.Authorized.ProofRequired.requestIssuance(
+    suspend fun AuthorizedRequest.ProofRequired.submitRequest(
         proof: Proof,
         claims: ClaimSet,
-    ): Result<AuthCodeFlowIssuance.Requested>
+    ): Result<SubmittedRequest>
 
-    suspend fun AuthCodeFlowIssuance.Requested.NonceMissing.reProcess(): AuthCodeFlowIssuance.Authorized.ProofRequired
+    suspend fun SubmittedRequest.NonceMissing.reProcess(): AuthorizedRequest.ProofRequired
+}
+
+interface ProcessIssuance {
+    suspend fun SubmittedRequest.Success.process(): Result<ProcessedRequest.Unvalidated>
+    suspend fun ProcessedRequest.Unvalidated.Responded.validate(): Result<ProcessedRequest.Issued>
+    suspend fun ProcessedRequest.Unvalidated.Deferred.request(): Result<ProcessedRequest.Unvalidated>
+}
+
+interface Issuer : AuthorizeIssuance, RequestIssuance, ProcessIssuance {
 
     companion object {
         fun make(
             authorizer: IssuanceAuthorizer,
             requester: IssuanceRequester,
-        ) = DefaultAuthorizationCodeFlowIssuer(authorizer, requester)
+        ): Issuer =
+            DefaultIssuer(authorizer, requester)
 
         fun ktor(
             authorizationServerMetadata: CIAuthorizationServerMetadata,
             issuerMetadata: CredentialIssuerMetadata,
             config: WalletOpenId4VCIConfig,
-        ) = DefaultAuthorizationCodeFlowIssuer(
-            IssuanceAuthorizer.ktor(
-                authorizationServerMetadata = authorizationServerMetadata,
-                config = config,
-            ),
-            IssuanceRequester.ktor(
-                issuerMetadata = issuerMetadata,
-            ),
-        )
-    }
-}
-
-interface PreAuthorizationCodeFlowIssuer {
-
-    suspend fun authorize(preAuthorizedCode: String, pin: String): Result<PreAuthCodeFlowIssuance.Authorized>
-
-    suspend fun PreAuthCodeFlowIssuance.Authorized.placeAccessTokenRequest(): Result<PreAuthCodeFlowIssuance.AccessTokenRetrieved>
-
-    suspend fun PreAuthCodeFlowIssuance.AccessTokenRetrieved.issueCredential(): Result<PreAuthCodeFlowIssuance.Issued>
-
-    companion object {
-        fun make(authorizer: IssuanceAuthorizer) = DefaultPreAuthorizedCodeFlowIssuer(authorizer)
-
-        fun ktor(
-            authorizationServerMetadata: CIAuthorizationServerMetadata,
-            config: WalletOpenId4VCIConfig,
-        ) = DefaultPreAuthorizedCodeFlowIssuer(
-            IssuanceAuthorizer.ktor(
-                authorizationServerMetadata = authorizationServerMetadata,
-                config = config,
-            ),
-        )
+        ): Issuer =
+            DefaultIssuer(
+                IssuanceAuthorizer.ktor(
+                    authorizationServerMetadata = authorizationServerMetadata,
+                    config = config,
+                ),
+                IssuanceRequester.ktor(
+                    issuerMetadata = issuerMetadata,
+                ),
+            )
     }
 }

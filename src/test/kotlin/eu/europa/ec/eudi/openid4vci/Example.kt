@@ -80,7 +80,7 @@ private class Wallet(
         )
 
         val offer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
-        val issuer = AuthorizationCodeFlowIssuer.ktor(
+        val issuer = Issuer.ktor(
             offer.authorizationServerMetadata,
             offer.credentialIssuerMetadata,
             vciWalletConfiguration,
@@ -101,7 +101,7 @@ private class Wallet(
             println("--> Authorization code retrieved: $authorizationCode")
 
             parPlaced
-                .completePar(authorizationCode).getOrThrow()
+                .receiveAuthorizationCode(authorizationCode).getOrThrow()
                 .placeAccessTokenRequest().getOrThrow()
                 .token.also {
                     println("--> Authorization code exchanged with access token : ${it.accessToken}")

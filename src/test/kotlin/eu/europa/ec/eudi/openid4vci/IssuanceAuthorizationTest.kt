@@ -285,7 +285,7 @@ class IssuanceAuthorizationTest {
         ).resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr").getOrThrow()
 
         // AUTHORIZATION CODE FLOW IS USED FOR ISSUANCE
-        val issuer = AuthorizationCodeFlowIssuer.make(
+        val issuer = Issuer.make(
             IssuanceAuthorizer.make(
                 offer.authorizationServerMetadata,
                 vciWalletConfiguration,
@@ -318,7 +318,7 @@ class IssuanceAuthorizationTest {
         // Proceed with next steps to issue certificate
         with(issuer) {
             parRequested
-                .completePar(authorizationCode).getOrThrow().also { println(it) }
+                .receiveAuthorizationCode(authorizationCode).getOrThrow().also { println(it) }
                 .placeAccessTokenRequest().getOrThrow().also { println(it) }
         }
     }
@@ -333,12 +333,16 @@ class IssuanceAuthorizationTest {
             "https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr",
         ).getOrThrow()
 
-        val issuer = PreAuthorizationCodeFlowIssuer.make(
+        val issuer = Issuer.make(
             IssuanceAuthorizer.make(
                 offer.authorizationServerMetadata,
                 vciWalletConfiguration,
                 createPostPar(client),
                 createGetAccessToken(client),
+            ),
+            IssuanceRequester.make(
+                issuerMetadata = offer.credentialIssuerMetadata,
+                postIssueRequest = createPostIssuance(client),
             ),
         )
 
@@ -351,9 +355,8 @@ class IssuanceAuthorizationTest {
         val userPin = "pin"
 
         with(issuer) {
-            authorize(preAuthorizationCode, userPin).getOrThrow().also { println(it) }
+            preAuthorize(offer.credentials, preAuthorizationCode, userPin).getOrThrow().also { println(it) }
                 .placeAccessTokenRequest().getOrThrow().also { println(it) }
-                .issueCredential().getOrThrow().also { println(it) }
         }
     }
 }
