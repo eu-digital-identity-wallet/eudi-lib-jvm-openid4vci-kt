@@ -16,15 +16,12 @@
 package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialSupported.MsoMdocCredentialCredentialSupported
-import eu.europa.ec.eudi.openid4vci.CredentialSupported.W3CVerifiableCredentialCredentialSupported
-import eu.europa.ec.eudi.openid4vci.CredentialSupported.W3CVerifiableCredentialCredentialSupported.*
-import eu.europa.ec.eudi.openid4vci.OfferedCredential.MsoMdocCredential
-import eu.europa.ec.eudi.openid4vci.OfferedCredential.W3CVerifiableCredential
+import eu.europa.ec.eudi.openid4vci.CredentialSupported.MsoMdoc
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
+import java.net.URL
 import java.time.Duration
 
 /**
@@ -36,7 +33,8 @@ internal class DefaultCredentialOfferRequestResolver(
 ) : CredentialOfferRequestResolver {
 
     private val credentialIssuerMetadataResolver = CredentialIssuerMetadataResolver(ioCoroutineDispatcher, httpGet)
-    private val authorizationServerMetadataResolver = AuthorizationServerMetadataResolver(ioCoroutineDispatcher, httpGet)
+    private val authorizationServerMetadataResolver =
+        AuthorizationServerMetadataResolver(ioCoroutineDispatcher, httpGet)
 
     override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> =
         runCatching {
@@ -59,8 +57,9 @@ internal class DefaultCredentialOfferRequestResolver(
             val credentialIssuerMetadata = credentialIssuerMetadataResolver.resolve(credentialIssuerId)
                 .getOrElse { CredentialOfferRequestError.UnableToResolveCredentialIssuerMetadata(it).raise() }
 
-            val authorizationServerMetadata = authorizationServerMetadataResolver.resolve(credentialIssuerMetadata.authorizationServer)
-                .getOrElse { CredentialOfferRequestError.UnableToResolveAuthorizationServerMetadata(it).raise() }
+            val authorizationServerMetadata =
+                authorizationServerMetadataResolver.resolve(credentialIssuerMetadata.authorizationServer)
+                    .getOrElse { CredentialOfferRequestError.UnableToResolveAuthorizationServerMetadata(it).raise() }
 
             val credentials = runCatching {
                 credentialOfferRequestObject.credentials
@@ -74,7 +73,13 @@ internal class DefaultCredentialOfferRequestResolver(
                 credentialOfferRequestObject.grants?.toGrants()
             }.getOrElse { CredentialOfferRequestValidationError.InvalidGrants(it).raise() }
 
-            CredentialOffer(credentialIssuerId, credentialIssuerMetadata, authorizationServerMetadata, credentials, grants)
+            CredentialOffer(
+                credentialIssuerId,
+                credentialIssuerMetadata,
+                authorizationServerMetadata,
+                credentials,
+                grants,
+            )
         }
 
     companion object {
@@ -107,9 +112,9 @@ internal class DefaultCredentialOfferRequestResolver(
         }
 
         /**
-         * Tries to parse a [JsonElement] as an [OfferedCredential].
+         * Tries to parse a [JsonElement] as an [CredentialMetadata].
          */
-        private fun JsonElement.toOfferedCredential(metadata: CredentialIssuerMetadata): OfferedCredential =
+        private fun JsonElement.toOfferedCredential(metadata: CredentialIssuerMetadata): CredentialMetadata =
             if (this is JsonPrimitive && isString) {
                 metadata.getOfferedCredentialByScope(content)
             } else if (this is JsonObject) {
@@ -119,41 +124,22 @@ internal class DefaultCredentialOfferRequestResolver(
             }
 
         /**
-         * Gets an [OfferedCredential] by its scope.
+         * Gets an [CredentialMetadata] by its scope.
          */
-        private fun CredentialIssuerMetadata.getOfferedCredentialByScope(scope: String): OfferedCredential =
+        private fun CredentialIssuerMetadata.getOfferedCredentialByScope(scope: String): CredentialMetadata =
             credentialsSupported
                 .firstOrNull { it.scope == scope }
                 ?.let {
-                    when (it) {
-                        is MsoMdocCredentialCredentialSupported -> MsoMdocCredential(it.docType, it.scope)
-                        is W3CVerifiableCredentialSignedJwtCredentialSupported ->
-                            W3CVerifiableCredential.SignedJwt(
-                                it.credentialDefinition,
-                                it.scope,
-                            )
-
-                        is W3CVerifiableCredentialJsonLdSignedJwtCredentialSupported ->
-                            W3CVerifiableCredential.JsonLdSignedJwt(
-                                it.credentialDefinition,
-                                it.scope,
-                            )
-
-                        is W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupported ->
-                            W3CVerifiableCredential.JsonLdDataIntegrity(
-                                it.credentialDefinition,
-                                it.scope,
-                            )
-                    }
+                    CredentialMetadata.ByScope(Scope.of(scope))
                 }
                 ?: throw IllegalArgumentException("Unknown scope '$scope")
 
         /**
-         * Converts this [JsonObject] to an [OfferedCredential].
+         * Converts this [JsonObject] to a [CredentialMetadata.ProfileSpecific] object.
          *
-         * The resulting [OfferedCredential] must be supported by the Credential Issuer and be present in its [CredentialIssuerMetadata].
+         * The resulting [CredentialMetadata.ProfileSpecific] must be supported by the Credential Issuer and be present in its [CredentialIssuerMetadata].
          */
-        private fun JsonObject.toOfferedCredential(metadata: CredentialIssuerMetadata): OfferedCredential {
+        private fun JsonObject.toOfferedCredential(metadata: CredentialIssuerMetadata): CredentialMetadata {
             val format =
                 getOrDefault("format", JsonNull)
                     .let {
@@ -164,7 +150,7 @@ internal class DefaultCredentialOfferRequestResolver(
                         }
                     }
 
-            fun CredentialIssuerMetadata.getMatchingMsoMdocCredential(): MsoMdocCredential {
+            fun CredentialIssuerMetadata.getMatchingMsoMdocCredential(): CredentialMetadata.MsoMdoc {
                 val docType = Json.decodeFromJsonElement<MsoMdocCredentialObject>(
                     this@toOfferedCredential,
                 ).docType
@@ -174,18 +160,16 @@ internal class DefaultCredentialOfferRequestResolver(
 
                 return credentialsSupported
                     .firstOrNull {
-                        it is MsoMdocCredentialCredentialSupported &&
+                        it is CredentialSupported.MsoMdoc &&
                             it.docType == docType
                     }
                     ?.let {
-                        MsoMdocCredential(docType, (it as MsoMdocCredentialCredentialSupported).scope)
+                        CredentialMetadata.MsoMdoc(docType, (it as MsoMdoc).scope)
                     }
                     ?: fail()
             }
 
-            fun CredentialIssuerMetadata.getMatchingW3CVerifiableCredential(
-                constructor: (CredentialDefinition, String?) -> W3CVerifiableCredential,
-            ): W3CVerifiableCredential {
+            fun CredentialIssuerMetadata.getMatchingSignedJwtCredential(): CredentialMetadata.SignedJwt {
                 val credentialDefinition = Json.decodeFromJsonElement<W3CVerifiableCredentialCredentialObject>(
                     this@toOfferedCredential,
                 ).credentialDefinition
@@ -197,12 +181,70 @@ internal class DefaultCredentialOfferRequestResolver(
 
                 return credentialsSupported
                     .firstOrNull {
-                        it is W3CVerifiableCredentialCredentialSupported &&
-                            it.credentialDefinition == credentialDefinition
+                        it is CredentialSupported.SignedJwt &&
+                            it.credentialDefinition.type == credentialDefinition.type
                     }
                     ?.let {
-                        constructor(
-                            credentialDefinition,
+                        CredentialMetadata.SignedJwt(
+                            CredentialDefinitionMetadata.NonLd(
+                                type = credentialDefinition.type,
+                            ),
+                            it.scope,
+                        )
+                    }
+                    ?: fail()
+            }
+
+            fun CredentialIssuerMetadata.getMatchingJsonLdSignedJwtCredential(): CredentialMetadata.JsonLdSignedJwt {
+                val credentialDefinition = Json.decodeFromJsonElement<W3CVerifiableCredentialCredentialObject>(
+                    this@toOfferedCredential,
+                ).credentialDefinition
+
+                fun fail(): Nothing =
+                    throw IllegalArgumentException(
+                        "Unsupported W3CVerifiableCredential with format '$format' and credentialDefinition '$credentialDefinition'",
+                    )
+
+                return credentialsSupported
+                    .firstOrNull {
+                        it is CredentialSupported.JsonLdSignedJwt &&
+                            it.credentialDefinition.type == credentialDefinition.type &&
+                            it.credentialDefinition.context.map { it.toString() } == credentialDefinition.context
+                    }
+                    ?.let {
+                        CredentialMetadata.JsonLdSignedJwt(
+                            CredentialDefinitionMetadata.LdSpecific(
+                                type = credentialDefinition.type,
+                                content = credentialDefinition.context?.map { URL(it) } ?: throw IllegalArgumentException("Unparsable"),
+                            ),
+                            it.scope,
+                        )
+                    }
+                    ?: fail()
+            }
+
+            fun CredentialIssuerMetadata.getMatchingJsonLdDataIntegrity(): CredentialMetadata.JsonLdDataIntegrity {
+                val credentialDefinition = Json.decodeFromJsonElement<W3CVerifiableCredentialCredentialObject>(
+                    this@toOfferedCredential,
+                ).credentialDefinition
+
+                fun fail(): Nothing =
+                    throw IllegalArgumentException(
+                        "Unsupported W3CVerifiableCredential with format '$format' and credentialDefinition '$credentialDefinition'",
+                    )
+
+                return credentialsSupported
+                    .firstOrNull {
+                        it is CredentialSupported.JsonLdDataIntegrity &&
+                            it.credentialDefinition.type == credentialDefinition.type &&
+                            it.credentialDefinition.context.map { it.toString() } == credentialDefinition.context
+                    }
+                    ?.let {
+                        CredentialMetadata.JsonLdDataIntegrity(
+                            CredentialDefinitionMetadata.LdSpecific(
+                                type = credentialDefinition.type,
+                                content = credentialDefinition.context?.map { URL(it) } ?: throw IllegalArgumentException("Unparsable"),
+                            ),
                             it.scope,
                         )
                     }
@@ -211,9 +253,10 @@ internal class DefaultCredentialOfferRequestResolver(
 
             return when (format) {
                 "mso_mdoc" -> metadata.getMatchingMsoMdocCredential()
-                "jwt_vc_json" -> metadata.getMatchingW3CVerifiableCredential(W3CVerifiableCredential::SignedJwt)
-                "jwt_vc_json-ld" -> metadata.getMatchingW3CVerifiableCredential(W3CVerifiableCredential::JsonLdSignedJwt)
-                "ldp_vc" -> metadata.getMatchingW3CVerifiableCredential(W3CVerifiableCredential::JsonLdDataIntegrity)
+                "jwt_vc_json" -> metadata.getMatchingSignedJwtCredential()
+                "jwt_vc_json-ld" -> metadata.getMatchingJsonLdSignedJwtCredential()
+                "ldp_vc" -> metadata.getMatchingJsonLdDataIntegrity()
+
                 else -> throw IllegalArgumentException("Unknown Credential format '$format'")
             }
         }

@@ -89,7 +89,7 @@ private class Wallet(
         return with(issuer) {
             println("--> Placing PAR to AS server's endpoint ${offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI}")
 
-            val parPlaced = placePushedAuthorizationRequest(offer.credentials, null).getOrThrow()
+            val parPlaced = pushAuthorizationCodeRequest(offer.credentials, null).getOrThrow()
 
             println("--> Placed PAR. Get authorization code URL is: ${parPlaced.getAuthorizationCodeURL.url.value}")
 
@@ -101,8 +101,8 @@ private class Wallet(
             println("--> Authorization code retrieved: $authorizationCode")
 
             parPlaced
-                .receiveAuthorizationCode(authorizationCode).getOrThrow()
-                .placeAccessTokenRequest().getOrThrow()
+                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                .requestAccessToken().getOrThrow()
                 .token.also {
                     println("--> Authorization code exchanged with access token : ${it.accessToken}")
                 }

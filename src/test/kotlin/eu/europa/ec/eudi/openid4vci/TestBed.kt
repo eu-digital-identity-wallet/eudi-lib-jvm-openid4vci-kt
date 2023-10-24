@@ -170,14 +170,16 @@ fun createGetASMetadata(managedHttpClient: HttpClient): HttpGet<String> =
         }
     }
 
-fun createPostIssuance(managedHttpClient: HttpClient): HttpPost<CredentialRequestTO, IssuanceResponse.Single, IssuanceResponse.Single> =
-    object : HttpPost<CredentialRequestTO, IssuanceResponse.Single, IssuanceResponse.Single> {
+fun createPostIssuance(
+    managedHttpClient: HttpClient,
+): HttpPost<CredentialRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
+    object : HttpPost<CredentialRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> {
         override suspend fun post(
             url: URL,
             headers: Map<String, String>,
             payload: CredentialRequestTO,
-            transform: suspend (response: HttpResponse) -> IssuanceResponse.Single,
-        ): IssuanceResponse.Single {
+            responseHandler: suspend (response: HttpResponse) -> CredentialIssuanceResponse,
+        ): CredentialIssuanceResponse {
             val response = managedHttpClient.post(url) {
                 headers {
                     headers.forEach {
@@ -187,6 +189,6 @@ fun createPostIssuance(managedHttpClient: HttpClient): HttpPost<CredentialReques
                 contentType(ContentType.parse("application/json"))
                 setBody(payload)
             }
-            return transform(response)
+            return responseHandler(response)
         }
     }

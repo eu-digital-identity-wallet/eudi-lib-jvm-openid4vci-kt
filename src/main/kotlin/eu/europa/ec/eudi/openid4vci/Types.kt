@@ -17,13 +17,20 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jwt.JWT
 import com.nimbusds.openid.connect.sdk.op.ReadOnlyOIDCProviderMetadata
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
+import java.util.*
 
 /**
  * A [URI] that strictly uses the 'https' protocol.
@@ -69,8 +76,14 @@ data class MsoMdocCredentialObject(
 @Serializable
 data class W3CVerifiableCredentialCredentialObject(
     @SerialName("format") @Required val format: String,
-    @SerialName("credential_definition") @Required val credentialDefinition: JsonObject,
-)
+    @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinition,
+) {
+    @Serializable
+    data class CredentialDefinition(
+        @SerialName("type") val type: List<String>,
+        @SerialName("@context") val context: List<String>? = null,
+    )
+}
 
 /**
  * Data of the Grant Types the Credential Issuer is prepared to process for a Credential Offer.
@@ -99,8 +112,6 @@ data class GrantsObject(
         @SerialName("interval") val interval: Long? = null,
     )
 }
-
-typealias CredentialDefinition = JsonObject
 
 /**
  * Unvalidated metadata of a Credential Issuer.
@@ -145,88 +156,10 @@ sealed interface CredentialSupportedObject {
     val display: List<DisplayObject>?
 
     /**
-     * The data of a W3C Verifiable Credential.
-     */
-    sealed interface W3CVerifiableCredentialCredentialSupportedObject : CredentialSupportedObject {
-
-        val credentialDefinition: JsonObject
-        val order: List<String>?
-
-        /**
-         * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
-         */
-        @Serializable
-        data class W3CVerifiableCredentialSignedJwtCredentialSupportedObject(
-            @SerialName("format") @Required override val format: String,
-            @SerialName("scope") override val scope: String? = null,
-            @SerialName("cryptographic_binding_methods_supported")
-            override val cryptographicBindingMethodsSupported: List<String>? = null,
-            @SerialName("cryptographic_suites_supported")
-            override val cryptographicSuitesSupported: List<String>? = null,
-            @SerialName("proof_types_supported")
-            override val proofTypesSupported: List<String>? = null,
-            @SerialName("display") override val display: List<DisplayObject>? = null,
-            @SerialName("credential_definition") @Required override val credentialDefinition: JsonObject,
-            @SerialName("order") override val order: List<String>? = null,
-        ) : W3CVerifiableCredentialCredentialSupportedObject {
-            init {
-                require(format == "jwt_vc_json") { "invalid format '$format'" }
-            }
-        }
-
-        /**
-         * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
-         */
-        @Serializable
-        data class W3CVerifiableCredentialJsonLdSignedJwtCredentialSupportedObject(
-            @SerialName("format") @Required override val format: String,
-            @SerialName("scope") override val scope: String? = null,
-            @SerialName("cryptographic_binding_methods_supported")
-            override val cryptographicBindingMethodsSupported: List<String>? = null,
-            @SerialName("cryptographic_suites_supported")
-            override val cryptographicSuitesSupported: List<String>? = null,
-            @SerialName("proof_types_supported")
-            override val proofTypesSupported: List<String>? = null,
-            @SerialName("display") override val display: List<DisplayObject>? = null,
-            @SerialName("@context") @Required val context: List<String> = emptyList(),
-            @SerialName("credential_definition") @Required override val credentialDefinition: JsonObject,
-            @SerialName("order") override val order: List<String>? = null,
-        ) : W3CVerifiableCredentialCredentialSupportedObject {
-            init {
-                require(format == "jwt_vc_json-ld") { "invalid format '$format'" }
-            }
-        }
-
-        /**
-         * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
-         */
-        @Serializable
-        data class W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupportedObject(
-            @SerialName("format") @Required override val format: String,
-            @SerialName("scope") override val scope: String? = null,
-            @SerialName("cryptographic_binding_methods_supported")
-            override val cryptographicBindingMethodsSupported: List<String>? = null,
-            @SerialName("cryptographic_suites_supported")
-            override val cryptographicSuitesSupported: List<String>? = null,
-            @SerialName("proof_types_supported")
-            override val proofTypesSupported: List<String>? = null,
-            @SerialName("display") override val display: List<DisplayObject>? = null,
-            @SerialName("@context") @Required val context: List<String> = emptyList(),
-            @SerialName("type") @Required val type: List<String> = emptyList(),
-            @SerialName("credential_definition") @Required override val credentialDefinition: JsonObject,
-            @SerialName("order") override val order: List<String>? = null,
-        ) : W3CVerifiableCredentialCredentialSupportedObject {
-            init {
-                require(format == "ldp_vc") { "invalid format '$format'" }
-            }
-        }
-    }
-
-    /**
      * The data of a Verifiable Credentials issued as an ISO mDL.
      */
     @Serializable
-    data class MsoMdocCredentialCredentialSupportedObject(
+    data class MsoMdoc(
         @SerialName("format") @Required override val format: String,
         @SerialName("scope") override val scope: String? = null,
         @SerialName("cryptographic_binding_methods_supported")
@@ -243,27 +176,109 @@ sealed interface CredentialSupportedObject {
         init {
             require(format == "mso_mdoc") { "invalid format '$format'" }
         }
+    }
 
-        /**
-         * The details of a Claim.
-         */
-        @Serializable
-        data class ClaimObject(
-            @SerialName("mandatory") val mandatory: Boolean? = null,
-            @SerialName("value_type") val valueType: String? = null,
-            @SerialName("display") val display: List<DisplayObject>? = null,
-        ) {
-
-            /**
-             * Display properties of a Claim.
-             */
-            @Serializable
-            data class DisplayObject(
-                @SerialName("name") val name: String? = null,
-                @SerialName("locale") val locale: String? = null,
-            )
+    /**
+     * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
+     */
+    @Serializable
+    data class SignedJwt(
+        @SerialName("format") @Required override val format: String,
+        @SerialName("scope") override val scope: String? = null,
+        @SerialName("cryptographic_binding_methods_supported")
+        override val cryptographicBindingMethodsSupported: List<String>? = null,
+        @SerialName("cryptographic_suites_supported")
+        override val cryptographicSuitesSupported: List<String>? = null,
+        @SerialName("proof_types_supported")
+        override val proofTypesSupported: List<String>? = null,
+        @SerialName("display") override val display: List<DisplayObject>? = null,
+        @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionObject,
+        @SerialName("order") val order: List<String>? = null,
+    ) : CredentialSupportedObject {
+        init {
+            require(format == "jwt_vc_json") { "invalid format '$format'" }
         }
     }
+
+    /**
+     * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
+     */
+    @Serializable
+    data class JsonLdSignedJwt(
+        @SerialName("format") @Required override val format: String,
+        @SerialName("scope") override val scope: String? = null,
+        @SerialName("cryptographic_binding_methods_supported")
+        override val cryptographicBindingMethodsSupported: List<String>? = null,
+        @SerialName("cryptographic_suites_supported")
+        override val cryptographicSuitesSupported: List<String>? = null,
+        @SerialName("proof_types_supported")
+        override val proofTypesSupported: List<String>? = null,
+        @SerialName("display") override val display: List<DisplayObject>? = null,
+        @SerialName("@context") @Required val context: List<String> = emptyList(),
+        @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionObjectLD,
+        @SerialName("order") val order: List<String>? = null,
+    ) : CredentialSupportedObject {
+        init {
+            require(format == "jwt_vc_json-ld") { "invalid format '$format'" }
+        }
+    }
+
+    /**
+     * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
+     */
+    @Serializable
+    data class JsonLdDataIntegrity(
+        @SerialName("format") @Required override val format: String,
+        @SerialName("scope") override val scope: String? = null,
+        @SerialName("cryptographic_binding_methods_supported")
+        override val cryptographicBindingMethodsSupported: List<String>? = null,
+        @SerialName("cryptographic_suites_supported")
+        override val cryptographicSuitesSupported: List<String>? = null,
+        @SerialName("proof_types_supported")
+        override val proofTypesSupported: List<String>? = null,
+        @SerialName("display") override val display: List<DisplayObject>? = null,
+        @SerialName("@context") @Required val context: List<String> = emptyList(),
+        @SerialName("type") @Required val type: List<String> = emptyList(),
+        @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionObjectLD,
+        @SerialName("order") val order: List<String>? = null,
+    ) : CredentialSupportedObject {
+        init {
+            require(format == "ldp_vc") { "invalid format '$format'" }
+        }
+    }
+}
+
+@Serializable
+data class CredentialDefinitionObject(
+    @SerialName("type") val types: List<String>,
+    @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimObject>?,
+)
+
+@Serializable
+data class CredentialDefinitionObjectLD(
+    @SerialName("@context") val context: List<String>,
+    @SerialName("type") val types: List<String>,
+    @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimObject>?,
+)
+
+/**
+ * The details of a Claim.
+ */
+@Serializable
+data class ClaimObject(
+    @SerialName("mandatory") val mandatory: Boolean? = null,
+    @SerialName("value_type") val valueType: String? = null,
+    @SerialName("display") val display: List<DisplayObject>? = null,
+) {
+
+    /**
+     * Display properties of a Claim.
+     */
+    @Serializable
+    data class DisplayObject(
+        @SerialName("name") val name: String? = null,
+        @SerialName("locale") val locale: String? = null,
+    )
 }
 
 /**
@@ -310,11 +325,7 @@ data class IssuanceAccessToken(
 data class IssuedCertificate(
     val format: String,
     val content: String,
-)
-
-data class UnvalidatedCertificate(
-    val format: String,
-    val content: String,
+    val cNonce: CNonce,
 )
 
 sealed interface IssuanceAuthorization {
@@ -329,7 +340,7 @@ sealed interface IssuanceAuthorization {
 
     data class PreAuthorizationCode(
         val preAuthorizedCode: String,
-        val pin: String,
+        val pin: String?,
     ) : IssuanceAuthorization {
         init {
             require(preAuthorizedCode.isNotEmpty()) { "Pre-Authorization code must not be empty" }
@@ -347,11 +358,13 @@ data class CNonce(
 }
 
 sealed interface Proof {
+    fun type(): ProofType
     fun toJsonObject(): JsonObject
 
     data class Jwt(
         val jwt: JWT,
     ) : Proof {
+        override fun type() = ProofType.JWT
         override fun toJsonObject(): JsonObject =
             JsonObject(
                 mapOf(
@@ -364,6 +377,7 @@ sealed interface Proof {
     data class Cwt(
         val cwt: String,
     ) : Proof {
+        override fun type() = ProofType.CWT
         override fun toJsonObject(): JsonObject =
             JsonObject(
                 mapOf(
@@ -374,5 +388,48 @@ sealed interface Proof {
     }
 }
 
+@JvmInline
+value class Scope private constructor(
+    val value: String,
+) {
+    companion object {
+        fun of(value: String): Scope {
+            require(value.isNotEmpty()) { "Scope value cannot be empty" }
+            return Scope(value)
+        }
+    }
+}
+
+/**
+ * The details of a Claim.
+ */
+@Serializable
+data class Claim(
+    @SerialName("mandatory") val mandatory: Boolean? = false,
+    @SerialName("value_type") val valueType: String? = null,
+    @SerialName("display") val display: List<Display> = emptyList(),
+) : java.io.Serializable {
+
+    /**
+     * Display properties of a Claim.
+     */
+    @Serializable
+    data class Display(
+        @SerialName("name") val name: String? = null,
+        @Serializable(LocalSerializer::class)
+        @SerialName("locale") val locale: Locale? = null,
+    ) : java.io.Serializable
+}
+
+object LocalSerializer : KSerializer<Locale> {
+
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Locale", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): Locale =
+        Locale.forLanguageTag(decoder.decodeString())
+
+    override fun serialize(encoder: Encoder, value: Locale) =
+        encoder.encodeString(value.toString())
+}
+
 typealias CIAuthorizationServerMetadata = ReadOnlyOIDCProviderMetadata
-typealias ClaimSet = List<String>

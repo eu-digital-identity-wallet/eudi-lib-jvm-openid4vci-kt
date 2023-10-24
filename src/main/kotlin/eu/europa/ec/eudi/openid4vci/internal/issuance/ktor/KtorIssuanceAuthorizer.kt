@@ -37,7 +37,7 @@ internal class KtorIssuanceAuthorizer private constructor(
 ) : IssuanceAuthorizer {
 
     override suspend fun submitPushedAuthorizationRequest(
-        scopes: List<String>,
+        scopes: List<Scope>,
         state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>> =
@@ -46,7 +46,7 @@ internal class KtorIssuanceAuthorizer private constructor(
     override suspend fun requestAccessTokenAuthFlow(authorizationCode: String, codeVerifier: String): Result<Pair<String, CNonce?>> =
         delegate.requestAccessTokenAuthFlow(authorizationCode, codeVerifier)
 
-    override suspend fun requestAccessTokenPreAuthFlow(preAuthorizedCode: String, pin: String): Result<Pair<String, CNonce?>> =
+    override suspend fun requestAccessTokenPreAuthFlow(preAuthorizedCode: String, pin: String?): Result<Pair<String, CNonce?>> =
         delegate.requestAccessTokenPreAuthFlow(preAuthorizedCode, pin)
 
     companion object {
@@ -65,7 +65,7 @@ internal class KtorIssuanceAuthorizer private constructor(
                         json = Json { ignoreUnknownKeys = true },
                     )
                 }
-                expectSuccess = true
+
             }
         }
 

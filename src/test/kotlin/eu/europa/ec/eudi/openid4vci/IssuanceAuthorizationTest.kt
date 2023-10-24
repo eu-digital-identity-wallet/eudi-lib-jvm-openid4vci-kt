@@ -308,7 +308,7 @@ class IssuanceAuthorizationTest {
 
         // Place PAR
         val parRequested =
-            issuer.placePushedAuthorizationRequest(offer.credentials, issuerState).getOrThrow()
+            issuer.pushAuthorizationCodeRequest(offer.credentials, issuerState).getOrThrow()
                 .also { println(it) }
 
         // [WALLET] CONSTRUCTS url GET request opens it in browser window and authenticates user in issuer's side
@@ -318,8 +318,8 @@ class IssuanceAuthorizationTest {
         // Proceed with next steps to issue certificate
         with(issuer) {
             parRequested
-                .receiveAuthorizationCode(authorizationCode).getOrThrow().also { println(it) }
-                .placeAccessTokenRequest().getOrThrow().also { println(it) }
+                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode)).also { println(it) }
+                .requestAccessToken().getOrThrow().also { println(it) }
         }
     }
 
@@ -355,8 +355,10 @@ class IssuanceAuthorizationTest {
         val userPin = "pin"
 
         with(issuer) {
-            preAuthorize(offer.credentials, preAuthorizationCode, userPin).getOrThrow().also { println(it) }
-                .placeAccessTokenRequest().getOrThrow().also { println(it) }
+            authorizeWithPreAuthorizationCode(
+                offer.credentials,
+                IssuanceAuthorization.PreAuthorizationCode(preAuthorizationCode, userPin),
+            ).getOrThrow().also { println(it) }
         }
     }
 }

@@ -20,6 +20,7 @@ import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import java.io.Serializable
+import java.net.URL
 import java.time.Duration
 
 /**
@@ -29,7 +30,7 @@ data class CredentialOffer(
     val credentialIssuerIdentifier: CredentialIssuerId,
     val credentialIssuerMetadata: CredentialIssuerMetadata,
     val authorizationServerMetadata: CIAuthorizationServerMetadata,
-    val credentials: List<OfferedCredential>,
+    val credentials: List<CredentialMetadata>,
     val grants: Grants? = null,
 ) : java.io.Serializable {
     init {
@@ -61,55 +62,68 @@ value class CredentialIssuerId private constructor(val value: HttpsUrl) {
 /**
  * A Credential being offered in a Credential Offer.
  */
-sealed interface OfferedCredential : java.io.Serializable {
+sealed interface CredentialMetadata : Serializable {
 
-    val scope: String?
+    data class ByScope(val scope: Scope) : CredentialMetadata
+
+    sealed interface ByProfile : CredentialMetadata
 
     /**
      * An MSO MDOC credential.
      */
-    data class MsoMdocCredential(
+    data class MsoMdoc(
         val docType: String,
-        override val scope: String? = null,
-    ) : OfferedCredential
+        val scope: String? = null,
+    ) : ByProfile
 
     /**
      * A W3C Verifiable Credential.
      */
-    sealed interface W3CVerifiableCredential : OfferedCredential {
-
-        val credentialDefinition: CredentialDefinition
-
-        /**
-         * A signed JWT not using JSON-LD.
-         *
-         * Format: jwt_vc_json
-         */
-        data class SignedJwt(
-            override val credentialDefinition: CredentialDefinition,
-            override val scope: String? = null,
-        ) : W3CVerifiableCredential
-
-        /**
-         * A signed JWT using JSON-LD.
-         *
-         * Format: jwt_vc_json-ld
-         */
-        data class JsonLdSignedJwt(
-            override val credentialDefinition: CredentialDefinition,
-            override val scope: String? = null,
-        ) : W3CVerifiableCredential
-
-        /**
-         * Data Integrity using JSON-LD.
-         *
-         * Format: ldp_vc
-         */
-        data class JsonLdDataIntegrity(
-            override val credentialDefinition: CredentialDefinition,
-            override val scope: String? = null,
-        ) : W3CVerifiableCredential
+    sealed interface W3CVerifiableCredential : ByProfile {
+        val credentialDefinition: CredentialDefinitionMetadata
     }
+
+    /**
+     * A signed JWT not using JSON-LD.
+     *
+     * Format: jwt_vc_json
+     */
+    data class SignedJwt(
+        override val credentialDefinition: CredentialDefinitionMetadata.NonLd,
+        val scope: String? = null,
+    ) : W3CVerifiableCredential
+
+    /**
+     * A signed JWT using JSON-LD.
+     *
+     * Format: jwt_vc_json-ld
+     */
+    data class JsonLdSignedJwt(
+        override val credentialDefinition: CredentialDefinitionMetadata.LdSpecific,
+        val scope: String? = null,
+    ) : W3CVerifiableCredential
+
+    /**
+     * Data Integrity using JSON-LD.
+     *
+     * Format: ldp_vc
+     */
+    data class JsonLdDataIntegrity(
+        override val credentialDefinition: CredentialDefinitionMetadata.LdSpecific,
+        val scope: String? = null,
+    ) : W3CVerifiableCredential
+}
+
+sealed interface CredentialDefinitionMetadata {
+
+    data class LdSpecific(
+        val content: List<URL>,
+        val type: List<String>,
+    ) : CredentialDefinitionMetadata
+
+    data class NonLd(
+        val type: List<String>,
+    ) : CredentialDefinitionMetadata
 }
 
 /**

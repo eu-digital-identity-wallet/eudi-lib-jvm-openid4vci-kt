@@ -42,18 +42,14 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 val credentialOffer =
                     getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer.json")
 
-                val universityDegreeJwt = universityDegreeJwt()
                 val mobileDrivingLicense = mobileDrivingLicense()
                 val expected = CredentialOffer(
                     credentialIssuerId(),
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        OfferedCredential.W3CVerifiableCredential.SignedJwt(
-                            universityDegreeJwt.credentialDefinition,
-                            universityDegreeJwt.scope,
-                        ),
-                        OfferedCredential.MsoMdocCredential(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                        CredentialMetadata.ByScope(Scope.of("UniversityDegree_JWT")),
+                        CredentialMetadata.MsoMdoc(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
@@ -108,7 +104,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        OfferedCredential.MsoMdocCredential(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                        CredentialMetadata.MsoMdoc(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
@@ -163,8 +159,10 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        OfferedCredential.W3CVerifiableCredential.SignedJwt(
-                            universityDegreeJwt.credentialDefinition,
+                        CredentialMetadata.SignedJwt(
+                            CredentialDefinitionMetadata.NonLd(
+                                universityDegreeJwt.credentialDefinition.type,
+                            ),
                             universityDegreeJwt.scope,
                         ),
                     ),
@@ -221,8 +219,11 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        OfferedCredential.W3CVerifiableCredential.JsonLdDataIntegrity(
-                            universityDegreeLdpVc.credentialDefinition,
+                        CredentialMetadata.JsonLdDataIntegrity(
+                            CredentialDefinitionMetadata.LdSpecific(
+                                universityDegreeLdpVc.credentialDefinition.context,
+                                universityDegreeLdpVc.credentialDefinition.type,
+                            ),
                             universityDegreeLdpVc.scope,
                         ),
                     ),
@@ -391,18 +392,14 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     .addParameter("credential_offer_uri", credentialOfferUri.value.toString())
                     .build()
 
-                val universityDegreeJwt = universityDegreeJwt()
                 val mobileDrivingLicense = mobileDrivingLicense()
                 val expected = CredentialOffer(
                     credentialIssuerId(),
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        OfferedCredential.W3CVerifiableCredential.SignedJwt(
-                            universityDegreeJwt.credentialDefinition,
-                            universityDegreeJwt.scope,
-                        ),
-                        OfferedCredential.MsoMdocCredential(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                        CredentialMetadata.ByScope(Scope.of("UniversityDegree_JWT")),
+                        CredentialMetadata.MsoMdoc(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),

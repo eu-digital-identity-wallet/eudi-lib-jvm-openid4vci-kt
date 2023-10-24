@@ -53,10 +53,37 @@ sealed interface AccessTokenRequestResponse {
     ) : AccessTokenRequestResponse
 }
 
+/**
+ * Holds a https [java.net.URL] to be used at the second step of PAR flow for retrieving the authorization code.
+ * Contains the 'request_uri' retrieved from the post to PAR endpoint of authorization server and the client_id.
+ */
+class GetAuthorizationCodeURL private constructor(val url: HttpsUrl) {
+    override fun toString(): String {
+        return url.toString()
+    }
+
+    companion object {
+        val PARAM_CLIENT_ID = "client_id"
+        val PARAM_REQUEST_URI = "request_uri"
+        val PARAM_STATE = "state"
+        operator fun invoke(url: String): GetAuthorizationCodeURL {
+            val httpsUrl = HttpsUrl(url).getOrThrow()
+            require(
+                httpsUrl.value.query != null && httpsUrl.value.query.contains("$PARAM_CLIENT_ID="),
+            ) { "URL must contain client_id query parameter" }
+            require(
+                httpsUrl.value.query != null && httpsUrl.value.query.contains("$PARAM_REQUEST_URI="),
+            ) { "URL must contain request_uri query parameter" }
+
+            return GetAuthorizationCodeURL(httpsUrl)
+        }
+    }
+}
+
 interface IssuanceAuthorizer {
 
     suspend fun submitPushedAuthorizationRequest(
-        scopes: List<String>,
+        scopes: List<Scope>,
         state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>>
@@ -68,7 +95,7 @@ interface IssuanceAuthorizer {
 
     suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: String,
-        pin: String,
+        pin: String?,
     ): Result<Pair<String, CNonce?>>
 
     companion object {

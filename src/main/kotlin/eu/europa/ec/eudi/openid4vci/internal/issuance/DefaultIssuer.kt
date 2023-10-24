@@ -23,16 +23,13 @@ internal class DefaultIssuer(
     val issuanceRequester: IssuanceRequester,
 ) : Issuer {
 
-    override suspend fun placePushedAuthorizationRequest(
-        credentials: List<OfferedCredential>,
+    override suspend fun pushAuthorizationCodeRequest(
+        credentials: List<CredentialMetadata>,
         issuerState: String?,
     ): Result<UnauthorizedRequest.ParRequested> =
         runCatching {
-            // Get scopes from credentials
-            val scopes = credentials.map { it.scope }.filterNotNull()
-
+            val scopes = credentials.filterIsInstance<CredentialMetadata.ByScope>().map { it.scope }
             val state = UUID.randomUUID().toString()
-            // Place PAR
             val (codeVerifier, getAuthorizationCodeUrl) =
                 authorizer.submitPushedAuthorizationRequest(scopes, state, issuerState).getOrThrow()
 
@@ -45,35 +42,16 @@ internal class DefaultIssuer(
             )
         }
 
-    override suspend fun preAuthorize(
-        credentials: List<OfferedCredential>,
-        preAuthorizedCode: String,
-        pin: String,
-    ): Result<UnauthorizedRequest.PreAuthorized> =
-        Result.success(
-            UnauthorizedRequest.PreAuthorized(
-                credentials = credentials,
-                authorizationCode = IssuanceAuthorization.PreAuthorizationCode(
-                    preAuthorizedCode = preAuthorizedCode,
-                    pin = pin,
-                ),
-            ),
+    override suspend fun UnauthorizedRequest.ParRequested.handleAuthorizationCode(
+        authorizationCode: IssuanceAuthorization.AuthorizationCode,
+    ): UnauthorizedRequest.AuthorizationCodeRetrieved =
+        UnauthorizedRequest.AuthorizationCodeRetrieved(
+            credentials = credentials,
+            authorizationCode = authorizationCode,
+            pkceVerifier = this.pkceVerifier,
         )
 
-    override suspend fun UnauthorizedRequest.ParRequested.receiveAuthorizationCode(
-        authorizationCode: String,
-    ): Result<UnauthorizedRequest.AuthorizationCodeRetrieved> =
-        runCatching {
-            require(authorizationCode.isNotEmpty()) { "Authorization code cannot be empty" }
-
-            UnauthorizedRequest.AuthorizationCodeRetrieved(
-                credentials = credentials,
-                authorizationCode = IssuanceAuthorization.AuthorizationCode(authorizationCode),
-                pkceVerifier = this.pkceVerifier,
-            )
-        }
-
-    override suspend fun UnauthorizedRequest.AuthorizationCodeRetrieved.placeAccessTokenRequest(): Result<AuthorizedRequest> =
+    override suspend fun UnauthorizedRequest.AuthorizationCodeRetrieved.requestAccessToken(): Result<AuthorizedRequest> =
         runCatching {
             val (accessToken, nonce) =
                 authorizer.requestAccessTokenAuthFlow(
@@ -83,17 +61,18 @@ internal class DefaultIssuer(
 
             nonce?.let {
                 AuthorizedRequest.ProofRequired(
-                    credentials = credentials,
                     token = IssuanceAccessToken(accessToken),
                     cNonce = nonce,
                 )
             } ?: AuthorizedRequest.NoProofRequired(
-                credentials = credentials,
                 token = IssuanceAccessToken(accessToken),
             )
         }
 
-    override suspend fun UnauthorizedRequest.PreAuthorized.placeAccessTokenRequest(): Result<AuthorizedRequest> =
+    override suspend fun authorizeWithPreAuthorizationCode(
+        credentials: List<CredentialMetadata>,
+        authorizationCode: IssuanceAuthorization.PreAuthorizationCode,
+    ): Result<AuthorizedRequest> =
         runCatching {
             val (accessToken, nonce) =
                 authorizer.requestAccessTokenPreAuthFlow(
@@ -103,122 +82,233 @@ internal class DefaultIssuer(
 
             nonce?.let {
                 AuthorizedRequest.ProofRequired(
-                    credentials = credentials,
                     token = IssuanceAccessToken(accessToken),
                     cNonce = nonce,
                 )
             } ?: AuthorizedRequest.NoProofRequired(
-                credentials = credentials,
                 token = IssuanceAccessToken(accessToken),
             )
         }
 
-    override suspend fun AuthorizedRequest.NoProofRequired.submitRequest(claims: ClaimSet): Result<SubmittedRequest> =
+    override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
+        credentialMetadata: CredentialMetadata,
+        claimSet: ClaimSet?,
+    ): Result<SubmittedRequest> =
         runCatching {
-            val credentialRequest = credentialRequest(null)
-
-            requestIssuance(credentialRequest, token) {
-                if (it is CredentialIssuanceException) {
-                    if (it.error is CredentialIssuanceError.InvalidProof) {
-                        SubmittedRequest.NonceMissing(
-                            error = it.error,
-                            credentials = credentials,
-                            token = token,
-                        )
-                    } else {
-                        SubmittedRequest.Failed(it.error)
-                    }
-                } else {
-                    throw it
-                }
+            requestIssuance(token) {
+                credentialMetadata
+                    .toIssuerSupportedCredential()
+                    .toIssuanceRequest(claimSet, null)
             }
         }
 
-    private fun AuthorizedRequest.credentialRequest(proof: Proof?): CredentialIssuanceRequest =
-        when {
-            credentials.size == 1 -> {
-                issuanceRequester.issuerMetadata.credentialsSupported
-                    .firstOrNull { it.scope == credentials[0].scope }
-                    ?.let {
-                        when (it) {
-                            is CredentialSupported.MsoMdocCredentialCredentialSupported ->
-                                CredentialIssuanceRequest.SingleCredential.MsoMdocIssuanceRequest(
-                                    doctype = it.docType,
-                                    proof = proof,
-                                ).getOrThrow()
+    override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
+        credentialMetadata: CredentialMetadata,
+        claimSet: ClaimSet?,
+        proof: Proof,
+    ): Result<SubmittedRequest> =
+        runCatching {
+            requestIssuance(token) {
+                credentialMetadata
+                    .toIssuerSupportedCredential()
+                    .toIssuanceRequest(claimSet, proof)
+            }
+        }
 
-                            else -> throw CredentialIssuanceException(
-                                CredentialIssuanceError.InvalidIssuanceRequest(
-                                    "Only mso_mdoc credential requests supported",
-                                ),
-                            )
-                        }
-                    } ?: throw CredentialIssuanceException(
-                    CredentialIssuanceError.InvalidIssuanceRequest(
-                        "Offered credential scope does not match any of issuer's supported credentials",
-                    ),
+    override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
+        credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
+    ): Result<SubmittedRequest> =
+        runCatching {
+            // TODO: Check if issuer exposes batch endpoint
+            requestIssuance(token) {
+                CredentialIssuanceRequest.BatchCredentials(
+                    credentialRequests = credentialsMetadata.map { pair ->
+                        pair.first
+                            .toIssuerSupportedCredential()
+                            .toIssuanceRequest(pair.second, null)
+                    },
                 )
             }
-
-            else -> TODO("Batch issuance requests not yet supported")
         }
+
+    override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
+        credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, Proof>>,
+    ): Result<SubmittedRequest> =
+        runCatching {
+            // TODO: Check if issuer exposes batch endpoint
+            requestIssuance(token) {
+                CredentialIssuanceRequest.BatchCredentials(
+                    credentialRequests = credentialsMetadata.map { triple ->
+                        triple.first
+                            .toIssuerSupportedCredential()
+                            .toIssuanceRequest(triple.second, triple.third)
+                    },
+                )
+            }
+        }
+
+    private fun CredentialMetadata.toIssuerSupportedCredential(): CredentialSupported =
+        when (this) {
+            is CredentialMetadata.ByScope -> issuanceRequester.issuerMetadata.supportedCredentialByScope(this)
+            is CredentialMetadata.ByProfile -> issuanceRequester.issuerMetadata.supportedCredentialByProfile(this)
+        }
+
+    private fun CredentialIssuerMetadata.supportedCredentialByScope(scoped: CredentialMetadata.ByScope): CredentialSupported =
+        credentialsSupported
+            .firstOrNull { it.scope == scoped.scope.value }
+            ?: throw IllegalArgumentException("Issuer does not support issuance of credential scope: ${scoped.scope}")
+
+    private fun CredentialIssuerMetadata.supportedCredentialByProfile(
+        metadata: CredentialMetadata.ByProfile,
+    ): CredentialSupported {
+        return when (metadata) {
+            is CredentialMetadata.MsoMdoc ->
+                credentialsSupported.firstOrNull {
+                    it is CredentialSupported.MsoMdoc && it.docType == metadata.docType
+                }
+
+            is CredentialMetadata.JsonLdDataIntegrity ->
+                credentialsSupported.firstOrNull {
+                    it is CredentialSupported.JsonLdDataIntegrity
+                }
+
+            is CredentialMetadata.JsonLdSignedJwt ->
+                credentialsSupported.firstOrNull {
+                    it is CredentialSupported.JsonLdSignedJwt
+                }
+
+            is CredentialMetadata.SignedJwt ->
+                credentialsSupported.firstOrNull {
+                    it is CredentialSupported.SignedJwt
+                }
+        }
+            ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
+    }
+
+    private fun CredentialSupported.toIssuanceRequest(
+        claimSet: ClaimSet?,
+        proof: Proof?,
+    ): CredentialIssuanceRequest.SingleCredential {
+        proof?.let {
+            require(this.proofTypesSupported.contains(it.type())) {
+                "Provided proof type ${proof.type()} is not one of supported [${this.proofTypesSupported}]."
+            }
+        }
+        // TODO: Validate crypto alg and method
+        return when (this) {
+            is CredentialSupported.MsoMdoc -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
+            is CredentialSupported.SignedJwt -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
+            is CredentialSupported.JsonLdDataIntegrity -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
+            is CredentialSupported.JsonLdSignedJwt -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
+        }
+    }
+
+    private fun CredentialSupported.MsoMdoc.toIssuanceRequest(
+        claimSet: ClaimSet?,
+        proof: Proof?,
+    ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
+        fun validateClaimSet(claimSet: ClaimSet.MsoMdoc): ClaimSet.MsoMdoc {
+            if (claims.isEmpty() && claimSet.claims.isNotEmpty()) {
+                CredentialIssuanceError.InvalidIssuanceRequest(
+                    "Issuer does not support claims for credential [MsoMdoc-${this.docType}]").raise()
+            }
+            claimSet.claims.entries.forEach { requestedClaim ->
+                this@toIssuanceRequest.claims.get(requestedClaim.key)?.let { supportedClaim ->
+                    if (!supportedClaim.keys.containsAll(requestedClaim.value.keys)) {
+                        CredentialIssuanceError.InvalidIssuanceRequest(
+                            "Claim names requested are not supported by issuer",
+                        ).raise()
+                    }
+                }
+                ?: CredentialIssuanceError.InvalidIssuanceRequest("Namespace ${requestedClaim.key} not supported by issuer").raise()
+            }
+            return claimSet
+        }
+        val validClaimSet =
+            claimSet?.let {
+                when (claimSet) {
+                    is ClaimSet.MsoMdoc -> validateClaimSet(claimSet)
+                    else -> CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance").raise()
+                }
+            }
+
+        CredentialIssuanceRequest.SingleCredential.MsoMdocIssuanceRequest(
+            doctype = docType,
+            proof = proof,
+            claimSet = validClaimSet,
+        ).getOrThrow()
+    }
+
+    private fun CredentialSupported.SignedJwt.toIssuanceRequest(
+        claimSet: ClaimSet?,
+        proof: Proof?,
+    ): Result<CredentialIssuanceRequest.SingleCredential> {
+        TODO("Not yet implemented")
+    }
+
+    private fun CredentialSupported.JsonLdDataIntegrity.toIssuanceRequest(
+        claimSet: ClaimSet?,
+        proof: Proof?,
+    ): Result<CredentialIssuanceRequest.SingleCredential> {
+        TODO("Not yet implemented")
+    }
+
+    private fun CredentialSupported.JsonLdSignedJwt.toIssuanceRequest(
+        claimSet: ClaimSet?,
+        proof: Proof?,
+    ): Result<CredentialIssuanceRequest.SingleCredential> {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
+        cNonce: CNonce,
+    ): AuthorizedRequest.ProofRequired =
+        AuthorizedRequest.ProofRequired(
+            token = token,
+            cNonce = cNonce,
+        )
+
     private suspend fun requestIssuance(
-        credentialRequest: CredentialIssuanceRequest,
         token: IssuanceAccessToken,
-        handleFailure: (Throwable) -> SubmittedRequest,
+        issuanceRequestSupplier: () -> CredentialIssuanceRequest,
     ): SubmittedRequest =
-        when (credentialRequest) {
+        when (val credentialRequest = issuanceRequestSupplier()) {
             is CredentialIssuanceRequest.SingleCredential -> {
                 issuanceRequester.placeIssuanceRequest(token, credentialRequest)
                     .fold(
                         onSuccess = {
                             SubmittedRequest.Success(it)
                         },
-                        onFailure = handleFailure,
+                        onFailure = {
+                            handleIssuanceFailure(it)
+                        },
                     )
             }
+
             is CredentialIssuanceRequest.BatchCredentials -> {
                 issuanceRequester.placeBatchIssuanceRequest(token, credentialRequest)
                     .fold(
                         onSuccess = {
                             SubmittedRequest.Success(it)
                         },
-                        onFailure = handleFailure,
+                        onFailure = {
+                            handleIssuanceFailure(it)
+                        },
                     )
             }
         }
 
-    override suspend fun AuthorizedRequest.ProofRequired.submitRequest(
-        proof: Proof,
-        claims: ClaimSet,
-    ): Result<SubmittedRequest> = runCatching {
-        val credentialRequest = credentialRequest(proof)
-
-        requestIssuance(credentialRequest, token) {
-            if (it is CredentialIssuanceException) {
-                SubmittedRequest.Failed(it.error)
+    private fun handleIssuanceFailure(throwable: Throwable): SubmittedRequest.Errored {
+        return if (throwable is CredentialIssuanceException) {
+            if (throwable.error is CredentialIssuanceError.InvalidProof) {
+                SubmittedRequest.InvalidProof(
+                    cNonce = CNonce(throwable.error.cNonce, throwable.error.cNonceExpiresIn),
+                )
             } else {
-                throw it
+                SubmittedRequest.Failed(throwable.error)
             }
+        } else {
+            throw throwable
         }
-    }
-
-    override suspend fun SubmittedRequest.NonceMissing.reProcess(): AuthorizedRequest.ProofRequired =
-        AuthorizedRequest.ProofRequired(
-            credentials = credentials,
-            token = token,
-            cNonce = cNonce,
-        )
-
-    override suspend fun SubmittedRequest.Success.process(): Result<ProcessedRequest.Unvalidated> {
-        TODO("Not yet implemented")
-    }
-
-    override suspend fun ProcessedRequest.Unvalidated.Responded.validate(): Result<ProcessedRequest.Issued> {
-        TODO("Not yet implemented")
-    }
-
-    override suspend fun ProcessedRequest.Unvalidated.Deferred.request(): Result<ProcessedRequest.Unvalidated> {
-        TODO("Not yet implemented")
     }
 }

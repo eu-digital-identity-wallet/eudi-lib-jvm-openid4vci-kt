@@ -15,12 +15,130 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.issuance.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceRequester
 import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorHttpClientFactory
 import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorIssuanceRequester
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+
+/**
+ * Credential(s) issuance request
+ */
+sealed interface CredentialIssuanceRequest {
+
+    /**
+     * Models an issuance request for a batch of credentials
+     */
+    data class BatchCredentials(
+        val credentialRequests: List<SingleCredential>,
+    ) : CredentialIssuanceRequest
+
+    /**
+     * Models an issuance request for a single credential
+     */
+    sealed interface SingleCredential : CredentialIssuanceRequest {
+
+        val format: String
+        val proof: Proof?
+        val credentialEncryptionJwk: JWK?
+        val credentialResponseEncryptionAlg: JWEAlgorithm?
+        val credentialResponseEncryptionMethod: EncryptionMethod?
+
+        fun requiresEncryptedResponse(): Boolean =
+            credentialResponseEncryptionAlg != null && credentialEncryptionJwk != null && credentialResponseEncryptionMethod != null
+
+        /**
+         * Issuance request for a credential of mso_mdoc format
+         */
+        class MsoMdocIssuanceRequest private constructor(
+            val doctype: String,
+            override val proof: Proof? = null,
+            override val credentialEncryptionJwk: JWK? = null,
+            override val credentialResponseEncryptionAlg: JWEAlgorithm? = null,
+            override val credentialResponseEncryptionMethod: EncryptionMethod? = null,
+            val claimSet: ClaimSet.MsoMdoc?,
+        ) : SingleCredential {
+
+            override val format: String = "mso_mdoc"
+
+            companion object {
+                operator fun invoke(
+                    proof: Proof? = null,
+                    credentialEncryptionJwk: JWK? = null,
+                    credentialResponseEncryptionAlg: JWEAlgorithm? = null,
+                    credentialResponseEncryptionMethod: EncryptionMethod? = null,
+                    doctype: String,
+                    claimSet: ClaimSet.MsoMdoc? = null,
+                ): Result<MsoMdocIssuanceRequest> = runCatching {
+                    var encryptionMethod = credentialResponseEncryptionMethod
+                    if (credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null) {
+                        encryptionMethod = EncryptionMethod.A256GCM
+                    } else if (credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null) {
+                        throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
+                            .asException()
+                    } else if (credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null) {
+                        throw CredentialIssuanceError.InvalidIssuanceRequest(
+                            "Credential response encryption algorithm must be specified if Credential " +
+                                "response encryption method is provided",
+                        ).asException()
+                    }
+
+                    MsoMdocIssuanceRequest(
+                        proof = proof,
+                        credentialEncryptionJwk = credentialEncryptionJwk,
+                        credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
+                        credentialResponseEncryptionMethod = encryptionMethod,
+                        doctype = doctype,
+                        claimSet = claimSet,
+                    )
+                }
+            }
+        }
+    }
+}
+
+data class DeferredCredentialRequest(
+    val transactionId: String,
+    val token: IssuanceAccessToken,
+)
+
+data class CredentialIssuanceResponse(
+    val credentialResponses: List<Result>,
+    val cNonce: CNonce?,
+) {
+    sealed interface Result {
+        data class Complete(
+            val format: String,
+            val credential: String,
+        ) : Result
+
+        data class Deferred(
+            val transactionId: String,
+        ) : Result
+    }
+}
+
+sealed interface ClaimSet {
+    data class MsoMdoc(
+        val claims: Map<Namespace, Map<ClaimName, Claim>>,
+    ) : ClaimSet
+
+    data class SignedJwt(
+        val claims: Map<ClaimName, Claim>,
+    ) : ClaimSet
+
+    data class JsonLdDataIntegrity(
+        val claims: Map<ClaimName, Claim>,
+    ) : ClaimSet
+
+    data class JsonLdSignedJwt(
+        val claims: Map<ClaimName, Claim>,
+    ) : ClaimSet
+}
 
 /**
  * Interface that specifies the interaction with a Credentials Issuer required to handle the issuance of a credential
@@ -38,7 +156,7 @@ interface IssuanceRequester {
     suspend fun placeIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.SingleCredential,
-    ): Result<IssuanceResponse.Single>
+    ): Result<CredentialIssuanceResponse>
 
     /**
      * Method that submits a request to credential issuer for the batch issuance of credentials.
@@ -49,7 +167,7 @@ interface IssuanceRequester {
     suspend fun placeBatchIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.BatchCredentials,
-    ): Result<IssuanceResponse.Batch>
+    ): Result<CredentialIssuanceResponse>
 
     /**
      * Method that submits a request to credential issuer's Deferred Credential Endpoint
@@ -60,12 +178,12 @@ interface IssuanceRequester {
     suspend fun placeDeferredCredentialRequest(
         accessToken: IssuanceAccessToken,
         request: DeferredCredentialRequest,
-    ): IssuanceResponse.Single
+    ): CredentialIssuanceResponse
 
     companion object {
         fun make(
             issuerMetadata: CredentialIssuerMetadata,
-            postIssueRequest: HttpPost<CredentialRequestTO, IssuanceResponse.Single, IssuanceResponse.Single>,
+            postIssueRequest: HttpPost<CredentialRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse>,
         ): IssuanceRequester =
             DefaultIssuanceRequester(
                 issuerMetadata = issuerMetadata,

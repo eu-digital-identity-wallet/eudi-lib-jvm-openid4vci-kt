@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vci.internal.issuance
 import com.nimbusds.oauth2.sdk.AuthorizationRequest
 import com.nimbusds.oauth2.sdk.PushedAuthorizationRequest
 import com.nimbusds.oauth2.sdk.ResponseType
-import com.nimbusds.oauth2.sdk.Scope
 import com.nimbusds.oauth2.sdk.id.ClientID
 import com.nimbusds.oauth2.sdk.id.State
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
@@ -30,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URI
 import java.net.URLEncoder
+import com.nimbusds.oauth2.sdk.Scope as NimbusOauth2Scope
 
 class DefaultIssuanceAuthorizer(
     val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -40,7 +40,7 @@ class DefaultIssuanceAuthorizer(
 ) : IssuanceAuthorizer {
 
     override suspend fun submitPushedAuthorizationRequest(
-        scopes: List<String>,
+        scopes: List<Scope>,
         state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>> = runCatching {
@@ -58,7 +58,7 @@ class DefaultIssuanceAuthorizer(
         ) {
             redirectionURI(config.authFlowRedirectionURI)
             codeChallenge(codeVerifier, CodeChallengeMethod.S256)
-            scope(Scope(*scopes.toTypedArray()))
+            scope(NimbusOauth2Scope(*scopes.map { it.value }.toTypedArray()))
             state(State(state))
             issuerState?.let {
                 customParameter("issuer_state", issuerState)
@@ -144,7 +144,7 @@ class DefaultIssuanceAuthorizer(
 
     override suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: String,
-        pin: String,
+        pin: String?,
     ): Result<Pair<String, CNonce?>> = runCatching {
         val params = TokenEndpointForm.PreAuthCodeFlow.of(preAuthorizedCode, pin)
         val response =
@@ -208,12 +208,20 @@ sealed interface TokenEndpointForm {
             val USER_PIN_PARAM = "user_pin"
             val PRE_AUTHORIZED_CODE_PARAM = "pre_authorized_code"
 
-            fun of(preAuthorizedCode: String, userPin: String): Map<String, String> =
-                mapOf(
-                    GRANT_TYPE_PARAM to URLEncoder.encode(GRANT_TYPE_PARAM_VALUE, "UTF-8"),
-                    PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
-                    USER_PIN_PARAM to userPin,
-                )
+            fun of(preAuthorizedCode: String, userPin: String?): Map<String, String> {
+                return if (userPin != null) {
+                    mapOf(
+                        GRANT_TYPE_PARAM to URLEncoder.encode(GRANT_TYPE_PARAM_VALUE, "UTF-8"),
+                        PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
+                        USER_PIN_PARAM to userPin,
+                    )
+                } else {
+                    mapOf(
+                        GRANT_TYPE_PARAM to URLEncoder.encode(GRANT_TYPE_PARAM_VALUE, "UTF-8"),
+                        PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
+                    )
+                }
+            }
         }
     }
 }

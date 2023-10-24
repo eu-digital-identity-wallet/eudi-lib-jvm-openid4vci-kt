@@ -18,15 +18,12 @@ package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialSupported.MsoMdocCredentialCredentialSupported
-import eu.europa.ec.eudi.openid4vci.CredentialSupported.W3CVerifiableCredentialCredentialSupported.*
-import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.MsoMdocCredentialCredentialSupportedObject
-import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.W3CVerifiableCredentialCredentialSupportedObject.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
+import java.net.URL
 import java.util.*
 
 /**
@@ -162,19 +159,19 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 }
 
             return when (format) {
-                "jwt_vc_json" -> Json.decodeFromJsonElement<W3CVerifiableCredentialSignedJwtCredentialSupportedObject>(
+                "jwt_vc_json" -> Json.decodeFromJsonElement<CredentialSupportedObject.SignedJwt>(
                     this,
                 )
 
-                "jwt_vc_json-ld" -> Json.decodeFromJsonElement<W3CVerifiableCredentialJsonLdSignedJwtCredentialSupportedObject>(
+                "jwt_vc_json-ld" -> Json.decodeFromJsonElement<CredentialSupportedObject.JsonLdSignedJwt>(
                     this,
                 )
 
-                "ldp_vc" -> Json.decodeFromJsonElement<W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupportedObject>(
+                "ldp_vc" -> Json.decodeFromJsonElement<CredentialSupportedObject.JsonLdDataIntegrity>(
                     this,
                 )
 
-                "mso_mdoc" -> Json.decodeFromJsonElement<MsoMdocCredentialCredentialSupportedObject>(
+                "mso_mdoc" -> Json.decodeFromJsonElement<CredentialSupportedObject.MsoMdoc>(
                     this,
                 )
 
@@ -233,15 +230,15 @@ internal class DefaultCredentialIssuerMetadataResolver(
 
             val display = display?.map { it.toDisplay() } ?: emptyList()
 
-            fun MsoMdocCredentialCredentialSupportedObject.claims(): MsoMdocClaims =
+            fun CredentialSupportedObject.MsoMdoc.claims(): MsoMdocClaims =
                 claims?.mapValues { namespaceAndClaims ->
                     namespaceAndClaims.value.mapValues { claimNameAndClaim ->
                         claimNameAndClaim.value.let { claimObject ->
-                            MsoMdocCredentialCredentialSupported.Claim(
+                            Claim(
                                 claimObject.mandatory ?: false,
                                 claimObject.valueType,
                                 claimObject.display?.map { displayObject ->
-                                    MsoMdocCredentialCredentialSupported.Claim.Display(
+                                    Claim.Display(
                                         displayObject.name,
                                         displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
                                     )
@@ -251,32 +248,71 @@ internal class DefaultCredentialIssuerMetadataResolver(
                     }
                 } ?: emptyMap()
 
+            fun CredentialDefinitionObject.transform(): CredentialDefinition.NonLd =
+                CredentialDefinition.NonLd(
+                    type = types,
+                    credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
+                        nameAndClaim.value.let {
+                            Claim(
+                                it.mandatory ?: false,
+                                it.valueType,
+                                it.display?.map { displayObject ->
+                                    Claim.Display(
+                                        displayObject.name,
+                                        displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
+                                    )
+                                } ?: emptyList(),
+                            )
+                        }
+                    },
+                )
+
+            fun CredentialDefinitionObjectLD.transform(): CredentialDefinition.LdSpecific =
+                CredentialDefinition.LdSpecific(
+                    context = context.map { URL(it) },
+                    type = types,
+                    credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
+                        nameAndClaim.value.let {
+                            Claim(
+                                it.mandatory ?: false,
+                                it.valueType,
+                                it.display?.map { displayObject ->
+                                    Claim.Display(
+                                        displayObject.name,
+                                        displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
+                                    )
+                                } ?: emptyList(),
+                            )
+                        }
+                    },
+                )
+
             return when (this) {
-                is W3CVerifiableCredentialSignedJwtCredentialSupportedObject ->
-                    W3CVerifiableCredentialSignedJwtCredentialSupported(
+                is CredentialSupportedObject.SignedJwt ->
+                    CredentialSupported.SignedJwt(
                         scope,
                         cryptographicBindingMethodsSupported,
                         cryptographicSuitesSupported,
                         proofTypesSupported,
                         display,
-                        credentialDefinition,
+                        credentialDefinition.transform(),
                         order ?: emptyList(),
                     )
 
-                is W3CVerifiableCredentialJsonLdSignedJwtCredentialSupportedObject ->
-                    W3CVerifiableCredentialJsonLdSignedJwtCredentialSupported(
+                is CredentialSupportedObject.JsonLdSignedJwt ->
+                    CredentialSupported.JsonLdSignedJwt(
                         scope,
                         cryptographicBindingMethodsSupported,
                         cryptographicSuitesSupported,
                         proofTypesSupported,
                         display,
                         context,
-                        credentialDefinition,
+                        credentialDefinition.transform(),
                         order ?: emptyList(),
                     )
 
-                is W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupportedObject ->
-                    W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupported(
+                is CredentialSupportedObject.JsonLdDataIntegrity ->
+                    CredentialSupported.JsonLdDataIntegrity(
                         scope,
                         cryptographicBindingMethodsSupported,
                         cryptographicSuitesSupported,
@@ -284,12 +320,12 @@ internal class DefaultCredentialIssuerMetadataResolver(
                         display,
                         context,
                         type,
-                        credentialDefinition,
+                        credentialDefinition.transform(),
                         order ?: emptyList(),
                     )
 
-                is MsoMdocCredentialCredentialSupportedObject ->
-                    MsoMdocCredentialCredentialSupported(
+                is CredentialSupportedObject.MsoMdoc ->
+                    CredentialSupported.MsoMdoc(
                         scope,
                         cryptographicBindingMethodsSupported,
                         cryptographicSuitesSupported,

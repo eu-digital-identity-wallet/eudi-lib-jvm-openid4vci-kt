@@ -42,19 +42,19 @@ internal class KtorIssuanceRequester private constructor(
     override suspend fun placeIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.SingleCredential
-    ): Result<IssuanceResponse.Single> =
+    ): Result<CredentialIssuanceResponse> =
         delegate.placeIssuanceRequest(accessToken, request)
 
     override suspend fun placeBatchIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.BatchCredentials
-    ): Result<IssuanceResponse.Batch> =
+    ): Result<CredentialIssuanceResponse> =
         delegate.placeBatchIssuanceRequest(accessToken, request)
 
     override suspend fun placeDeferredCredentialRequest(
         accessToken: IssuanceAccessToken,
         request: DeferredCredentialRequest
-    ): IssuanceResponse.Single =
+    ): CredentialIssuanceResponse =
         delegate.placeDeferredCredentialRequest(accessToken, request)
 
     companion object {
@@ -73,7 +73,7 @@ internal class KtorIssuanceRequester private constructor(
                         json = Json { ignoreUnknownKeys = true },
                     )
                 }
-                expectSuccess = true
+
             }
         }
 
@@ -92,15 +92,15 @@ internal class KtorIssuanceRequester private constructor(
         }
 
         private fun postIssueRequest(httpClient: HttpClient):
-                HttpPost<CredentialRequestTO, IssuanceResponse.Single, IssuanceResponse.Single> =
+                HttpPost<CredentialRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
 
-            object : HttpPost<CredentialRequestTO, IssuanceResponse.Single, IssuanceResponse.Single> {
+            object : HttpPost<CredentialRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> {
                 override suspend fun post(
                     url: URL,
                     headers: Map<String, String>,
                     payload: CredentialRequestTO,
-                    transform: suspend (response: HttpResponse) -> IssuanceResponse.Single
-                ): IssuanceResponse.Single {
+                    responseHandler: suspend (response: HttpResponse) -> CredentialIssuanceResponse
+                ): CredentialIssuanceResponse {
                     val response = httpClient.post(url) {
                         headers {
                             headers.forEach {
@@ -110,7 +110,7 @@ internal class KtorIssuanceRequester private constructor(
                         contentType(ContentType.parse("application/json"))
                         setBody(payload)
                     }
-                    return transform(response)
+                    return responseHandler(response)
                 }
             }
     }

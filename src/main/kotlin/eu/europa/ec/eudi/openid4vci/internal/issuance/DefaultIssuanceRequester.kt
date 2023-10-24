@@ -51,7 +51,8 @@ sealed interface CredentialRequestTO {
         val credentialResponseEncryptionMethod: String?
 
         @Serializable
-        data class MsoMdocIssuanceRequestObject(
+        @SerialName("MsoMdoc")
+        data class MsoMdocIssuanceRequestTO(
             @SerialName("format") override val format: String,
             @SerialName("doctype") val docType: String,
             @SerialName("proof") override val proof: JsonObject?,
@@ -69,11 +70,11 @@ data class GenericErrorResponse(
     @SerialName("error_description") val errorDescription: String? = null,
     @SerialName("c_nonce") val cNonce: String? = null,
     @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
-    @SerialName("interval ") val interval: Long? = null,
+    @SerialName("interval") val interval: Long? = null,
 )
 
 @Serializable
-data class GenericSuccessResponse(
+data class SingleIssuanceSuccessResponse(
     @SerialName("format") val format: String,
     @SerialName("credential") val credential: String? = null,
     @SerialName("transaction_id") val transactionId: String? = null,
@@ -81,16 +82,30 @@ data class GenericSuccessResponse(
     @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
 )
 
+@Serializable
+data class BatchIssuanceSuccessResponse(
+    @SerialName("credential_responses") val credentialResponses: List<CertificateIssuanceResponse>,
+    @SerialName("c_nonce") val cNonce: String? = null,
+    @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
+) {
+    @Serializable
+    data class CertificateIssuanceResponse(
+        @SerialName("format") val format: String,
+        @SerialName("credential") val credential: String? = null,
+        @SerialName("transaction_id") val transactionId: String? = null,
+    )
+}
+
 internal class DefaultIssuanceRequester(
     val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     override val issuerMetadata: CredentialIssuerMetadata,
-    val postIssueRequest: HttpPost<CredentialRequestTO, IssuanceResponse.Single, IssuanceResponse.Single>,
+    val postIssueRequest: HttpPost<CredentialRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse>,
 ) : IssuanceRequester {
 
     override suspend fun placeIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.SingleCredential,
-    ): Result<IssuanceResponse.Single> =
+    ): Result<CredentialIssuanceResponse> =
         runCatching {
             withContext(coroutineDispatcher) {
                 postIssueRequest.post(
@@ -98,18 +113,17 @@ internal class DefaultIssuanceRequester(
                     mapOf(accessToken.toAuthorizationHeader()),
                     request.toTO(),
                 ) {
+                    // Process response
                     if (it.status.isSuccess()) {
-                        // Process response
                         if (request.requiresEncryptedResponse()) {
-                            TODO("Decrypt JWT")
-                            TODO("Extract JWT claims and map them to IssuanceResponse")
+                            TODO("NOT IMPLEMENTED: Decrypt JWT, extract JWT claims and map them to IssuanceResponse")
                         } else {
-                            val success = it.body<GenericSuccessResponse>()
-                            success.toIssuanceResponseSingle()
+                            val success = it.body<SingleIssuanceSuccessResponse>()
+                            success.toSingleIssuanceResponse()
                         }
                     } else {
                         val error = it.body<GenericErrorResponse>()
-                        throw error.toIssuanceError().asException()
+                        error.toIssuanceError().raise()
                     }
                 }
             }
@@ -118,36 +132,72 @@ internal class DefaultIssuanceRequester(
     override suspend fun placeBatchIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.BatchCredentials,
-    ): Result<IssuanceResponse.Batch> {
-        TODO("Integration with Batch Credential Endpoint not yet implemented")
+    ): Result<CredentialIssuanceResponse> = runCatching {
+        if (issuerMetadata.batchCredentialEndpoint == null) {
+            CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance.raise()
+        }
+        withContext(coroutineDispatcher) {
+            postIssueRequest.post(
+                issuerMetadata.batchCredentialEndpoint.value.value.toURL(),
+                mapOf(accessToken.toAuthorizationHeader()),
+                request.toTO(),
+            ) {
+                // Process response
+                if (it.status.isSuccess()) {
+                    // TODO: Handle encrypted responses
+                    val success = it.body<BatchIssuanceSuccessResponse>()
+                    success.toBatchIssuanceResponse()
+                } else {
+                    val error = it.body<GenericErrorResponse>()
+                    error.toIssuanceError().raise()
+                }
+            }
+        }
     }
 
     override suspend fun placeDeferredCredentialRequest(
         accessToken: IssuanceAccessToken,
         request: DeferredCredentialRequest,
-    ): IssuanceResponse.Single {
+    ): CredentialIssuanceResponse {
         TODO("Integration with Deferred Credential Endpoint not yet implemented")
     }
 }
 
-private fun GenericSuccessResponse.toIssuanceResponseSingle(): IssuanceResponse.Single =
+private fun SingleIssuanceSuccessResponse.toSingleIssuanceResponse(): CredentialIssuanceResponse =
     transactionId?.let {
-        IssuanceResponse.Single(
-            format = format,
-            cNonce = cNonce,
-            cNonceExpiresInSeconds = cNonceExpiresInSeconds,
-            result = IssuanceResponse.Result.Deferred(transactionId),
+        CredentialIssuanceResponse(
+            cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
+            credentialResponses = listOf(CredentialIssuanceResponse.Result.Deferred(transactionId)),
         )
     } ?: credential?.let {
-        IssuanceResponse.Single(
-            format = format,
-            cNonce = cNonce,
-            cNonceExpiresInSeconds = cNonceExpiresInSeconds,
-            result = IssuanceResponse.Result.Complete(credential),
+        CredentialIssuanceResponse(
+            cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
+            credentialResponses = listOf(CredentialIssuanceResponse.Result.Complete(format, credential)),
         )
-    } ?: throw CredentialIssuanceError.ResponseUnparsable(
-        "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
-    ).asException()
+    }
+        ?: CredentialIssuanceError.ResponseUnparsable(
+            "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
+        ).raise()
+
+private fun BatchIssuanceSuccessResponse.toBatchIssuanceResponse(): CredentialIssuanceResponse {
+    fun mapResults() = credentialResponses.map {
+        it.transactionId?.let {
+            CredentialIssuanceResponse.Result.Deferred(it)
+        } ?: it.credential?.let { credential ->
+            CredentialIssuanceResponse.Result.Complete(it.format, credential)
+        }
+            ?: CredentialIssuanceError.ResponseUnparsable(
+                "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
+            ).raise()
+    }
+
+    fun mapCNonce() = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
+
+    return CredentialIssuanceResponse(
+        credentialResponses = mapResults(),
+        cNonce = mapCNonce(),
+    )
+}
 
 private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError =
     when (error) {
@@ -155,7 +205,7 @@ private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError =
             cNonce?.let {
                 CredentialIssuanceError.InvalidProof(
                     cNonce = cNonce,
-                    cNonceExpiresIn = cNonceExpiresInSeconds ?: 5,
+                    cNonceExpiresIn = cNonceExpiresInSeconds,
                 )
             }
                 ?: CredentialIssuanceError.ResponseUnparsable("Issuer responded with invalid_proof error but no c_nonce was provided")
@@ -164,7 +214,8 @@ private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError =
         "issuance_pending" -> {
             interval?.let {
                 CredentialIssuanceError.DeferredCredentialIssuancePending(interval)
-            } ?: CredentialIssuanceError.DeferredCredentialIssuancePending()
+            }
+                ?: CredentialIssuanceError.DeferredCredentialIssuancePending()
         }
 
         "invalid_token" -> CredentialIssuanceError.InvalidToken
@@ -181,7 +232,7 @@ private fun IssuanceAccessToken.toAuthorizationHeader(): Pair<String, String> = 
 private fun CredentialIssuanceRequest.SingleCredential.toTO(): CredentialRequestTO.SingleCredentialTO {
     return when (this) {
         is CredentialIssuanceRequest.SingleCredential.MsoMdocIssuanceRequest ->
-            CredentialRequestTO.SingleCredentialTO.MsoMdocIssuanceRequestObject(
+            CredentialRequestTO.SingleCredentialTO.MsoMdocIssuanceRequestTO(
                 format = "mso_mdoc",
                 docType = doctype,
                 proof = proof?.toJsonObject(),
@@ -192,8 +243,8 @@ private fun CredentialIssuanceRequest.SingleCredential.toTO(): CredentialRequest
                 },
                 credentialResponseEncryptionAlg = credentialResponseEncryptionAlg?.toString(),
                 credentialResponseEncryptionMethod = credentialResponseEncryptionMethod?.toString(),
-                claims = claims?.let {
-                    Json.encodeToJsonElement(claims).jsonObject
+                claims = claimSet?.let {
+                    Json.encodeToJsonElement(it.claims).jsonObject
                 },
             )
     }
