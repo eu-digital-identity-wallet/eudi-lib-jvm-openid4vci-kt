@@ -65,7 +65,6 @@ internal class KtorIssuanceAuthorizer private constructor(
                         json = Json { ignoreUnknownKeys = true },
                     )
                 }
-
             }
         }
 

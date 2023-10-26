@@ -18,12 +18,65 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
-import eu.europa.ec.eudi.openid4vci.internal.issuance.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceRequester
 import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorHttpClientFactory
 import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorIssuanceRequester
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+
+@Serializable
+sealed interface CredentialIssuanceRequestTO {
+
+    @Serializable
+    data class BatchCredentialsTO(
+        @SerialName("credential_requests") val credentialRequests: List<SingleCredentialTO>,
+    ) : CredentialIssuanceRequestTO
+
+    @Serializable
+    sealed interface SingleCredentialTO : CredentialIssuanceRequestTO {
+
+        val format: String
+        val proof: JsonObject?
+        val credentialEncryptionJwk: JsonObject?
+        val credentialResponseEncryptionAlg: String?
+        val credentialResponseEncryptionMethod: String?
+    }
+}
+
+@Serializable
+data class GenericErrorResponse(
+    @SerialName("error") val error: String,
+    @SerialName("error_description") val errorDescription: String? = null,
+    @SerialName("c_nonce") val cNonce: String? = null,
+    @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
+    @SerialName("interval") val interval: Long? = null,
+)
+
+@Serializable
+data class SingleIssuanceSuccessResponse(
+    @SerialName("format") val format: String,
+    @SerialName("credential") val credential: String? = null,
+    @SerialName("transaction_id") val transactionId: String? = null,
+    @SerialName("c_nonce") val cNonce: String? = null,
+    @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
+)
+
+@Serializable
+data class BatchIssuanceSuccessResponse(
+    @SerialName("credential_responses") val credentialResponses: List<CertificateIssuanceResponse>,
+    @SerialName("c_nonce") val cNonce: String? = null,
+    @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
+) {
+    @Serializable
+    data class CertificateIssuanceResponse(
+        @SerialName("format") val format: String,
+        @SerialName("credential") val credential: String? = null,
+        @SerialName("transaction_id") val transactionId: String? = null,
+    )
+}
 
 /**
  * Credential(s) issuance request
@@ -50,54 +103,6 @@ sealed interface CredentialIssuanceRequest {
 
         fun requiresEncryptedResponse(): Boolean =
             credentialResponseEncryptionAlg != null && credentialEncryptionJwk != null && credentialResponseEncryptionMethod != null
-
-        /**
-         * Issuance request for a credential of mso_mdoc format
-         */
-        class MsoMdocIssuanceRequest private constructor(
-            val doctype: String,
-            override val proof: Proof? = null,
-            override val credentialEncryptionJwk: JWK? = null,
-            override val credentialResponseEncryptionAlg: JWEAlgorithm? = null,
-            override val credentialResponseEncryptionMethod: EncryptionMethod? = null,
-            val claimSet: ClaimSet.MsoMdoc?,
-        ) : SingleCredential {
-
-            override val format: String = "mso_mdoc"
-
-            companion object {
-                operator fun invoke(
-                    proof: Proof? = null,
-                    credentialEncryptionJwk: JWK? = null,
-                    credentialResponseEncryptionAlg: JWEAlgorithm? = null,
-                    credentialResponseEncryptionMethod: EncryptionMethod? = null,
-                    doctype: String,
-                    claimSet: ClaimSet.MsoMdoc? = null,
-                ): Result<MsoMdocIssuanceRequest> = runCatching {
-                    var encryptionMethod = credentialResponseEncryptionMethod
-                    if (credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null) {
-                        encryptionMethod = EncryptionMethod.A256GCM
-                    } else if (credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null) {
-                        throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
-                            .asException()
-                    } else if (credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null) {
-                        throw CredentialIssuanceError.InvalidIssuanceRequest(
-                            "Credential response encryption algorithm must be specified if Credential " +
-                                "response encryption method is provided",
-                        ).asException()
-                    }
-
-                    MsoMdocIssuanceRequest(
-                        proof = proof,
-                        credentialEncryptionJwk = credentialEncryptionJwk,
-                        credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
-                        credentialResponseEncryptionMethod = encryptionMethod,
-                        doctype = doctype,
-                        claimSet = claimSet,
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -183,7 +188,7 @@ interface IssuanceRequester {
     companion object {
         fun make(
             issuerMetadata: CredentialIssuerMetadata,
-            postIssueRequest: HttpPost<CredentialRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse>,
+            postIssueRequest: HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse>,
         ): IssuanceRequester =
             DefaultIssuanceRequester(
                 issuerMetadata = issuerMetadata,

@@ -23,7 +23,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
-import java.net.URL
 import java.util.*
 
 /**
@@ -121,7 +120,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
             val credentialsSupported = runCatching {
                 credentialsSupported
                     .map { it.toCredentialSupportedObject() }
-                    .map { it.toCredentialSupported() }
+                    .map { it.toDomain() }
             }.getOrElse { CredentialIssuerMetadataValidationError.InvalidCredentialsSupported(it).raise() }
                 .ifEmpty {
                     CredentialIssuerMetadataValidationError.CredentialsSupportedRequired.raise()
@@ -159,182 +158,23 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 }
 
             return when (format) {
-                "jwt_vc_json" -> Json.decodeFromJsonElement<CredentialSupportedObject.SignedJwt>(
+                W3CSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CSignedJwtProfile.CredentialSupportedObject>(
                     this,
                 )
 
-                "jwt_vc_json-ld" -> Json.decodeFromJsonElement<CredentialSupportedObject.JsonLdSignedJwt>(
+                W3CJsonLdSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdSignedJwtProfile.CredentialSupportedObject>(
                     this,
                 )
 
-                "ldp_vc" -> Json.decodeFromJsonElement<CredentialSupportedObject.JsonLdDataIntegrity>(
+                W3CJsonLdDataIntegrityProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdDataIntegrityProfile.CredentialSupportedObject>(
                     this,
                 )
 
-                "mso_mdoc" -> Json.decodeFromJsonElement<CredentialSupportedObject.MsoMdoc>(
+                MsoMdocProfile.FORMAT -> Json.decodeFromJsonElement<MsoMdocProfile.CredentialSupportedObject>(
                     this,
                 )
 
                 else -> throw IllegalArgumentException("Unsupported Credential format '$format'")
-            }
-        }
-
-        /**
-         * Converts a [CredentialSupportedObject] to a [CredentialSupported].
-         */
-        private fun CredentialSupportedObject.toCredentialSupported(): CredentialSupported {
-            val cryptographicBindingMethodsSupported =
-                cryptographicBindingMethodsSupported?.map {
-                    when (it) {
-                        "jwk" -> CryptographicBindingMethod.JWK
-                        "cose_key" -> CryptographicBindingMethod.COSE
-                        "mso" -> CryptographicBindingMethod.MSO
-                        else ->
-                            if (it.startsWith("did")) {
-                                CryptographicBindingMethod.DID(it)
-                            } else {
-                                throw IllegalArgumentException("Unknown Cryptographic Binding Method '$it'")
-                            }
-                    }
-                } ?: emptyList()
-            val cryptographicSuitesSupported = cryptographicSuitesSupported ?: emptyList()
-            val proofTypesSupported =
-                proofTypesSupported
-                    ?.map {
-                        when (it) {
-                            "jwt" -> ProofType.JWT
-                            "cwt" -> ProofType.CWT
-                            else -> throw IllegalArgumentException("Unknown Proof Type '$it'")
-                        }
-                    } ?: emptyList<ProofType>()
-                    .ifEmpty {
-                        listOf(ProofType.JWT)
-                    }
-
-            fun DisplayObject.toDisplay(): Display {
-                fun DisplayObject.LogoObject.toLogo(): Display.Logo =
-                    Display.Logo(
-                        url?.let { HttpsUrl(it).getOrThrow() },
-                        alternativeText,
-                    )
-
-                return Display(
-                    name,
-                    locale?.let { Locale.forLanguageTag(it) },
-                    logo?.toLogo(),
-                    description,
-                    backgroundColor,
-                    textColor,
-                )
-            }
-
-            val display = display?.map { it.toDisplay() } ?: emptyList()
-
-            fun CredentialSupportedObject.MsoMdoc.claims(): MsoMdocClaims =
-                claims?.mapValues { namespaceAndClaims ->
-                    namespaceAndClaims.value.mapValues { claimNameAndClaim ->
-                        claimNameAndClaim.value.let { claimObject ->
-                            Claim(
-                                claimObject.mandatory ?: false,
-                                claimObject.valueType,
-                                claimObject.display?.map { displayObject ->
-                                    Claim.Display(
-                                        displayObject.name,
-                                        displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                                    )
-                                } ?: emptyList(),
-                            )
-                        }
-                    }
-                } ?: emptyMap()
-
-            fun CredentialDefinitionObject.transform(): CredentialDefinition.NonLd =
-                CredentialDefinition.NonLd(
-                    type = types,
-                    credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
-                        nameAndClaim.value.let {
-                            Claim(
-                                it.mandatory ?: false,
-                                it.valueType,
-                                it.display?.map { displayObject ->
-                                    Claim.Display(
-                                        displayObject.name,
-                                        displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                                    )
-                                } ?: emptyList(),
-                            )
-                        }
-                    },
-                )
-
-            fun CredentialDefinitionObjectLD.transform(): CredentialDefinition.LdSpecific =
-                CredentialDefinition.LdSpecific(
-                    context = context.map { URL(it) },
-                    type = types,
-                    credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
-                        nameAndClaim.value.let {
-                            Claim(
-                                it.mandatory ?: false,
-                                it.valueType,
-                                it.display?.map { displayObject ->
-                                    Claim.Display(
-                                        displayObject.name,
-                                        displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                                    )
-                                } ?: emptyList(),
-                            )
-                        }
-                    },
-                )
-
-            return when (this) {
-                is CredentialSupportedObject.SignedJwt ->
-                    CredentialSupported.SignedJwt(
-                        scope,
-                        cryptographicBindingMethodsSupported,
-                        cryptographicSuitesSupported,
-                        proofTypesSupported,
-                        display,
-                        credentialDefinition.transform(),
-                        order ?: emptyList(),
-                    )
-
-                is CredentialSupportedObject.JsonLdSignedJwt ->
-                    CredentialSupported.JsonLdSignedJwt(
-                        scope,
-                        cryptographicBindingMethodsSupported,
-                        cryptographicSuitesSupported,
-                        proofTypesSupported,
-                        display,
-                        context,
-                        credentialDefinition.transform(),
-                        order ?: emptyList(),
-                    )
-
-                is CredentialSupportedObject.JsonLdDataIntegrity ->
-                    CredentialSupported.JsonLdDataIntegrity(
-                        scope,
-                        cryptographicBindingMethodsSupported,
-                        cryptographicSuitesSupported,
-                        proofTypesSupported,
-                        display,
-                        context,
-                        type,
-                        credentialDefinition.transform(),
-                        order ?: emptyList(),
-                    )
-
-                is CredentialSupportedObject.MsoMdoc ->
-                    CredentialSupported.MsoMdoc(
-                        scope,
-                        cryptographicBindingMethodsSupported,
-                        cryptographicSuitesSupported,
-                        proofTypesSupported,
-                        display,
-                        docType,
-                        claims(),
-                        order ?: emptyList(),
-                    )
             }
         }
 

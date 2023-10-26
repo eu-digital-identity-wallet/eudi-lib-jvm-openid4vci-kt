@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.PlainJWT
-import eu.europa.ec.eudi.openid4vci.internal.issuance.CredentialRequestTO
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -117,10 +116,10 @@ class IssuanceRequestTest {
                         call.request.headers["Content-Type"] == "application/json",
                     )
 
-                    val request = call.receive<CredentialRequestTO>()
+                    val request = call.receive<CredentialIssuanceRequestTO>()
                     assertThat(
                         "Wrong credential request type",
-                        request is CredentialRequestTO.SingleCredentialTO,
+                        request is CredentialIssuanceRequestTO.SingleCredentialTO,
                     )
                 }
             },
@@ -200,10 +199,10 @@ class IssuanceRequestTest {
                         call.request.headers["Content-Type"] == "application/json",
                     )
 
-                    val request = call.receive<CredentialRequestTO>()
+                    val request = call.receive<CredentialIssuanceRequestTO>()
                     assertThat(
                         "Wrong credential request type",
-                        request is CredentialRequestTO.SingleCredentialTO,
+                        request is CredentialIssuanceRequestTO.SingleCredentialTO,
                     )
                 }
             },
@@ -268,7 +267,7 @@ class IssuanceRequestTest {
             { call ->
                 runBlocking {
                     val request =
-                        call.receive<CredentialRequestTO>() as CredentialRequestTO.SingleCredentialTO.MsoMdocIssuanceRequestTO
+                        call.receive<CredentialIssuanceRequestTO>() as MsoMdocProfile.CredentialIssuanceRequestTO
                     println(request)
                     if (request.proof != null) {
                         call.respondText(

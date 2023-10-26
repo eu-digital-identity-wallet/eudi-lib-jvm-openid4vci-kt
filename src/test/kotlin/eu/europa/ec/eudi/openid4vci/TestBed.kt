@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.issuance.CredentialRequestTO
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -172,12 +171,12 @@ fun createGetASMetadata(managedHttpClient: HttpClient): HttpGet<String> =
 
 fun createPostIssuance(
     managedHttpClient: HttpClient,
-): HttpPost<CredentialRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
-    object : HttpPost<CredentialRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> {
+): HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
+    object : HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> {
         override suspend fun post(
             url: URL,
             headers: Map<String, String>,
-            payload: CredentialRequestTO,
+            payload: CredentialIssuanceRequestTO,
             responseHandler: suspend (response: HttpResponse) -> CredentialIssuanceResponse,
         ): CredentialIssuanceResponse {
             val response = managedHttpClient.post(url) {

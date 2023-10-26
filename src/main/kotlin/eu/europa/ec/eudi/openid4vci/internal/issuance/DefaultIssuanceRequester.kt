@@ -21,85 +21,14 @@ import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
-
-@Serializable
-sealed interface CredentialRequestTO {
-
-    @Serializable
-    data class BatchCredentialsTO(
-        @SerialName("credential_requests") val credentialRequests: List<SingleCredentialTO>,
-    ) : CredentialRequestTO
-
-    @Serializable
-    data class DeferredCredentialTO(
-        @SerialName("transaction_id") val transactionId: String,
-    ) : CredentialRequestTO
-
-    @Serializable
-    sealed interface SingleCredentialTO : CredentialRequestTO {
-
-        val format: String
-        val proof: JsonObject?
-        val credentialEncryptionJwk: JsonObject?
-        val credentialResponseEncryptionAlg: String?
-        val credentialResponseEncryptionMethod: String?
-
-        @Serializable
-        @SerialName("MsoMdoc")
-        data class MsoMdocIssuanceRequestTO(
-            @SerialName("format") override val format: String,
-            @SerialName("doctype") val docType: String,
-            @SerialName("proof") override val proof: JsonObject?,
-            @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject?,
-            @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String?,
-            @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String?,
-            @SerialName("claims") val claims: JsonObject?,
-        ) : SingleCredentialTO
-    }
-}
-
-@Serializable
-data class GenericErrorResponse(
-    @SerialName("error") val error: String,
-    @SerialName("error_description") val errorDescription: String? = null,
-    @SerialName("c_nonce") val cNonce: String? = null,
-    @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
-    @SerialName("interval") val interval: Long? = null,
-)
-
-@Serializable
-data class SingleIssuanceSuccessResponse(
-    @SerialName("format") val format: String,
-    @SerialName("credential") val credential: String? = null,
-    @SerialName("transaction_id") val transactionId: String? = null,
-    @SerialName("c_nonce") val cNonce: String? = null,
-    @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
-)
-
-@Serializable
-data class BatchIssuanceSuccessResponse(
-    @SerialName("credential_responses") val credentialResponses: List<CertificateIssuanceResponse>,
-    @SerialName("c_nonce") val cNonce: String? = null,
-    @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
-) {
-    @Serializable
-    data class CertificateIssuanceResponse(
-        @SerialName("format") val format: String,
-        @SerialName("credential") val credential: String? = null,
-        @SerialName("transaction_id") val transactionId: String? = null,
-    )
-}
 
 internal class DefaultIssuanceRequester(
     val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     override val issuerMetadata: CredentialIssuerMetadata,
-    val postIssueRequest: HttpPost<CredentialRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse>,
+    val postIssueRequest: HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse>,
 ) : IssuanceRequester {
 
     override suspend fun placeIssuanceRequest(
@@ -229,11 +158,11 @@ private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError =
 
 private fun IssuanceAccessToken.toAuthorizationHeader(): Pair<String, String> = "Authorization" to "BEARER $accessToken"
 
-private fun CredentialIssuanceRequest.SingleCredential.toTO(): CredentialRequestTO.SingleCredentialTO {
+private fun CredentialIssuanceRequest.SingleCredential.toTO(): CredentialIssuanceRequestTO.SingleCredentialTO {
     return when (this) {
-        is CredentialIssuanceRequest.SingleCredential.MsoMdocIssuanceRequest ->
-            CredentialRequestTO.SingleCredentialTO.MsoMdocIssuanceRequestTO(
-                format = "mso_mdoc",
+        is MsoMdocProfile.CredentialIssuanceRequest ->
+            MsoMdocProfile.CredentialIssuanceRequestTO(
+                format = MsoMdocProfile.FORMAT,
                 docType = doctype,
                 proof = proof?.toJsonObject(),
                 credentialEncryptionJwk = credentialEncryptionJwk?.let {
@@ -250,8 +179,8 @@ private fun CredentialIssuanceRequest.SingleCredential.toTO(): CredentialRequest
     }
 }
 
-private fun CredentialIssuanceRequest.BatchCredentials.toTO(): CredentialRequestTO {
-    return CredentialRequestTO.BatchCredentialsTO(
+private fun CredentialIssuanceRequest.BatchCredentials.toTO(): CredentialIssuanceRequestTO {
+    return CredentialIssuanceRequestTO.BatchCredentialsTO(
         credentialRequests = credentialRequests.map { it.toTO() },
     )
 }

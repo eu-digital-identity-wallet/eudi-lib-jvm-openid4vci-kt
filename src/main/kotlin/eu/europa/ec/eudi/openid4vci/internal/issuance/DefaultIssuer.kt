@@ -162,24 +162,29 @@ internal class DefaultIssuer(
         metadata: CredentialMetadata.ByProfile,
     ): CredentialSupported {
         return when (metadata) {
-            is CredentialMetadata.MsoMdoc ->
+            is MsoMdocProfile.CredentialMetadata ->
                 credentialsSupported.firstOrNull {
-                    it is CredentialSupported.MsoMdoc && it.docType == metadata.docType
+                    it is MsoMdocProfile.CredentialSupported && it.docType == metadata.docType
                 }
 
-            is CredentialMetadata.JsonLdDataIntegrity ->
+            is W3CJsonLdDataIntegrityProfile.CredentialMetadata ->
                 credentialsSupported.firstOrNull {
-                    it is CredentialSupported.JsonLdDataIntegrity
+                    it is W3CJsonLdDataIntegrityProfile.CredentialSupported &&
+                        it.credentialDefinition.context == metadata.credentialDefinition.content &&
+                        it.credentialDefinition.type == metadata.credentialDefinition.type
                 }
 
-            is CredentialMetadata.JsonLdSignedJwt ->
+            is W3CJsonLdSignedJwtProfile.CredentialMetadata ->
                 credentialsSupported.firstOrNull {
-                    it is CredentialSupported.JsonLdSignedJwt
+                    it is W3CJsonLdSignedJwtProfile.CredentialSupported &&
+                        it.credentialDefinition.context == metadata.credentialDefinition.content &&
+                        it.credentialDefinition.type == metadata.credentialDefinition.type
                 }
 
-            is CredentialMetadata.SignedJwt ->
+            is W3CSignedJwtProfile.CredentialMetadata ->
                 credentialsSupported.firstOrNull {
-                    it is CredentialSupported.SignedJwt
+                    it is W3CSignedJwtProfile.CredentialSupported &&
+                        it.credentialDefinition.type == metadata.credentialDefinition.type
                 }
         }
             ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
@@ -196,21 +201,22 @@ internal class DefaultIssuer(
         }
         // TODO: Validate crypto alg and method
         return when (this) {
-            is CredentialSupported.MsoMdoc -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
-            is CredentialSupported.SignedJwt -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
-            is CredentialSupported.JsonLdDataIntegrity -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
-            is CredentialSupported.JsonLdSignedJwt -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
+            is MsoMdocProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
+            is W3CSignedJwtProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
+            is W3CJsonLdDataIntegrityProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
+            is W3CJsonLdSignedJwtProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
         }
     }
 
-    private fun CredentialSupported.MsoMdoc.toIssuanceRequest(
+    private fun MsoMdocProfile.CredentialSupported.toIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
         fun validateClaimSet(claimSet: ClaimSet.MsoMdoc): ClaimSet.MsoMdoc {
             if (claims.isEmpty() && claimSet.claims.isNotEmpty()) {
                 CredentialIssuanceError.InvalidIssuanceRequest(
-                    "Issuer does not support claims for credential [MsoMdoc-${this.docType}]").raise()
+                    "Issuer does not support claims for credential [MsoMdoc-${this.docType}]",
+                ).raise()
             }
             claimSet.claims.entries.forEach { requestedClaim ->
                 this@toIssuanceRequest.claims.get(requestedClaim.key)?.let { supportedClaim ->
@@ -220,7 +226,7 @@ internal class DefaultIssuer(
                         ).raise()
                     }
                 }
-                ?: CredentialIssuanceError.InvalidIssuanceRequest("Namespace ${requestedClaim.key} not supported by issuer").raise()
+                    ?: CredentialIssuanceError.InvalidIssuanceRequest("Namespace ${requestedClaim.key} not supported by issuer").raise()
             }
             return claimSet
         }
@@ -232,28 +238,28 @@ internal class DefaultIssuer(
                 }
             }
 
-        CredentialIssuanceRequest.SingleCredential.MsoMdocIssuanceRequest(
+        MsoMdocProfile.CredentialIssuanceRequest(
             doctype = docType,
             proof = proof,
             claimSet = validClaimSet,
         ).getOrThrow()
     }
 
-    private fun CredentialSupported.SignedJwt.toIssuanceRequest(
+    private fun W3CSignedJwtProfile.CredentialSupported.toIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
     ): Result<CredentialIssuanceRequest.SingleCredential> {
         TODO("Not yet implemented")
     }
 
-    private fun CredentialSupported.JsonLdDataIntegrity.toIssuanceRequest(
+    private fun W3CJsonLdDataIntegrityProfile.CredentialSupported.toIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
     ): Result<CredentialIssuanceRequest.SingleCredential> {
         TODO("Not yet implemented")
     }
 
-    private fun CredentialSupported.JsonLdSignedJwt.toIssuanceRequest(
+    private fun W3CJsonLdSignedJwtProfile.CredentialSupported.toIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
     ): Result<CredentialIssuanceRequest.SingleCredential> {

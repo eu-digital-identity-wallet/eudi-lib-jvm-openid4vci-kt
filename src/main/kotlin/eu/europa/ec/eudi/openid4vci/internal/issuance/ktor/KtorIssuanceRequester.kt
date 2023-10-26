@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci.internal.issuance.ktor
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.issuance.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceRequester
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -92,13 +91,13 @@ internal class KtorIssuanceRequester private constructor(
         }
 
         private fun postIssueRequest(httpClient: HttpClient):
-                HttpPost<CredentialRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
+                HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
 
-            object : HttpPost<CredentialRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> {
+            object : HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> {
                 override suspend fun post(
                     url: URL,
                     headers: Map<String, String>,
-                    payload: CredentialRequestTO,
+                    payload: CredentialIssuanceRequestTO,
                     responseHandler: suspend (response: HttpResponse) -> CredentialIssuanceResponse
                 ): CredentialIssuanceResponse {
                     val response = httpClient.post(url) {
