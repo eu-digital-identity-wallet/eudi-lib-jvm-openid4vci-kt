@@ -37,7 +37,6 @@ sealed interface CredentialIssuanceRequestTO {
 
     @Serializable
     sealed interface SingleCredentialTO : CredentialIssuanceRequestTO {
-
         val format: String
         val proof: JsonObject?
         val credentialEncryptionJwk: JsonObject?
@@ -132,6 +131,9 @@ sealed interface ClaimSet {
         val claims: Map<Namespace, Map<ClaimName, Claim>>,
     ) : ClaimSet
 
+    data class SdJwtVc(
+        val claims: Map<ClaimName, Claim>,
+    ) : ClaimSet
     data class SignedJwt(
         val claims: Map<ClaimName, Claim>,
     ) : ClaimSet

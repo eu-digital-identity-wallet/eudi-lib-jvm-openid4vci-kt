@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci.internal.issuance
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.client.call.*
 import io.ktor.http.*
+import io.ktor.util.reflect.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -40,7 +41,7 @@ internal class DefaultIssuanceRequester(
                 postIssueRequest.post(
                     issuerMetadata.credentialEndpoint.value.value.toURL(),
                     mapOf(accessToken.toAuthorizationHeader()),
-                    request.toTO(),
+                    request.toTransferObject(),
                 ) {
                     // Process response
                     if (it.status.isSuccess()) {
@@ -69,7 +70,7 @@ internal class DefaultIssuanceRequester(
             postIssueRequest.post(
                 issuerMetadata.batchCredentialEndpoint.value.value.toURL(),
                 mapOf(accessToken.toAuthorizationHeader()),
-                request.toTO(),
+                request.toTransferObject(),
             ) {
                 // Process response
                 if (it.status.isSuccess()) {
@@ -130,7 +131,8 @@ private fun BatchIssuanceSuccessResponse.toBatchIssuanceResponse(): CredentialIs
 
 private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError =
     when (error) {
-        "invalid_proof" -> {
+        "invalid_proof",
+        -> {
             cNonce?.let {
                 CredentialIssuanceError.InvalidProof(
                     cNonce = cNonce,
@@ -158,7 +160,7 @@ private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError =
 
 private fun IssuanceAccessToken.toAuthorizationHeader(): Pair<String, String> = "Authorization" to "BEARER $accessToken"
 
-private fun CredentialIssuanceRequest.SingleCredential.toTO(): CredentialIssuanceRequestTO.SingleCredentialTO {
+private fun CredentialIssuanceRequest.SingleCredential.toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO {
     return when (this) {
         is MsoMdocProfile.CredentialIssuanceRequest ->
             MsoMdocProfile.CredentialIssuanceRequestTO(
@@ -176,11 +178,30 @@ private fun CredentialIssuanceRequest.SingleCredential.toTO(): CredentialIssuanc
                     Json.encodeToJsonElement(it.claims).jsonObject
                 },
             )
+
+        is SdJwtVcProfile.CredentialIssuanceRequest ->
+            SdJwtVcProfile.CredentialIssuanceRequestTO(
+                format = SdJwtVcProfile.FORMAT,
+                proof = proof?.toJsonObject(),
+                credentialEncryptionJwk = credentialEncryptionJwk?.let {
+                    Json.parseToJsonElement(
+                        it.toPublicJWK().toString(),
+                    ).jsonObject
+                },
+                credentialResponseEncryptionAlg = credentialResponseEncryptionAlg?.toString(),
+                credentialResponseEncryptionMethod = credentialResponseEncryptionMethod?.toString(),
+                credentialDefinition = SdJwtVcProfile.CredentialIssuanceRequestTO.CredentialDefinitionTO(
+                    type = credentialDefinition.type,
+                    claims = credentialDefinition.claims?.let {
+                        Json.encodeToJsonElement(it.claims).jsonObject
+                    },
+                ),
+            )
     }
 }
 
-private fun CredentialIssuanceRequest.BatchCredentials.toTO(): CredentialIssuanceRequestTO {
+private fun CredentialIssuanceRequest.BatchCredentials.toTransferObject(): CredentialIssuanceRequestTO {
     return CredentialIssuanceRequestTO.BatchCredentialsTO(
-        credentialRequests = credentialRequests.map { it.toTO() },
+        credentialRequests = credentialRequests.map { it.toTransferObject() },
     )
 }

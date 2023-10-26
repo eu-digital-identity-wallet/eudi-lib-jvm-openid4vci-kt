@@ -99,12 +99,12 @@ data class Claim(
     @kotlinx.serialization.Serializable
     data class Display(
         @SerialName("name") val name: String? = null,
-        @kotlinx.serialization.Serializable(LocalSerializer::class)
+        @kotlinx.serialization.Serializable(LocaleSerializer::class)
         @SerialName("locale") val locale: Locale? = null,
     ) : java.io.Serializable
 }
 
-object LocalSerializer : KSerializer<Locale> {
+object LocaleSerializer : KSerializer<Locale> {
 
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Locale", PrimitiveKind.STRING)
 

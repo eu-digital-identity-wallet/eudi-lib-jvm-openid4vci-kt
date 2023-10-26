@@ -23,7 +23,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
-import java.util.*
 
 /**
  * Default implementation of [CredentialIssuerMetadataResolver].
@@ -48,7 +47,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
         }.getOrElse { CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(it).raise() }
 
         val credentialIssuerMetadataObject = runCatching {
-            Json.decodeFromString<CredentialIssuerMetadataObject>(credentialIssuerMetadataContent)
+            Json.decodeFromString<CredentialIssuerMetadataTO>(credentialIssuerMetadataContent)
         }.getOrElse { CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(it).raise() }
 
         credentialIssuerMetadataObject.toDomain()
@@ -64,9 +63,9 @@ internal class DefaultCredentialIssuerMetadataResolver(
     companion object {
 
         /**
-         * Converts and validates  a [CredentialIssuerMetadataObject] as a [CredentialIssuerMetadata] instance.
+         * Converts and validates  a [CredentialIssuerMetadataTO] as a [CredentialIssuerMetadata] instance.
          */
-        private fun CredentialIssuerMetadataObject.toDomain(): CredentialIssuerMetadata {
+        private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
             val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
                 .getOrElse { CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId(it).raise() }
 
@@ -145,9 +144,9 @@ internal class DefaultCredentialIssuerMetadataResolver(
         }
 
         /**
-         * Converts a [JsonObject] to a [CredentialSupportedObject].
+         * Converts a [JsonObject] to a [CredentialSupportedTO].
          */
-        private fun JsonObject.toCredentialSupportedObject(): CredentialSupportedObject {
+        private fun JsonObject.toCredentialSupportedObject(): CredentialSupportedTO {
             val format =
                 getOrDefault("format", JsonNull).let {
                     if (it is JsonPrimitive && it.isString) {
@@ -158,19 +157,23 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 }
 
             return when (format) {
-                W3CSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CSignedJwtProfile.CredentialSupportedObject>(
+                W3CSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CSignedJwtProfile.CredentialSupportedTO>(
                     this,
                 )
 
-                W3CJsonLdSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdSignedJwtProfile.CredentialSupportedObject>(
+                W3CJsonLdSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdSignedJwtProfile.CredentialSupportedTO>(
                     this,
                 )
 
-                W3CJsonLdDataIntegrityProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdDataIntegrityProfile.CredentialSupportedObject>(
+                W3CJsonLdDataIntegrityProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdDataIntegrityProfile.CredentialSupportedTO>(
                     this,
                 )
 
-                MsoMdocProfile.FORMAT -> Json.decodeFromJsonElement<MsoMdocProfile.CredentialSupportedObject>(
+                MsoMdocProfile.FORMAT -> Json.decodeFromJsonElement<MsoMdocProfile.CredentialSupportedTO>(
+                    this,
+                )
+
+                SdJwtVcProfile.FORMAT -> Json.decodeFromJsonElement<SdJwtVcProfile.CredentialSupportedObject>(
                     this,
                 )
 
@@ -179,9 +182,9 @@ internal class DefaultCredentialIssuerMetadataResolver(
         }
 
         /**
-         * Converts a [CredentialIssuerMetadataObject.DisplayObject] to a [CredentialIssuerMetadata.Display] instance.
+         * Converts a [CredentialIssuerMetadataTO.DisplayTO] to a [CredentialIssuerMetadata.Display] instance.
          */
-        private fun CredentialIssuerMetadataObject.DisplayObject.toDomain(): CredentialIssuerMetadata.Display =
+        private fun CredentialIssuerMetadataTO.DisplayTO.toDomain(): CredentialIssuerMetadata.Display =
             CredentialIssuerMetadata.Display(name, locale)
     }
 }

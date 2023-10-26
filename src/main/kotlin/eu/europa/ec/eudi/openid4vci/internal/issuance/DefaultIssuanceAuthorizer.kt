@@ -58,7 +58,7 @@ class DefaultIssuanceAuthorizer(
         ) {
             redirectionURI(config.authFlowRedirectionURI)
             codeChallenge(codeVerifier, CodeChallengeMethod.S256)
-            scope(NimbusOauth2Scope(*scopes.map { it.value }.toTypedArray()))
+            scope(NimbusOauth2Scope(*scopes.map { it.value }.toTypedArray(), "openid"))
             state(State(state))
             issuerState?.let {
                 customParameter("issuer_state", issuerState)

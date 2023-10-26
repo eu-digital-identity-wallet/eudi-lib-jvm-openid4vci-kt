@@ -32,7 +32,7 @@ object W3CJsonLdDataIntegrityProfile {
      * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
      */
     @Serializable
-    data class CredentialSupportedObject(
+    data class CredentialSupportedTO(
         @SerialName("format") @Required override val format: String,
         @SerialName("scope") override val scope: String? = null,
         @SerialName("cryptographic_binding_methods_supported")
@@ -41,15 +41,22 @@ object W3CJsonLdDataIntegrityProfile {
         override val cryptographicSuitesSupported: List<String>? = null,
         @SerialName("proof_types_supported")
         override val proofTypesSupported: List<String>? = null,
-        @SerialName("display") override val display: List<DisplayObject>? = null,
+        @SerialName("display") override val display: List<DisplayTO>? = null,
         @SerialName("@context") @Required val context: List<String> = emptyList(),
         @SerialName("type") @Required val type: List<String> = emptyList(),
-        @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionObjectLD,
+        @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
         @SerialName("order") val order: List<String>? = null,
-    ) : eu.europa.ec.eudi.openid4vci.CredentialSupportedObject {
+    ) : eu.europa.ec.eudi.openid4vci.CredentialSupportedTO {
         init {
             require(format == FORMAT) { "invalid format '$format'" }
         }
+
+        @Serializable
+        data class CredentialDefinitionTO(
+            @SerialName("@context") val context: List<String>,
+            @SerialName("type") val types: List<String>,
+            @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>?,
+        )
 
         override fun toDomain(): eu.europa.ec.eudi.openid4vci.CredentialSupported {
             val bindingMethods =
@@ -73,6 +80,26 @@ object W3CJsonLdDataIntegrityProfile {
         }
     }
 
+    fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): CredentialSupported.CredentialDefinition =
+        CredentialSupported.CredentialDefinition(
+            context = context.map { URL(it) },
+            type = types,
+            credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
+                nameAndClaim.value.let {
+                    Claim(
+                        it.mandatory ?: false,
+                        it.valueType,
+                        it.display?.map { displayObject ->
+                            Claim.Display(
+                                displayObject.name,
+                                displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
+                            )
+                        } ?: emptyList(),
+                    )
+                }
+            },
+        )
+
     /**
      * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
      */
@@ -95,25 +122,17 @@ object W3CJsonLdDataIntegrityProfile {
         )
     }
 
-    fun CredentialDefinitionObjectLD.toDomain(): CredentialSupported.CredentialDefinition =
-        CredentialSupported.CredentialDefinition(
-            context = context.map { URL(it) },
-            type = types,
-            credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
-                nameAndClaim.value.let {
-                    Claim(
-                        it.mandatory ?: false,
-                        it.valueType,
-                        it.display?.map { displayObject ->
-                            Claim.Display(
-                                displayObject.name,
-                                displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                            )
-                        } ?: emptyList(),
-                    )
-                }
-            },
+    @Serializable
+    data class CredentialMetadataTO(
+        @SerialName("format") @Required val format: String,
+        @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinition,
+    ) {
+        @Serializable
+        data class CredentialDefinition(
+            @SerialName("type") val type: List<String>,
+            @SerialName("@context") val context: List<String>? = null,
         )
+    }
 
     /**
      * Data Integrity using JSON-LD credential metadata object.
@@ -129,8 +148,8 @@ object W3CJsonLdDataIntegrityProfile {
         )
     }
 
-    fun matchAndToDomain(jsonObject: JsonObject, metadata: CredentialIssuerMetadata): CredentialMetadata {
-        val credentialDefinition = Json.decodeFromJsonElement<W3CVerifiableCredentialCredentialObject>(
+    fun matchSupportedAndToDomain(jsonObject: JsonObject, metadata: CredentialIssuerMetadata): CredentialMetadata {
+        val credentialDefinition = Json.decodeFromJsonElement<CredentialMetadataTO>(
             jsonObject,
         ).credentialDefinition
 

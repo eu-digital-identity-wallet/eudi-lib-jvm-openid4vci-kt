@@ -17,8 +17,8 @@ package eu.europa.ec.eudi.openid4vci
 
 import java.util.*
 
-fun DisplayObject.toDomain(): Display {
-    fun DisplayObject.LogoObject.toLogo(): Display.Logo =
+fun DisplayTO.toDomain(): Display {
+    fun DisplayTO.LogoObject.toLogo(): Display.Logo =
         Display.Logo(
             url?.let { HttpsUrl(it).getOrThrow() },
             alternativeText,

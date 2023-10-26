@@ -28,7 +28,7 @@ internal class DefaultIssuer(
         issuerState: String?,
     ): Result<UnauthorizedRequest.ParRequested> =
         runCatching {
-            val scopes = credentials.filterIsInstance<CredentialMetadata.ByScope>().map { it.scope }
+            val scopes = credentials.filterIsInstance<CredentialMetadata.ByScope>().map { it.scope }.toMutableList()
             val state = UUID.randomUUID().toString()
             val (codeVerifier, getAuthorizationCodeUrl) =
                 authorizer.submitPushedAuthorizationRequest(scopes, state, issuerState).getOrThrow()
@@ -186,6 +186,8 @@ internal class DefaultIssuer(
                     it is W3CSignedJwtProfile.CredentialSupported &&
                         it.credentialDefinition.type == metadata.credentialDefinition.type
                 }
+
+            is SdJwtVcProfile.CredentialMetadata -> TODO()
         }
             ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
     }
@@ -205,6 +207,7 @@ internal class DefaultIssuer(
             is W3CSignedJwtProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
             is W3CJsonLdDataIntegrityProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
             is W3CJsonLdSignedJwtProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
+            is SdJwtVcProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
         }
     }
 
@@ -226,20 +229,55 @@ internal class DefaultIssuer(
                         ).raise()
                     }
                 }
-                    ?: CredentialIssuanceError.InvalidIssuanceRequest("Namespace ${requestedClaim.key} not supported by issuer").raise()
+                    ?: CredentialIssuanceError.InvalidIssuanceRequest("Namespace ${requestedClaim.key} not supported by issuer")
+                        .raise()
             }
             return claimSet
         }
-        val validClaimSet =
-            claimSet?.let {
-                when (claimSet) {
-                    is ClaimSet.MsoMdoc -> validateClaimSet(claimSet)
-                    else -> CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance").raise()
-                }
+
+        val validClaimSet = claimSet?.let {
+            when (claimSet) {
+                is ClaimSet.MsoMdoc -> validateClaimSet(claimSet)
+                else -> CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
+                    .raise()
             }
+        }
 
         MsoMdocProfile.CredentialIssuanceRequest(
             doctype = docType,
+            proof = proof,
+            claimSet = validClaimSet,
+        ).getOrThrow()
+    }
+
+    private fun SdJwtVcProfile.CredentialSupported.toIssuanceRequest(
+        claimSet: ClaimSet?,
+        proof: Proof?,
+    ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
+        fun validateClaimSet(claimSet: ClaimSet.SdJwtVc): ClaimSet.SdJwtVc {
+            if ((credentialDefinition.claims == null || credentialDefinition.claims.isEmpty()) && claimSet.claims.isNotEmpty()) {
+                CredentialIssuanceError.InvalidIssuanceRequest(
+                    "Issuer does not support claims for credential [${SdJwtVcProfile.FORMAT}-${this.credentialDefinition.type}]",
+                ).raise()
+            }
+            if (credentialDefinition.claims != null && !credentialDefinition.claims.keys.containsAll(claimSet.claims.keys)) {
+                CredentialIssuanceError.InvalidIssuanceRequest(
+                    "Claim names requested are not supported by issuer",
+                ).raise()
+            }
+            return claimSet
+        }
+
+        val validClaimSet = claimSet?.let {
+            when (claimSet) {
+                is ClaimSet.SdJwtVc -> validateClaimSet(claimSet)
+                else -> CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
+                    .raise()
+            }
+        }
+
+        SdJwtVcProfile.CredentialIssuanceRequest(
+            type = credentialDefinition.type,
             proof = proof,
             claimSet = validClaimSet,
         ).getOrThrow()

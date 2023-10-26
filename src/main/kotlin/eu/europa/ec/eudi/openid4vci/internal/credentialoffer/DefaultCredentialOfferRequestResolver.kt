@@ -46,7 +46,7 @@ internal class DefaultCredentialOfferRequestResolver(
                     }
             }
             val credentialOfferRequestObject = runCatching {
-                Json.decodeFromString<CredentialOfferRequestObject>(credentialOfferRequestObjectString)
+                Json.decodeFromString<CredentialOfferRequestTO>(credentialOfferRequestObjectString)
             }.getOrElse { CredentialOfferRequestError.NonParseableCredentialOffer(it).raise() }
 
             val credentialIssuerId = CredentialIssuerId(credentialOfferRequestObject.credentialIssuerIdentifier)
@@ -83,9 +83,9 @@ internal class DefaultCredentialOfferRequestResolver(
     companion object {
 
         /**
-         * Tries to parse a [GrantsObject] to a [Grants] instance.
+         * Tries to parse a [GrantsTO] to a [Grants] instance.
          */
-        private fun GrantsObject.toGrants(): Grants? {
+        private fun GrantsTO.toGrants(): Grants? {
             val maybeAuthorizationCodeGrant =
                 authorizationCode?.let { Grants.AuthorizationCode(it.issuerState) }
             val maybePreAuthorizedCodeGrant =
@@ -149,10 +149,11 @@ internal class DefaultCredentialOfferRequestResolver(
                     }
 
             return when (format) {
-                MsoMdocProfile.FORMAT -> MsoMdocProfile.matchAndToDomain(this, metadata)
-                W3CSignedJwtProfile.FORMAT -> W3CSignedJwtProfile.matchAndToDomain(this, metadata)
-                W3CJsonLdSignedJwtProfile.FORMAT -> W3CJsonLdSignedJwtProfile.matchAndToDomain(this, metadata)
-                W3CJsonLdDataIntegrityProfile.FORMAT -> W3CJsonLdDataIntegrityProfile.matchAndToDomain(this, metadata)
+                MsoMdocProfile.FORMAT -> MsoMdocProfile.matchSupportedAndToDomain(this, metadata)
+                W3CSignedJwtProfile.FORMAT -> W3CSignedJwtProfile.matchSupportedAndToDomain(this, metadata)
+                W3CJsonLdSignedJwtProfile.FORMAT -> W3CJsonLdSignedJwtProfile.matchSupportedAndToDomain(this, metadata)
+                W3CJsonLdDataIntegrityProfile.FORMAT -> W3CJsonLdDataIntegrityProfile.matchSupportedAndToDomain(this, metadata)
+                SdJwtVcProfile.FORMAT -> SdJwtVcProfile.matchSupportedAndToDomain(this, metadata)
 
                 else -> throw IllegalArgumentException("Unknown Credential format '$format'")
             }

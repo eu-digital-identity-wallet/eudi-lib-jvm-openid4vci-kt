@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jwt.JWT
-import com.nimbusds.openid.connect.sdk.op.ReadOnlyOIDCProviderMetadata
+import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -48,50 +48,26 @@ value class HttpsUrl private constructor(val value: URI) {
  * The unvalidated data of a Credential Offer.
  */
 @Serializable
-data class CredentialOfferRequestObject(
+data class CredentialOfferRequestTO(
     @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
     @SerialName("credentials") @Required val credentials: List<JsonElement>,
-    @SerialName("grants") val grants: GrantsObject? = null,
+    @SerialName("grants") val grants: GrantsTO? = null,
 )
-
-/**
- * An MSO MDOC Credential Object.
- */
-@Serializable
-data class MsoMdocCredentialObject(
-    @SerialName("format") @Required val format: String,
-    @SerialName("doctype") @Required val docType: String,
-)
-
-/**
- * A W3C Verifiable Credential, Credential Object.
- */
-@Serializable
-data class W3CVerifiableCredentialCredentialObject(
-    @SerialName("format") @Required val format: String,
-    @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinition,
-) {
-    @Serializable
-    data class CredentialDefinition(
-        @SerialName("type") val type: List<String>,
-        @SerialName("@context") val context: List<String>? = null,
-    )
-}
 
 /**
  * Data of the Grant Types the Credential Issuer is prepared to process for a Credential Offer.
  */
 @Serializable
-data class GrantsObject(
-    @SerialName("authorization_code") val authorizationCode: AuthorizationCodeObject? = null,
-    @SerialName("urn:ietf:params:oauth:grant-type:pre-authorized_code") val preAuthorizedCode: PreAuthorizedCodeObject? = null,
+data class GrantsTO(
+    @SerialName("authorization_code") val authorizationCode: AuthorizationCodeTO? = null,
+    @SerialName("urn:ietf:params:oauth:grant-type:pre-authorized_code") val preAuthorizedCode: PreAuthorizedCodeTO? = null,
 ) {
 
     /**
      * Data for an Authorization Code Grant Type.
      */
     @Serializable
-    data class AuthorizationCodeObject(
+    data class AuthorizationCodeTO(
         @SerialName("issuer_state") val issuerState: String? = null,
     )
 
@@ -99,7 +75,7 @@ data class GrantsObject(
      * Data for a Pre-Authorized Code Grant Type.
      */
     @Serializable
-    data class PreAuthorizedCodeObject(
+    data class PreAuthorizedCodeTO(
         @SerialName("pre-authorized_code") @Required val preAuthorizedCode: String,
         @SerialName("user_pin_required") val pinRequired: Boolean? = null,
         @SerialName("interval") val interval: Long? = null,
@@ -110,7 +86,7 @@ data class GrantsObject(
  * Unvalidated metadata of a Credential Issuer.
  */
 @Serializable
-data class CredentialIssuerMetadataObject(
+data class CredentialIssuerMetadataTO(
     @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
     @SerialName("authorization_server") val authorizationServer: String? = null,
     @SerialName("credential_endpoint") @Required val credentialEndpoint: String,
@@ -123,14 +99,14 @@ data class CredentialIssuerMetadataObject(
     @SerialName("require_credential_response_encryption")
     val requireCredentialResponseEncryption: Boolean? = null,
     @SerialName("credentials_supported") val credentialsSupported: List<JsonObject> = emptyList(),
-    @SerialName("display") val display: List<DisplayObject>? = null,
+    @SerialName("display") val display: List<DisplayTO>? = null,
 ) {
 
     /**
      * Display properties of a Credential Issuer.
      */
     @Serializable
-    data class DisplayObject(
+    data class DisplayTO(
         @SerialName("name") val name: String? = null,
         @SerialName("locale") val locale: String? = null,
     )
@@ -139,46 +115,33 @@ data class CredentialIssuerMetadataObject(
 /**
  * The metadata of a Credentials that can be issued by a Credential Issuer.
  */
-sealed interface CredentialSupportedObject {
+sealed interface CredentialSupportedTO {
 
     val format: String
     val scope: String?
     val cryptographicBindingMethodsSupported: List<String>?
     val cryptographicSuitesSupported: List<String>?
     val proofTypesSupported: List<String>?
-    val display: List<DisplayObject>?
+    val display: List<DisplayTO>?
 
     fun toDomain(): CredentialSupported
 }
-
-@Serializable
-data class CredentialDefinitionObject(
-    @SerialName("type") val types: List<String>,
-    @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimObject>?,
-)
-
-@Serializable
-data class CredentialDefinitionObjectLD(
-    @SerialName("@context") val context: List<String>,
-    @SerialName("type") val types: List<String>,
-    @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimObject>?,
-)
 
 /**
  * The details of a Claim.
  */
 @Serializable
-data class ClaimObject(
+data class ClaimTO(
     @SerialName("mandatory") val mandatory: Boolean? = null,
     @SerialName("value_type") val valueType: String? = null,
-    @SerialName("display") val display: List<DisplayObject>? = null,
+    @SerialName("display") val display: List<DisplayTO>? = null,
 ) {
 
     /**
      * Display properties of a Claim.
      */
     @Serializable
-    data class DisplayObject(
+    data class DisplayTO(
         @SerialName("name") val name: String? = null,
         @SerialName("locale") val locale: String? = null,
     )
@@ -188,7 +151,7 @@ data class ClaimObject(
  * Display properties of a supported credential type for a certain language.
  */
 @Serializable
-data class DisplayObject(
+data class DisplayTO(
     @SerialName("name") @Required val name: String,
     @SerialName("locale") val locale: String? = null,
     @SerialName("logo") val logo: LogoObject? = null,
@@ -297,4 +260,4 @@ value class Scope private constructor(
     }
 }
 
-typealias CIAuthorizationServerMetadata = ReadOnlyOIDCProviderMetadata
+typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata

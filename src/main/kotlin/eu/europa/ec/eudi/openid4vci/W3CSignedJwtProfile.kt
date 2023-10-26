@@ -31,7 +31,7 @@ object W3CSignedJwtProfile {
      * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
      */
     @Serializable
-    data class CredentialSupportedObject(
+    data class CredentialSupportedTO(
         @SerialName("format") @Required override val format: String,
         @SerialName("scope") override val scope: String? = null,
         @SerialName("cryptographic_binding_methods_supported")
@@ -40,13 +40,19 @@ object W3CSignedJwtProfile {
         override val cryptographicSuitesSupported: List<String>? = null,
         @SerialName("proof_types_supported")
         override val proofTypesSupported: List<String>? = null,
-        @SerialName("display") override val display: List<DisplayObject>? = null,
-        @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionObject,
+        @SerialName("display") override val display: List<DisplayTO>? = null,
+        @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
         @SerialName("order") val order: List<String>? = null,
-    ) : eu.europa.ec.eudi.openid4vci.CredentialSupportedObject {
+    ) : eu.europa.ec.eudi.openid4vci.CredentialSupportedTO {
         init {
             require(format == FORMAT) { "invalid format '$format'" }
         }
+
+        @Serializable
+        data class CredentialDefinitionTO(
+            @SerialName("type") val types: List<String>,
+            @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>?,
+        )
 
         override fun toDomain(): eu.europa.ec.eudi.openid4vci.CredentialSupported {
             val bindingMethods =
@@ -68,26 +74,7 @@ object W3CSignedJwtProfile {
         }
     }
 
-    /**
-     * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
-     */
-    data class CredentialSupported(
-        override val scope: String? = null,
-        override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-        override val cryptographicSuitesSupported: List<String> = emptyList(),
-        override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
-        override val display: List<Display> = emptyList(),
-        val credentialDefinition: CredentialDefinition,
-        val order: List<ClaimName> = emptyList(),
-    ) : eu.europa.ec.eudi.openid4vci.CredentialSupported {
-
-        data class CredentialDefinition(
-            val type: List<String>,
-            val credentialSubject: Map<ClaimName, Claim?>?,
-        )
-    }
-
-    fun CredentialDefinitionObject.toDomain(): CredentialSupported.CredentialDefinition =
+    fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): CredentialSupported.CredentialDefinition =
         CredentialSupported.CredentialDefinition(
             type = types,
             credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
@@ -107,6 +94,36 @@ object W3CSignedJwtProfile {
         )
 
     /**
+     * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
+     */
+    data class CredentialSupported(
+        override val scope: String? = null,
+        override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
+        override val cryptographicSuitesSupported: List<String> = emptyList(),
+        override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
+        override val display: List<Display> = emptyList(),
+        val credentialDefinition: CredentialDefinition,
+        val order: List<ClaimName> = emptyList(),
+    ) : eu.europa.ec.eudi.openid4vci.CredentialSupported {
+
+        data class CredentialDefinition(
+            val type: List<String>,
+            val credentialSubject: Map<ClaimName, Claim?>?,
+        )
+    }
+
+    @Serializable
+    data class CredentialMetadataTO(
+        @SerialName("format") @Required val format: String,
+        @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinition,
+    ) {
+        @Serializable
+        data class CredentialDefinition(
+            @SerialName("type") val type: List<String>,
+        )
+    }
+
+    /**
      * A signed JWT (not using JSON-LD) credential metadata object.
      */
     data class CredentialMetadata(
@@ -118,8 +135,8 @@ object W3CSignedJwtProfile {
         )
     }
 
-    fun matchAndToDomain(jsonObject: JsonObject, metadata: CredentialIssuerMetadata): CredentialMetadata {
-        val credentialDefinition = Json.decodeFromJsonElement<W3CVerifiableCredentialCredentialObject>(
+    fun matchSupportedAndToDomain(jsonObject: JsonObject, metadata: CredentialIssuerMetadata): CredentialMetadata {
+        val credentialDefinition = Json.decodeFromJsonElement<CredentialMetadataTO>(
             jsonObject,
         ).credentialDefinition
 
