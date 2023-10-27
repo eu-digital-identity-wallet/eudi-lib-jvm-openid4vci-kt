@@ -18,10 +18,8 @@ package eu.europa.ec.eudi.openid4vci
 import java.net.URI
 
 typealias ClientId = String
-typealias ClientSecret = String
 
 data class WalletOpenId4VCIConfig(
     val clientId: ClientId,
-    val clientSecret: ClientSecret,
     val authFlowRedirectionURI: URI,
 )

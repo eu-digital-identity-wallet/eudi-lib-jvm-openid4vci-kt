@@ -18,16 +18,11 @@ package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialSupported.MsoMdocCredentialCredentialSupported
-import eu.europa.ec.eudi.openid4vci.CredentialSupported.W3CVerifiableCredentialCredentialSupported.*
-import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.MsoMdocCredentialCredentialSupportedObject
-import eu.europa.ec.eudi.openid4vci.CredentialSupportedObject.W3CVerifiableCredentialCredentialSupportedObject.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
-import java.util.*
 
 /**
  * Default implementation of [CredentialIssuerMetadataResolver].
@@ -52,7 +47,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
         }.getOrElse { CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(it).raise() }
 
         val credentialIssuerMetadataObject = runCatching {
-            Json.decodeFromString<CredentialIssuerMetadataObject>(credentialIssuerMetadataContent)
+            Json.decodeFromString<CredentialIssuerMetadataTO>(credentialIssuerMetadataContent)
         }.getOrElse { CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(it).raise() }
 
         credentialIssuerMetadataObject.toDomain()
@@ -68,9 +63,9 @@ internal class DefaultCredentialIssuerMetadataResolver(
     companion object {
 
         /**
-         * Converts and validates  a [CredentialIssuerMetadataObject] as a [CredentialIssuerMetadata] instance.
+         * Converts and validates  a [CredentialIssuerMetadataTO] as a [CredentialIssuerMetadata] instance.
          */
-        private fun CredentialIssuerMetadataObject.toDomain(): CredentialIssuerMetadata {
+        private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
             val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
                 .getOrElse { CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId(it).raise() }
 
@@ -124,7 +119,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
             val credentialsSupported = runCatching {
                 credentialsSupported
                     .map { it.toCredentialSupportedObject() }
-                    .map { it.toCredentialSupported() }
+                    .map { it.toDomain() }
             }.getOrElse { CredentialIssuerMetadataValidationError.InvalidCredentialsSupported(it).raise() }
                 .ifEmpty {
                     CredentialIssuerMetadataValidationError.CredentialsSupportedRequired.raise()
@@ -149,9 +144,9 @@ internal class DefaultCredentialIssuerMetadataResolver(
         }
 
         /**
-         * Converts a [JsonObject] to a [CredentialSupportedObject].
+         * Converts a [JsonObject] to a [CredentialSupportedTO].
          */
-        private fun JsonObject.toCredentialSupportedObject(): CredentialSupportedObject {
+        private fun JsonObject.toCredentialSupportedObject(): CredentialSupportedTO {
             val format =
                 getOrDefault("format", JsonNull).let {
                     if (it is JsonPrimitive && it.isString) {
@@ -162,19 +157,23 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 }
 
             return when (format) {
-                "jwt_vc_json" -> Json.decodeFromJsonElement<W3CVerifiableCredentialSignedJwtCredentialSupportedObject>(
+                W3CSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CSignedJwtProfile.CredentialSupportedTO>(
                     this,
                 )
 
-                "jwt_vc_json-ld" -> Json.decodeFromJsonElement<W3CVerifiableCredentialJsonLdSignedJwtCredentialSupportedObject>(
+                W3CJsonLdSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdSignedJwtProfile.CredentialSupportedTO>(
                     this,
                 )
 
-                "ldp_vc" -> Json.decodeFromJsonElement<W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupportedObject>(
+                W3CJsonLdDataIntegrityProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdDataIntegrityProfile.CredentialSupportedTO>(
                     this,
                 )
 
-                "mso_mdoc" -> Json.decodeFromJsonElement<MsoMdocCredentialCredentialSupportedObject>(
+                MsoMdocProfile.FORMAT -> Json.decodeFromJsonElement<MsoMdocProfile.CredentialSupportedTO>(
+                    this,
+                )
+
+                SdJwtVcProfile.FORMAT -> Json.decodeFromJsonElement<SdJwtVcProfile.CredentialSupportedObject>(
                     this,
                 )
 
@@ -183,129 +182,9 @@ internal class DefaultCredentialIssuerMetadataResolver(
         }
 
         /**
-         * Converts a [CredentialSupportedObject] to a [CredentialSupported].
+         * Converts a [CredentialIssuerMetadataTO.DisplayTO] to a [CredentialIssuerMetadata.Display] instance.
          */
-        private fun CredentialSupportedObject.toCredentialSupported(): CredentialSupported {
-            val cryptographicBindingMethodsSupported =
-                cryptographicBindingMethodsSupported?.map {
-                    when (it) {
-                        "jwk" -> CryptographicBindingMethod.JWK
-                        "cose_key" -> CryptographicBindingMethod.COSE
-                        "mso" -> CryptographicBindingMethod.MSO
-                        else ->
-                            if (it.startsWith("did")) {
-                                CryptographicBindingMethod.DID(it)
-                            } else {
-                                throw IllegalArgumentException("Unknown Cryptographic Binding Method '$it'")
-                            }
-                    }
-                } ?: emptyList()
-            val cryptographicSuitesSupported = cryptographicSuitesSupported ?: emptyList()
-            val proofTypesSupported =
-                proofTypesSupported
-                    ?.map {
-                        when (it) {
-                            "jwt" -> ProofType.JWT
-                            "cwt" -> ProofType.CWT
-                            else -> throw IllegalArgumentException("Unknown Proof Type '$it'")
-                        }
-                    } ?: emptyList<ProofType>()
-                    .ifEmpty {
-                        listOf(ProofType.JWT)
-                    }
-
-            fun DisplayObject.toDisplay(): Display {
-                fun DisplayObject.LogoObject.toLogo(): Display.Logo =
-                    Display.Logo(
-                        url?.let { HttpsUrl(it).getOrThrow() },
-                        alternativeText,
-                    )
-
-                return Display(
-                    name,
-                    locale?.let { Locale.forLanguageTag(it) },
-                    logo?.toLogo(),
-                    description,
-                    backgroundColor,
-                    textColor,
-                )
-            }
-
-            val display = display?.map { it.toDisplay() } ?: emptyList()
-
-            fun MsoMdocCredentialCredentialSupportedObject.claims(): MsoMdocClaims =
-                claims?.mapValues { namespaceAndClaims ->
-                    namespaceAndClaims.value.mapValues { claimNameAndClaim ->
-                        claimNameAndClaim.value.let { claimObject ->
-                            MsoMdocCredentialCredentialSupported.Claim(
-                                claimObject.mandatory ?: false,
-                                claimObject.valueType,
-                                claimObject.display?.map { displayObject ->
-                                    MsoMdocCredentialCredentialSupported.Claim.Display(
-                                        displayObject.name,
-                                        displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                                    )
-                                } ?: emptyList(),
-                            )
-                        }
-                    }
-                } ?: emptyMap()
-
-            return when (this) {
-                is W3CVerifiableCredentialSignedJwtCredentialSupportedObject ->
-                    W3CVerifiableCredentialSignedJwtCredentialSupported(
-                        scope,
-                        cryptographicBindingMethodsSupported,
-                        cryptographicSuitesSupported,
-                        proofTypesSupported,
-                        display,
-                        credentialDefinition,
-                        order ?: emptyList(),
-                    )
-
-                is W3CVerifiableCredentialJsonLdSignedJwtCredentialSupportedObject ->
-                    W3CVerifiableCredentialJsonLdSignedJwtCredentialSupported(
-                        scope,
-                        cryptographicBindingMethodsSupported,
-                        cryptographicSuitesSupported,
-                        proofTypesSupported,
-                        display,
-                        context,
-                        credentialDefinition,
-                        order ?: emptyList(),
-                    )
-
-                is W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupportedObject ->
-                    W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupported(
-                        scope,
-                        cryptographicBindingMethodsSupported,
-                        cryptographicSuitesSupported,
-                        proofTypesSupported,
-                        display,
-                        context,
-                        type,
-                        credentialDefinition,
-                        order ?: emptyList(),
-                    )
-
-                is MsoMdocCredentialCredentialSupportedObject ->
-                    MsoMdocCredentialCredentialSupported(
-                        scope,
-                        cryptographicBindingMethodsSupported,
-                        cryptographicSuitesSupported,
-                        proofTypesSupported,
-                        display,
-                        docType,
-                        claims(),
-                        order ?: emptyList(),
-                    )
-            }
-        }
-
-        /**
-         * Converts a [CredentialIssuerMetadataObject.DisplayObject] to a [CredentialIssuerMetadata.Display] instance.
-         */
-        private fun CredentialIssuerMetadataObject.DisplayObject.toDomain(): CredentialIssuerMetadata.Display =
+        private fun CredentialIssuerMetadataTO.DisplayTO.toDomain(): CredentialIssuerMetadata.Display =
             CredentialIssuerMetadata.Display(name, locale)
     }
 }
