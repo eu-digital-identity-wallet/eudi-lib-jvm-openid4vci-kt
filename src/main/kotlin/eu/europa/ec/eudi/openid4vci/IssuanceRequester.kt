@@ -129,26 +129,7 @@ data class CredentialIssuanceResponse(
     }
 }
 
-sealed interface ClaimSet {
-    data class MsoMdoc(
-        val claims: Map<Namespace, Map<ClaimName, Claim>>,
-    ) : ClaimSet
-
-    data class SdJwtVc(
-        val claims: Map<ClaimName, Claim>,
-    ) : ClaimSet
-    data class SignedJwt(
-        val claims: Map<ClaimName, Claim>,
-    ) : ClaimSet
-
-    data class JsonLdDataIntegrity(
-        val claims: Map<ClaimName, Claim>,
-    ) : ClaimSet
-
-    data class JsonLdSignedJwt(
-        val claims: Map<ClaimName, Claim>,
-    ) : ClaimSet
-}
+sealed interface ClaimSet
 
 /**
  * Interface that specifies the interaction with a Credentials Issuer required to handle the issuance of a credential

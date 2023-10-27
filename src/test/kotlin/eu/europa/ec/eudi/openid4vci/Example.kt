@@ -79,7 +79,6 @@ private class Wallet(
 
     val vciWalletConfiguration = WalletOpenId4VCIConfig(
         clientId = "wallet-dev",
-        clientSecret = "dvGPqa3Spk3KU2nljDIzCixbm9y3HXWN",
         authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
     )
 

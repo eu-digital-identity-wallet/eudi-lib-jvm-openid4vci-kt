@@ -148,6 +148,10 @@ object MsoMdocProfile {
         @SerialName("claims") val claims: JsonObject?,
     ) : eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequestTO.SingleCredentialTO
 
+    data class ClaimSet(
+        val claims: Map<Namespace, Map<ClaimName, Claim>>,
+    ) : eu.europa.ec.eudi.openid4vci.ClaimSet
+
     /**
      * Issuance request for a credential of mso_mdoc format
      */
@@ -157,7 +161,7 @@ object MsoMdocProfile {
         override val credentialEncryptionJwk: JWK? = null,
         override val credentialResponseEncryptionAlg: JWEAlgorithm? = null,
         override val credentialResponseEncryptionMethod: EncryptionMethod? = null,
-        val claimSet: ClaimSet.MsoMdoc?,
+        val claimSet: ClaimSet?,
     ) : eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequest.SingleCredential {
 
         override val format: String = "mso_mdoc"
@@ -169,7 +173,7 @@ object MsoMdocProfile {
                 credentialResponseEncryptionAlg: JWEAlgorithm? = null,
                 credentialResponseEncryptionMethod: EncryptionMethod? = null,
                 doctype: String,
-                claimSet: ClaimSet.MsoMdoc? = null,
+                claimSet: ClaimSet? = null,
             ): Result<CredentialIssuanceRequest> = runCatching {
                 var encryptionMethod = credentialResponseEncryptionMethod
                 if (credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null) {

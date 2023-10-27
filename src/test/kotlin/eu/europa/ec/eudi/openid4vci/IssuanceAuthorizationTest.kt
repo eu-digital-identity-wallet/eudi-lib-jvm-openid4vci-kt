@@ -64,7 +64,6 @@ class IssuanceAuthorizationTest {
 
     val vciWalletConfiguration = WalletOpenId4VCIConfig(
         clientId = "MyWallet_ClientId",
-        clientSecret = "23WR66278",
         authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     )
 

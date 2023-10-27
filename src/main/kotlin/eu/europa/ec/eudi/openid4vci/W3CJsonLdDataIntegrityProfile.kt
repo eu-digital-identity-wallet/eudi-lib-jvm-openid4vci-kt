@@ -175,4 +175,8 @@ object W3CJsonLdDataIntegrityProfile {
             }
             ?: fail()
     }
+
+    data class ClaimSet(
+        val claims: Map<ClaimName, Claim>,
+    ) : eu.europa.ec.eudi.openid4vci.ClaimSet
 }

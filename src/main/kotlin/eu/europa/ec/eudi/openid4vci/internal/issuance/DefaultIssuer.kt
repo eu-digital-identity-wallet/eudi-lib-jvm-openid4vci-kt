@@ -215,7 +215,7 @@ internal class DefaultIssuer(
         claimSet: ClaimSet?,
         proof: Proof?,
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
-        fun validateClaimSet(claimSet: ClaimSet.MsoMdoc): ClaimSet.MsoMdoc {
+        fun validateClaimSet(claimSet: MsoMdocProfile.ClaimSet): MsoMdocProfile.ClaimSet {
             if (claims.isEmpty() && claimSet.claims.isNotEmpty()) {
                 CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential [MsoMdoc-${this.docType}]",
@@ -237,7 +237,7 @@ internal class DefaultIssuer(
 
         val validClaimSet = claimSet?.let {
             when (claimSet) {
-                is ClaimSet.MsoMdoc -> validateClaimSet(claimSet)
+                is MsoMdocProfile.ClaimSet -> validateClaimSet(claimSet)
                 else -> CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
                     .raise()
             }
@@ -254,7 +254,7 @@ internal class DefaultIssuer(
         claimSet: ClaimSet?,
         proof: Proof?,
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
-        fun validateClaimSet(claimSet: ClaimSet.SdJwtVc): ClaimSet.SdJwtVc {
+        fun validateClaimSet(claimSet: SdJwtVcProfile.ClaimSet): SdJwtVcProfile.ClaimSet {
             if ((credentialDefinition.claims == null || credentialDefinition.claims.isEmpty()) && claimSet.claims.isNotEmpty()) {
                 CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential [${SdJwtVcProfile.FORMAT}-${this.credentialDefinition.type}]",
@@ -270,7 +270,7 @@ internal class DefaultIssuer(
 
         val validClaimSet = claimSet?.let {
             when (claimSet) {
-                is ClaimSet.SdJwtVc -> validateClaimSet(claimSet)
+                is SdJwtVcProfile.ClaimSet -> validateClaimSet(claimSet)
                 else -> CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
                     .raise()
             }

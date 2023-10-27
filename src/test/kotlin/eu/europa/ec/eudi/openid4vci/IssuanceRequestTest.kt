@@ -44,7 +44,6 @@ class IssuanceRequestTest {
 
     val vciWalletConfiguration = WalletOpenId4VCIConfig(
         clientId = "MyWallet_ClientId",
-        clientSecret = "23WR66278",
         authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     )
 
@@ -57,7 +56,7 @@ class IssuanceRequestTest {
                         client,
                         AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
                     )
-                    val claimSet = ClaimSet.MsoMdoc(
+                    val claimSet = MsoMdocProfile.ClaimSet(
                         claims = mapOf(
                             "org.iso.18013.5.1" to mapOf(
                                 "given_name" to Claim(),
@@ -135,7 +134,7 @@ class IssuanceRequestTest {
                         client,
                         AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
                     )
-                    val claimSet = ClaimSet.MsoMdoc(
+                    val claimSet = MsoMdocProfile.ClaimSet(
                         claims = mapOf(
                             "org.iso.18013.5.1" to mapOf(
                                 "given_name" to Claim(),
@@ -218,7 +217,7 @@ class IssuanceRequestTest {
                     val (offer, authorizedRequest, issuer) =
                         initIssuerWithOfferAndAuthorize(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
 
-                    val claimSet = ClaimSet.MsoMdoc(
+                    val claimSet = MsoMdocProfile.ClaimSet(
                         claims = mapOf(
                             "org.iso.18013.5.1" to mapOf(
                                 "given_name" to Claim(),

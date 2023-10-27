@@ -159,4 +159,8 @@ object W3CSignedJwtProfile {
             }
             ?: fail()
     }
+
+    data class ClaimSet(
+        val claims: Map<ClaimName, Claim>,
+    ) : eu.europa.ec.eudi.openid4vci.ClaimSet
 }

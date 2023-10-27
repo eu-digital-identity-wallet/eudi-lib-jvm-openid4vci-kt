@@ -139,6 +139,27 @@ object SdJwtVcProfile {
             ?: fail()
     }
 
+    @Serializable
+    @SerialName(FORMAT)
+    data class CredentialIssuanceRequestTO(
+        @SerialName("proof") override val proof: JsonObject?,
+        @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject?,
+        @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String?,
+        @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String?,
+        @SerialName("credential_definition") val credentialDefinition: CredentialDefinitionTO,
+    ) : eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequestTO.SingleCredentialTO {
+
+        @Serializable
+        data class CredentialDefinitionTO(
+            @SerialName("type") val type: String,
+            @SerialName("claims") val claims: JsonObject?,
+        )
+    }
+
+    data class ClaimSet(
+        val claims: Map<ClaimName, Claim>,
+    ) : eu.europa.ec.eudi.openid4vci.ClaimSet
+
     class CredentialIssuanceRequest private constructor(
         override val proof: Proof? = null,
         override val credentialEncryptionJwk: JWK? = null,
@@ -151,7 +172,7 @@ object SdJwtVcProfile {
 
         data class CredentialDefinition(
             val type: String,
-            val claims: ClaimSet.SdJwtVc?,
+            val claims: ClaimSet?,
         )
 
         companion object {
@@ -161,7 +182,7 @@ object SdJwtVcProfile {
                 credentialEncryptionJwk: JWK? = null,
                 credentialResponseEncryptionAlg: JWEAlgorithm? = null,
                 credentialResponseEncryptionMethod: EncryptionMethod? = null,
-                claimSet: ClaimSet.SdJwtVc? = null,
+                claimSet: ClaimSet? = null,
             ): Result<CredentialIssuanceRequest> = runCatching {
                 var encryptionMethod = credentialResponseEncryptionMethod
                 if (credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null) {
@@ -188,22 +209,5 @@ object SdJwtVcProfile {
                 )
             }
         }
-    }
-
-    @Serializable
-    @SerialName(FORMAT)
-    data class CredentialIssuanceRequestTO(
-        @SerialName("proof") override val proof: JsonObject?,
-        @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject?,
-        @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String?,
-        @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String?,
-        @SerialName("credential_definition") val credentialDefinition: CredentialDefinitionTO,
-    ) : eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequestTO.SingleCredentialTO {
-
-        @Serializable
-        data class CredentialDefinitionTO(
-            @SerialName("type") val type: String,
-            @SerialName("claims") val claims: JsonObject?,
-        )
     }
 }
