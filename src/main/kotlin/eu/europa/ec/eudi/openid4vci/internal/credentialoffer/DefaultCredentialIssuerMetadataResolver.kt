@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
@@ -53,7 +54,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
         credentialIssuerMetadataObject.toDomain()
             .also {
                 if (it.credentialIssuerIdentifier != issuer) {
-                    CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId(
+                    InvalidCredentialIssuerId(
                         IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
                     ).raise()
                 }
@@ -67,25 +68,25 @@ internal class DefaultCredentialIssuerMetadataResolver(
          */
         private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
             val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
-                .getOrElse { CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId(it).raise() }
+                .getOrElse { InvalidCredentialIssuerId(it).raise() }
 
             val authorizationServer =
                 authorizationServer
                     ?.let {
                         HttpsUrl(it).getOrElse { error ->
-                            CredentialIssuerMetadataValidationError.InvalidAuthorizationServer(error).raise()
+                            InvalidAuthorizationServer(error).raise()
                         }
                     }
                     ?: credentialIssuerIdentifier.value
 
             val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
-                .getOrElse { CredentialIssuerMetadataValidationError.InvalidCredentialEndpoint(it).raise() }
+                .getOrElse { InvalidCredentialEndpoint(it).raise() }
 
             val batchCredentialEndpoint =
                 batchCredentialEndpoint
                     ?.let {
                         CredentialIssuerEndpoint(it).getOrElse { error ->
-                            CredentialIssuerMetadataValidationError.InvalidBatchCredentialEndpoint(error).raise()
+                            InvalidBatchCredentialEndpoint(error).raise()
                         }
                     }
 
@@ -93,41 +94,51 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 deferredCredentialEndpoint
                     ?.let {
                         CredentialIssuerEndpoint(it).getOrElse { error ->
-                            CredentialIssuerMetadataValidationError.InvalidDeferredCredentialEndpoint(error).raise()
+                            InvalidDeferredCredentialEndpoint(error).raise()
                         }
                     }
 
-            val credentialResponseEncryptionAlgorithmsSupported = runCatching {
-                credentialResponseEncryptionAlgorithmsSupported?.map { JWEAlgorithm.parse(it) } ?: emptyList()
-            }.getOrElse {
-                CredentialIssuerMetadataValidationError.InvalidCredentialResponseEncryptionAlgorithmsSupported(
-                    it,
-                ).raise()
-            }
+            fun credentialResponseEncryption(): Result<CredentialResponseEncryption> = runCatching {
+                val requireEncryption = requireCredentialResponseEncryption ?: false
+                val encryptionAlgorithms = try {
+                    credentialResponseEncryptionAlgorithmsSupported?.map { JWEAlgorithm.parse(it) } ?: emptyList()
+                } catch (it: Throwable) {
+                    InvalidCredentialResponseEncryptionAlgorithmsSupported(it).raise()
+                }
+                val encryptionMethods = try {
+                    credentialResponseEncryptionMethodsSupported?.map { EncryptionMethod.parse(it) } ?: emptyList()
+                } catch (it: Throwable) {
+                    InvalidCredentialResponseEncryptionMethodsSupported(it).raise()
+                }
 
-            val credentialResponseEncryptionMethodsSupported = runCatching {
-                credentialResponseEncryptionMethodsSupported?.map { EncryptionMethod.parse(it) } ?: emptyList()
-            }.getOrElse {
-                CredentialIssuerMetadataValidationError.InvalidCredentialResponseEncryptionMethodsSupported(it).raise()
-            }
+                if (requireEncryption) {
+                    if (encryptionAlgorithms.isEmpty()) {
+                        CredentialResponseEncryptionAlgorithmsRequired.raise()
+                    }
 
-            val requireCredentialResponseEncryption = requireCredentialResponseEncryption ?: false
-            if (requireCredentialResponseEncryption && credentialResponseEncryptionAlgorithmsSupported.isEmpty()) {
-                CredentialIssuerMetadataValidationError.CredentialResponseEncryptionAlgorithmsRequired.raise()
+                    CredentialResponseEncryption.Required(
+                        encryptionAlgorithms,
+                        encryptionMethods,
+                    )
+                } else {
+                    require(encryptionAlgorithms.isEmpty())
+                    require(encryptionMethods.isEmpty())
+                    CredentialResponseEncryption.NotRequired
+                }
             }
 
             val credentialsSupported = runCatching {
                 credentialsSupported
                     .map { it.toCredentialSupportedObject() }
                     .map { it.toDomain() }
-            }.getOrElse { CredentialIssuerMetadataValidationError.InvalidCredentialsSupported(it).raise() }
+            }.getOrElse { InvalidCredentialsSupported(it).raise() }
                 .ifEmpty {
-                    CredentialIssuerMetadataValidationError.CredentialsSupportedRequired.raise()
+                    CredentialsSupportedRequired.raise()
                 }
 
             val display = runCatching {
                 display?.map { it.toDomain() } ?: emptyList()
-            }.getOrElse { CredentialIssuerMetadataValidationError.InvalidDisplay(it).raise() }
+            }.getOrElse { InvalidDisplay(it).raise() }
 
             return CredentialIssuerMetadata(
                 credentialIssuerIdentifier,
@@ -135,9 +146,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 credentialEndpoint,
                 batchCredentialEndpoint,
                 deferredCredentialEndpoint,
-                credentialResponseEncryptionAlgorithmsSupported,
-                credentialResponseEncryptionMethodsSupported,
-                requireCredentialResponseEncryption,
+                credentialResponseEncryption().getOrThrow(),
                 credentialsSupported,
                 display,
             )
