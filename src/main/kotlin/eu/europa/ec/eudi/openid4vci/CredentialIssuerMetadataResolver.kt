@@ -248,18 +248,6 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
     class InvalidDeferredCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
     /**
-     * The supported Credential Encryption Algorithms are not valid.
-     */
-    class InvalidCredentialResponseEncryptionAlgorithmsSupported(cause: Throwable) :
-        CredentialIssuerMetadataValidationError(cause)
-
-    /**
-     * The supported Credential Encryption Methods are not valid.
-     */
-    class InvalidCredentialResponseEncryptionMethodsSupported(cause: Throwable) :
-        CredentialIssuerMetadataValidationError(cause)
-
-    /**
      * Credential Encryption Algorithms are required.
      */
     object CredentialResponseEncryptionAlgorithmsRequired :
@@ -281,11 +269,6 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
 
         private fun readResolve(): Any = CredentialsSupportedRequired
     }
-
-    /**
-     * Display is not valid.
-     */
-    class InvalidDisplay(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 }
 
 /**
