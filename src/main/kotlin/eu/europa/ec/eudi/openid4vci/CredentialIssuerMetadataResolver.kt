@@ -31,9 +31,9 @@ import kotlinx.serialization.encoding.Encoder
 import java.io.Serializable
 import java.util.*
 
-sealed interface CredentialResponseEncryption {
+sealed interface CredentialResponseEncryption : Serializable {
     data object NotRequired : CredentialResponseEncryption {
-        override fun toString(): String = "NotRequired"
+        private fun readResolve(): Any = NotRequired
     }
 
     data class Required(
@@ -59,7 +59,7 @@ data class CredentialIssuerMetadata(
     val credentialResponseEncryption: CredentialResponseEncryption = NotRequired,
     val credentialsSupported: List<CredentialSupported>,
     val display: List<Display> = emptyList(),
-) : java.io.Serializable {
+) : Serializable {
 
     init {
         require(credentialsSupported.isNotEmpty()) { "credentialsSupported must not be empty" }
@@ -71,7 +71,7 @@ data class CredentialIssuerMetadata(
     data class Display(
         val name: String? = null,
         val locale: String? = null,
-    ) : java.io.Serializable
+    ) : Serializable
 }
 
 /**
@@ -102,7 +102,7 @@ data class Claim(
     @SerialName("mandatory") val mandatory: Boolean? = false,
     @SerialName("value_type") val valueType: String? = null,
     @SerialName("display") val display: List<Display> = emptyList(),
-) : java.io.Serializable {
+) : Serializable {
 
     /**
      * Display properties of a Claim.
@@ -112,7 +112,7 @@ data class Claim(
         @SerialName("name") val name: String? = null,
         @kotlinx.serialization.Serializable(LocaleSerializer::class)
         @SerialName("locale") val locale: Locale? = null,
-    ) : java.io.Serializable
+    ) : Serializable
 }
 
 internal object LocaleSerializer : KSerializer<Locale> {
@@ -141,7 +141,7 @@ sealed interface CredentialSupported : Serializable {
 /**
  * Cryptographic Binding Methods for issued Credentials.
  */
-sealed interface CryptographicBindingMethod : java.io.Serializable {
+sealed interface CryptographicBindingMethod : Serializable {
 
     /**
      * JWK format.
@@ -167,15 +167,13 @@ sealed interface CryptographicBindingMethod : java.io.Serializable {
     /**
      * DID method.
      */
-    data class DID(
-        val method: String,
-    ) : CryptographicBindingMethod
+    data class DID(val method: String) : CryptographicBindingMethod
 }
 
 /**
  * Proof types supported by a Credential Issuer.
  */
-enum class ProofType : java.io.Serializable {
+enum class ProofType : Serializable {
     JWT,
     CWT,
 }
@@ -192,7 +190,7 @@ data class Display(
     val description: String? = null,
     val backgroundColor: CssColor? = null,
     val textColor: CssColor? = null,
-) : java.io.Serializable {
+) : Serializable {
 
     /**
      * Logo information.
@@ -200,76 +198,77 @@ data class Display(
     data class Logo(
         val url: HttpsUrl? = null,
         val alternativeText: String? = null,
-    ) : java.io.Serializable
+    ) : Serializable
 }
 
 /**
  * Errors that can occur while trying to fetch and validate the metadata of a Credential Issuer.
  */
-sealed interface CredentialIssuerMetadataError : Serializable {
+sealed class CredentialIssuerMetadataError(cause: Throwable) : Throwable(cause), Serializable {
 
     /**
      * Indicates the Credential Issuer metadata could not be fetched.
      */
-    data class UnableToFetchCredentialIssuerMetadata(val cause: Throwable) : CredentialIssuerMetadataError
+    class UnableToFetchCredentialIssuerMetadata(cause: Throwable) : CredentialIssuerMetadataError(cause)
 
     /**
      * Indicates the Credential Issuer metadata could not be parsed.
      */
-    data class NonParseableCredentialIssuerMetadata(val cause: Throwable) : CredentialIssuerMetadataError
+    class NonParseableCredentialIssuerMetadata(cause: Throwable) : CredentialIssuerMetadataError(cause)
 
     /**
      * Wraps this [CredentialIssuerMetadataError] to a [CredentialIssuerMetadataException].
      */
-    fun toException(): CredentialIssuerMetadataException = CredentialIssuerMetadataException(this)
+    fun toException(): Throwable = CredentialIssuerMetadataException(this)
 }
 
 /**
- * Errors that can occur while trying to to validate the metadata of a Credential Issuer.
+ * Errors that can occur while trying to validate the metadata of a Credential Issuer.
  */
-sealed interface CredentialIssuerMetadataValidationError : CredentialIssuerMetadataError {
+sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : CredentialIssuerMetadataError(cause) {
 
     /**
      * The Id of the Credential Issuer is not valid.
      */
-    data class InvalidCredentialIssuerId(val reason: Throwable) : CredentialIssuerMetadataValidationError
+    class InvalidCredentialIssuerId(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The URL of the Authorization Server is not valid.
      */
-    data class InvalidAuthorizationServer(val reason: Throwable) : CredentialIssuerMetadataValidationError
+    class InvalidAuthorizationServer(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The URL of the Credential Endpoint is not valid.
      */
-    data class InvalidCredentialEndpoint(val reason: Throwable) : CredentialIssuerMetadataValidationError
+    class InvalidCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The URL of the Batch Credential Endpoint is not valid.
      */
-    data class InvalidBatchCredentialEndpoint(val reason: Throwable) : CredentialIssuerMetadataValidationError
+    class InvalidBatchCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The URL of the Deferred Credential Endpoint is not valid.
      */
-    data class InvalidDeferredCredentialEndpoint(val reason: Throwable) : CredentialIssuerMetadataValidationError
+    class InvalidDeferredCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The supported Credential Encryption Algorithms are not valid.
      */
-    data class InvalidCredentialResponseEncryptionAlgorithmsSupported(val reason: Throwable) :
-        CredentialIssuerMetadataValidationError
+    class InvalidCredentialResponseEncryptionAlgorithmsSupported(cause: Throwable) :
+        CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The supported Credential Encryption Methods are not valid.
      */
-    data class InvalidCredentialResponseEncryptionMethodsSupported(val reason: Throwable) :
-        CredentialIssuerMetadataValidationError
+    class InvalidCredentialResponseEncryptionMethodsSupported(cause: Throwable) :
+        CredentialIssuerMetadataValidationError(cause)
 
     /**
      * Credential Encryption Algorithms are required.
      */
-    data object CredentialResponseEncryptionAlgorithmsRequired : CredentialIssuerMetadataValidationError {
+    object CredentialResponseEncryptionAlgorithmsRequired :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("Credential ResponseEncryption Algorithms Required")) {
 
         private fun readResolve(): Any = CredentialResponseEncryptionAlgorithmsRequired
     }
@@ -277,12 +276,13 @@ sealed interface CredentialIssuerMetadataValidationError : CredentialIssuerMetad
     /**
      * The supported Credentials not valid.
      */
-    data class InvalidCredentialsSupported(val reason: Throwable) : CredentialIssuerMetadataValidationError
+    class InvalidCredentialsSupported(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * Supported Credentials are required.
      */
-    data object CredentialsSupportedRequired : CredentialIssuerMetadataValidationError {
+    object CredentialsSupportedRequired :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("Credentials Supported Required")) {
 
         private fun readResolve(): Any = CredentialsSupportedRequired
     }
@@ -290,7 +290,7 @@ sealed interface CredentialIssuerMetadataValidationError : CredentialIssuerMetad
     /**
      * Display is not valid.
      */
-    data class InvalidDisplay(val reason: Throwable) : CredentialIssuerMetadataValidationError
+    class InvalidDisplay(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 }
 
 /**
