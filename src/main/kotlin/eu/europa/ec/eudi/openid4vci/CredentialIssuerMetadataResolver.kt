@@ -32,7 +32,7 @@ import java.io.Serializable
 import java.util.*
 
 sealed interface CredentialResponseEncryption {
-    object NotRequired : CredentialResponseEncryption {
+    data object NotRequired : CredentialResponseEncryption {
         override fun toString(): String = "NotRequired"
     }
 
@@ -115,7 +115,7 @@ data class Claim(
     ) : java.io.Serializable
 }
 
-object LocaleSerializer : KSerializer<Locale> {
+internal object LocaleSerializer : KSerializer<Locale> {
 
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Locale", PrimitiveKind.STRING)
 
@@ -146,25 +146,22 @@ sealed interface CryptographicBindingMethod : java.io.Serializable {
     /**
      * JWK format.
      */
-    object JWK : CryptographicBindingMethod {
+    data object JWK : CryptographicBindingMethod {
         private fun readResolve(): Any = JWK
-        override fun toString(): String = "JWK"
     }
 
     /**
      * COSE Key object.
      */
-    object COSE : CryptographicBindingMethod {
+    data object COSE : CryptographicBindingMethod {
         private fun readResolve(): Any = COSE
-        override fun toString(): String = "COSE"
     }
 
     /**
      * MSO.
      */
-    object MSO : CryptographicBindingMethod {
+    data object MSO : CryptographicBindingMethod {
         private fun readResolve(): Any = MSO
-        override fun toString(): String = "MSO"
     }
 
     /**
@@ -225,11 +222,6 @@ sealed interface CredentialIssuerMetadataError : Serializable {
      * Wraps this [CredentialIssuerMetadataError] to a [CredentialIssuerMetadataException].
      */
     fun toException(): CredentialIssuerMetadataException = CredentialIssuerMetadataException(this)
-
-    /**
-     * Wraps this [CredentialIssuerMetadataError] and throws it as a [CredentialIssuerMetadataException].
-     */
-    fun raise(): Nothing = throw toException()
 }
 
 /**
@@ -277,11 +269,9 @@ sealed interface CredentialIssuerMetadataValidationError : CredentialIssuerMetad
     /**
      * Credential Encryption Algorithms are required.
      */
-    object CredentialResponseEncryptionAlgorithmsRequired : CredentialIssuerMetadataValidationError {
+    data object CredentialResponseEncryptionAlgorithmsRequired : CredentialIssuerMetadataValidationError {
 
         private fun readResolve(): Any = CredentialResponseEncryptionAlgorithmsRequired
-
-        override fun toString(): String = "CredentialResponseEncryptionAlgorithmsRequired"
     }
 
     /**
@@ -292,11 +282,9 @@ sealed interface CredentialIssuerMetadataValidationError : CredentialIssuerMetad
     /**
      * Supported Credentials are required.
      */
-    object CredentialsSupportedRequired : CredentialIssuerMetadataValidationError {
+    data object CredentialsSupportedRequired : CredentialIssuerMetadataValidationError {
 
         private fun readResolve(): Any = CredentialsSupportedRequired
-
-        override fun toString(): String = "CredentialsSupportedRequired"
     }
 
     /**
