@@ -21,12 +21,13 @@ import io.ktor.server.request.*
 import kotlinx.coroutines.runBlocking
 import org.hamcrest.MatcherAssert.assertThat
 import org.junit.jupiter.api.Assertions
-import org.junit.jupiter.api.Assertions.fail
+
 import java.net.URI
 import java.net.URLEncoder
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.fail
 
 class IssuanceAuthorizationTest {
 

@@ -22,6 +22,7 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 
@@ -33,167 +34,151 @@ internal class DefaultCredentialIssuerMetadataResolver(
     private val httpGet: HttpGet<String>,
 ) : CredentialIssuerMetadataResolver {
 
-    override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> = runCatching {
-        val credentialIssuerMetadataContent = runCatching {
-            val url =
-                URLBuilder(issuer.value.value.toString())
-                    .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
-                    .build()
-                    .toURI()
-                    .toURL()
+    override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> = coroutineScope {
+        runCatching {
+            val credentialIssuerMetadataContent = try {
+                val url =
+                    URLBuilder(issuer.value.value.toString())
+                        .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
+                        .build()
+                        .toURI()
+                        .toURL()
 
-            withContext(ioCoroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
-                httpGet.get(url).getOrThrow()
-            }
-        }.getOrElse { CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(it).raise() }
-
-        val credentialIssuerMetadataObject = runCatching {
-            Json.decodeFromString<CredentialIssuerMetadataTO>(credentialIssuerMetadataContent)
-        }.getOrElse { CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(it).raise() }
-
-        credentialIssuerMetadataObject.toDomain()
-            .also {
-                if (it.credentialIssuerIdentifier != issuer) {
-                    InvalidCredentialIssuerId(
-                        IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
-                    ).raise()
+                withContext(ioCoroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
+                    httpGet.get(url).getOrThrow()
                 }
-            }
-    }
-
-    companion object {
-
-        /**
-         * Converts and validates  a [CredentialIssuerMetadataTO] as a [CredentialIssuerMetadata] instance.
-         */
-        private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
-            val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
-                .getOrElse { InvalidCredentialIssuerId(it).raise() }
-
-            val authorizationServer =
-                authorizationServer
-                    ?.let {
-                        HttpsUrl(it).getOrElse { error ->
-                            InvalidAuthorizationServer(error).raise()
-                        }
-                    }
-                    ?: credentialIssuerIdentifier.value
-
-            val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
-                .getOrElse { InvalidCredentialEndpoint(it).raise() }
-
-            val batchCredentialEndpoint =
-                batchCredentialEndpoint
-                    ?.let {
-                        CredentialIssuerEndpoint(it).getOrElse { error ->
-                            InvalidBatchCredentialEndpoint(error).raise()
-                        }
-                    }
-
-            val deferredCredentialEndpoint =
-                deferredCredentialEndpoint
-                    ?.let {
-                        CredentialIssuerEndpoint(it).getOrElse { error ->
-                            InvalidDeferredCredentialEndpoint(error).raise()
-                        }
-                    }
-
-            fun credentialResponseEncryption(): Result<CredentialResponseEncryption> = runCatching {
-                val requireEncryption = requireCredentialResponseEncryption ?: false
-                val encryptionAlgorithms = try {
-                    credentialResponseEncryptionAlgorithmsSupported?.map { JWEAlgorithm.parse(it) } ?: emptyList()
-                } catch (it: Throwable) {
-                    InvalidCredentialResponseEncryptionAlgorithmsSupported(it).raise()
-                }
-                val encryptionMethods = try {
-                    credentialResponseEncryptionMethodsSupported?.map { EncryptionMethod.parse(it) } ?: emptyList()
-                } catch (it: Throwable) {
-                    InvalidCredentialResponseEncryptionMethodsSupported(it).raise()
-                }
-
-                if (requireEncryption) {
-                    if (encryptionAlgorithms.isEmpty()) {
-                        CredentialResponseEncryptionAlgorithmsRequired.raise()
-                    }
-
-                    CredentialResponseEncryption.Required(
-                        encryptionAlgorithms,
-                        encryptionMethods,
-                    )
-                } else {
-                    require(encryptionAlgorithms.isEmpty())
-                    require(encryptionMethods.isEmpty())
-                    CredentialResponseEncryption.NotRequired
-                }
+            } catch (t: Throwable) {
+                throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
             }
 
-            val credentialsSupported = runCatching {
-                credentialsSupported
-                    .map { it.toCredentialSupportedObject() }
-                    .map { it.toDomain() }
-            }.getOrElse { InvalidCredentialsSupported(it).raise() }
-                .ifEmpty {
-                    CredentialsSupportedRequired.raise()
-                }
+            val credentialIssuerMetadataObject = try {
+                Json.decodeFromString<CredentialIssuerMetadataTO>(credentialIssuerMetadataContent)
+            } catch (t: Throwable) {
+                throw CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(t)
+            }
 
-            val display = runCatching {
-                display?.map { it.toDomain() } ?: emptyList()
-            }.getOrElse { InvalidDisplay(it).raise() }
+            val result = credentialIssuerMetadataObject.toDomain().getOrThrow()
 
-            return CredentialIssuerMetadata(
-                credentialIssuerIdentifier,
-                authorizationServer,
-                credentialEndpoint,
-                batchCredentialEndpoint,
-                deferredCredentialEndpoint,
-                credentialResponseEncryption().getOrThrow(),
-                credentialsSupported,
-                display,
-            )
+            if (result.credentialIssuerIdentifier != issuer) {
+                throw InvalidCredentialIssuerId(
+                    IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
+                )
+            }
+            result
         }
-
-        /**
-         * Converts a [JsonObject] to a [CredentialSupportedTO].
-         */
-        private fun JsonObject.toCredentialSupportedObject(): CredentialSupportedTO {
-            val format =
-                getOrDefault("format", JsonNull).let {
-                    if (it is JsonPrimitive && it.isString) {
-                        it.content
-                    } else {
-                        throw IllegalArgumentException("'format' must be a JsonPrimitive that contains a string")
-                    }
-                }
-
-            return when (format) {
-                W3CSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CSignedJwtProfile.CredentialSupportedTO>(
-                    this,
-                )
-
-                W3CJsonLdSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdSignedJwtProfile.CredentialSupportedTO>(
-                    this,
-                )
-
-                W3CJsonLdDataIntegrityProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdDataIntegrityProfile.CredentialSupportedTO>(
-                    this,
-                )
-
-                MsoMdocProfile.FORMAT -> Json.decodeFromJsonElement<MsoMdocProfile.CredentialSupportedTO>(
-                    this,
-                )
-
-                SdJwtVcProfile.FORMAT -> Json.decodeFromJsonElement<SdJwtVcProfile.CredentialSupportedObject>(
-                    this,
-                )
-
-                else -> throw IllegalArgumentException("Unsupported Credential format '$format'")
-            }
-        }
-
-        /**
-         * Converts a [CredentialIssuerMetadataTO.DisplayTO] to a [CredentialIssuerMetadata.Display] instance.
-         */
-        private fun CredentialIssuerMetadataTO.DisplayTO.toDomain(): CredentialIssuerMetadata.Display =
-            CredentialIssuerMetadata.Display(name, locale)
     }
 }
+
+/**
+ * Converts and validates  a [CredentialIssuerMetadataTO] as a [CredentialIssuerMetadata] instance.
+ */
+private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetadata> = runCatching {
+    val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
+        .getOrThrowAs { InvalidCredentialIssuerId(it) }
+
+    val authorizationServer = authorizationServer
+        ?.let { HttpsUrl(it).getOrThrowAs(::InvalidAuthorizationServer) }
+        ?: credentialIssuerIdentifier.value
+
+    val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
+        .getOrThrowAs(::InvalidCredentialEndpoint)
+
+    val batchCredentialEndpoint = batchCredentialEndpoint
+        ?.let { CredentialIssuerEndpoint(it).getOrThrowAs(::InvalidBatchCredentialEndpoint) }
+
+    val deferredCredentialEndpoint = deferredCredentialEndpoint
+        ?.let { CredentialIssuerEndpoint(it).getOrThrowAs(::InvalidDeferredCredentialEndpoint) }
+
+    fun credentialResponseEncryption(): Result<CredentialResponseEncryption> = runCatching {
+        val requireEncryption = requireCredentialResponseEncryption ?: false
+        val encryptionAlgorithms = credentialResponseEncryptionAlgorithmsSupported
+            ?.map { JWEAlgorithm.parse(it) }
+            ?: emptyList()
+        val encryptionMethods = credentialResponseEncryptionMethodsSupported
+            ?.map { EncryptionMethod.parse(it) }
+            ?: emptyList()
+
+        if (requireEncryption) {
+            if (encryptionAlgorithms.isEmpty()) {
+                throw CredentialResponseEncryptionAlgorithmsRequired
+            }
+
+            CredentialResponseEncryption.Required(
+                encryptionAlgorithms,
+                encryptionMethods,
+            )
+        } else {
+            require(encryptionAlgorithms.isEmpty())
+            require(encryptionMethods.isEmpty())
+            CredentialResponseEncryption.NotRequired
+        }
+    }
+
+    val credentialsSupported = try {
+        credentialsSupported.map { it.toCredentialSupportedObject().getOrThrow().toDomain() }
+    } catch (it: Throwable) {
+        throw InvalidCredentialsSupported(it)
+    }.apply {
+        ifEmpty { throw CredentialsSupportedRequired }
+    }
+
+    val display = display?.map { it.toDomain() } ?: emptyList()
+
+    CredentialIssuerMetadata(
+        credentialIssuerIdentifier,
+        authorizationServer,
+        credentialEndpoint,
+        batchCredentialEndpoint,
+        deferredCredentialEndpoint,
+        credentialResponseEncryption().getOrThrow(),
+        credentialsSupported,
+        display,
+    )
+}
+
+/**
+ * Converts a [JsonObject] to a [CredentialSupportedTO].
+ */
+private fun JsonObject.toCredentialSupportedObject(): Result<CredentialSupportedTO> = runCatching {
+    val format =
+        getOrDefault("format", JsonNull).let { jsonElement ->
+
+            require(jsonElement is JsonPrimitive && jsonElement.isString) {
+                "'format' must be a JsonPrimitive that contains a string"
+            }
+            jsonElement.content
+        }
+
+    when (format) {
+        W3CSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CSignedJwtProfile.CredentialSupportedTO>(
+            this,
+        )
+
+        W3CJsonLdSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdSignedJwtProfile.CredentialSupportedTO>(
+            this,
+        )
+
+        W3CJsonLdDataIntegrityProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdDataIntegrityProfile.CredentialSupportedTO>(
+            this,
+        )
+
+        MsoMdocProfile.FORMAT -> Json.decodeFromJsonElement<MsoMdocProfile.CredentialSupportedTO>(
+            this,
+        )
+
+        SdJwtVcProfile.FORMAT -> Json.decodeFromJsonElement<SdJwtVcProfile.CredentialSupportedObject>(
+            this,
+        )
+
+        else -> throw IllegalArgumentException("Unsupported Credential format '$format'")
+    }
+}
+
+/**
+ * Converts a [CredentialIssuerMetadataTO.DisplayTO] to a [CredentialIssuerMetadata.Display] instance.
+ */
+private fun CredentialIssuerMetadataTO.DisplayTO.toDomain(): CredentialIssuerMetadata.Display =
+    CredentialIssuerMetadata.Display(name, locale)
+
+private fun <T> Result<T>.getOrThrowAs(f: (Throwable) -> Throwable): T =
+    fold(onSuccess = { it }, onFailure = { throw f(it) })
