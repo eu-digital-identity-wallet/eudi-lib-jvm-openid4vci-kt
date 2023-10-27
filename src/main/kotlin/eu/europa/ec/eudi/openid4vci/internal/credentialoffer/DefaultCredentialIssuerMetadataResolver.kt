@@ -22,6 +22,7 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 
@@ -33,32 +34,37 @@ internal class DefaultCredentialIssuerMetadataResolver(
     private val httpGet: HttpGet<String>,
 ) : CredentialIssuerMetadataResolver {
 
-    override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> = runCatching {
-        val credentialIssuerMetadataContent = runCatching {
-            val url =
-                URLBuilder(issuer.value.value.toString())
-                    .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
-                    .build()
-                    .toURI()
-                    .toURL()
+    override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> = coroutineScope {
+        runCatching {
+            val credentialIssuerMetadataContent = try {
+                val url =
+                    URLBuilder(issuer.value.value.toString())
+                        .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
+                        .build()
+                        .toURI()
+                        .toURL()
 
-            withContext(ioCoroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
-                httpGet.get(url).getOrThrow()
+                withContext(ioCoroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
+                    httpGet.get(url).getOrThrow()
+                }
+            } catch (t: Throwable) {
+                throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
             }
-        }.getOrThrow { CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(it) }
 
-        val credentialIssuerMetadataObject = try {
-            Json.decodeFromString<CredentialIssuerMetadataTO>(credentialIssuerMetadataContent)
-        } catch (t: Throwable) {
-            throw CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(t)
-        }
+            val credentialIssuerMetadataObject = try {
+                Json.decodeFromString<CredentialIssuerMetadataTO>(credentialIssuerMetadataContent)
+            } catch (t: Throwable) {
+                throw CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(t)
+            }
 
-        credentialIssuerMetadataObject.toDomain().apply {
-            if (credentialIssuerIdentifier != issuer) {
+            val result = credentialIssuerMetadataObject.toDomain().getOrThrow()
+
+            if (result.credentialIssuerIdentifier != issuer) {
                 throw InvalidCredentialIssuerId(
                     IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
                 )
             }
+            result
         }
     }
 }
@@ -66,43 +72,31 @@ internal class DefaultCredentialIssuerMetadataResolver(
 /**
  * Converts and validates  a [CredentialIssuerMetadataTO] as a [CredentialIssuerMetadata] instance.
  */
-private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
+private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetadata> = runCatching {
     val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
-        .getOrThrow { InvalidCredentialIssuerId(it) }
+        .getOrThrowAs { InvalidCredentialIssuerId(it) }
 
-    val authorizationServer =
-        authorizationServer
-            ?.let {
-                HttpsUrl(it).getOrElse { error ->
-                    throw InvalidAuthorizationServer(error)
-                }
-            }
-            ?: credentialIssuerIdentifier.value
+    val authorizationServer = authorizationServer
+        ?.let { HttpsUrl(it).getOrThrowAs(::InvalidAuthorizationServer) }
+        ?: credentialIssuerIdentifier.value
 
     val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
-        .getOrThrow(::InvalidCredentialEndpoint)
+        .getOrThrowAs(::InvalidCredentialEndpoint)
 
-    val batchCredentialEndpoint =
-        batchCredentialEndpoint
-            ?.let {
-                CredentialIssuerEndpoint(it).getOrThrow(::InvalidBatchCredentialEndpoint)
-            }
+    val batchCredentialEndpoint = batchCredentialEndpoint
+        ?.let { CredentialIssuerEndpoint(it).getOrThrowAs(::InvalidBatchCredentialEndpoint) }
 
-    val deferredCredentialEndpoint =
-        deferredCredentialEndpoint
-            ?.let {
-                CredentialIssuerEndpoint(it).getOrThrow(::InvalidDeferredCredentialEndpoint)
-            }
+    val deferredCredentialEndpoint = deferredCredentialEndpoint
+        ?.let { CredentialIssuerEndpoint(it).getOrThrowAs(::InvalidDeferredCredentialEndpoint) }
 
     fun credentialResponseEncryption(): Result<CredentialResponseEncryption> = runCatching {
         val requireEncryption = requireCredentialResponseEncryption ?: false
-        val encryptionAlgorithms =
-            credentialResponseEncryptionAlgorithmsSupported?.map {
-                JWEAlgorithm.parse(it)
-            } ?: emptyList()
-
-        val encryptionMethods =
-            credentialResponseEncryptionMethodsSupported?.map { EncryptionMethod.parse(it) } ?: emptyList()
+        val encryptionAlgorithms = credentialResponseEncryptionAlgorithmsSupported
+            ?.map { JWEAlgorithm.parse(it) }
+            ?: emptyList()
+        val encryptionMethods = credentialResponseEncryptionMethodsSupported
+            ?.map { EncryptionMethod.parse(it) }
+            ?: emptyList()
 
         if (requireEncryption) {
             if (encryptionAlgorithms.isEmpty()) {
@@ -130,7 +124,7 @@ private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
 
     val display = display?.map { it.toDomain() } ?: emptyList()
 
-    return CredentialIssuerMetadata(
+    CredentialIssuerMetadata(
         credentialIssuerIdentifier,
         authorizationServer,
         credentialEndpoint,
@@ -186,5 +180,5 @@ private fun JsonObject.toCredentialSupportedObject(): Result<CredentialSupported
 private fun CredentialIssuerMetadataTO.DisplayTO.toDomain(): CredentialIssuerMetadata.Display =
     CredentialIssuerMetadata.Display(name, locale)
 
-private fun <T> Result<T>.getOrThrow(f: (Throwable) -> Throwable): T =
+private fun <T> Result<T>.getOrThrowAs(f: (Throwable) -> Throwable): T =
     fold(onSuccess = { it }, onFailure = { throw f(it) })
