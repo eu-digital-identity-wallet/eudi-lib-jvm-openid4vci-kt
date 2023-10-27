@@ -20,7 +20,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
-import java.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * A default implementation for [CredentialOfferRequestResolver].
@@ -93,7 +93,7 @@ internal class DefaultCredentialOfferRequestResolver(
                     Grants.PreAuthorizedCode(
                         it.preAuthorizedCode,
                         it.pinRequired ?: false,
-                        it.interval?.let { interval -> Duration.ofSeconds(interval) } ?: Duration.ofSeconds(5L),
+                        it.interval?.seconds ?: 5.seconds,
                     )
                 }
 
