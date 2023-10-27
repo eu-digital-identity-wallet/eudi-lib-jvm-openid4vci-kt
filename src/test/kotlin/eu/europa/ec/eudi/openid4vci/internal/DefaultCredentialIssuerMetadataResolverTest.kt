@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataResolver
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions
@@ -41,11 +40,9 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                     .fold(
                         { Assertions.fail("CredentialIssuerMetadata resolution should have failed") },
                         {
-                            val exception =
-                                Assertions.assertInstanceOf(CredentialIssuerMetadataException::class.java, it)
                             Assertions.assertInstanceOf(
                                 CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata::class.java,
-                                exception.error,
+                                it,
                             )
                         },
                     )
@@ -74,11 +71,9 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                     .fold(
                         { Assertions.fail("CredentialIssuerMetadata resolution should have failed") },
                         {
-                            val exception =
-                                Assertions.assertInstanceOf(CredentialIssuerMetadataException::class.java, it)
                             Assertions.assertInstanceOf(
                                 CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata::class.java,
-                                exception.error,
+                                it,
                             )
                         },
                     )
@@ -109,11 +104,9 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                     .fold(
                         { Assertions.fail("CredentialIssuerMetadata resolution should have failed") },
                         {
-                            val exception =
-                                Assertions.assertInstanceOf(CredentialIssuerMetadataException::class.java, it)
                             Assertions.assertInstanceOf(
                                 CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId::class.java,
-                                exception.error,
+                                it,
                             )
                         },
                     )

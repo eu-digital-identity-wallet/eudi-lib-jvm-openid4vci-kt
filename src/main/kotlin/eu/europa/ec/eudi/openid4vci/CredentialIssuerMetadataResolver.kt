@@ -215,11 +215,6 @@ sealed class CredentialIssuerMetadataError(cause: Throwable) : Throwable(cause),
      * Indicates the Credential Issuer metadata could not be parsed.
      */
     class NonParseableCredentialIssuerMetadata(cause: Throwable) : CredentialIssuerMetadataError(cause)
-
-    /**
-     * Wraps this [CredentialIssuerMetadataError] to a [CredentialIssuerMetadataException].
-     */
-    fun toException(): Throwable = CredentialIssuerMetadataException(this)
 }
 
 /**

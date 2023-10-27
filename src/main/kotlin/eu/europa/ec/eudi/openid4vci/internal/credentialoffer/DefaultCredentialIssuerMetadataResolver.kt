@@ -45,18 +45,18 @@ internal class DefaultCredentialIssuerMetadataResolver(
             withContext(ioCoroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
                 httpGet.get(url).getOrThrow()
             }
-        }.getOrElse { throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(it).toException() }
+        }.getOrElse { throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(it) }
 
         val credentialIssuerMetadataObject = runCatching {
             Json.decodeFromString<CredentialIssuerMetadataTO>(credentialIssuerMetadataContent)
-        }.getOrElse { throw CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(it).toException() }
+        }.getOrElse { throw CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(it) }
 
         credentialIssuerMetadataObject.toDomain()
             .also {
                 if (it.credentialIssuerIdentifier != issuer) {
                     throw InvalidCredentialIssuerId(
                         IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
-                    ).toException()
+                    )
                 }
             }
     }
@@ -68,25 +68,25 @@ internal class DefaultCredentialIssuerMetadataResolver(
          */
         private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
             val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
-                .getOrElse { throw InvalidCredentialIssuerId(it).toException() }
+                .getOrElse { throw InvalidCredentialIssuerId(it) }
 
             val authorizationServer =
                 authorizationServer
                     ?.let {
                         HttpsUrl(it).getOrElse { error ->
-                            throw InvalidAuthorizationServer(error).toException()
+                            throw InvalidAuthorizationServer(error)
                         }
                     }
                     ?: credentialIssuerIdentifier.value
 
             val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
-                .getOrElse { throw InvalidCredentialEndpoint(it).toException() }
+                .getOrElse { throw InvalidCredentialEndpoint(it) }
 
             val batchCredentialEndpoint =
                 batchCredentialEndpoint
                     ?.let {
                         CredentialIssuerEndpoint(it).getOrElse { error ->
-                            throw InvalidBatchCredentialEndpoint(error).toException()
+                            throw InvalidBatchCredentialEndpoint(error)
                         }
                     }
 
@@ -94,7 +94,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 deferredCredentialEndpoint
                     ?.let {
                         CredentialIssuerEndpoint(it).getOrElse { error ->
-                            throw InvalidDeferredCredentialEndpoint(error).toException()
+                            throw InvalidDeferredCredentialEndpoint(error)
                         }
                     }
 
@@ -103,17 +103,17 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 val encryptionAlgorithms = try {
                     credentialResponseEncryptionAlgorithmsSupported?.map { JWEAlgorithm.parse(it) } ?: emptyList()
                 } catch (it: Throwable) {
-                    throw InvalidCredentialResponseEncryptionAlgorithmsSupported(it).toException()
+                    throw InvalidCredentialResponseEncryptionAlgorithmsSupported(it)
                 }
                 val encryptionMethods = try {
                     credentialResponseEncryptionMethodsSupported?.map { EncryptionMethod.parse(it) } ?: emptyList()
                 } catch (it: Throwable) {
-                    throw InvalidCredentialResponseEncryptionMethodsSupported(it).toException()
+                    throw InvalidCredentialResponseEncryptionMethodsSupported(it)
                 }
 
                 if (requireEncryption) {
                     if (encryptionAlgorithms.isEmpty()) {
-                        throw CredentialResponseEncryptionAlgorithmsRequired.toException()
+                        throw CredentialResponseEncryptionAlgorithmsRequired
                     }
 
                     CredentialResponseEncryption.Required(
@@ -131,14 +131,14 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 credentialsSupported
                     .map { it.toCredentialSupportedObject() }
                     .map { it.toDomain() }
-            }.getOrElse { throw InvalidCredentialsSupported(it).toException() }
+            }.getOrElse { throw InvalidCredentialsSupported(it) }
                 .ifEmpty {
-                    throw CredentialsSupportedRequired.toException()
+                    throw CredentialsSupportedRequired
                 }
 
             val display = runCatching {
                 display?.map { it.toDomain() } ?: emptyList()
-            }.getOrElse { throw InvalidDisplay(it).toException() }
+            }.getOrElse { throw InvalidDisplay(it) }
 
             return CredentialIssuerMetadata(
                 credentialIssuerIdentifier,
