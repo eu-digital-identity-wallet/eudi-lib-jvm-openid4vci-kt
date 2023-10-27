@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialIssuerMetadataResolver
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,22 @@ import kotlinx.serialization.encoding.Encoder
 import java.io.Serializable
 import java.util.*
 
+sealed interface CredentialResponseEncryption {
+    object NotRequired : CredentialResponseEncryption {
+        override fun toString(): String = "NotRequired"
+    }
+
+    data class Required(
+        val algorithmsSupported: List<JWEAlgorithm>,
+        val encryptionMethodsSupported: List<EncryptionMethod>,
+    ) : CredentialResponseEncryption {
+        init {
+            require(algorithmsSupported.isNotEmpty()) { "algorithmsSupported cannot be empty" }
+            require(encryptionMethodsSupported.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
+        }
+    }
+}
+
 /**
  * The metadata of a Credential Issuer.
  */
@@ -39,18 +56,12 @@ data class CredentialIssuerMetadata(
     val credentialEndpoint: CredentialIssuerEndpoint,
     val batchCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
-    val credentialResponseEncryptionAlgorithmsSupported: List<JWEAlgorithm> = emptyList(),
-    val credentialResponseEncryptionMethodsSupported: List<EncryptionMethod> = emptyList(),
-    val requireCredentialResponseEncryption: Boolean = false,
+    val credentialResponseEncryption: CredentialResponseEncryption = NotRequired,
     val credentialsSupported: List<CredentialSupported>,
     val display: List<Display> = emptyList(),
 ) : java.io.Serializable {
+
     init {
-        if (requireCredentialResponseEncryption) {
-            require(credentialResponseEncryptionAlgorithmsSupported.isNotEmpty()) {
-                "credentialResponseEncryptionAlgorithmsSupported are required"
-            }
-        }
         require(credentialsSupported.isNotEmpty()) { "credentialsSupported must not be empty" }
     }
 

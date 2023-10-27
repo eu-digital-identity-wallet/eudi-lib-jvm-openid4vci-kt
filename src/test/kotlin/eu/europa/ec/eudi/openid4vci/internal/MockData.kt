@@ -163,7 +163,10 @@ internal fun universityDegreeLdpVc() =
             "UniversityDegreeCredential_LDP_VC",
         ),
         W3CJsonLdDataIntegrityProfile.CredentialSupported.CredentialDefinition(
-            listOf(URL("https://www.w3.org/2018/credentials/v1"), URL("https://www.w3.org/2018/credentials/examples/v1")),
+            listOf(
+                URL("https://www.w3.org/2018/credentials/v1"),
+                URL("https://www.w3.org/2018/credentials/examples/v1"),
+            ),
             listOf("VerifiableCredential_LDP_VC", "UniversityDegreeCredential_LDP_VC"),
             mapOf(
                 "given_name" to Claim(
@@ -252,9 +255,10 @@ internal fun credentialIssuerMetadata() =
         CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials").getOrThrow(),
         CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/batch").getOrThrow(),
         CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/deferred").getOrThrow(),
-        listOf(JWEAlgorithm.PBES2_HS512_A256KW, JWEAlgorithm.PBES2_HS384_A192KW, JWEAlgorithm.PBES2_HS256_A128KW),
-        listOf(EncryptionMethod.XC20P),
-        true,
+        CredentialResponseEncryption.Required(
+            listOf(JWEAlgorithm.PBES2_HS512_A256KW, JWEAlgorithm.PBES2_HS384_A192KW, JWEAlgorithm.PBES2_HS256_A128KW),
+            listOf(EncryptionMethod.XC20P),
+        ),
         listOf(universityDegreeJwt(), mobileDrivingLicense(), universityDegreeLdpVc()),
         listOf(CredentialIssuerMetadata.Display("credential-issuer.example.com", "en-US")),
     )
