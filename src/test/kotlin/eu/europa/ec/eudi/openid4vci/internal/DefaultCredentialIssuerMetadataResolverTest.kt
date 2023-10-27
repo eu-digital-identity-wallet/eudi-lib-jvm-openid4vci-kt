@@ -18,8 +18,10 @@ package eu.europa.ec.eudi.openid4vci.internal
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.Assertions
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.fail
 
 internal class DefaultCredentialIssuerMetadataResolverTest {
 
@@ -28,8 +30,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         runBlocking {
             mockEngine(
                 verifier = {
-                    Assertions.assertEquals(1, it.size)
-                    Assertions.assertEquals(
+                    assertEquals(1, it.size)
+                    assertEquals(
                         credentialIssuerMetadataUrl().value,
                         it[0].url.toURI(),
                     )
@@ -38,12 +40,9 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                 CredentialIssuerMetadataResolver(httpGet = httpGet)
                     .resolve(credentialIssuerId())
                     .fold(
-                        { Assertions.fail("CredentialIssuerMetadata resolution should have failed") },
+                        { fail("CredentialIssuerMetadata resolution should have failed") },
                         {
-                            Assertions.assertInstanceOf(
-                                CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata::class.java,
-                                it,
-                            )
+                            assertIs<CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata>(it)
                         },
                     )
             }
@@ -59,8 +58,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/invalid_credential_issuer_metadata.json"),
                 ),
                 verifier = {
-                    Assertions.assertEquals(1, it.size)
-                    Assertions.assertEquals(
+                    assertEquals(1, it.size)
+                    assertEquals(
                         credentialIssuerMetadataUrl().value,
                         it[0].url.toURI(),
                     )
@@ -69,12 +68,9 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                 CredentialIssuerMetadataResolver(httpGet = httpGet)
                     .resolve(credentialIssuerId())
                     .fold(
-                        { Assertions.fail("CredentialIssuerMetadata resolution should have failed") },
+                        { fail("CredentialIssuerMetadata resolution should have failed") },
                         {
-                            Assertions.assertInstanceOf(
-                                CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata::class.java,
-                                it,
-                            )
+                            assertIs<CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata>(it)
                         },
                     )
             }
@@ -92,8 +88,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 verifier = {
-                    Assertions.assertEquals(1, it.size)
-                    Assertions.assertEquals(
+                    assertEquals(1, it.size)
+                    assertEquals(
                         credentialIssuerMetadataUrl.value,
                         it[0].url.toURI(),
                     )
@@ -102,12 +98,9 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                 CredentialIssuerMetadataResolver(httpGet = httpGet)
                     .resolve(credentialIssuerId)
                     .fold(
-                        { Assertions.fail("CredentialIssuerMetadata resolution should have failed") },
+                        { fail("CredentialIssuerMetadata resolution should have failed") },
                         {
-                            Assertions.assertInstanceOf(
-                                CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId::class.java,
-                                it,
-                            )
+                            assertIs<CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId>(it)
                         },
                     )
             }
@@ -126,8 +119,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
                 ),
                 verifier = {
-                    Assertions.assertEquals(1, it.size)
-                    Assertions.assertEquals(
+                    assertEquals(1, it.size)
+                    assertEquals(
                         credentialIssuerMetadataUrl.value,
                         it[0].url.toURI(),
                     )
@@ -136,8 +129,13 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                 CredentialIssuerMetadataResolver(httpGet = httpGet)
                     .resolve(credentialIssuerId)
                     .fold(
-                        { Assertions.assertEquals(credentialIssuerMetadata(), it) },
-                        { Assertions.assertEquals("CredentialIssuerMetadata resolution should have succeeded", it) },
+                        { assertEquals(credentialIssuerMetadata(), it) },
+                        {
+                            assertEquals(
+                                IllegalArgumentException("CredentialIssuerMetadata resolution should have succeeded"),
+                                it,
+                            )
+                        },
                     )
             }
         }
