@@ -20,7 +20,7 @@ import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import java.io.Serializable
-import java.time.Duration
+import kotlin.time.Duration
 
 /**
  * A Credential Offer.
@@ -80,7 +80,9 @@ sealed interface Grants : java.io.Serializable {
         val issuerState: String? = null,
     ) : Grants {
         init {
-            require(!(issuerState?.isBlank() ?: false)) { "issuerState cannot be blank" }
+            issuerState?.let {
+                require(issuerState.isNotBlank()) { "issuerState cannot be blank" }
+            }
         }
     }
 
@@ -90,10 +92,11 @@ sealed interface Grants : java.io.Serializable {
     data class PreAuthorizedCode(
         val preAuthorizedCode: String,
         val pinRequired: Boolean = false,
-        val interval: Duration = Duration.ofSeconds(5L),
+        val interval: Duration,
     ) : Grants {
         init {
             require(preAuthorizedCode.isNotBlank()) { "preAuthorizedCode cannot be blank" }
+            require(interval.isPositive()) { "interval cannot be negative or zero" }
         }
     }
 
