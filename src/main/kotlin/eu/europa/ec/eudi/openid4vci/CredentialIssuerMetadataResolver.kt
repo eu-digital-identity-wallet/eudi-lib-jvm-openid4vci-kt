@@ -289,11 +289,6 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
 }
 
 /**
- * Indicates a [CredentialOfferRequestError] occurred while trying to fetch or validate the metadata of a Credential Issuer.
- */
-data class CredentialIssuerMetadataException(val error: CredentialIssuerMetadataError) : Exception()
-
-/**
  * Service for fetching, parsing, and validating the metadata of a Credential Issuer.
  */
 internal fun interface CredentialIssuerMetadataResolver {
