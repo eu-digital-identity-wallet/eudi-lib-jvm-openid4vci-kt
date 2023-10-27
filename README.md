@@ -48,7 +48,6 @@ Section [5.1.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credenti
 
 ### Credential Request
 In the current version of the library only integrations with issuer's [Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-credential-endpoint) are supported. No support yet for the Batch and Deferred Credential Endpoints.
-This means that for cases that the credential issuance flow starts with a Credential Offer that includes multiple credentials in its credential attribute only the first one will be served.
 
 #### Encrypted Responses
 Specification defines that issuer's response to the credential request can be encrypted as specified either by the client's credential request (see [7.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-credential-request)) or the issuer's metadata (issuer metadata `require_credential_response_encryption` attribute [10.2.3](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-10.2.3)). The current version of the library does not support encrypted responses.   

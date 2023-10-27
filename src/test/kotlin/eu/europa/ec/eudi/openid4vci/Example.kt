@@ -15,8 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jwt.JWTClaimsSet
-import com.nimbusds.jwt.PlainJWT
+import com.nimbusds.jose.JWSAlgorithm
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -26,15 +25,11 @@ import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.jsoup.Jsoup
 import org.jsoup.nodes.FormElement
 import java.net.URI
 import java.net.URL
-import java.time.Instant
 
 val SdJwtVC_CredentialOffer = """
     {
@@ -61,7 +56,7 @@ val MsoMdoc_CredentialOffer = """
 """.trimIndent()
 
 fun main(): Unit = runBlocking {
-    val coUrl = "http://localhost:8080/credentialoffer?credential_offer=$MsoMdoc_CredentialOffer"
+    val coUrl = "http://localhost:8080/credentialoffer?credential_offer=$SdJwtVC_CredentialOffer"
     val wallet = Wallet.ofUser(ActingUser("babis", "babis"))
     val credential = wallet.issueOfferedCredential(coUrl)
 
@@ -77,7 +72,7 @@ private class Wallet(
     val actingUser: ActingUser,
 ) {
 
-    val vciWalletConfiguration = WalletOpenId4VCIConfig(
+    val config = WalletOpenId4VCIConfig(
         clientId = "wallet-dev",
         authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
     )
@@ -96,7 +91,7 @@ private class Wallet(
         val issuer = Issuer.ktor(
             offer.authorizationServerMetadata,
             offer.credentialIssuerMetadata,
-            vciWalletConfiguration,
+            config,
         )
 
         // Authorize with auth code flow
@@ -107,7 +102,15 @@ private class Wallet(
                 noProofRequiredSubmissionUseCase(issuer, authorized, offer)
             }
             is AuthorizedRequest.ProofRequired -> {
-                proofRequiredSubmissionUseCase(issuer, authorized, offer, authorized.cNonce.toJwtProof())
+                proofRequiredSubmissionUseCase(
+                    issuer,
+                    authorized,
+                    offer,
+                    authorized.cNonce.toJwtProof(
+                        config.clientId,
+                        offer.credentialIssuerIdentifier.value.value.toString(),
+                    ),
+                )
             }
         }
 
@@ -182,16 +185,17 @@ private class Wallet(
                         is CredentialIssuanceResponse.Result.Deferred -> result.transactionId
                     }
                 }
-
                 is SubmittedRequest.InvalidProof -> {
                     proofRequiredSubmissionUseCase(
                         issuer,
                         noProofRequiredState.handleInvalidProof(requestOutcome.cNonce),
                         offer,
-                        requestOutcome.cNonce.toJwtProof(),
+                        requestOutcome.cNonce.toJwtProof(
+                            config.clientId,
+                            offer.credentialIssuerIdentifier.value.value.toString(),
+                        ),
                     )
                 }
-
                 is SubmittedRequest.Failed -> {
                     requestOutcome.error.raise()
                 }
@@ -247,18 +251,16 @@ private class Wallet(
         return URL(action)
     }
 
-    private fun CNonce.toJwtProof(): Proof.Jwt {
-        val jsonObject =
-            buildJsonObject {
-                put("iss", "wallet_client_id")
-                put("iat", Instant.now().epochSecond)
-                put("aud", CREDENTIAL_ISSUER_PUBLIC_URL)
-                put("nonce", value)
-            }
-        val jsonStr = Json.encodeToString(jsonObject)
-        return Proof.Jwt(
-            jwt = PlainJWT(JWTClaimsSet.parse(jsonStr)),
-        )
+    private fun CNonce.toJwtProof(clientId: String, audience: String): Proof.Jwt {
+        val jwt = with(ProofBuilder.ofType(ProofType.JWT)) {
+            alg(JWSAlgorithm.RS256)
+            iss(clientId)
+            jwk(ProofBuilder.randomRSAKey())
+            aud(audience)
+            nonce(value)
+            build()
+        }
+        return Proof.Jwt(jwt)
     }
 
     companion object {
