@@ -40,7 +40,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN}}
       - name: Build with Gradle Wrapper & Run Sonar
         if: (steps.checksecrets.outputs.secretspresent == 'YES')
-        uses: gradle/gradle-build-action@v2.8.0
+        uses: gradle/gradle-build-action@v2.9.0
         with:
           gradle-version: wrapper
           arguments: test jacocoTestReport sonar --info --full-stacktrace -Dsonar.organization=${{ github.repository_owner }} -Dsonar.projectKey=${{ env.PROJECTKEY }}
