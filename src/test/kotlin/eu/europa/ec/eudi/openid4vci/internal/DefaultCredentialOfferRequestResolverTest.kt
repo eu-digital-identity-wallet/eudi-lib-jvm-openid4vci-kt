@@ -20,8 +20,11 @@ import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.apache.http.client.utils.URIBuilder
-import org.junit.jupiter.api.Assertions
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.fail
+import kotlin.time.Duration.Companion.seconds
 
 internal class DefaultCredentialOfferRequestResolverTest {
 
@@ -37,27 +40,23 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     match(oidcAuthorizationServerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
-                verifier = { Assertions.assertEquals(2, it.size) },
+                verifier = { assertEquals(2, it.size) },
             ) { httpGet ->
                 val credentialOffer =
                     getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer.json")
 
-                val universityDegreeJwt = universityDegreeJwt()
                 val mobileDrivingLicense = mobileDrivingLicense()
                 val expected = CredentialOffer(
                     credentialIssuerId(),
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        OfferedCredential.W3CVerifiableCredential.SignedJwt(
-                            universityDegreeJwt.credentialDefinition,
-                            universityDegreeJwt.scope,
-                        ),
-                        OfferedCredential.MsoMdocCredential(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                        CredentialMetadata.ByScope(Scope.of("UniversityDegree_JWT")),
+                        MsoMdocProfile.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                        Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true),
+                        Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
                     ),
                 )
 
@@ -69,17 +68,17 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     .resolve(credentialEndpointUrl.toString())
                     .fold(
                         {
-                            Assertions.assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
-                            Assertions.assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
+                            assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
+                            assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
                             // equals not implemented by OIDCProviderMetadata
-                            Assertions.assertEquals(
+                            assertEquals(
                                 expected.authorizationServerMetadata.toJSONObject(),
                                 it.authorizationServerMetadata.toJSONObject(),
                             )
-                            Assertions.assertEquals(expected.credentials, it.credentials)
-                            Assertions.assertEquals(expected.grants, it.grants)
+                            assertEquals(expected.credentials, it.credentials)
+                            assertEquals(expected.grants, it.grants)
                         },
-                        { Assertions.fail("Credential Offer resolution should have succeeded", it) },
+                        { fail("Credential Offer resolution should have succeeded", it) },
                     )
             }
         }
@@ -97,7 +96,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     match(oidcAuthorizationServerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
-                verifier = { Assertions.assertEquals(2, it.size) },
+                verifier = { assertEquals(2, it.size) },
             ) { httpGet ->
                 val credentialOffer =
                     getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/mso_mdoc_credential_offer.json")
@@ -108,11 +107,11 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        OfferedCredential.MsoMdocCredential(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                        MsoMdocProfile.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                        Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true),
+                        Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
                     ),
                 )
 
@@ -124,77 +123,77 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     .resolve(credentialEndpointUrl.toString())
                     .fold(
                         {
-                            Assertions.assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
-                            Assertions.assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
+                            assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
+                            assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
                             // equals not implemented by OIDCProviderMetadata
-                            Assertions.assertEquals(
+                            assertEquals(
                                 expected.authorizationServerMetadata.toJSONObject(),
                                 it.authorizationServerMetadata.toJSONObject(),
                             )
-                            Assertions.assertEquals(expected.credentials, it.credentials)
-                            Assertions.assertEquals(expected.grants, it.grants)
+                            assertEquals(expected.credentials, it.credentials)
+                            assertEquals(expected.grants, it.grants)
                         },
-                        { Assertions.fail("Credential Offer resolution should have succeeded", it) },
+                        { fail("Credential Offer resolution should have succeeded", it) },
                     )
             }
         }
     }
 
     @Test
-    internal fun `resolve success with jwt_vc_json`() {
-        runBlocking {
-            mockEngine(
-                RequestMocker(
-                    match(credentialIssuerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
-                ),
-                RequestMocker(
-                    match(oidcAuthorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-                ),
-                verifier = { Assertions.assertEquals(2, it.size) },
-            ) { httpGet ->
-                val credentialOffer =
-                    getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/jwt_vc_json_credential_offer.json")
+    internal fun `resolve success with jwt_vc_json`() = runBlocking {
+        mockEngine(
+            RequestMocker(
+                match(credentialIssuerMetadataUrl().value),
+                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+            ),
+            RequestMocker(
+                match(oidcAuthorizationServerMetadataUrl().value),
+                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
+            ),
+            verifier = { assertEquals(2, it.size) },
+        ) { httpGet ->
+            val credentialOffer =
+                getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/jwt_vc_json_credential_offer.json")
 
-                val universityDegreeJwt = universityDegreeJwt()
-                val expected = CredentialOffer(
-                    credentialIssuerId(),
-                    credentialIssuerMetadata(),
-                    oidcAuthorizationServerMetadata(),
-                    listOf(
-                        OfferedCredential.W3CVerifiableCredential.SignedJwt(
-                            universityDegreeJwt.credentialDefinition,
-                            universityDegreeJwt.scope,
+            val universityDegreeJwt = universityDegreeJwt()
+            val expected = CredentialOffer(
+                credentialIssuerId(),
+                credentialIssuerMetadata(),
+                oidcAuthorizationServerMetadata(),
+                listOf(
+                    W3CSignedJwtProfile.CredentialMetadata(
+                        W3CSignedJwtProfile.CredentialMetadata.CredentialDefinitionMetadata(
+                            universityDegreeJwt.credentialDefinition.type,
                         ),
+                        universityDegreeJwt.scope,
                     ),
-                    Grants.Both(
-                        Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                        Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true),
-                    ),
+                ),
+                Grants.Both(
+                    Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
+                    Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
+                ),
+            )
+
+            val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+                .addParameter("credential_offer", credentialOffer)
+                .build()
+
+            DefaultCredentialOfferRequestResolver(Dispatchers.IO, httpGet)
+                .resolve(credentialEndpointUrl.toString())
+                .fold(
+                    {
+                        assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
+                        assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
+                        // equals not implemented by OIDCProviderMetadata
+                        assertEquals(
+                            expected.authorizationServerMetadata.toJSONObject(),
+                            it.authorizationServerMetadata.toJSONObject(),
+                        )
+                        assertEquals(expected.credentials, it.credentials)
+                        assertEquals(expected.grants, it.grants)
+                    },
+                    { fail("Credential Offer resolution should have succeeded", it) },
                 )
-
-                val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
-                    .addParameter("credential_offer", credentialOffer)
-                    .build()
-
-                DefaultCredentialOfferRequestResolver(Dispatchers.IO, httpGet)
-                    .resolve(credentialEndpointUrl.toString())
-                    .fold(
-                        {
-                            Assertions.assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
-                            Assertions.assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
-                            // equals not implemented by OIDCProviderMetadata
-                            Assertions.assertEquals(
-                                expected.authorizationServerMetadata.toJSONObject(),
-                                it.authorizationServerMetadata.toJSONObject(),
-                            )
-                            Assertions.assertEquals(expected.credentials, it.credentials)
-                            Assertions.assertEquals(expected.grants, it.grants)
-                        },
-                        { Assertions.fail("Credential Offer resolution should have succeeded", it) },
-                    )
-            }
         }
     }
 
@@ -210,7 +209,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     match(oidcAuthorizationServerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
-                verifier = { Assertions.assertEquals(2, it.size) },
+                verifier = { assertEquals(2, it.size) },
             ) { httpGet ->
                 val credentialOffer =
                     getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/ldp_vc_credential_offer.json")
@@ -221,14 +220,17 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        OfferedCredential.W3CVerifiableCredential.JsonLdDataIntegrity(
-                            universityDegreeLdpVc.credentialDefinition,
+                        W3CJsonLdDataIntegrityProfile.CredentialMetadata(
+                            W3CJsonLdDataIntegrityProfile.CredentialMetadata.CredentialDefinitionMetadata(
+                                universityDegreeLdpVc.credentialDefinition.context,
+                                universityDegreeLdpVc.credentialDefinition.type,
+                            ),
                             universityDegreeLdpVc.scope,
                         ),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                        Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true),
+                        Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
                     ),
                 )
 
@@ -240,17 +242,17 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     .resolve(credentialEndpointUrl.toString())
                     .fold(
                         {
-                            Assertions.assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
-                            Assertions.assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
+                            assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
+                            assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
                             // equals not implemented by OIDCProviderMetadata
-                            Assertions.assertEquals(
+                            assertEquals(
                                 expected.authorizationServerMetadata.toJSONObject(),
                                 it.authorizationServerMetadata.toJSONObject(),
                             )
-                            Assertions.assertEquals(expected.credentials, it.credentials)
-                            Assertions.assertEquals(expected.grants, it.grants)
+                            assertEquals(expected.credentials, it.credentials)
+                            assertEquals(expected.grants, it.grants)
                         },
-                        { Assertions.fail("Credential Offer resolution should have succeeded", it) },
+                        { fail("Credential Offer resolution should have succeeded", it) },
                     )
             }
         }
@@ -268,7 +270,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     match(oidcAuthorizationServerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
-                verifier = { Assertions.assertEquals(2, it.size) },
+                verifier = { assertEquals(2, it.size) },
             ) { httpGet ->
                 val credentialOffer =
                     getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_offer_with_unknown_format.json")
@@ -280,13 +282,10 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 DefaultCredentialOfferRequestResolver(Dispatchers.IO, httpGet)
                     .resolve(credentialEndpointUrl.toString())
                     .fold(
-                        { Assertions.fail("Credential Offer resolution should have failed") },
+                        { fail("Credential Offer resolution should have failed") },
                         {
-                            val exception = Assertions.assertInstanceOf(CredentialOfferRequestException::class.java, it)
-                            Assertions.assertInstanceOf(
-                                CredentialOfferRequestValidationError.InvalidCredentials::class.java,
-                                exception.error,
-                            )
+                            val exception = assertIs<CredentialOfferRequestException>(it)
+                            assertIs<CredentialOfferRequestValidationError.InvalidCredentials>(exception.error)
                         },
                     )
             }
@@ -305,7 +304,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     match(oidcAuthorizationServerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
-                verifier = { Assertions.assertEquals(2, it.size) },
+                verifier = { assertEquals(2, it.size) },
             ) { httpGet ->
                 val credentialOffer =
                     getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_offer_with_blank_issuer_state.json")
@@ -317,11 +316,10 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 DefaultCredentialOfferRequestResolver(Dispatchers.IO, httpGet)
                     .resolve(credentialEndpointUrl.toString())
                     .fold(
-                        { Assertions.fail("Credential Offer resolution should have failed") },
+                        { fail("Credential Offer resolution should have failed") },
                         {
-                            val exception = Assertions.assertInstanceOf(CredentialOfferRequestException::class.java, it)
-                            Assertions.assertInstanceOf(
-                                CredentialOfferRequestValidationError.InvalidGrants::class.java,
+                            val exception = assertIs<CredentialOfferRequestException>(it)
+                            assertIs<CredentialOfferRequestValidationError>(
                                 exception.error,
                             )
                         },
@@ -342,7 +340,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     match(oidcAuthorizationServerMetadataUrl().value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
                 ),
-                verifier = { Assertions.assertEquals(2, it.size) },
+                verifier = { assertEquals(2, it.size) },
             ) { httpGet ->
                 val credentialOffer =
                     getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_offer_with_blank_pre_authorized_code.json")
@@ -354,11 +352,10 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 DefaultCredentialOfferRequestResolver(Dispatchers.IO, httpGet)
                     .resolve(credentialEndpointUrl.toString())
                     .fold(
-                        { Assertions.fail("Credential Offer resolution should have failed") },
+                        { fail("Credential Offer resolution should have failed") },
                         {
-                            val exception = Assertions.assertInstanceOf(CredentialOfferRequestException::class.java, it)
-                            Assertions.assertInstanceOf(
-                                CredentialOfferRequestValidationError.InvalidGrants::class.java,
+                            val exception = assertIs<CredentialOfferRequestException>(it)
+                            assertIs<CredentialOfferRequestValidationError.InvalidGrants>(
                                 exception.error,
                             )
                         },
@@ -385,28 +382,24 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     match(credentialOfferUri.value),
                     jsonResponse("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer.json"),
                 ),
-                verifier = { Assertions.assertEquals(3, it.size) },
+                verifier = { assertEquals(3, it.size) },
             ) { httpGet ->
                 val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
                     .addParameter("credential_offer_uri", credentialOfferUri.value.toString())
                     .build()
 
-                val universityDegreeJwt = universityDegreeJwt()
                 val mobileDrivingLicense = mobileDrivingLicense()
                 val expected = CredentialOffer(
                     credentialIssuerId(),
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        OfferedCredential.W3CVerifiableCredential.SignedJwt(
-                            universityDegreeJwt.credentialDefinition,
-                            universityDegreeJwt.scope,
-                        ),
-                        OfferedCredential.MsoMdocCredential(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                        CredentialMetadata.ByScope(Scope.of("UniversityDegree_JWT")),
+                        MsoMdocProfile.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                        Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true),
+                        Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
                     ),
                 )
 
@@ -414,17 +407,17 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     .resolve(credentialEndpointUrl.toString())
                     .fold(
                         {
-                            Assertions.assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
-                            Assertions.assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
+                            assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
+                            assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
                             // equals not implemented by OIDCProviderMetadata
-                            Assertions.assertEquals(
+                            assertEquals(
                                 expected.authorizationServerMetadata.toJSONObject(),
                                 it.authorizationServerMetadata.toJSONObject(),
                             )
-                            Assertions.assertEquals(expected.credentials, it.credentials)
-                            Assertions.assertEquals(expected.grants, it.grants)
+                            assertEquals(expected.credentials, it.credentials)
+                            assertEquals(expected.grants, it.grants)
                         },
-                        { Assertions.fail("Credential Offer resolution should have succeeded", it) },
+                        { fail("Credential Offer resolution should have succeeded", it) },
                     )
             }
         }

@@ -34,14 +34,9 @@ import com.nimbusds.openid.connect.sdk.claims.ClaimType
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderEndpointMetadata
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialSupported.MsoMdocCredentialCredentialSupported
-import eu.europa.ec.eudi.openid4vci.CredentialSupported.W3CVerifiableCredentialCredentialSupported.W3CVerifiableCredentialSignedJwtCredentialSupported
-import eu.europa.ec.eudi.openid4vci.CredentialSupported.W3CVerifiableCredentialCredentialSupported.W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupported
 import io.ktor.http.*
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
+import java.net.URL
 import java.util.*
 
 /**
@@ -89,7 +84,7 @@ internal fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: Http
  * Gets the 'UniversityDegree_JWT' scoped credential used throughout the tests.
  */
 internal fun universityDegreeJwt() =
-    W3CVerifiableCredentialSignedJwtCredentialSupported(
+    W3CSignedJwtProfile.CredentialSupported(
         "UniversityDegree_JWT",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("ES256K"),
@@ -107,57 +102,28 @@ internal fun universityDegreeJwt() =
                 "#FFFFFF",
             ),
         ),
-        JsonObject(
+        W3CSignedJwtProfile.CredentialSupported.CredentialDefinition(
+            listOf("VerifiableCredential", "UniversityDegreeCredential"),
             mapOf(
-                "type" to JsonArray(
-                    listOf(
-                        JsonPrimitive("VerifiableCredential"),
-                        JsonPrimitive("UniversityDegreeCredential"),
+                "given_name" to Claim(
+                    display = listOf(
+                        Claim.Display(
+                            "Given Name", Locale.forLanguageTag("en-US"),
+                        ),
                     ),
                 ),
-                "credentialSubject" to JsonObject(
-                    mapOf(
-                        "given_name" to JsonObject(
-                            mapOf(
-                                "display" to JsonArray(
-                                    listOf(
-                                        JsonObject(
-                                            mapOf(
-                                                "name" to JsonPrimitive("Given Name"),
-                                                "locale" to JsonPrimitive("en-US"),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
+                "family_name" to Claim(
+                    display = listOf(
+                        Claim.Display(
+                            "Surname", Locale.forLanguageTag("en-US"),
                         ),
-                        "family_name" to JsonObject(
-                            mapOf(
-                                "display" to JsonArray(
-                                    listOf(
-                                        JsonObject(
-                                            mapOf(
-                                                "name" to JsonPrimitive("Surname"),
-                                                "locale" to JsonPrimitive("en-US"),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                        ),
-                        "degree" to JsonObject(emptyMap()),
-                        "gpa" to JsonObject(
-                            mapOf(
-                                "display" to JsonArray(
-                                    listOf(
-                                        JsonObject(
-                                            mapOf(
-                                                "name" to JsonPrimitive("GPA"),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
+                    ),
+                ),
+                "degree" to Claim(),
+                "gpa" to Claim(
+                    display = listOf(
+                        Claim.Display(
+                            "name", Locale.forLanguageTag("GPA"),
                         ),
                     ),
                 ),
@@ -170,7 +136,7 @@ internal fun universityDegreeJwt() =
  * Gets the 'UniversityDegree_LDP_VC' scoped credential used throughout the tests.
  */
 internal fun universityDegreeLdpVc() =
-    W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupported(
+    W3CJsonLdDataIntegrityProfile.CredentialSupported(
         "UniversityDegree_LDP_VC",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("Ed25519Signature2018"),
@@ -196,63 +162,29 @@ internal fun universityDegreeLdpVc() =
             "VerifiableCredential_LDP_VC",
             "UniversityDegreeCredential_LDP_VC",
         ),
-        JsonObject(
+        W3CJsonLdDataIntegrityProfile.CredentialSupported.CredentialDefinition(
+            listOf(URL("https://www.w3.org/2018/credentials/v1"), URL("https://www.w3.org/2018/credentials/examples/v1")),
+            listOf("VerifiableCredential_LDP_VC", "UniversityDegreeCredential_LDP_VC"),
             mapOf(
-                "@context" to JsonArray(
-                    listOf(
-                        JsonPrimitive("https://www.w3.org/2018/credentials/v1"),
-                        JsonPrimitive("https://www.w3.org/2018/credentials/examples/v1"),
+                "given_name" to Claim(
+                    display = listOf(
+                        Claim.Display(
+                            "Given Name", Locale.forLanguageTag("en-US"),
+                        ),
                     ),
                 ),
-                "type" to JsonArray(
-                    listOf(
-                        JsonPrimitive("VerifiableCredential_LDP_VC"),
-                        JsonPrimitive("UniversityDegreeCredential_LDP_VC"),
+                "family_name" to Claim(
+                    display = listOf(
+                        Claim.Display(
+                            "Surname", Locale.forLanguageTag("en-US"),
+                        ),
                     ),
                 ),
-                "credentialSubject" to JsonObject(
-                    mapOf(
-                        "given_name" to JsonObject(
-                            mapOf(
-                                "display" to JsonArray(
-                                    listOf(
-                                        JsonObject(
-                                            mapOf(
-                                                "name" to JsonPrimitive("Given Name"),
-                                                "locale" to JsonPrimitive("en-US"),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                        ),
-                        "family_name" to JsonObject(
-                            mapOf(
-                                "display" to JsonArray(
-                                    listOf(
-                                        JsonObject(
-                                            mapOf(
-                                                "name" to JsonPrimitive("Surname"),
-                                                "locale" to JsonPrimitive("en-US"),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                        ),
-                        "degree" to JsonObject(emptyMap()),
-                        "gpa" to JsonObject(
-                            mapOf(
-                                "display" to JsonArray(
-                                    listOf(
-                                        JsonObject(
-                                            mapOf(
-                                                "name" to JsonPrimitive("GPA"),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
+                "degree" to Claim(),
+                "gpa" to Claim(
+                    display = listOf(
+                        Claim.Display(
+                            "name", Locale.forLanguageTag("GPA"),
                         ),
                     ),
                 ),
@@ -265,7 +197,7 @@ internal fun universityDegreeLdpVc() =
  * Gets the 'mDL' scoped credential used throughout the tests.
  */
 internal fun mobileDrivingLicense() =
-    MsoMdocCredentialCredentialSupported(
+    MsoMdocProfile.CredentialSupported(
         "mDL",
         listOf(CryptographicBindingMethod.MSO),
         listOf("ES256", "ES384", "ES512"),
@@ -286,26 +218,26 @@ internal fun mobileDrivingLicense() =
         "org.iso.18013.5.1.mDL",
         mapOf(
             "org.iso.18013.5.1" to mapOf(
-                "given_name" to MsoMdocCredentialCredentialSupported.Claim(
+                "given_name" to Claim(
                     display = listOf(
-                        MsoMdocCredentialCredentialSupported.Claim.Display(
+                        Claim.Display(
                             "Given Name",
                             Locale.forLanguageTag("en-US"),
                         ),
                     ),
                 ),
-                "family_name" to MsoMdocCredentialCredentialSupported.Claim(
+                "family_name" to Claim(
                     display = listOf(
-                        MsoMdocCredentialCredentialSupported.Claim.Display(
+                        Claim.Display(
                             "Surname",
                             Locale.forLanguageTag("en-US"),
                         ),
                     ),
                 ),
-                "birth_date" to MsoMdocCredentialCredentialSupported.Claim(),
+                "birth_date" to Claim(),
             ),
             "org.iso.18013.5.1.aamva" to mapOf(
-                "organ_donor" to MsoMdocCredentialCredentialSupported.Claim(),
+                "organ_donor" to Claim(),
             ),
         ),
     )

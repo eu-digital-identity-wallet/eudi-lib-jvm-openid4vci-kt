@@ -16,8 +16,8 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceAuthorizer
-import eu.europa.ec.eudi.openid4vci.internal.issuance.KtorHttpClientFactory
-import eu.europa.ec.eudi.openid4vci.internal.issuance.KtorIssuanceAuthorizer
+import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorHttpClientFactory
+import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorIssuanceAuthorizer
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.SerialName
@@ -42,8 +42,8 @@ sealed interface AccessTokenRequestResponse {
     data class Success(
         @SerialName("access_token") val accessToken: String,
         @SerialName("expires_in") val expiresIn: Long,
-        @SerialName("scope") val scope: String,
-        // ?? refreshToken, tokenType ??
+        @SerialName("c_nonce") val cNonce: String? = null,
+        @SerialName("c_nonce_expires_in") val cNonceExpiresIn: Long? = null,
     ) : AccessTokenRequestResponse
 
     @Serializable
@@ -53,10 +53,37 @@ sealed interface AccessTokenRequestResponse {
     ) : AccessTokenRequestResponse
 }
 
+/**
+ * Holds a https [java.net.URL] to be used at the second step of PAR flow for retrieving the authorization code.
+ * Contains the 'request_uri' retrieved from the post to PAR endpoint of authorization server and the client_id.
+ */
+class GetAuthorizationCodeURL private constructor(val url: HttpsUrl) {
+    override fun toString(): String {
+        return url.toString()
+    }
+
+    companion object {
+        val PARAM_CLIENT_ID = "client_id"
+        val PARAM_REQUEST_URI = "request_uri"
+        val PARAM_STATE = "state"
+        operator fun invoke(url: String): GetAuthorizationCodeURL {
+            val httpsUrl = HttpsUrl(url).getOrThrow()
+            require(
+                httpsUrl.value.query != null && httpsUrl.value.query.contains("$PARAM_CLIENT_ID="),
+            ) { "URL must contain client_id query parameter" }
+            require(
+                httpsUrl.value.query != null && httpsUrl.value.query.contains("$PARAM_REQUEST_URI="),
+            ) { "URL must contain request_uri query parameter" }
+
+            return GetAuthorizationCodeURL(httpsUrl)
+        }
+    }
+}
+
 interface IssuanceAuthorizer {
 
     suspend fun submitPushedAuthorizationRequest(
-        scopes: List<String>,
+        scopes: List<Scope>,
         state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>>
@@ -64,12 +91,12 @@ interface IssuanceAuthorizer {
     suspend fun requestAccessTokenAuthFlow(
         authorizationCode: String,
         codeVerifier: String,
-    ): Result<String>
+    ): Result<Pair<String, CNonce?>>
 
     suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: String,
-        pin: String,
-    ): Result<String>
+        pin: String?,
+    ): Result<Pair<String, CNonce?>>
 
     companion object {
         fun make(

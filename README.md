@@ -38,7 +38,23 @@ TBD
 
 ## OpenId4VCI features supported
 
-TBD
+### Credential Offer
+
+###  `credentials` 
+Specification defines that for this required parameter (of type JSON array) its elements can be JSON Strings or JSON Objects. In the current version of the library only JSON String values are supported.
+Section [5.1.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-5.1.2) defines the way to process them. They are used as `scope` values that are: 
+-   Included as the "scope" parameter in the authorization grant type
+-   Are validated against issuer's metadata for existance in 'credentials_supported' metadata attribute (see section [10.2.3](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-10.2.3))  
+
+### Credential Request
+In the current version of the library only integrations with issuer's [Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-credential-endpoint) are supported. No support yet for the Batch and Deferred Credential Endpoints.
+This means that for cases that the credential issuance flow starts with a Credential Offer that includes multiple credentials in its credential attribute only the first one will be served.
+
+#### Encrypted Responses
+Specification defines that issuer's response to the credential request can be encrypted as specified either by the client's credential request (see [7.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-credential-request)) or the issuer's metadata (issuer metadata `require_credential_response_encryption` attribute [10.2.3](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-10.2.3)). The current version of the library does not support encrypted responses.   
+
+#### Credential Format Profiles
+OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library focuses only on **mso_mdoc** format as specified in section [E.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-iso-mdl)  
 
 ## License
 

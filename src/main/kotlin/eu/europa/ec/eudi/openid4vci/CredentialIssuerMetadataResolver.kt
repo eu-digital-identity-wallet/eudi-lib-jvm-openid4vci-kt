@@ -20,6 +20,13 @@ import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialIssuerMetadataResolver
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import java.io.Serializable
 import java.util.*
 
@@ -76,104 +83,48 @@ value class CredentialIssuerEndpoint private constructor(val value: HttpsUrl) {
     }
 }
 
-typealias Namespace = String
-typealias ClaimName = String
-typealias MsoMdocClaims = Map<Namespace, Map<ClaimName, CredentialSupported.MsoMdocCredentialCredentialSupported.Claim>>
+/**
+ * The details of a Claim.
+ */
+@kotlinx.serialization.Serializable
+data class Claim(
+    @SerialName("mandatory") val mandatory: Boolean? = false,
+    @SerialName("value_type") val valueType: String? = null,
+    @SerialName("display") val display: List<Display> = emptyList(),
+) : java.io.Serializable {
+
+    /**
+     * Display properties of a Claim.
+     */
+    @kotlinx.serialization.Serializable
+    data class Display(
+        @SerialName("name") val name: String? = null,
+        @kotlinx.serialization.Serializable(LocaleSerializer::class)
+        @SerialName("locale") val locale: Locale? = null,
+    ) : java.io.Serializable
+}
+
+object LocaleSerializer : KSerializer<Locale> {
+
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Locale", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): Locale =
+        Locale.forLanguageTag(decoder.decodeString())
+
+    override fun serialize(encoder: Encoder, value: Locale) =
+        encoder.encodeString(value.toString())
+}
 
 /**
  * Credentials supported by an Issuer.
  */
-sealed interface CredentialSupported : java.io.Serializable {
+sealed interface CredentialSupported : Serializable {
 
     val scope: String?
     val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod>
     val cryptographicSuitesSupported: List<String>
     val proofTypesSupported: List<ProofType>
     val display: List<Display>
-
-    /**
-     * The data of a W3C Verifiable Credential.
-     */
-    sealed interface W3CVerifiableCredentialCredentialSupported : CredentialSupported {
-
-        val credentialDefinition: CredentialDefinition
-        val order: List<ClaimName>
-
-        /**
-         * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
-         */
-        data class W3CVerifiableCredentialSignedJwtCredentialSupported(
-            override val scope: String? = null,
-            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-            override val cryptographicSuitesSupported: List<String> = emptyList(),
-            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
-            override val display: List<Display> = emptyList(),
-            override val credentialDefinition: CredentialDefinition,
-            override val order: List<ClaimName> = emptyList(),
-        ) : W3CVerifiableCredentialCredentialSupported
-
-        /**
-         * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
-         */
-        data class W3CVerifiableCredentialJsonLdSignedJwtCredentialSupported(
-            override val scope: String? = null,
-            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-            override val cryptographicSuitesSupported: List<String> = emptyList(),
-            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
-            override val display: List<Display> = emptyList(),
-            val context: List<String> = emptyList(),
-            override val credentialDefinition: CredentialDefinition,
-            override val order: List<ClaimName> = emptyList(),
-        ) : W3CVerifiableCredentialCredentialSupported
-
-        /**
-         * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
-         */
-        data class W3CVerifiableCredentialsJsonLdDataIntegrityCredentialSupported(
-            override val scope: String? = null,
-            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-            override val cryptographicSuitesSupported: List<String> = emptyList(),
-            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
-            override val display: List<Display> = emptyList(),
-            val context: List<String> = emptyList(),
-            val type: List<String> = emptyList(),
-            override val credentialDefinition: CredentialDefinition,
-            override val order: List<ClaimName> = emptyList(),
-        ) : W3CVerifiableCredentialCredentialSupported
-    }
-
-    /**
-     * The data of a Verifiable Credentials issued as an ISO mDL.
-     */
-    data class MsoMdocCredentialCredentialSupported(
-        override val scope: String? = null,
-        override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-        override val cryptographicSuitesSupported: List<String> = emptyList(),
-        override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
-        override val display: List<Display> = emptyList(),
-        val docType: String,
-        val claims: MsoMdocClaims = emptyMap(),
-        val order: List<ClaimName> = emptyList(),
-    ) : CredentialSupported {
-
-        /**
-         * The details of a Claim.
-         */
-        data class Claim(
-            val mandatory: Boolean? = false,
-            val valueType: String? = null,
-            val display: List<Display> = emptyList(),
-        ) : java.io.Serializable {
-
-            /**
-             * Display properties of a Claim.
-             */
-            data class Display(
-                val name: String? = null,
-                val locale: Locale? = null,
-            ) : java.io.Serializable
-        }
-    }
 }
 
 /**
@@ -371,3 +322,7 @@ internal fun interface CredentialIssuerMetadataResolver {
         ): CredentialIssuerMetadataResolver = DefaultCredentialIssuerMetadataResolver(ioCoroutineDispatcher, httpGet)
     }
 }
+
+typealias Namespace = String
+typealias ClaimName = String
+typealias MsoMdocClaims = Map<Namespace, Map<ClaimName, Claim>>
