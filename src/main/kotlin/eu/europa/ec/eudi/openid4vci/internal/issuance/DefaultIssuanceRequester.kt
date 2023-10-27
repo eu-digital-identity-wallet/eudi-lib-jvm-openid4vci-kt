@@ -164,7 +164,6 @@ private fun CredentialIssuanceRequest.SingleCredential.toTransferObject(): Crede
     return when (this) {
         is MsoMdocProfile.CredentialIssuanceRequest ->
             MsoMdocProfile.CredentialIssuanceRequestTO(
-                format = MsoMdocProfile.FORMAT,
                 docType = doctype,
                 proof = proof?.toJsonObject(),
                 credentialEncryptionJwk = credentialEncryptionJwk?.let {
@@ -181,7 +180,6 @@ private fun CredentialIssuanceRequest.SingleCredential.toTransferObject(): Crede
 
         is SdJwtVcProfile.CredentialIssuanceRequest ->
             SdJwtVcProfile.CredentialIssuanceRequestTO(
-                format = SdJwtVcProfile.FORMAT,
                 proof = proof?.toJsonObject(),
                 credentialEncryptionJwk = credentialEncryptionJwk?.let {
                     Json.parseToJsonElement(

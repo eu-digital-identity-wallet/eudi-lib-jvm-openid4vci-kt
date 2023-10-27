@@ -18,9 +18,10 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
-import kotlinx.serialization.*
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.util.*
@@ -190,10 +191,8 @@ object SdJwtVcProfile {
     }
 
     @Serializable
-    @OptIn(ExperimentalSerializationApi::class)
-    @JsonClassDiscriminator("format")
+    @SerialName(FORMAT)
     data class CredentialIssuanceRequestTO(
-        @SerialName("format") override val format: String,
         @SerialName("proof") override val proof: JsonObject?,
         @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject?,
         @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String?,

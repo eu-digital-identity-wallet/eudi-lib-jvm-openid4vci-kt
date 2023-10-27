@@ -23,11 +23,15 @@ import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorHttpClientFactory
 import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorIssuanceRequester
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@JsonClassDiscriminator("format")
 sealed interface CredentialIssuanceRequestTO {
 
     @Serializable
@@ -37,7 +41,6 @@ sealed interface CredentialIssuanceRequestTO {
 
     @Serializable
     sealed interface SingleCredentialTO : CredentialIssuanceRequestTO {
-        val format: String
         val proof: JsonObject?
         val credentialEncryptionJwk: JsonObject?
         val credentialResponseEncryptionAlg: String?
