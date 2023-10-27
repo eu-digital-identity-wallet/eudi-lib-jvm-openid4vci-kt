@@ -1,6 +1,6 @@
 [versions]
 dependency-check = "8.4.0"
-sonarqube = "4.3.0.3225"
+sonarqube = "4.4.1.3373"
 kotlin = "1.9.10"
 spotless = "6.20.0"
 nimbus-sdk = "10.13.2"
