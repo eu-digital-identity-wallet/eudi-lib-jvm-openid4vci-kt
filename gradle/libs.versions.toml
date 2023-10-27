@@ -1,7 +1,7 @@
 [versions]
 dependency-check = "8.4.0"
 sonarqube = "4.3.0.3225"
-kotlin = "1.8.21"
+kotlin = "1.9.10"
 spotless = "6.20.0"
 nimbus-sdk = "10.13.2"
 ktor = "2.3.3"
