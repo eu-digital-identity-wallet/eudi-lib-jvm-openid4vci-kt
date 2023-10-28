@@ -35,29 +35,28 @@ internal class DefaultIssuanceRequester(
     override suspend fun placeIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.SingleCredential,
-    ): Result<CredentialIssuanceResponse> =
+    ): Result<CredentialIssuanceResponse> = withContext(coroutineDispatcher) {
         runCatching {
-            withContext(coroutineDispatcher) {
-                postIssueRequest.post(
-                    issuerMetadata.credentialEndpoint.value.value.toURL(),
-                    mapOf(accessToken.toAuthorizationHeader()),
-                    request.toTransferObject(),
-                ) {
-                    // Process response
-                    if (it.status.isSuccess()) {
-                        if (request.requiresEncryptedResponse()) {
-                            TODO("NOT IMPLEMENTED: Decrypt JWT, extract JWT claims and map them to IssuanceResponse")
-                        } else {
-                            val success = it.body<SingleIssuanceSuccessResponse>()
-                            success.toSingleIssuanceResponse()
-                        }
+            postIssueRequest.post(
+                issuerMetadata.credentialEndpoint.value.value.toURL(),
+                mapOf(accessToken.toAuthorizationHeader()),
+                request.toTransferObject(),
+            ) {
+                // Process response
+                if (it.status.isSuccess()) {
+                    if (request.requiresEncryptedResponse()) {
+                        TODO("NOT IMPLEMENTED: Decrypt JWT, extract JWT claims and map them to IssuanceResponse")
                     } else {
-                        val error = it.body<GenericErrorResponse>()
-                        error.toIssuanceError().raise()
+                        val success = it.body<SingleIssuanceSuccessResponse>()
+                        success.toSingleIssuanceResponse()
                     }
+                } else {
+                    val error = it.body<GenericErrorResponse>()
+                    error.toIssuanceError().raise()
                 }
             }
         }
+    }
 
     override suspend fun placeBatchIssuanceRequest(
         accessToken: IssuanceAccessToken,
@@ -137,6 +136,7 @@ private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError =
                 CredentialIssuanceError.InvalidProof(
                     cNonce = cNonce,
                     cNonceExpiresIn = cNonceExpiresInSeconds,
+                    errorDescription = errorDescription,
                 )
             }
                 ?: CredentialIssuanceError.ResponseUnparsable("Issuer responded with invalid_proof error but no c_nonce was provided")

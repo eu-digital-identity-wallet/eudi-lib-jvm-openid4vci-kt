@@ -93,59 +93,53 @@ internal class DefaultIssuer(
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
-    ): Result<SubmittedRequest> =
-        runCatching {
-            requestIssuance(token) {
-                credentialMetadata
-                    .toIssuerSupportedCredential()
-                    .toIssuanceRequest(claimSet, null)
-            }
+    ): Result<SubmittedRequest> = runCatching {
+        requestIssuance(token) {
+            credentialMetadata
+                .toIssuerSupportedCredential()
+                .toIssuanceRequest(claimSet, null)
         }
+    }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
         proof: Proof,
-    ): Result<SubmittedRequest> =
-        runCatching {
-            requestIssuance(token) {
-                credentialMetadata
-                    .toIssuerSupportedCredential()
-                    .toIssuanceRequest(claimSet, proof)
-            }
+    ): Result<SubmittedRequest> = runCatching {
+        requestIssuance(token) {
+            credentialMetadata
+                .toIssuerSupportedCredential()
+                .toIssuanceRequest(claimSet, proof)
         }
+    }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
-    ): Result<SubmittedRequest> =
-        runCatching {
-            // TODO: Check if issuer exposes batch endpoint
-            requestIssuance(token) {
-                CredentialIssuanceRequest.BatchCredentials(
-                    credentialRequests = credentialsMetadata.map { pair ->
-                        pair.first
-                            .toIssuerSupportedCredential()
-                            .toIssuanceRequest(pair.second, null)
-                    },
-                )
-            }
+    ): Result<SubmittedRequest> = runCatching {
+        requestIssuance(token) {
+            CredentialIssuanceRequest.BatchCredentials(
+                credentialRequests = credentialsMetadata.map { pair ->
+                    pair.first
+                        .toIssuerSupportedCredential()
+                        .toIssuanceRequest(pair.second, null)
+                },
+            )
         }
+    }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, Proof>>,
-    ): Result<SubmittedRequest> =
-        runCatching {
-            // TODO: Check if issuer exposes batch endpoint
-            requestIssuance(token) {
-                CredentialIssuanceRequest.BatchCredentials(
-                    credentialRequests = credentialsMetadata.map { triple ->
-                        triple.first
-                            .toIssuerSupportedCredential()
-                            .toIssuanceRequest(triple.second, triple.third)
-                    },
-                )
-            }
+    ): Result<SubmittedRequest> = runCatching {
+        requestIssuance(token) {
+            CredentialIssuanceRequest.BatchCredentials(
+                credentialRequests = credentialsMetadata.map { triple ->
+                    triple.first
+                        .toIssuerSupportedCredential()
+                        .toIssuanceRequest(triple.second, triple.third)
+                },
+            )
         }
+    }
 
     private fun CredentialMetadata.toIssuerSupportedCredential(): CredentialSupported =
         when (this) {

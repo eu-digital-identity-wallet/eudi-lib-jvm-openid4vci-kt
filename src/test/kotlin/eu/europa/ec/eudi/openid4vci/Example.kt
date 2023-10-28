@@ -28,6 +28,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.jsoup.Jsoup
 import org.jsoup.nodes.FormElement
+import java.lang.IllegalStateException
 import java.net.URI
 import java.net.URL
 
@@ -78,16 +79,16 @@ private class Wallet(
     )
 
     suspend fun issueOfferedCredential(coUrl: String): String {
-        val ktorHttpClient = defaultHttpClientFactory()
-        val credentialOfferRequestResolver = CredentialOfferRequestResolver(
-            httpGet = { url ->
-                runCatching {
-                    ktorHttpClient.get(url).body<String>()
-                }
-            },
-        )
-
-        val offer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
+        val offer = HttpClientFactory().use { client ->
+            val credentialOfferRequestResolver = CredentialOfferRequestResolver(
+                httpGet = { url ->
+                    runCatching {
+                        client.get(url).body<String>()
+                    }
+                },
+            )
+            credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
+        }
         val issuer = Issuer.ktor(
             offer.authorizationServerMetadata,
             offer.credentialIssuerMetadata,
@@ -96,7 +97,6 @@ private class Wallet(
 
         // Authorize with auth code flow
         val authorized = authorizeRequestWithAuthCodeUseCase(issuer, offer)
-
         val outcome = when (authorized) {
             is AuthorizedRequest.NoProofRequired -> {
                 noProofRequiredSubmissionUseCase(issuer, authorized, offer)
@@ -164,7 +164,8 @@ private class Wallet(
                     requestOutcome.error.raise()
                 }
 
-                is SubmittedRequest.InvalidProof -> TODO()
+                is SubmittedRequest.InvalidProof ->
+                    throw IllegalStateException("Although providing a proof with c_nonce the proof is still invalid")
             }
         }
     }
@@ -185,6 +186,7 @@ private class Wallet(
                         is CredentialIssuanceResponse.Result.Deferred -> result.transactionId
                     }
                 }
+
                 is SubmittedRequest.InvalidProof -> {
                     proofRequiredSubmissionUseCase(
                         issuer,
@@ -196,6 +198,7 @@ private class Wallet(
                         ),
                     )
                 }
+
                 is SubmittedRequest.Failed -> {
                     requestOutcome.error.raise()
                 }
@@ -203,46 +206,42 @@ private class Wallet(
         }
     }
 
-    private fun httpClientWithHttpCookiesFactory(): HttpClient =
-        HttpClient {
-            install(ContentNegotiation) { json() }
-            install(HttpCookies)
-        }
-
-    private fun defaultHttpClientFactory(): HttpClient =
+    private fun HttpClientFactory(): HttpClient =
         HttpClient {
             install(ContentNegotiation) {
                 json(
                     json = Json { ignoreUnknownKeys = true },
                 )
             }
+            install(HttpCookies)
         }
 
     private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
-        val client = httpClientWithHttpCookiesFactory()
+        HttpClientFactory().use { client ->
 
-        val loginUrl = HttpGet { url ->
-            runCatching {
-                client.get(url).body<String>()
-            }
-        }.get(getAuthorizationCodeUrl).getOrThrow().extractASLoginUrl()
+            val loginUrl = HttpGet { url ->
+                runCatching {
+                    client.get(url).body<String>()
+                }
+            }.get(getAuthorizationCodeUrl).getOrThrow().extractASLoginUrl()
 
-        return HttpFormPost { url, formParameters ->
-            val response = client.submitForm(
-                url = url.toString(),
-                formParameters = Parameters.build {
-                    formParameters.entries.forEach { append(it.key, it.value) }
-                },
+            return HttpFormPost { url, formParameters ->
+                val response = client.submitForm(
+                    url = url.toString(),
+                    formParameters = Parameters.build {
+                        formParameters.entries.forEach { append(it.key, it.value) }
+                    },
+                )
+                val redirectLocation = response.headers.get("Location").toString()
+                URLBuilder(redirectLocation).parameters.get("code")
+            }.post(
+                loginUrl,
+                mapOf(
+                    "username" to actingUser.username,
+                    "password" to actingUser.password,
+                ),
             )
-            val redirectLocation = response.headers.get("Location").toString()
-            URLBuilder(redirectLocation).parameters.get("code")
-        }.post(
-            loginUrl,
-            mapOf(
-                "username" to actingUser.username,
-                "password" to actingUser.password,
-            ),
-        )
+        }
     }
 
     private fun String.extractASLoginUrl(): URL {

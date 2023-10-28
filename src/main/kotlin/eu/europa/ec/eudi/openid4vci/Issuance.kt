@@ -80,6 +80,7 @@ sealed interface SubmittedRequest {
 
     class InvalidProof(
         val cNonce: CNonce,
+        val errorDescription: String? = null,
     ) : Errored
 }
 
@@ -189,6 +190,7 @@ sealed interface CredentialIssuanceError {
     data class InvalidProof(
         val cNonce: String,
         val cNonceExpiresIn: Long? = 5,
+        val errorDescription: String? = null,
     ) : CredentialIssuanceError
 
     /**

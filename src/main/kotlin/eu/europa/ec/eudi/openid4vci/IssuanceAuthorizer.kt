@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceAuthorizer
-import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorHttpClientFactory
 import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorIssuanceAuthorizer
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -116,13 +115,11 @@ interface IssuanceAuthorizer {
             authorizationServerMetadata: CIAuthorizationServerMetadata,
             config: WalletOpenId4VCIConfig,
             coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            httpClientFactory: KtorHttpClientFactory = KtorIssuanceAuthorizer.DefaultFactory,
         ): IssuanceAuthorizer =
             KtorIssuanceAuthorizer(
                 authorizationServerMetadata = authorizationServerMetadata,
                 config = config,
                 coroutineDispatcher = coroutineDispatcher,
-                httpClientFactory = httpClientFactory,
             )
     }
 }

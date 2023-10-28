@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jwt.JWT
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
+import io.ktor.client.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -259,5 +260,7 @@ value class Scope private constructor(
         }
     }
 }
+
+typealias KtorHttpClientFactory = () -> HttpClient
 
 typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata

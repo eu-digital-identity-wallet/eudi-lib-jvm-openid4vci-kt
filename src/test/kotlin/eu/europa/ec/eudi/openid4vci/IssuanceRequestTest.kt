@@ -147,19 +147,19 @@ class IssuanceRequestTest {
                         when (authorizedRequest) {
                             is AuthorizedRequest.NoProofRequired -> {
                                 val credentialMetadata = offer.credentials[0]
-                                authorizedRequest.requestSingle(credentialMetadata, claimSet)
-                                    .fold(
-                                        onSuccess = {
-                                            assertThat(
-                                                "Expected CredentialIssuanceException to be thrown but was not",
-                                                it is SubmittedRequest.Failed &&
-                                                    it.error is CredentialIssuanceError.ResponseUnparsable,
-                                            )
-                                        },
-                                        onFailure = {
-                                            fail("No exception expected to be thrown")
-                                        },
-                                    )
+                                val requestSingle = authorizedRequest.requestSingle(credentialMetadata, claimSet)
+                                requestSingle.fold(
+                                    onSuccess = {
+                                        assertThat(
+                                            "Expected CredentialIssuanceException to be thrown but was not",
+                                            it is SubmittedRequest.Failed &&
+                                                it.error is CredentialIssuanceError.ResponseUnparsable,
+                                        )
+                                    },
+                                    onFailure = {
+                                        fail("No exception expected to be thrown")
+                                    },
+                                )
                             }
 
                             is AuthorizedRequest.ProofRequired ->
@@ -242,10 +242,10 @@ class IssuanceRequestTest {
                                             credentialMetadata,
                                             claimSet,
                                             proof,
-                                        ).getOrThrow()
+                                        )
                                         assertThat(
                                             "Second attempt should be successful",
-                                            response is SubmittedRequest.Success,
+                                            response.getOrThrow() is SubmittedRequest.Success,
                                         )
                                     }
 

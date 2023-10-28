@@ -27,13 +27,13 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.serialization.json.Json
 import java.net.URL
 
-typealias KtorHttpClientFactory = () -> HttpClient
-
 /**
  * Implementation of [IssuanceAuthorizer] that used ktor clients for all http calls.
  */
-internal class KtorIssuanceAuthorizer private constructor(
-    val delegate: IssuanceAuthorizer,
+internal class KtorIssuanceAuthorizer(
+    val authorizationServerMetadata: CIAuthorizationServerMetadata,
+    val config: WalletOpenId4VCIConfig,
+    val coroutineDispatcher: CoroutineDispatcher,
 ) : IssuanceAuthorizer {
 
     override suspend fun submitPushedAuthorizationRequest(
@@ -41,13 +41,28 @@ internal class KtorIssuanceAuthorizer private constructor(
         state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>> =
-        delegate.submitPushedAuthorizationRequest(scopes, state, issuerState)
+        HttpClientFactory().use { client ->
+            authorizer(client).submitPushedAuthorizationRequest(scopes, state, issuerState)
+        }
 
     override suspend fun requestAccessTokenAuthFlow(authorizationCode: String, codeVerifier: String): Result<Pair<String, CNonce?>> =
-        delegate.requestAccessTokenAuthFlow(authorizationCode, codeVerifier)
+        HttpClientFactory().use { client ->
+            authorizer(client).requestAccessTokenAuthFlow(authorizationCode, codeVerifier)
+        }
 
     override suspend fun requestAccessTokenPreAuthFlow(preAuthorizedCode: String, pin: String?): Result<Pair<String, CNonce?>> =
-        delegate.requestAccessTokenPreAuthFlow(preAuthorizedCode, pin)
+        HttpClientFactory().use { client ->
+            authorizer(client).requestAccessTokenPreAuthFlow(preAuthorizedCode, pin)
+        }
+
+    private fun authorizer(client: HttpClient) =
+        DefaultIssuanceAuthorizer(
+            coroutineDispatcher = coroutineDispatcher,
+            authorizationServerMetadata = authorizationServerMetadata,
+            config = config,
+            postPar = parFormPost(client),
+            getAccessToken = accessTokenFormPost(client),
+        )
 
     companion object {
 
@@ -58,7 +73,7 @@ internal class KtorIssuanceAuthorizer private constructor(
          *
          * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
          */
-        val DefaultFactory: KtorHttpClientFactory = {
+        private val HttpClientFactory: KtorHttpClientFactory = {
             HttpClient {
                 install(ContentNegotiation) {
                     json(
@@ -66,23 +81,6 @@ internal class KtorIssuanceAuthorizer private constructor(
                     )
                 }
             }
-        }
-
-        operator fun invoke(
-            authorizationServerMetadata: CIAuthorizationServerMetadata,
-            config: WalletOpenId4VCIConfig,
-            coroutineDispatcher: CoroutineDispatcher,
-            httpClientFactory: KtorHttpClientFactory,
-        ): KtorIssuanceAuthorizer {
-            val client = httpClientFactory()
-            val delegate = DefaultIssuanceAuthorizer(
-                coroutineDispatcher = coroutineDispatcher,
-                authorizationServerMetadata = authorizationServerMetadata,
-                config = config,
-                postPar = parFormPost(client),
-                getAccessToken = accessTokenFormPost(client),
-            )
-            return KtorIssuanceAuthorizer(delegate)
         }
 
         private fun parFormPost(httpClient: HttpClient): HttpFormPost<PushedAuthorizationRequestResponse> =

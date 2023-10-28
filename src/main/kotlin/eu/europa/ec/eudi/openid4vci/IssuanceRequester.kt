@@ -19,7 +19,6 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceRequester
-import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorHttpClientFactory
 import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorIssuanceRequester
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -183,12 +182,10 @@ interface IssuanceRequester {
         fun ktor(
             issuerMetadata: CredentialIssuerMetadata,
             coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            httpClientFactory: KtorHttpClientFactory = KtorIssuanceRequester.DefaultFactory,
         ): IssuanceRequester =
             KtorIssuanceRequester(
                 issuerMetadata = issuerMetadata,
                 coroutineDispatcher = coroutineDispatcher,
-                httpClientFactory = httpClientFactory,
             )
     }
 }
