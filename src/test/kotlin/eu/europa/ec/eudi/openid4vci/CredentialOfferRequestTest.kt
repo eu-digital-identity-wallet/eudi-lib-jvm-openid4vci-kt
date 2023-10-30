@@ -16,8 +16,10 @@
 package eu.europa.ec.eudi.openid4vci
 
 import org.apache.http.client.utils.URIBuilder
-import org.junit.jupiter.api.Assertions
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.fail
 
 internal class CredentialOfferRequestTest {
 
@@ -25,11 +27,10 @@ internal class CredentialOfferRequestTest {
     internal fun `Fails with non parsable Credential Offer Endpoint URL`() {
         CredentialOfferRequest("file:")
             .fold(
-                { Assertions.fail("Credential Offer Endpoint URL should not have been parsed") },
+                { fail("Credential Offer Endpoint URL should not have been parsed") },
                 {
-                    val error = Assertions.assertInstanceOf(CredentialOfferRequestException::class.java, it)
-                    Assertions.assertInstanceOf(
-                        CredentialOfferRequestError.NonParsableCredentialOfferEndpointUrl::class.java,
+                    val error = assertIs<CredentialOfferRequestException>(it)
+                    assertIs<CredentialOfferRequestError.NonParsableCredentialOfferEndpointUrl>(
                         error.error,
                     )
                 },
@@ -40,11 +41,11 @@ internal class CredentialOfferRequestTest {
     internal fun `Fails when neither 'credential_offer' nor 'credential_offer_uri' is provided`() {
         CredentialOfferRequest("wallet://credential_offer")
             .fold(
-                { Assertions.fail("Credential Offer Endpoint URL should not have been parsed") },
+                { fail("Credential Offer Endpoint URL should not have been parsed") },
                 {
-                    val error = Assertions.assertInstanceOf(CredentialOfferRequestException::class.java, it)
-                    Assertions.assertInstanceOf(
-                        CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri::class.java,
+                    val error = assertIs<CredentialOfferRequestException>(it)
+                    assertIs<CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri>(
+
                         error.error,
                     )
                 },
@@ -59,11 +60,11 @@ internal class CredentialOfferRequestTest {
             .build()
         CredentialOfferRequest(uri.toString())
             .fold(
-                { Assertions.fail("Credential Offer Endpoint URL should not have been parsed") },
+                { fail("Credential Offer Endpoint URL should not have been parsed") },
                 {
-                    val error = Assertions.assertInstanceOf(CredentialOfferRequestException::class.java, it)
-                    Assertions.assertInstanceOf(
-                        CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri::class.java,
+                    val error = assertIs<CredentialOfferRequestException>(it)
+                    assertIs<CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri>(
+
                         error.error,
                     )
                 },
@@ -101,10 +102,10 @@ internal class CredentialOfferRequestTest {
         CredentialOfferRequest(credentialOfferEndpointUri.toString())
             .fold(
                 {
-                    val passByValue = Assertions.assertInstanceOf(CredentialOfferRequest.PassByValue::class.java, it)
-                    Assertions.assertEquals(credentialOffer, passByValue.value)
+                    val passByValue = assertIs<CredentialOfferRequest.PassByValue>(it)
+                    assertEquals(credentialOffer, passByValue.value)
                 },
-                { Assertions.fail("Credential Offer Endpoint URL should not have been parsed") },
+                { fail("Credential Offer Endpoint URL should not have been parsed") },
             )
     }
 
@@ -116,11 +117,10 @@ internal class CredentialOfferRequestTest {
             .build()
         CredentialOfferRequest(credentialOfferEndpointUri.toString())
             .fold(
-                { Assertions.fail("Credential Offer Endpoint URL should not have been parsed") },
+                { fail("Credential Offer Endpoint URL should not have been parsed") },
                 {
-                    val error = Assertions.assertInstanceOf(CredentialOfferRequestException::class.java, it)
-                    Assertions.assertInstanceOf(
-                        CredentialOfferRequestValidationError.InvalidCredentialOfferUri::class.java,
+                    val error = assertIs<CredentialOfferRequestException>(it)
+                    assertIs<CredentialOfferRequestValidationError.InvalidCredentialOfferUri>(
                         error.error,
                     )
                 },
@@ -137,11 +137,11 @@ internal class CredentialOfferRequestTest {
             .fold(
                 {
                     val passByReference =
-                        Assertions.assertInstanceOf(CredentialOfferRequest.PassByReference::class.java, it)
-                    Assertions.assertEquals(credentialOfferUri, passByReference.value.value.toString())
+                        assertIs<CredentialOfferRequest.PassByReference>(it)
+                    assertEquals(credentialOfferUri, passByReference.value.value.toString())
                 },
                 {
-                    Assertions.fail("Credential Offer Endpoint URL should have been parsed")
+                    fail("Credential Offer Endpoint URL should have been parsed")
                 },
             )
     }
