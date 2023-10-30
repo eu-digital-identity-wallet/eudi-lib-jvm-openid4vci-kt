@@ -32,7 +32,7 @@ import java.net.URL
  * Default implementation for [AuthorizationServerMetadataResolver].
  */
 internal class DefaultAuthorizationServerMetadataResolver(
-    private val ioCoroutineDispatcher: CoroutineDispatcher,
+    private val coroutineDispatcher: CoroutineDispatcher,
     private val httpGet: HttpGet<String>,
 ) : AuthorizationServerMetadataResolver {
 
@@ -79,7 +79,7 @@ internal class DefaultAuthorizationServerMetadataResolver(
      * using the provided [parser].
      */
     private suspend fun <T> fetchAndParse(url: URL, parser: (JSONObject) -> T): T =
-        withContext(ioCoroutineDispatcher + CoroutineName("$url")) {
+        withContext(coroutineDispatcher + CoroutineName("$url")) {
             httpGet.get(url)
                 .mapCatching { JSONObjectUtils.parse(it) }
                 .mapCatching { parser(it) }

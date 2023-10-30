@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultAuthorizationServerMetadataResolver
+import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.ktor.KtorAuthorizationServerMetadataResolver
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
@@ -43,5 +44,12 @@ internal fun interface AuthorizationServerMetadataResolver {
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpGet: HttpGet<String>,
         ): AuthorizationServerMetadataResolver = DefaultAuthorizationServerMetadataResolver(ioCoroutineDispatcher, httpGet)
+
+        fun ktor(
+            coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        ): AuthorizationServerMetadataResolver =
+            KtorAuthorizationServerMetadataResolver(
+                coroutineDispatcher = coroutineDispatcher,
+            )
     }
 }
