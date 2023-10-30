@@ -19,6 +19,7 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialIssuerMetadataResolver
+import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.ktor.KtorCredentialIssuerMetadataResolver
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.KSerializer
@@ -79,6 +80,8 @@ data class CredentialIssuerMetadata(
  */
 @JvmInline
 value class CredentialIssuerEndpoint private constructor(val value: HttpsUrl) {
+
+    override fun toString(): String = value.toString()
 
     companion object {
 
@@ -292,6 +295,13 @@ internal fun interface CredentialIssuerMetadataResolver {
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpGet: HttpGet<String>,
         ): CredentialIssuerMetadataResolver = DefaultCredentialIssuerMetadataResolver(ioCoroutineDispatcher, httpGet)
+
+        fun ktor(
+            coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        ): CredentialIssuerMetadataResolver =
+            KtorCredentialIssuerMetadataResolver(
+                coroutineDispatcher = coroutineDispatcher,
+            )
     }
 }
 

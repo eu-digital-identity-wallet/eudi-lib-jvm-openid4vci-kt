@@ -30,7 +30,7 @@ import kotlinx.serialization.json.*
  * Default implementation of [CredentialIssuerMetadataResolver].
  */
 internal class DefaultCredentialIssuerMetadataResolver(
-    private val ioCoroutineDispatcher: CoroutineDispatcher,
+    private val coroutineDispatcher: CoroutineDispatcher,
     private val httpGet: HttpGet<String>,
 ) : CredentialIssuerMetadataResolver {
 
@@ -38,13 +38,13 @@ internal class DefaultCredentialIssuerMetadataResolver(
         runCatching {
             val credentialIssuerMetadataContent = try {
                 val url =
-                    URLBuilder(issuer.value.value.toString())
+                    URLBuilder(issuer.toString())
                         .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
                         .build()
                         .toURI()
                         .toURL()
 
-                withContext(ioCoroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
+                withContext(coroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
                     httpGet.get(url).getOrThrow()
                 }
             } catch (t: Throwable) {

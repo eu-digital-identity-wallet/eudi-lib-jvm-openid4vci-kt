@@ -31,30 +31,44 @@ import java.net.URL
  * Implementation of [IssuanceRequester] that used ktor clients for all http calls.
  */
 @Suppress("ktlint")
-internal class KtorIssuanceRequester private constructor(
-    val delegate: IssuanceRequester,
+internal class KtorIssuanceRequester(
+    override val issuerMetadata: CredentialIssuerMetadata,
+    val coroutineDispatcher: CoroutineDispatcher,
 ) : IssuanceRequester {
-
-    override val issuerMetadata: CredentialIssuerMetadata
-        get() = delegate.issuerMetadata
 
     override suspend fun placeIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.SingleCredential
-    ): Result<CredentialIssuanceResponse> =
-        delegate.placeIssuanceRequest(accessToken, request)
+    ): Result<CredentialIssuanceResponse> {
+        HttpClientFactory().use { client ->
+            return requester(client).placeIssuanceRequest(accessToken, request)
+        }
+    }
 
     override suspend fun placeBatchIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.BatchCredentials
-    ): Result<CredentialIssuanceResponse> =
-        delegate.placeBatchIssuanceRequest(accessToken, request)
+    ): Result<CredentialIssuanceResponse> {
+        HttpClientFactory().use { client ->
+            return requester(client).placeBatchIssuanceRequest(accessToken, request)
+        }
+    }
 
     override suspend fun placeDeferredCredentialRequest(
         accessToken: IssuanceAccessToken,
         request: DeferredCredentialRequest
-    ): CredentialIssuanceResponse =
-        delegate.placeDeferredCredentialRequest(accessToken, request)
+    ): CredentialIssuanceResponse {
+        HttpClientFactory().use { client ->
+            return requester(client).placeDeferredCredentialRequest(accessToken, request)
+        }
+    }
+
+    fun requester(client: HttpClient): DefaultIssuanceRequester =
+        DefaultIssuanceRequester(
+            coroutineDispatcher = coroutineDispatcher,
+            issuerMetadata = issuerMetadata,
+            postIssueRequest = postIssueRequest(client),
+        )
 
     companion object {
 
@@ -65,7 +79,7 @@ internal class KtorIssuanceRequester private constructor(
          *
          * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
          */
-        val DefaultFactory: KtorHttpClientFactory = {
+        private val HttpClientFactory: KtorHttpClientFactory = {
             HttpClient {
                 install(ContentNegotiation) {
                     json(
@@ -74,20 +88,6 @@ internal class KtorIssuanceRequester private constructor(
                 }
 
             }
-        }
-
-        operator fun invoke(
-            issuerMetadata: CredentialIssuerMetadata,
-            coroutineDispatcher: CoroutineDispatcher,
-            httpClientFactory: KtorHttpClientFactory,
-        ): KtorIssuanceRequester {
-            val client = httpClientFactory()
-            val delegate = DefaultIssuanceRequester(
-                coroutineDispatcher = coroutineDispatcher,
-                issuerMetadata = issuerMetadata,
-                postIssueRequest = postIssueRequest(client),
-            )
-            return KtorIssuanceRequester(delegate)
         }
 
         private fun postIssueRequest(httpClient: HttpClient):

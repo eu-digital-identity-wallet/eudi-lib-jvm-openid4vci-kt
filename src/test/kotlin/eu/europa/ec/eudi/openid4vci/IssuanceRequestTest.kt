@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.PlainJWT
 import io.ktor.client.*
@@ -147,19 +148,19 @@ class IssuanceRequestTest {
                         when (authorizedRequest) {
                             is AuthorizedRequest.NoProofRequired -> {
                                 val credentialMetadata = offer.credentials[0]
-                                authorizedRequest.requestSingle(credentialMetadata, claimSet)
-                                    .fold(
-                                        onSuccess = {
-                                            assertThat(
-                                                "Expected CredentialIssuanceException to be thrown but was not",
-                                                it is SubmittedRequest.Failed &&
-                                                    it.error is CredentialIssuanceError.ResponseUnparsable,
-                                            )
-                                        },
-                                        onFailure = {
-                                            fail("No exception expected to be thrown")
-                                        },
-                                    )
+                                val requestSingle = authorizedRequest.requestSingle(credentialMetadata, claimSet)
+                                requestSingle.fold(
+                                    onSuccess = {
+                                        assertThat(
+                                            "Expected CredentialIssuanceException to be thrown but was not",
+                                            it is SubmittedRequest.Failed &&
+                                                it.error is CredentialIssuanceError.ResponseUnparsable,
+                                        )
+                                    },
+                                    onFailure = {
+                                        fail("No exception expected to be thrown")
+                                    },
+                                )
                             }
 
                             is AuthorizedRequest.ProofRequired ->
@@ -226,6 +227,10 @@ class IssuanceRequestTest {
                             ),
                         ),
                     )
+                    val bindingKey = BindingKey.Jwk(
+                        algorithm = JWSAlgorithm.RS256,
+                        jwk = ProofBuilder.randomRSASigningKey(2048),
+                    )
 
                     with(issuer) {
                         when (authorizedRequest) {
@@ -237,15 +242,14 @@ class IssuanceRequestTest {
                                     is SubmittedRequest.InvalidProof -> {
                                         val proofRequired =
                                             authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                                        val proof = proofRequired.cNonce.toJwtProof()
                                         val response = proofRequired.requestSingle(
                                             credentialMetadata,
                                             claimSet,
-                                            proof,
-                                        ).getOrThrow()
+                                            bindingKey,
+                                        )
                                         assertThat(
                                             "Second attempt should be successful",
-                                            response is SubmittedRequest.Success,
+                                            response.getOrThrow() is SubmittedRequest.Success,
                                         )
                                     }
 

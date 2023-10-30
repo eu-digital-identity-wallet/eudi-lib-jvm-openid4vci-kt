@@ -15,8 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jwt.JWTClaimsSet
-import com.nimbusds.jwt.PlainJWT
+import com.nimbusds.jose.JWSAlgorithm
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -26,22 +25,21 @@ import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.jsoup.Jsoup
 import org.jsoup.nodes.FormElement
+import java.lang.IllegalStateException
 import java.net.URI
 import java.net.URL
-import java.time.Instant
+
+val CredentialIssuer_URL = "http://localhost:8080"
+val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
+val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
 
 val SdJwtVC_CredentialOffer = """
     {
-      "credential_issuer": "http://localhost:8080",
-      "credentials": [
-        "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-      ],
+      "credential_issuer": "$CredentialIssuer_URL",
+      "credentials": [ "$PID_SdJwtVC_SCOPE" ],
       "grants": {
         "authorization_code": {}
       }
@@ -50,22 +48,48 @@ val SdJwtVC_CredentialOffer = """
 
 val MsoMdoc_CredentialOffer = """
     {
-      "credential_issuer": "http://localhost:8080",
+      "credential_issuer": "$CredentialIssuer_URL",
       "grants": {
         "authorization_code": {}
       },
-      "credentials": [
-        "eu.europa.ec.eudiw.pid_mso_mdoc"        
-      ]
+      "credentials": [ "$PID_MsoMdoc_SCOPE" ]
     }
 """.trimIndent()
 
-fun main(): Unit = runBlocking {
-    val coUrl = "http://localhost:8080/credentialoffer?credential_offer=$MsoMdoc_CredentialOffer"
-    val wallet = Wallet.ofUser(ActingUser("babis", "babis"))
-    val credential = wallet.issueOfferedCredential(coUrl)
+val config = WalletOpenId4VCIConfig(
+    clientId = "wallet-dev",
+    authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
+)
 
-    println("--> Issued credential : $credential")
+fun main(): Unit = runBlocking {
+    val bindingKey = BindingKey.Jwk(
+        algorithm = JWSAlgorithm.RS256,
+        jwk = ProofBuilder.randomRSASigningKey(2048),
+    )
+
+    val user = ActingUser("babis", "babis")
+    val wallet = Wallet.ofUser(user, bindingKey)
+
+    WalletInitiatedIssuanceWithOffer(wallet)
+    WalletInitiatedIssuanceNoOffer(wallet)
+}
+
+private suspend fun WalletInitiatedIssuanceWithOffer(wallet: Wallet) {
+    println("[[Scenario: Offer passed to wallet via url]] ")
+
+    val coUrl = "http://localhost:8080/credentialoffer?credential_offer=$SdJwtVC_CredentialOffer"
+
+    val credential = wallet.issueByCredentialOfferUrl(coUrl)
+
+    println("--> Issued credential : $credential \n")
+}
+
+private suspend fun WalletInitiatedIssuanceNoOffer(wallet: Wallet) {
+    println("[[Scenario: No offer passed, wallet initiates issuance by credetial scopes]]")
+
+    val credential = wallet.issueByScope(PID_SdJwtVC_SCOPE)
+
+    println("--> Issued credential : $credential \n")
 }
 
 data class ActingUser(
@@ -75,42 +99,59 @@ data class ActingUser(
 
 private class Wallet(
     val actingUser: ActingUser,
+    val bindingKey: BindingKey,
 ) {
 
-    val vciWalletConfiguration = WalletOpenId4VCIConfig(
-        clientId = "wallet-dev",
-        authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
-    )
+    suspend fun issueByScope(scope: String): String {
+        val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
+        val issuerMetadata = CredentialIssuerMetadataResolver.ktor().resolve(credentialIssuerIdentifier).getOrThrow()
+        val authServerMetadata = AuthorizationServerMetadataResolver.ktor().resolve(issuerMetadata.authorizationServer).getOrThrow()
 
-    suspend fun issueOfferedCredential(coUrl: String): String {
-        val ktorHttpClient = defaultHttpClientFactory()
-        val credentialOfferRequestResolver = CredentialOfferRequestResolver(
-            httpGet = { url ->
-                runCatching {
-                    ktorHttpClient.get(url).body<String>()
-                }
-            },
+        val offer = CredentialOffer(
+            credentialIssuerIdentifier = credentialIssuerIdentifier,
+            credentials = listOf(CredentialMetadata.ByScope(Scope.of(scope))),
+            credentialIssuerMetadata = issuerMetadata,
+            authorizationServerMetadata = authServerMetadata,
         )
+        return issueOfferedCredential(offer)
+    }
 
-        val offer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
+    suspend fun issueByCredentialOfferUrl(coUrl: String): String {
+        val offer = HttpClientFactory().use { client ->
+            val credentialOfferRequestResolver = CredentialOfferRequestResolver(
+                httpGet = { url ->
+                    runCatching {
+                        client.get(url).body<String>()
+                    }
+                },
+            )
+            credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
+        }
+
+        return issueOfferedCredential(offer)
+    }
+
+    private suspend fun issueOfferedCredential(offer: CredentialOffer): String {
         val issuer = Issuer.ktor(
             offer.authorizationServerMetadata,
             offer.credentialIssuerMetadata,
-            vciWalletConfiguration,
+            config,
         )
-
         // Authorize with auth code flow
         val authorized = authorizeRequestWithAuthCodeUseCase(issuer, offer)
-
         val outcome = when (authorized) {
             is AuthorizedRequest.NoProofRequired -> {
                 noProofRequiredSubmissionUseCase(issuer, authorized, offer)
             }
+
             is AuthorizedRequest.ProofRequired -> {
-                proofRequiredSubmissionUseCase(issuer, authorized, offer, authorized.cNonce.toJwtProof())
+                proofRequiredSubmissionUseCase(
+                    issuer,
+                    authorized,
+                    offer,
+                )
             }
         }
-
         return outcome
     }
 
@@ -139,14 +180,38 @@ private class Wallet(
         }
     }
 
+    private suspend fun authorizeRequestWithPreAuthCodeUseCase(
+        issuer: Issuer,
+        offer: CredentialOffer,
+    ): AuthorizedRequest {
+        with(issuer) {
+            val preAuthorizedCode =
+                when (val grants = offer.grants) {
+                    is Grants.Both -> grants.preAuthorizedCode
+                    is Grants.PreAuthorizedCode -> grants
+                    else -> throw IllegalStateException(
+                        "Invalid proof: Grants expected should be either Grants.PreAuthorizedCode or Grants.Both",
+                    )
+                }
+
+            val preAuthorizationCode =
+                IssuanceAuthorization.PreAuthorizationCode(preAuthorizedCode.preAuthorizedCode, "")
+
+            val authorizedRequest = authorizeWithPreAuthorizationCode(offer.credentials, preAuthorizationCode).getOrThrow()
+
+            println("--> Pre-authorization code exchanged with access token : ${authorizedRequest.token.accessToken}")
+
+            return authorizedRequest
+        }
+    }
+
     private suspend fun proofRequiredSubmissionUseCase(
         issuer: Issuer,
         authorized: AuthorizedRequest.ProofRequired,
         offer: CredentialOffer,
-        proof: Proof.Jwt,
     ): String {
         with(issuer) {
-            val requestOutcome = authorized.requestSingle(offer.credentials[0], null, proof).getOrThrow()
+            val requestOutcome = authorized.requestSingle(offer.credentials[0], null, bindingKey).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
@@ -161,7 +226,8 @@ private class Wallet(
                     requestOutcome.error.raise()
                 }
 
-                is SubmittedRequest.InvalidProof -> TODO()
+                is SubmittedRequest.InvalidProof ->
+                    throw IllegalStateException("Although providing a proof with c_nonce the proof is still invalid")
             }
         }
     }
@@ -188,7 +254,6 @@ private class Wallet(
                         issuer,
                         noProofRequiredState.handleInvalidProof(requestOutcome.cNonce),
                         offer,
-                        requestOutcome.cNonce.toJwtProof(),
                     )
                 }
 
@@ -199,46 +264,42 @@ private class Wallet(
         }
     }
 
-    private fun httpClientWithHttpCookiesFactory(): HttpClient =
-        HttpClient {
-            install(ContentNegotiation) { json() }
-            install(HttpCookies)
-        }
-
-    private fun defaultHttpClientFactory(): HttpClient =
+    private fun HttpClientFactory(): HttpClient =
         HttpClient {
             install(ContentNegotiation) {
                 json(
                     json = Json { ignoreUnknownKeys = true },
                 )
             }
+            install(HttpCookies)
         }
 
     private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
-        val client = httpClientWithHttpCookiesFactory()
+        HttpClientFactory().use { client ->
 
-        val loginUrl = HttpGet { url ->
-            runCatching {
-                client.get(url).body<String>()
-            }
-        }.get(getAuthorizationCodeUrl).getOrThrow().extractASLoginUrl()
+            val loginUrl = HttpGet { url ->
+                runCatching {
+                    client.get(url).body<String>()
+                }
+            }.get(getAuthorizationCodeUrl).getOrThrow().extractASLoginUrl()
 
-        return HttpFormPost { url, formParameters ->
-            val response = client.submitForm(
-                url = url.toString(),
-                formParameters = Parameters.build {
-                    formParameters.entries.forEach { append(it.key, it.value) }
-                },
+            return HttpFormPost { url, formParameters ->
+                val response = client.submitForm(
+                    url = url.toString(),
+                    formParameters = Parameters.build {
+                        formParameters.entries.forEach { append(it.key, it.value) }
+                    },
+                )
+                val redirectLocation = response.headers.get("Location").toString()
+                URLBuilder(redirectLocation).parameters.get("code")
+            }.post(
+                loginUrl,
+                mapOf(
+                    "username" to actingUser.username,
+                    "password" to actingUser.password,
+                ),
             )
-            val redirectLocation = response.headers.get("Location").toString()
-            URLBuilder(redirectLocation).parameters.get("code")
-        }.post(
-            loginUrl,
-            mapOf(
-                "username" to actingUser.username,
-                "password" to actingUser.password,
-            ),
-        )
+        }
     }
 
     private fun String.extractASLoginUrl(): URL {
@@ -247,21 +308,7 @@ private class Wallet(
         return URL(action)
     }
 
-    private fun CNonce.toJwtProof(): Proof.Jwt {
-        val jsonObject =
-            buildJsonObject {
-                put("iss", "wallet_client_id")
-                put("iat", Instant.now().epochSecond)
-                put("aud", CREDENTIAL_ISSUER_PUBLIC_URL)
-                put("nonce", value)
-            }
-        val jsonStr = Json.encodeToString(jsonObject)
-        return Proof.Jwt(
-            jwt = PlainJWT(JWTClaimsSet.parse(jsonStr)),
-        )
-    }
-
     companion object {
-        fun ofUser(actingUser: ActingUser) = Wallet(actingUser)
+        fun ofUser(actingUser: ActingUser, bindingKey: BindingKey.Jwk) = Wallet(actingUser, bindingKey)
     }
 }

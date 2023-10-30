@@ -80,6 +80,7 @@ sealed interface SubmittedRequest {
 
     class InvalidProof(
         val cNonce: CNonce,
+        val errorDescription: String? = null,
     ) : Errored
 }
 
@@ -113,7 +114,7 @@ interface RequestIssuance {
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
-        proof: Proof,
+        bindingKey: BindingKey,
     ): Result<SubmittedRequest>
 
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
@@ -121,7 +122,7 @@ interface RequestIssuance {
     ): Result<SubmittedRequest>
 
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, Proof>>,
+        credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
     ): Result<SubmittedRequest>
 
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
@@ -189,6 +190,7 @@ sealed interface CredentialIssuanceError {
     data class InvalidProof(
         val cNonce: String,
         val cNonceExpiresIn: Long? = 5,
+        val errorDescription: String? = null,
     ) : CredentialIssuanceError
 
     /**
@@ -214,6 +216,12 @@ sealed interface CredentialIssuanceError {
     ) : CredentialIssuanceError
 
     data class ResponseUnparsable(val error: String) : CredentialIssuanceError
+
+    sealed interface ProofGenerationError : CredentialIssuanceError {
+        object BindingMethodNotSupported : ProofGenerationError
+        object CryptographicSuiteNotSupported : ProofGenerationError
+        object ProofTypeNotSupported : ProofGenerationError
+    }
 }
 
 /**

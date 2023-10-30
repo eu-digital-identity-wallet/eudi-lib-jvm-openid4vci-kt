@@ -43,6 +43,9 @@ data class CredentialOffer(
 @JvmInline
 value class CredentialIssuerId private constructor(val value: HttpsUrl) {
 
+    override fun toString(): String =
+        value.value.toString()
+
     companion object {
 
         /**

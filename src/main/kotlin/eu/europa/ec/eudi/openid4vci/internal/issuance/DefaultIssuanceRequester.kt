@@ -22,9 +22,7 @@ import io.ktor.util.reflect.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 
 internal class DefaultIssuanceRequester(
     val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -35,29 +33,28 @@ internal class DefaultIssuanceRequester(
     override suspend fun placeIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.SingleCredential,
-    ): Result<CredentialIssuanceResponse> =
+    ): Result<CredentialIssuanceResponse> = withContext(coroutineDispatcher) {
         runCatching {
-            withContext(coroutineDispatcher) {
-                postIssueRequest.post(
-                    issuerMetadata.credentialEndpoint.value.value.toURL(),
-                    mapOf(accessToken.toAuthorizationHeader()),
-                    request.toTransferObject(),
-                ) {
-                    // Process response
-                    if (it.status.isSuccess()) {
-                        if (request.requiresEncryptedResponse()) {
-                            TODO("NOT IMPLEMENTED: Decrypt JWT, extract JWT claims and map them to IssuanceResponse")
-                        } else {
-                            val success = it.body<SingleIssuanceSuccessResponse>()
-                            success.toSingleIssuanceResponse()
-                        }
+            postIssueRequest.post(
+                issuerMetadata.credentialEndpoint.value.value.toURL(),
+                mapOf(accessToken.toAuthorizationHeader()),
+                request.toTransferObject(),
+            ) {
+                // Process response
+                if (it.status.isSuccess()) {
+                    if (request.requiresEncryptedResponse()) {
+                        TODO("NOT IMPLEMENTED: Decrypt JWT, extract JWT claims and map them to IssuanceResponse")
                     } else {
-                        val error = it.body<GenericErrorResponse>()
-                        error.toIssuanceError().raise()
+                        val success = it.body<SingleIssuanceSuccessResponse>()
+                        success.toSingleIssuanceResponse()
                     }
+                } else {
+                    val error = it.body<GenericErrorResponse>()
+                    error.toIssuanceError().raise()
                 }
             }
         }
+    }
 
     override suspend fun placeBatchIssuanceRequest(
         accessToken: IssuanceAccessToken,
@@ -137,6 +134,7 @@ private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError =
                 CredentialIssuanceError.InvalidProof(
                     cNonce = cNonce,
                     cNonceExpiresIn = cNonceExpiresInSeconds,
+                    errorDescription = errorDescription,
                 )
             }
                 ?: CredentialIssuanceError.ResponseUnparsable("Issuer responded with invalid_proof error but no c_nonce was provided")
@@ -197,6 +195,26 @@ private fun CredentialIssuanceRequest.SingleCredential.toTransferObject(): Crede
             )
     }
 }
+
+private fun Proof.toJsonObject(): JsonObject =
+    when (this) {
+        is Proof.Jwt -> {
+            JsonObject(
+                mapOf(
+                    "proof_type" to JsonPrimitive("jwt"),
+                    "jwt" to JsonPrimitive(jwt.serialize()),
+                ),
+            )
+        }
+        is Proof.Cwt -> {
+            JsonObject(
+                mapOf(
+                    "proof_type" to JsonPrimitive("cwt"),
+                    "jwt" to JsonPrimitive(cwt),
+                ),
+            )
+        }
+    }
 
 private fun CredentialIssuanceRequest.BatchCredentials.toTransferObject(): CredentialIssuanceRequestTO {
     return CredentialIssuanceRequestTO.BatchCredentialsTO(
