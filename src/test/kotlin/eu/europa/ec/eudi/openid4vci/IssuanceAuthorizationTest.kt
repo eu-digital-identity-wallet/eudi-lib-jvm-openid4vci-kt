@@ -19,14 +19,10 @@ import eu.europa.ec.eudi.openid4vci.internal.issuance.TokenEndpointForm
 import io.ktor.client.*
 import io.ktor.server.request.*
 import kotlinx.coroutines.runBlocking
-import org.hamcrest.MatcherAssert.assertThat
-import org.junit.jupiter.api.Assertions
 import java.net.URI
 import java.net.URLEncoder
 import java.util.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.fail
+import kotlin.test.*
 
 class IssuanceAuthorizationTest {
 
@@ -78,31 +74,32 @@ class IssuanceAuthorizationTest {
             { postParCall ->
                 runBlocking {
                     val formParameters = postParCall.receiveParameters()
-                    assertThat(
+                    assertEquals(
+                        "application/x-www-form-urlencoded; charset=UTF-8",
+                        postParCall.request.headers["Content-Type"],
                         "Wrong content-type, expected application/x-www-form-urlencoded",
-                        "application/x-www-form-urlencoded; charset=UTF-8".equals(postParCall.request.headers["Content-Type"]),
                     )
                     val scope = formParameters["scope"].toString()
-                    assertThat(
-                        "Missing scope UniversityDegree",
+                    assertTrue(
                         scope.contains("UniversityDegree"),
+                        "Missing scope UniversityDegree",
                     )
-                    assertThat(
-                        "Missing scope PID_mso_mdoc",
+                    assertTrue(
                         scope.contains("PID_mso_mdoc"),
+                        "Missing scope PID_mso_mdoc",
                     )
-                    assertThat(
+                    assertNull(
+                        formParameters["issuer_state"],
                         "No issuer_state expected when issuance starts from wallet",
-                        formParameters["issuer_state"] == null,
                     )
 
-                    assertThat(
+                    assertNotNull(
+                        formParameters["code_challenge"],
                         "PKCE code challenge was expected but not sent.",
-                        formParameters["code_challenge"] != null,
                     )
-                    assertThat(
+                    assertNotNull(
+                        formParameters["code_challenge_method"],
                         "PKCE code challenge method was expected but not sent.",
-                        formParameters["code_challenge_method"] != null,
                     )
                 }
             },
@@ -114,34 +111,35 @@ class IssuanceAuthorizationTest {
                         tokenPostCall.request.headers["Content-Type"],
                     )
 
-                    assertThat(
+                    assertNotNull(
+                        formParameters[TokenEndpointForm.AuthCodeFlow.CODE_VERIFIER_PARAM],
                         "PKCE code verifier was expected but not sent.",
-                        formParameters[TokenEndpointForm.AuthCodeFlow.CODE_VERIFIER_PARAM] != null,
                     )
 
-                    assertThat(
+                    assertNotNull(
+                        formParameters[TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM],
                         "Parameter ${TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM} was expected but not sent.",
-                        formParameters[TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM] != null,
                     )
 
-                    assertThat(
+                    assertNotNull(
+                        formParameters[TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM],
                         "Parameter ${TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM} was expected but not sent.",
-                        formParameters[TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM] != null,
                     )
 
-                    assertThat(
+                    assertNotNull(
+                        formParameters[TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM],
                         "Parameter ${TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM} was expected but not sent.",
-                        formParameters[TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM] != null,
                     )
 
                     val grantType = formParameters[TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM]
-                    assertThat(
+                    assertNotNull(
+                        grantType,
                         "Parameter ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM} was expected but not sent.",
-                        grantType != null,
                     )
-                    assertThat(
+                    assertEquals(
+                        TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE,
+                        grantType,
                         "Expected grant_type is ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but instead sent $grantType.",
-                        TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE.equals(grantType),
                     )
                 }
             },
@@ -159,23 +157,24 @@ class IssuanceAuthorizationTest {
             { postParCall ->
                 runBlocking {
                     val formParameters = postParCall.receiveParameters()
-                    assertThat(
+                    assertEquals(
+                        "application/x-www-form-urlencoded; charset=UTF-8",
+                        postParCall.request.headers["Content-Type"],
                         "Wrong content-type, expected application/x-www-form-urlencoded",
-                        "application/x-www-form-urlencoded; charset=UTF-8".equals(postParCall.request.headers["Content-Type"]),
                     )
                     val scope = formParameters["scope"].toString()
-                    assertThat(
-                        "Missing scope UniversityDegree",
+                    assertTrue(
                         scope.contains("UniversityDegree"),
+                        "Missing scope UniversityDegree",
                     )
-                    assertThat(
-                        "Missing scope PID_mso_mdoc",
+                    assertTrue(
                         scope.contains("PID_mso_mdoc"),
+                        "Missing scope PID_mso_mdoc",
                     )
 
-                    assertThat(
+                    assertNotNull(
+                        formParameters["issuer_state"],
                         "Parameter issuer_state is expected when issuance starts from issuer site",
-                        formParameters["issuer_state"] != null,
                     )
                 }
             },
@@ -186,39 +185,40 @@ class IssuanceAuthorizationTest {
                         "application/x-www-form-urlencoded; charset=UTF-8",
                         tokenPostCall.request.headers["Content-Type"],
                     )
-                    assertThat(
+                    assertNotNull(
+                        formParameters["code_verifier"],
                         "PKCE code verifier was expected but not sent.",
-                        formParameters["code_verifier"] != null,
                     )
 
-                    assertThat(
+                    assertNotNull(
+                        formParameters[TokenEndpointForm.AuthCodeFlow.CODE_VERIFIER_PARAM],
                         "PKCE code verifier was expected but not sent.",
-                        formParameters[TokenEndpointForm.AuthCodeFlow.CODE_VERIFIER_PARAM] != null,
                     )
 
-                    assertThat(
+                    assertNotNull(
+                        formParameters[TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM],
                         "Parameter ${TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM} was expected but not sent.",
-                        formParameters[TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM] != null,
                     )
 
-                    assertThat(
+                    assertNotNull(
+                        formParameters[TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM],
                         "Parameter ${TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM} was expected but not sent.",
-                        formParameters[TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM] != null,
                     )
 
-                    assertThat(
+                    assertNotNull(
+                        formParameters[TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM],
                         "Parameter ${TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM} was expected but not sent.",
-                        formParameters[TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM] != null,
                     )
 
                     val grantType = formParameters[TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM]
-                    assertThat(
+                    assertNotNull(
+                        grantType,
                         "Parameter ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM} was expected but not sent.",
-                        grantType != null,
                     )
-                    assertThat(
+                    assertEquals(
+                        TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE,
+                        grantType,
                         "Expected grant_type is ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but instead sent $grantType.",
-                        TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE.equals(grantType),
                     )
                 }
             },
@@ -239,36 +239,38 @@ class IssuanceAuthorizationTest {
             { tokenPostCall ->
                 runBlocking {
                     val formParameters = tokenPostCall.receiveParameters()
-                    assertThat(
+                    assertEquals(
+                        "application/x-www-form-urlencoded; charset=UTF-8",
+                        tokenPostCall.request.headers["Content-Type"],
                         "Wrong content-type, expected application/x-www-form-urlencoded",
-                        "application/x-www-form-urlencoded; charset=UTF-8".equals(tokenPostCall.request.headers["Content-Type"]),
                     )
 
-                    assertThat(
+                    assertNull(
+                        formParameters["code_verifier"],
                         "PKCE code verifier was not expected but sent.",
-                        formParameters["code_verifier"] == null,
                     )
 
-                    assertThat(
+                    assertNotNull(
+                        formParameters[TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM],
                         "Parameter ${TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM} was expected but not sent.",
-                        formParameters[TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM] != null,
                     )
 
-                    assertThat(
+                    assertNotNull(
+                        formParameters[TokenEndpointForm.PreAuthCodeFlow.USER_PIN_PARAM],
                         "Parameter ${TokenEndpointForm.PreAuthCodeFlow.USER_PIN_PARAM} was expected but not sent.",
-                        formParameters[TokenEndpointForm.PreAuthCodeFlow.USER_PIN_PARAM] != null,
                     )
 
                     val grantType = formParameters[TokenEndpointForm.PreAuthCodeFlow.GRANT_TYPE_PARAM]
-                    assertThat(
+                    assertNotNull(
+                        grantType,
                         "Parameter grant_type was expected but not sent.",
-                        grantType != null,
                     )
                     val grantTypeParamValueUrlEncoded =
                         URLEncoder.encode(TokenEndpointForm.PreAuthCodeFlow.GRANT_TYPE_PARAM_VALUE, "UTF-8")
-                    assertThat(
+                    assertEquals(
+                        grantTypeParamValueUrlEncoded,
+                        grantType,
                         "Expected grant_type is ${TokenEndpointForm.PreAuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but instead sent $grantType.",
-                        grantTypeParamValueUrlEncoded.equals(grantType),
                     )
                 }
             },
@@ -281,7 +283,8 @@ class IssuanceAuthorizationTest {
     ) = runBlocking {
         val offer = CredentialOfferRequestResolver(
             httpGet = createGetASMetadata(client),
-        ).resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr").getOrThrow()
+        ).resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
+            .getOrThrow()
 
         // AUTHORIZATION CODE FLOW IS USED FOR ISSUANCE
         val issuer = Issuer.make(
@@ -302,7 +305,7 @@ class IssuanceAuthorizationTest {
                 is Grants.AuthorizationCode -> grants.issuerState
                 is Grants.Both -> grants.authorizationCode.issuerState
                 null -> null
-                else -> Assertions.fail("Not expected offer grant type")
+                else -> fail("Not expected offer grant type")
             }
 
         // Place PAR
@@ -317,7 +320,8 @@ class IssuanceAuthorizationTest {
         // Proceed with next steps to issue certificate
         with(issuer) {
             parRequested
-                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode)).also { println(it) }
+                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                .also { println(it) }
                 .requestAccessToken().getOrThrow().also { println(it) }
         }
     }
