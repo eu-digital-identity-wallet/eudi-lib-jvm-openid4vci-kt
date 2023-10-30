@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.PlainJWT
 import io.ktor.client.*
@@ -226,6 +227,10 @@ class IssuanceRequestTest {
                             ),
                         ),
                     )
+                    val bindingKey = BindingKey.Jwk(
+                        algorithm = JWSAlgorithm.RS256,
+                        jwk = ProofBuilder.randomRSASigningKey(2048),
+                    )
 
                     with(issuer) {
                         when (authorizedRequest) {
@@ -237,11 +242,10 @@ class IssuanceRequestTest {
                                     is SubmittedRequest.InvalidProof -> {
                                         val proofRequired =
                                             authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                                        val proof = proofRequired.cNonce.toJwtProof()
                                         val response = proofRequired.requestSingle(
                                             credentialMetadata,
                                             claimSet,
-                                            proof,
+                                            bindingKey,
                                         )
                                         assertThat(
                                             "Second attempt should be successful",

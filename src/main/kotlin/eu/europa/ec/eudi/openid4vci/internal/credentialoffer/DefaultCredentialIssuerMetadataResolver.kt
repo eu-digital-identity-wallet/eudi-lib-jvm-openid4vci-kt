@@ -38,7 +38,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
         runCatching {
             val credentialIssuerMetadataContent = try {
                 val url =
-                    URLBuilder(issuer.value.value.toString())
+                    URLBuilder(issuer.toString())
                         .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
                         .build()
                         .toURI()

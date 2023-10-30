@@ -19,8 +19,8 @@ import eu.europa.ec.eudi.openid4vci.*
 import java.util.*
 
 internal class DefaultIssuer(
-    val authorizer: IssuanceAuthorizer,
-    val issuanceRequester: IssuanceRequester,
+    private val authorizer: IssuanceAuthorizer,
+    private val issuanceRequester: IssuanceRequester,
 ) : Issuer {
 
     override suspend fun pushAuthorizationCodeRequest(
@@ -33,7 +33,6 @@ internal class DefaultIssuer(
             val (codeVerifier, getAuthorizationCodeUrl) =
                 authorizer.submitPushedAuthorizationRequest(scopes, state, issuerState).getOrThrow()
 
-            // Transition state
             UnauthorizedRequest.ParRequested(
                 credentials = credentials,
                 getAuthorizationCodeURL = getAuthorizationCodeUrl,
@@ -104,14 +103,59 @@ internal class DefaultIssuer(
     override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
-        proof: Proof,
+        bindingKey: BindingKey,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
-            credentialMetadata
-                .toIssuerSupportedCredential()
-                .toIssuanceRequest(claimSet, proof)
+            with(credentialMetadata.toIssuerSupportedCredential()) {
+                toIssuanceRequest(
+                    claimSet,
+                    bindingKey.toSupportedProof(this, cNonce.value),
+                )
+            }
         }
     }
+
+    private fun BindingKey.toSupportedProof(credentialSpec: CredentialSupported, cNonce: String): Proof =
+        // Validate that the provided evidence is one of those that issuer supports
+        when (this) {
+            is BindingKey.Jwk -> {
+                fun isAlgorithmIsSupported(): Boolean =
+                    credentialSpec.cryptographicSuitesSupported.contains(algorithm.name)
+
+                fun isBindingMethodSupported(): Boolean =
+                    credentialSpec.cryptographicBindingMethodsSupported.contains(CryptographicBindingMethod.JWK)
+
+                fun isProofTypeSupported(): Boolean =
+                    credentialSpec.proofTypesSupported.contains(ProofType.JWT)
+
+                if (!isAlgorithmIsSupported()) {
+                    CredentialIssuanceError.ProofGenerationError.BindingMethodNotSupported.raise()
+                }
+                if (!isBindingMethodSupported()) {
+                    CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported.raise()
+                }
+                if (!isProofTypeSupported()) {
+                    CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported.raise()
+                }
+
+                Proof.Jwt(
+                    with(
+                        ProofBuilder.ofType(ProofType.JWT),
+                    ) {
+                        iss("") // TODO: Get from config??
+                        aud(issuanceRequester.issuerMetadata.credentialIssuerIdentifier.toString())
+                        jwk(this@toSupportedProof.jwk)
+                        alg(this@toSupportedProof.algorithm)
+                        nonce(cNonce)
+
+                        build()
+                    },
+                )
+            }
+
+            is BindingKey.Did -> TODO("DID proof evidence not supported yet")
+            is BindingKey.X509 -> TODO("X509 proof evidence not supported yet")
+        }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
@@ -128,14 +172,17 @@ internal class DefaultIssuer(
     }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, Proof>>,
+        credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             CredentialIssuanceRequest.BatchCredentials(
                 credentialRequests = credentialsMetadata.map { triple ->
-                    triple.first
-                        .toIssuerSupportedCredential()
-                        .toIssuanceRequest(triple.second, triple.third)
+                    with(triple.first.toIssuerSupportedCredential()) {
+                        toIssuanceRequest(
+                            triple.second,
+                            triple.third.toSupportedProof(this, cNonce.value),
+                        )
+                    }
                 },
             )
         }

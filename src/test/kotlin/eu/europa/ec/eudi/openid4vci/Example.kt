@@ -58,7 +58,13 @@ val MsoMdoc_CredentialOffer = """
 
 fun main(): Unit = runBlocking {
     val coUrl = "http://localhost:8080/credentialoffer?credential_offer=$SdJwtVC_CredentialOffer"
-    val wallet = Wallet.ofUser(ActingUser("babis", "babis"))
+
+    val bindingKey = BindingKey.Jwk(
+        algorithm = JWSAlgorithm.RS256,
+        jwk = ProofBuilder.randomRSASigningKey(2048),
+    )
+
+    val wallet = Wallet.ofUser(ActingUser("babis", "babis"), bindingKey)
     val credential = wallet.issueOfferedCredential(coUrl)
 
     println("--> Issued credential : $credential")
@@ -71,6 +77,7 @@ data class ActingUser(
 
 private class Wallet(
     val actingUser: ActingUser,
+    val bindingKey: BindingKey,
 ) {
 
     val config = WalletOpenId4VCIConfig(
@@ -106,10 +113,6 @@ private class Wallet(
                     issuer,
                     authorized,
                     offer,
-                    authorized.cNonce.toJwtProof(
-                        config.clientId,
-                        offer.credentialIssuerIdentifier.value.value.toString(),
-                    ),
                 )
             }
         }
@@ -146,10 +149,9 @@ private class Wallet(
         issuer: Issuer,
         authorized: AuthorizedRequest.ProofRequired,
         offer: CredentialOffer,
-        proof: Proof.Jwt,
     ): String {
         with(issuer) {
-            val requestOutcome = authorized.requestSingle(offer.credentials[0], null, proof).getOrThrow()
+            val requestOutcome = authorized.requestSingle(offer.credentials[0], null, bindingKey).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
@@ -186,19 +188,13 @@ private class Wallet(
                         is CredentialIssuanceResponse.Result.Deferred -> result.transactionId
                     }
                 }
-
                 is SubmittedRequest.InvalidProof -> {
                     proofRequiredSubmissionUseCase(
                         issuer,
                         noProofRequiredState.handleInvalidProof(requestOutcome.cNonce),
                         offer,
-                        requestOutcome.cNonce.toJwtProof(
-                            config.clientId,
-                            offer.credentialIssuerIdentifier.value.value.toString(),
-                        ),
                     )
                 }
-
                 is SubmittedRequest.Failed -> {
                     requestOutcome.error.raise()
                 }
@@ -250,19 +246,7 @@ private class Wallet(
         return URL(action)
     }
 
-    private fun CNonce.toJwtProof(clientId: String, audience: String): Proof.Jwt {
-        val jwt = with(ProofBuilder.ofType(ProofType.JWT)) {
-            alg(JWSAlgorithm.RS256)
-            iss(clientId)
-            jwk(ProofBuilder.randomRSAKey())
-            aud(audience)
-            nonce(value)
-            build()
-        }
-        return Proof.Jwt(jwt)
-    }
-
     companion object {
-        fun ofUser(actingUser: ActingUser) = Wallet(actingUser)
+        fun ofUser(actingUser: ActingUser, bindingKey: BindingKey.Jwk) = Wallet(actingUser, bindingKey)
     }
 }

@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.JWT
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
 import io.ktor.client.*
@@ -23,14 +25,16 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
+import java.security.cert.X509Certificate
 
 /**
  * A [URI] that strictly uses the 'https' protocol.
  */
 @JvmInline
 value class HttpsUrl private constructor(val value: URI) {
+
+    override fun toString(): String = value.toString()
 
     companion object {
 
@@ -220,33 +224,34 @@ data class CNonce(
 
 sealed interface Proof {
     fun type(): ProofType
-    fun toJsonObject(): JsonObject
 
     data class Jwt(
         val jwt: JWT,
     ) : Proof {
         override fun type() = ProofType.JWT
-        override fun toJsonObject(): JsonObject =
-            JsonObject(
-                mapOf(
-                    "proof_type" to JsonPrimitive("jwt"),
-                    "jwt" to JsonPrimitive(jwt.serialize()),
-                ),
-            )
     }
 
     data class Cwt(
         val cwt: String,
     ) : Proof {
         override fun type() = ProofType.CWT
-        override fun toJsonObject(): JsonObject =
-            JsonObject(
-                mapOf(
-                    "proof_type" to JsonPrimitive("cwt"),
-                    "jwt" to JsonPrimitive(cwt),
-                ),
-            )
     }
+}
+
+sealed interface BindingKey {
+
+    data class Jwk(
+        val algorithm: JWSAlgorithm,
+        val jwk: JWK,
+    ) : BindingKey
+
+    data class Did(
+        val identity: String,
+    ) : BindingKey
+
+    data class X509(
+        val certificate: X509Certificate,
+    ) : BindingKey
 }
 
 @JvmInline

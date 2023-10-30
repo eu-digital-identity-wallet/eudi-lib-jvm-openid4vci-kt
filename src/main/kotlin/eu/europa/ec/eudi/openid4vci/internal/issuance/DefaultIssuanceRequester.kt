@@ -22,9 +22,7 @@ import io.ktor.util.reflect.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 
 internal class DefaultIssuanceRequester(
     val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -197,6 +195,26 @@ private fun CredentialIssuanceRequest.SingleCredential.toTransferObject(): Crede
             )
     }
 }
+
+private fun Proof.toJsonObject(): JsonObject =
+    when (this) {
+        is Proof.Jwt -> {
+            JsonObject(
+                mapOf(
+                    "proof_type" to JsonPrimitive("jwt"),
+                    "jwt" to JsonPrimitive(jwt.serialize()),
+                ),
+            )
+        }
+        is Proof.Cwt -> {
+            JsonObject(
+                mapOf(
+                    "proof_type" to JsonPrimitive("cwt"),
+                    "jwt" to JsonPrimitive(cwt),
+                ),
+            )
+        }
+    }
 
 private fun CredentialIssuanceRequest.BatchCredentials.toTransferObject(): CredentialIssuanceRequestTO {
     return CredentialIssuanceRequestTO.BatchCredentialsTO(

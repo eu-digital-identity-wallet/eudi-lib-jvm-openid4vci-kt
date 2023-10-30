@@ -49,7 +49,7 @@ internal fun credentialIssuerId() = CredentialIssuerId("https://credential-issue
  */
 internal fun credentialIssuerMetadataUrl(credentialIssuerId: CredentialIssuerId = credentialIssuerId()) =
     HttpsUrl(
-        URLBuilder(credentialIssuerId.value.value.toString())
+        URLBuilder(credentialIssuerId.toString())
             .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
             .buildString(),
     ).getOrThrow()

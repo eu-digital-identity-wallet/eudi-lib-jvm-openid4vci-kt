@@ -24,7 +24,6 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
-import java.lang.IllegalStateException
 import java.time.Instant
 import java.util.*
 
@@ -63,24 +62,20 @@ sealed interface ProofBuilder {
         }
 
         fun build(): SignedJWT {
-            if (this.alg == null) {
-                throw IllegalStateException("No signing algorithm provided")
+            checkNotNull(alg) {
+                "No signing algorithm provided"
             }
-
-            if (this.jwk == null) {
-                throw IllegalStateException("Cryptographic key material must be provided")
+            checkNotNull(jwk) {
+                "Cryptographic key material must be provided"
             }
-
-            if (jwk!!.keyType != KeyType.forAlgorithm(alg)) {
-                throw IllegalStateException("Provided key does not match signing algorithm")
+            check(jwk?.keyType == KeyType.forAlgorithm(alg)) {
+                "Provided key and signing algorithm do not match"
             }
-
-            // Validate mandatory
-            if (claimsSet.claims["aud"] == null) {
-                throw IllegalStateException("Claim 'aud' is missing")
+            checkNotNull(claimsSet.claims["aud"]) {
+                "Claim 'aud' is missing"
             }
-            if (claimsSet.claims["nonce"] == null) {
-                throw IllegalStateException("Claim 'nonce' is missing")
+            checkNotNull(claimsSet.claims["nonce"]) {
+                "Claim 'nonce' is missing"
             }
 
             val headerBuilder = JWSHeader.Builder(alg)
@@ -90,10 +85,7 @@ sealed interface ProofBuilder {
             claimsSet.issueTime(Date.from(Instant.now()))
 
             val signedJWT = SignedJWT(headerBuilder.build(), claimsSet.build())
-
-            val signerFactory = DefaultJWSSignerFactory()
-            val signer = signerFactory.createJWSSigner(jwk!!, alg)
-
+            val signer = DefaultJWSSignerFactory().createJWSSigner(jwk!!, alg)
             signedJWT.sign(signer)
 
             return signedJWT
@@ -107,13 +99,13 @@ sealed interface ProofBuilder {
                 ProofType.CWT -> TODO("CWT proofs not supported yet")
             }
 
-        fun randomRSAKey(): RSAKey = RSAKeyGenerator(2048)
+        fun randomRSASigningKey(size: Int): RSAKey = RSAKeyGenerator(size)
             .keyUse(KeyUse.SIGNATURE)
             .keyID(UUID.randomUUID().toString())
             .issueTime(Date(System.currentTimeMillis()))
             .generate()
 
-        fun randomECKey(): ECKey = ECKeyGenerator(Curve.P_256)
+        fun randomECSigningKey(curve: Curve): ECKey = ECKeyGenerator(curve)
             .keyUse(KeyUse.SIGNATURE)
             .keyID(UUID.randomUUID().toString())
             .issueTime(Date(System.currentTimeMillis()))

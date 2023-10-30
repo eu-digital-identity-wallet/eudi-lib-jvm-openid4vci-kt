@@ -80,6 +80,8 @@ data class CredentialIssuerMetadata(
 @JvmInline
 value class CredentialIssuerEndpoint private constructor(val value: HttpsUrl) {
 
+    override fun toString(): String = value.toString()
+
     companion object {
 
         /**
