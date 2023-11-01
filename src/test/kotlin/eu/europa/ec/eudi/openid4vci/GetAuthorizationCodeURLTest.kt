@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -39,7 +40,7 @@ class GetAuthorizationCodeURLTest {
                 GetAuthorizationCodeURL("https://issuer")
             },
         )
-        assertTrue(exception.message.equals("URL must contain client_id query parameter"))
+        assertTrue(exception.message.equals("URL must contain query parameter"))
 
         exception = assertFailsWith<IllegalArgumentException>(
             message = "URL must contain client_id query parameter",
@@ -47,18 +48,16 @@ class GetAuthorizationCodeURLTest {
                 GetAuthorizationCodeURL("https://issuer?param=client_id")
             },
         )
-        assertTrue(exception.message.equals("URL must contain client_id query parameter"))
+        assertEquals("URL must contain client_id query parameter", exception.message)
     }
 
     @Test
     fun `Fails no request_uri query param`() {
         var exception = assertFailsWith<IllegalArgumentException>(
             message = "URL must contain request_uri query parameter",
-            block = {
-                GetAuthorizationCodeURL("https://issuer?client_id=wallet_client_id")
-            },
+            block = { GetAuthorizationCodeURL("https://issuer?client_id=wallet_client_id") },
         )
-        assertTrue(exception.message.equals("URL must contain request_uri query parameter"))
+        assertEquals("URL must contain request_uri query parameter", exception.message)
 
         exception = assertFailsWith<IllegalArgumentException>(
             message = "URL must contain request_uri query parameter",
@@ -66,7 +65,7 @@ class GetAuthorizationCodeURLTest {
                 GetAuthorizationCodeURL("https://issuer?client_id=wallet_client_id")
             },
         )
-        assertTrue(exception.message.equals("URL must contain request_uri query parameter"))
+        assertEquals("URL must contain request_uri query parameter", exception.message)
     }
 
     @Test

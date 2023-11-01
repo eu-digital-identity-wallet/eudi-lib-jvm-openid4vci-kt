@@ -126,22 +126,17 @@ private fun testBed(
 }
 
 fun createPostPar(managedHttpClient: HttpClient): HttpFormPost<PushedAuthorizationRequestResponse> =
-    object : HttpFormPost<PushedAuthorizationRequestResponse> {
-        override suspend fun post(
-            url: URL,
-            formParameters: Map<String, String>,
-        ): PushedAuthorizationRequestResponse {
-            val response = managedHttpClient.submitForm(
-                url = url.toString(),
-                formParameters = Parameters.build {
-                    formParameters.entries.forEach { append(it.key, it.value) }
-                },
-            )
-            return if (response.status == HttpStatusCode.OK) {
-                response.body<PushedAuthorizationRequestResponse.Success>()
-            } else {
-                response.body<PushedAuthorizationRequestResponse.Failure>()
-            }
+    HttpFormPost { url, formParameters ->
+        val response = managedHttpClient.submitForm(
+            url = url.toString(),
+            formParameters = Parameters.build {
+                formParameters.entries.forEach { append(it.key, it.value) }
+            },
+        )
+        if (response.status == HttpStatusCode.OK) {
+            response.body<PushedAuthorizationRequestResponse.Success>()
+        } else {
+            response.body<PushedAuthorizationRequestResponse.Failure>()
         }
     }
 
@@ -172,22 +167,15 @@ fun createGetASMetadata(managedHttpClient: HttpClient): HttpGet<String> =
 fun createPostIssuance(
     managedHttpClient: HttpClient,
 ): HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
-    object : HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> {
-        override suspend fun post(
-            url: URL,
-            headers: Map<String, String>,
-            payload: CredentialIssuanceRequestTO,
-            responseHandler: suspend (response: HttpResponse) -> CredentialIssuanceResponse,
-        ): CredentialIssuanceResponse {
-            val response = managedHttpClient.post(url) {
-                headers {
-                    headers.forEach {
-                        append(it.key, it.value)
-                    }
+    HttpPost { url, headers, payload, responseHandler ->
+        val response = managedHttpClient.post(url) {
+            headers {
+                headers.forEach {
+                    append(it.key, it.value)
                 }
-                contentType(ContentType.parse("application/json"))
-                setBody(payload)
             }
-            return responseHandler(response)
+            contentType(ContentType.parse("application/json"))
+            setBody(payload)
         }
+        responseHandler(response)
     }

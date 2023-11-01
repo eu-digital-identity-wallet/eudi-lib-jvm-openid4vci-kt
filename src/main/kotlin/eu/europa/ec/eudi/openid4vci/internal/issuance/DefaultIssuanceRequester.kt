@@ -16,9 +16,10 @@
 package eu.europa.ec.eudi.openid4vci.internal.issuance
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequest.BatchCredentials
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequest.SingleCredential
 import io.ktor.client.call.*
 import io.ktor.http.*
-import io.ktor.util.reflect.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,7 +33,7 @@ internal class DefaultIssuanceRequester(
 
     override suspend fun placeIssuanceRequest(
         accessToken: IssuanceAccessToken,
-        request: CredentialIssuanceRequest.SingleCredential,
+        request: SingleCredential,
     ): Result<CredentialIssuanceResponse> = withContext(coroutineDispatcher) {
         runCatching {
             postIssueRequest.post(
@@ -58,7 +59,7 @@ internal class DefaultIssuanceRequester(
 
     override suspend fun placeBatchIssuanceRequest(
         accessToken: IssuanceAccessToken,
-        request: CredentialIssuanceRequest.BatchCredentials,
+        request: BatchCredentials,
     ): Result<CredentialIssuanceResponse> = runCatching {
         if (issuerMetadata.batchCredentialEndpoint == null) {
             CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance.raise()
@@ -107,12 +108,10 @@ private fun SingleIssuanceSuccessResponse.toSingleIssuanceResponse(): Credential
         ).raise()
 
 private fun BatchIssuanceSuccessResponse.toBatchIssuanceResponse(): CredentialIssuanceResponse {
-    fun mapResults() = credentialResponses.map {
-        it.transactionId?.let {
-            CredentialIssuanceResponse.Result.Deferred(it)
-        } ?: it.credential?.let { credential ->
-            CredentialIssuanceResponse.Result.Complete(it.format, credential)
-        }
+    fun mapResults() = credentialResponses.map { res ->
+        res.transactionId
+            ?.let { CredentialIssuanceResponse.Result.Deferred(it) }
+            ?: res.credential?.let { credential -> CredentialIssuanceResponse.Result.Complete(res.format, credential) }
             ?: CredentialIssuanceError.ResponseUnparsable(
                 "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
             ).raise()
@@ -128,24 +127,21 @@ private fun BatchIssuanceSuccessResponse.toBatchIssuanceResponse(): CredentialIs
 
 private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError =
     when (error) {
-        "invalid_proof",
-        -> {
-            cNonce?.let {
-                CredentialIssuanceError.InvalidProof(
-                    cNonce = cNonce,
-                    cNonceExpiresIn = cNonceExpiresInSeconds,
-                    errorDescription = errorDescription,
-                )
-            }
+        "invalid_proof" ->
+            cNonce
+                ?.let {
+                    CredentialIssuanceError.InvalidProof(
+                        cNonce = cNonce,
+                        cNonceExpiresIn = cNonceExpiresInSeconds,
+                        errorDescription = errorDescription,
+                    )
+                }
                 ?: CredentialIssuanceError.ResponseUnparsable("Issuer responded with invalid_proof error but no c_nonce was provided")
-        }
 
-        "issuance_pending" -> {
-            interval?.let {
-                CredentialIssuanceError.DeferredCredentialIssuancePending(interval)
-            }
+        "issuance_pending" ->
+            interval
+                ?.let { CredentialIssuanceError.DeferredCredentialIssuancePending(interval) }
                 ?: CredentialIssuanceError.DeferredCredentialIssuancePending()
-        }
 
         "invalid_token" -> CredentialIssuanceError.InvalidToken
         "invalid_transaction_id " -> CredentialIssuanceError.InvalidTransactionId
@@ -156,68 +152,65 @@ private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError =
         else -> CredentialIssuanceError.IssuanceRequestFailed(error, errorDescription)
     }
 
-private fun IssuanceAccessToken.toAuthorizationHeader(): Pair<String, String> = "Authorization" to "BEARER $accessToken"
+private fun IssuanceAccessToken.toAuthorizationHeader(): Pair<String, String> =
+    "Authorization" to "BEARER $accessToken"
 
-private fun CredentialIssuanceRequest.SingleCredential.toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO {
-    return when (this) {
-        is MsoMdocProfile.CredentialIssuanceRequest ->
-            MsoMdocProfile.CredentialIssuanceRequestTO(
-                docType = doctype,
-                proof = proof?.toJsonObject(),
-                credentialEncryptionJwk = credentialEncryptionJwk?.let {
-                    Json.parseToJsonElement(
-                        it.toPublicJWK().toString(),
-                    ).jsonObject
-                },
-                credentialResponseEncryptionAlg = credentialResponseEncryptionAlg?.toString(),
-                credentialResponseEncryptionMethod = credentialResponseEncryptionMethod?.toString(),
-                claims = claimSet?.let {
+private fun SingleCredential.toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO =
+    when (this) {
+        is MsoMdocProfile.CredentialIssuanceRequest -> MsoMdocProfile.CredentialIssuanceRequestTO(
+            docType = doctype,
+            proof = proof?.toJsonObject(),
+            credentialEncryptionJwk = credentialEncryptionJwk?.let {
+                Json.parseToJsonElement(
+                    it.toPublicJWK().toString(),
+                ).jsonObject
+            },
+            credentialResponseEncryptionAlg = credentialResponseEncryptionAlg?.toString(),
+            credentialResponseEncryptionMethod = credentialResponseEncryptionMethod?.toString(),
+            claims = claimSet?.let {
+                Json.encodeToJsonElement(it.claims).jsonObject
+            },
+        )
+
+        is SdJwtVcProfile.CredentialIssuanceRequest -> SdJwtVcProfile.CredentialIssuanceRequestTO(
+            proof = proof?.toJsonObject(),
+            credentialEncryptionJwk = credentialEncryptionJwk?.let {
+                Json.parseToJsonElement(
+                    it.toPublicJWK().toString(),
+                ).jsonObject
+            },
+            credentialResponseEncryptionAlg = credentialResponseEncryptionAlg?.toString(),
+            credentialResponseEncryptionMethod = credentialResponseEncryptionMethod?.toString(),
+            credentialDefinition = SdJwtVcProfile.CredentialIssuanceRequestTO.CredentialDefinitionTO(
+                type = credentialDefinition.type,
+                claims = credentialDefinition.claims?.let {
                     Json.encodeToJsonElement(it.claims).jsonObject
                 },
-            )
+            ),
+        )
+    }
 
-        is SdJwtVcProfile.CredentialIssuanceRequest ->
-            SdJwtVcProfile.CredentialIssuanceRequestTO(
-                proof = proof?.toJsonObject(),
-                credentialEncryptionJwk = credentialEncryptionJwk?.let {
-                    Json.parseToJsonElement(
-                        it.toPublicJWK().toString(),
-                    ).jsonObject
-                },
-                credentialResponseEncryptionAlg = credentialResponseEncryptionAlg?.toString(),
-                credentialResponseEncryptionMethod = credentialResponseEncryptionMethod?.toString(),
-                credentialDefinition = SdJwtVcProfile.CredentialIssuanceRequestTO.CredentialDefinitionTO(
-                    type = credentialDefinition.type,
-                    claims = credentialDefinition.claims?.let {
-                        Json.encodeToJsonElement(it.claims).jsonObject
-                    },
-                ),
-            )
+private fun Proof.toJsonObject(): JsonObject = when (this) {
+    is Proof.Jwt -> {
+        JsonObject(
+            mapOf(
+                "proof_type" to JsonPrimitive("jwt"),
+                "jwt" to JsonPrimitive(jwt.serialize()),
+            ),
+        )
+    }
+
+    is Proof.Cwt -> {
+        JsonObject(
+            mapOf(
+                "proof_type" to JsonPrimitive("cwt"),
+                "jwt" to JsonPrimitive(cwt),
+            ),
+        )
     }
 }
 
-private fun Proof.toJsonObject(): JsonObject =
-    when (this) {
-        is Proof.Jwt -> {
-            JsonObject(
-                mapOf(
-                    "proof_type" to JsonPrimitive("jwt"),
-                    "jwt" to JsonPrimitive(jwt.serialize()),
-                ),
-            )
-        }
-        is Proof.Cwt -> {
-            JsonObject(
-                mapOf(
-                    "proof_type" to JsonPrimitive("cwt"),
-                    "jwt" to JsonPrimitive(cwt),
-                ),
-            )
-        }
-    }
-
-private fun CredentialIssuanceRequest.BatchCredentials.toTransferObject(): CredentialIssuanceRequestTO {
-    return CredentialIssuanceRequestTO.BatchCredentialsTO(
+private fun BatchCredentials.toTransferObject(): CredentialIssuanceRequestTO =
+    CredentialIssuanceRequestTO.BatchCredentialsTO(
         credentialRequests = credentialRequests.map { it.toTransferObject() },
     )
-}

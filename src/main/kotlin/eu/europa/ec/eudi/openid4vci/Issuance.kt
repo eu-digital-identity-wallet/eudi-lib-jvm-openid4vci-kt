@@ -203,12 +203,12 @@ sealed interface CredentialIssuanceError {
     /**
      * Invalid access token passed to issuance server
      */
-    object InvalidToken : CredentialIssuanceError
-    object InvalidTransactionId : CredentialIssuanceError
-    object UnsupportedCredentialType : CredentialIssuanceError
-    object UnsupportedCredentialFormat : CredentialIssuanceError
-    object InvalidEncryptionParameters : CredentialIssuanceError
-    object IssuerDoesNotSupportBatchIssuance : CredentialIssuanceError
+    data object InvalidToken : CredentialIssuanceError
+    data object InvalidTransactionId : CredentialIssuanceError
+    data object UnsupportedCredentialType : CredentialIssuanceError
+    data object UnsupportedCredentialFormat : CredentialIssuanceError
+    data object InvalidEncryptionParameters : CredentialIssuanceError
+    data object IssuerDoesNotSupportBatchIssuance : CredentialIssuanceError
 
     data class IssuanceRequestFailed(
         val error: String,
@@ -218,9 +218,9 @@ sealed interface CredentialIssuanceError {
     data class ResponseUnparsable(val error: String) : CredentialIssuanceError
 
     sealed interface ProofGenerationError : CredentialIssuanceError {
-        object BindingMethodNotSupported : ProofGenerationError
-        object CryptographicSuiteNotSupported : ProofGenerationError
-        object ProofTypeNotSupported : ProofGenerationError
+        data object BindingMethodNotSupported : ProofGenerationError
+        data object CryptographicSuiteNotSupported : ProofGenerationError
+        data object ProofTypeNotSupported : ProofGenerationError
     }
 }
 

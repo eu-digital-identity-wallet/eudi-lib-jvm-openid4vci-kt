@@ -68,48 +68,45 @@ internal class KtorIssuanceAuthorizer(
             postPar = parFormPost(client),
             getAccessToken = accessTokenFormPost(client),
         )
+}
 
-    companion object {
-
-        /**
-         * Factory which produces a [Ktor Http client][HttpClient]
-         * The actual engine will be peeked up by whatever
-         * it is available in classpath
-         *
-         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
-         */
-        private val HttpClientFactory: KtorHttpClientFactory = {
-            HttpClient {
-                install(ContentNegotiation) {
-                    json(
-                        json = Json { ignoreUnknownKeys = true },
-                    )
-                }
-            }
+/**
+ * Factory which produces a [Ktor Http client][HttpClient]
+ * The actual engine will be peeked up by whatever
+ * it is available in classpath
+ *
+ * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
+ */
+private val HttpClientFactory: KtorHttpClientFactory = {
+    HttpClient {
+        install(ContentNegotiation) {
+            json(
+                json = Json { ignoreUnknownKeys = true },
+            )
         }
-
-        private fun parFormPost(httpClient: HttpClient): HttpFormPost<PushedAuthorizationRequestResponse> =
-            HttpFormPost<PushedAuthorizationRequestResponse> { url, formParameters ->
-                val response = httpClient.submitForm(
-                    url = url.toString(),
-                    formParameters = Parameters.build {
-                        formParameters.entries.forEach { append(it.key, it.value) }
-                    },
-                )
-                if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
-                else response.body<PushedAuthorizationRequestResponse.Failure>()
-            }
-
-        private fun accessTokenFormPost(httpClient: HttpClient): HttpFormPost<AccessTokenRequestResponse> =
-            HttpFormPost<AccessTokenRequestResponse> { url, formParameters ->
-                val response = httpClient.submitForm(
-                    url = url.toString(),
-                    formParameters = Parameters.build {
-                        formParameters.entries.forEach { append(it.key, it.value) }
-                    },
-                )
-                if (response.status.isSuccess()) response.body<AccessTokenRequestResponse.Success>()
-                else response.body<AccessTokenRequestResponse.Failure>()
-            }
     }
 }
+
+private fun parFormPost(httpClient: HttpClient): HttpFormPost<PushedAuthorizationRequestResponse> =
+    HttpFormPost { url, formParameters ->
+        val response = httpClient.submitForm(
+            url = url.toString(),
+            formParameters = Parameters.build {
+                formParameters.entries.forEach { (k, v) -> append(k, v) }
+            },
+        )
+        if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
+        else response.body<PushedAuthorizationRequestResponse.Failure>()
+    }
+
+private fun accessTokenFormPost(httpClient: HttpClient): HttpFormPost<AccessTokenRequestResponse> =
+    HttpFormPost { url, formParameters ->
+        val response = httpClient.submitForm(
+            url = url.toString(),
+            formParameters = Parameters.build {
+                formParameters.entries.forEach { (k, v) -> append(k, v) }
+            },
+        )
+        if (response.status.isSuccess()) response.body<AccessTokenRequestResponse.Success>()
+        else response.body<AccessTokenRequestResponse.Failure>()
+    }

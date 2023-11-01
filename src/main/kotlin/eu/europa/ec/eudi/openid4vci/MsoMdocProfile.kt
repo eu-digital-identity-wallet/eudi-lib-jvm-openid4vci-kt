@@ -120,21 +120,11 @@ object MsoMdocProfile {
     ) : eu.europa.ec.eudi.openid4vci.CredentialMetadata.ByProfile
 
     fun matchSupportedAndToDomain(jsonObject: JsonObject, metadata: CredentialIssuerMetadata): CredentialMetadata {
-        val docType = Json.decodeFromJsonElement<CredentialMetadataTO>(
-            jsonObject,
-        ).docType
-
-        fun fail(): Nothing =
-            throw IllegalArgumentException("Unsupported MsoMdocCredential with format '$FORMAT' and docType '$docType'")
-
+        val docType = Json.decodeFromJsonElement<CredentialMetadataTO>(jsonObject).docType
         return metadata.credentialsSupported
-            .firstOrNull {
-                it is CredentialSupported && it.docType == docType
-            }
-            ?.let {
-                CredentialMetadata(docType, (it as CredentialSupported).scope)
-            }
-            ?: fail()
+            .firstOrNull { it is CredentialSupported && it.docType == docType }
+            ?.let { CredentialMetadata(docType, (it as CredentialSupported).scope) }
+            ?: error("Unsupported MsoMdocCredential with format '$FORMAT' and docType '$docType'")
     }
 
     @Serializable
