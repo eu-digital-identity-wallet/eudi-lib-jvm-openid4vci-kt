@@ -18,9 +18,10 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
-import kotlinx.serialization.Required
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -53,17 +54,17 @@ object MsoMdocProfile {
         }
 
         override fun toDomain(): CredentialSupported {
-            val bindingMethods =
-                cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
-                    ?: emptyList()
+            val bindingMethods = cryptographicBindingMethodsSupported
+                ?.toCryptographicBindingMethods()
+                ?: emptyList()
             val display = display?.map { it.toDomain() } ?: emptyList()
             val proofTypesSupported = proofTypesSupported.toProofTypes()
             val cryptographicSuitesSupported = cryptographicSuitesSupported ?: emptyList()
 
             fun claims(): MsoMdocClaims =
-                claims?.mapValues { namespaceAndClaims ->
-                    namespaceAndClaims.value.mapValues { claimNameAndClaim ->
-                        claimNameAndClaim.value.let { claimObject ->
+                claims?.mapValues { (_, claims) ->
+                    claims.mapValues { (_, claim) ->
+                        claim.let { claimObject ->
                             Claim(
                                 claimObject.mandatory ?: false,
                                 claimObject.valueType,
@@ -138,9 +139,23 @@ object MsoMdocProfile {
         @SerialName("claims") val claims: JsonObject?,
     ) : eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequestTO.SingleCredentialTO
 
-    data class ClaimSet(
-        val claims: Map<Namespace, Map<ClaimName, Claim>>,
-    ) : eu.europa.ec.eudi.openid4vci.ClaimSet
+    @Serializable(with = ClaimSetSerializer::class)
+    class ClaimSet(
+        claims: Map<Namespace, Map<ClaimName, Claim>>,
+    ) : Map<Namespace, Map<ClaimName, Claim>> by claims, eu.europa.ec.eudi.openid4vci.ClaimSet
+
+    private object ClaimSetSerializer : KSerializer<ClaimSet> {
+        val internal = serializer<Map<Namespace, Map<ClaimName, Claim>>>()
+        override val descriptor: SerialDescriptor =
+            internal.descriptor
+
+        override fun deserialize(decoder: Decoder): ClaimSet =
+            ClaimSet(internal.deserialize(decoder))
+
+        override fun serialize(encoder: Encoder, value: ClaimSet) {
+            internal.serialize(encoder, value as Map<Namespace, Map<ClaimName, Claim>>)
+        }
+    }
 
     /**
      * Issuance request for a credential of mso_mdoc format
@@ -173,14 +188,13 @@ object MsoMdocProfile {
 
                     credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null -> {
                         throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
-                            .asException()
                     }
 
                     credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null -> {
                         throw CredentialIssuanceError.InvalidIssuanceRequest(
                             "Credential response encryption algorithm must be specified if Credential " +
                                 "response encryption method is provided",
-                        ).asException()
+                        )
                     }
                 }
 

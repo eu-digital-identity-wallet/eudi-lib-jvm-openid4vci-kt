@@ -191,13 +191,12 @@ object SdJwtVcProfile {
                     }
                     credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null -> {
                         throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
-                            .asException()
                     }
                     credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null -> {
                         throw CredentialIssuanceError.InvalidIssuanceRequest(
                             "Credential response encryption algorithm must be specified if Credential " +
                                 "response encryption method is provided",
-                        ).asException()
+                        )
                     }
                 }
 

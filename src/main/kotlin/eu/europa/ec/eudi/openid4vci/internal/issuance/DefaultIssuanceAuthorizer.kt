@@ -107,7 +107,7 @@ class DefaultIssuanceAuthorizer(
             throw CredentialIssuanceError.PushedAuthorizationRequestFailed(
                 error,
                 errorDescription,
-            ).asException()
+            )
     }
 
     override suspend fun requestAccessTokenAuthFlow(
@@ -139,7 +139,7 @@ class DefaultIssuanceAuthorizer(
                 throw CredentialIssuanceError.AccessTokenRequestFailed(
                     response.error,
                     response.errorDescription,
-                ).asException()
+                )
         }
     }
 
@@ -165,7 +165,7 @@ class DefaultIssuanceAuthorizer(
                 throw CredentialIssuanceError.AccessTokenRequestFailed(
                     response.error,
                     response.errorDescription,
-                ).asException()
+                )
         }
     }
 

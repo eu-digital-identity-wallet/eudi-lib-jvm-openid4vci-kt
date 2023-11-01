@@ -129,13 +129,13 @@ internal class DefaultIssuer(
                     credentialSpec.proofTypesSupported.contains(ProofType.JWT)
 
                 if (!isAlgorithmIsSupported()) {
-                    CredentialIssuanceError.ProofGenerationError.BindingMethodNotSupported.raise()
+                    throw CredentialIssuanceError.ProofGenerationError.BindingMethodNotSupported
                 }
                 if (!isBindingMethodSupported()) {
-                    CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported.raise()
+                    throw CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported
                 }
                 if (!isProofTypeSupported()) {
-                    CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported.raise()
+                    throw CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
                 }
 
                 Proof.Jwt(
@@ -257,21 +257,20 @@ internal class DefaultIssuer(
         proof: Proof?,
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
         fun validateClaimSet(claimSet: MsoMdocProfile.ClaimSet): MsoMdocProfile.ClaimSet {
-            if (claims.isEmpty() && claimSet.claims.isNotEmpty()) {
-                CredentialIssuanceError.InvalidIssuanceRequest(
+            if (claims.isEmpty() && claimSet.isNotEmpty()) {
+                throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential [MsoMdoc-${this.docType}]",
-                ).raise()
+                )
             }
-            claimSet.claims.entries.forEach { requestedClaim ->
-                this@toIssuanceRequest.claims.get(requestedClaim.key)?.let { supportedClaim ->
-                    if (!supportedClaim.keys.containsAll(requestedClaim.value.keys)) {
-                        CredentialIssuanceError.InvalidIssuanceRequest(
+            claimSet.forEach { (nameSpace, attributes) ->
+                claims[nameSpace]?.let { supportedClaim ->
+                    if (!supportedClaim.keys.containsAll(attributes.keys)) {
+                        throw CredentialIssuanceError.InvalidIssuanceRequest(
                             "Claim names requested are not supported by issuer",
-                        ).raise()
+                        )
                     }
                 }
-                    ?: CredentialIssuanceError.InvalidIssuanceRequest("Namespace ${requestedClaim.key} not supported by issuer")
-                        .raise()
+                    ?: throw CredentialIssuanceError.InvalidIssuanceRequest("Namespace $nameSpace not supported by issuer")
             }
             return claimSet
         }
@@ -279,8 +278,7 @@ internal class DefaultIssuer(
         val validClaimSet = claimSet?.let {
             when (claimSet) {
                 is MsoMdocProfile.ClaimSet -> validateClaimSet(claimSet)
-                else -> CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
-                    .raise()
+                else -> throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
             }
         }
 
@@ -297,14 +295,14 @@ internal class DefaultIssuer(
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
         fun validateClaimSet(claimSet: SdJwtVcProfile.ClaimSet): SdJwtVcProfile.ClaimSet {
             if (credentialDefinition.claims.isNullOrEmpty() && claimSet.claims.isNotEmpty()) {
-                CredentialIssuanceError.InvalidIssuanceRequest(
+                throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential [${SdJwtVcProfile.FORMAT}-${this.credentialDefinition.type}]",
-                ).raise()
+                )
             }
             if (credentialDefinition.claims != null && !credentialDefinition.claims.keys.containsAll(claimSet.claims.keys)) {
-                CredentialIssuanceError.InvalidIssuanceRequest(
+                throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Claim names requested are not supported by issuer",
-                ).raise()
+                )
             }
             return claimSet
         }
@@ -312,8 +310,7 @@ internal class DefaultIssuer(
         val validClaimSet = claimSet?.let {
             when (claimSet) {
                 is SdJwtVcProfile.ClaimSet -> validateClaimSet(claimSet)
-                else -> CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
-                    .raise()
+                else -> throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
             }
         }
 
@@ -384,14 +381,12 @@ internal class DefaultIssuer(
         }
 
     private fun handleIssuanceFailure(throwable: Throwable): SubmittedRequest.Errored {
-        return if (throwable is CredentialIssuanceException) {
-            if (throwable.error is CredentialIssuanceError.InvalidProof)
-                SubmittedRequest.InvalidProof(
-                    cNonce = CNonce(throwable.error.cNonce, throwable.error.cNonceExpiresIn),
-                )
-            else SubmittedRequest.Failed(throwable.error)
-        } else {
-            throw throwable
+        return when (throwable) {
+            is CredentialIssuanceError.InvalidProof -> SubmittedRequest.InvalidProof(
+                cNonce = CNonce(throwable.cNonce, throwable.cNonceExpiresIn),
+            )
+            is CredentialIssuanceError -> SubmittedRequest.Failed(throwable)
+            else -> throw throwable
         }
     }
 }

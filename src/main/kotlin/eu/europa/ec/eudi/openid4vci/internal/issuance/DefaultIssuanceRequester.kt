@@ -51,7 +51,7 @@ internal class DefaultIssuanceRequester(
                     }
                 } else {
                     val error = it.body<GenericErrorResponse>()
-                    error.toIssuanceError().raise()
+                    throw error.toIssuanceError()
                 }
             }
         }
@@ -62,7 +62,7 @@ internal class DefaultIssuanceRequester(
         request: BatchCredentials,
     ): Result<CredentialIssuanceResponse> = runCatching {
         if (issuerMetadata.batchCredentialEndpoint == null) {
-            CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance.raise()
+            throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance
         }
         withContext(coroutineDispatcher) {
             postIssueRequest.post(
@@ -77,7 +77,7 @@ internal class DefaultIssuanceRequester(
                     success.toBatchIssuanceResponse()
                 } else {
                     val error = it.body<GenericErrorResponse>()
-                    error.toIssuanceError().raise()
+                    throw error.toIssuanceError()
                 }
             }
         }
@@ -103,18 +103,18 @@ private fun SingleIssuanceSuccessResponse.toSingleIssuanceResponse(): Credential
             credentialResponses = listOf(CredentialIssuanceResponse.Result.Complete(format, credential)),
         )
     }
-        ?: CredentialIssuanceError.ResponseUnparsable(
+        ?: throw CredentialIssuanceError.ResponseUnparsable(
             "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
-        ).raise()
+        )
 
 private fun BatchIssuanceSuccessResponse.toBatchIssuanceResponse(): CredentialIssuanceResponse {
     fun mapResults() = credentialResponses.map { res ->
         res.transactionId
             ?.let { CredentialIssuanceResponse.Result.Deferred(it) }
             ?: res.credential?.let { credential -> CredentialIssuanceResponse.Result.Complete(res.format, credential) }
-            ?: CredentialIssuanceError.ResponseUnparsable(
+            ?: throw CredentialIssuanceError.ResponseUnparsable(
                 "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
-            ).raise()
+            )
     }
 
     fun mapCNonce() = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
@@ -168,7 +168,7 @@ private fun SingleCredential.toTransferObject(): CredentialIssuanceRequestTO.Sin
             credentialResponseEncryptionAlg = credentialResponseEncryptionAlg?.toString(),
             credentialResponseEncryptionMethod = credentialResponseEncryptionMethod?.toString(),
             claims = claimSet?.let {
-                Json.encodeToJsonElement(it.claims).jsonObject
+                Json.encodeToJsonElement(it).jsonObject
             },
         )
 

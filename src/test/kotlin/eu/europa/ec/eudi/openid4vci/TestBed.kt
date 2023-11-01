@@ -42,19 +42,19 @@ fun authorizationTestBed(
 }
 
 fun issuanceTestBed(
-    testBlock: (client: HttpClient) -> Unit,
-    issuanceRequestResponse: (call: ApplicationCall) -> Unit,
-    issuanceRequestPostAssertions: (call: ApplicationCall) -> Unit,
+    testBlock: suspend (client: HttpClient) -> Unit,
+    issuanceRequestResponse: suspend (call: ApplicationCall) -> Unit,
+    issuanceRequestPostAssertions: suspend (call: ApplicationCall) -> Unit,
 ) {
     testBed(testBlock, {}, {}, issuanceRequestResponse, issuanceRequestPostAssertions)
 }
 
 private fun testBed(
-    testBlock: (client: HttpClient) -> Unit,
-    parPostAssertions: (call: ApplicationCall) -> Unit,
-    tokenPostAssertions: (call: ApplicationCall) -> Unit,
-    issuanceRequestResponse: (call: ApplicationCall) -> Unit,
-    issuanceRequestAssertions: (call: ApplicationCall) -> Unit,
+    testBlock: suspend (client: HttpClient) -> Unit,
+    parPostAssertions: suspend (call: ApplicationCall) -> Unit,
+    tokenPostAssertions: suspend (call: ApplicationCall) -> Unit,
+    issuanceRequestResponse: suspend (call: ApplicationCall) -> Unit,
+    issuanceRequestAssertions: suspend (call: ApplicationCall) -> Unit,
 ) = testApplication {
     externalServices {
         // Credential issuer server
@@ -141,20 +141,15 @@ fun createPostPar(managedHttpClient: HttpClient): HttpFormPost<PushedAuthorizati
     }
 
 fun createGetAccessToken(managedHttpClient: HttpClient): HttpFormPost<AccessTokenRequestResponse> =
-    object : HttpFormPost<AccessTokenRequestResponse> {
-        override suspend fun post(url: URL, formParameters: Map<String, String>): AccessTokenRequestResponse {
-            val response = managedHttpClient.submitForm(
-                url = url.toString(),
-                formParameters = Parameters.build {
-                    formParameters.entries.forEach { append(it.key, it.value) }
-                },
-            )
-            return if (response.status.isSuccess()) {
-                response.body<AccessTokenRequestResponse.Success>()
-            } else {
-                response.body<AccessTokenRequestResponse.Failure>()
-            }
-        }
+    HttpFormPost { url, formParameters ->
+        val response = managedHttpClient.submitForm(
+            url = url.toString(),
+            formParameters = Parameters.build {
+                formParameters.entries.forEach { append(it.key, it.value) }
+            },
+        )
+        if (response.status.isSuccess()) response.body<AccessTokenRequestResponse.Success>()
+        else response.body<AccessTokenRequestResponse.Failure>()
     }
 
 fun createGetASMetadata(managedHttpClient: HttpClient): HttpGet<String> =
