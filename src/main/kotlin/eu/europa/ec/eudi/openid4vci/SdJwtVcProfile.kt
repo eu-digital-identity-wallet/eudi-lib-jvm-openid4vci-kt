@@ -185,16 +185,20 @@ object SdJwtVcProfile {
                 claimSet: ClaimSet? = null,
             ): Result<CredentialIssuanceRequest> = runCatching {
                 var encryptionMethod = credentialResponseEncryptionMethod
-                if (credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null) {
-                    encryptionMethod = EncryptionMethod.A256GCM
-                } else if (credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null) {
-                    throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
-                        .asException()
-                } else if (credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null) {
-                    throw CredentialIssuanceError.InvalidIssuanceRequest(
-                        "Credential response encryption algorithm must be specified if Credential " +
-                            "response encryption method is provided",
-                    ).asException()
+                when {
+                    credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null -> {
+                        encryptionMethod = EncryptionMethod.A256GCM
+                    }
+                    credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null -> {
+                        throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
+                            .asException()
+                    }
+                    credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null -> {
+                        throw CredentialIssuanceError.InvalidIssuanceRequest(
+                            "Credential response encryption algorithm must be specified if Credential " +
+                                    "response encryption method is provided",
+                        ).asException()
+                    }
                 }
 
                 CredentialIssuanceRequest(
