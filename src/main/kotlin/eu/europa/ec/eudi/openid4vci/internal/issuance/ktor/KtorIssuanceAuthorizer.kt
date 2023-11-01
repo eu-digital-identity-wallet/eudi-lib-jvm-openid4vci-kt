@@ -25,7 +25,6 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.serialization.json.Json
-import java.net.URL
 
 /**
  * Implementation of [IssuanceAuthorizer] that used ktor clients for all http calls.
@@ -45,12 +44,18 @@ internal class KtorIssuanceAuthorizer(
             authorizer(client).submitPushedAuthorizationRequest(scopes, state, issuerState)
         }
 
-    override suspend fun requestAccessTokenAuthFlow(authorizationCode: String, codeVerifier: String): Result<Pair<String, CNonce?>> =
+    override suspend fun requestAccessTokenAuthFlow(
+        authorizationCode: String,
+        codeVerifier: String,
+    ): Result<Pair<String, CNonce?>> =
         HttpClientFactory().use { client ->
             authorizer(client).requestAccessTokenAuthFlow(authorizationCode, codeVerifier)
         }
 
-    override suspend fun requestAccessTokenPreAuthFlow(preAuthorizedCode: String, pin: String?): Result<Pair<String, CNonce?>> =
+    override suspend fun requestAccessTokenPreAuthFlow(
+        preAuthorizedCode: String,
+        pin: String?,
+    ): Result<Pair<String, CNonce?>> =
         HttpClientFactory().use { client ->
             authorizer(client).requestAccessTokenPreAuthFlow(preAuthorizedCode, pin)
         }
@@ -84,40 +89,27 @@ internal class KtorIssuanceAuthorizer(
         }
 
         private fun parFormPost(httpClient: HttpClient): HttpFormPost<PushedAuthorizationRequestResponse> =
-            object : HttpFormPost<PushedAuthorizationRequestResponse> {
-                override suspend fun post(
-                    url: URL,
-                    formParameters: Map<String, String>,
-                ): PushedAuthorizationRequestResponse {
-                    val response = httpClient.submitForm(
-                        url = url.toString(),
-                        formParameters = Parameters.build {
-                            formParameters.entries.forEach { append(it.key, it.value) }
-                        },
-                    )
-                    return if (response.status.isSuccess()) {
-                        response.body<PushedAuthorizationRequestResponse.Success>()
-                    } else {
-                        response.body<PushedAuthorizationRequestResponse.Failure>()
-                    }
-                }
+            HttpFormPost<PushedAuthorizationRequestResponse> { url, formParameters ->
+                val response = httpClient.submitForm(
+                    url = url.toString(),
+                    formParameters = Parameters.build {
+                        formParameters.entries.forEach { append(it.key, it.value) }
+                    },
+                )
+                if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
+                else response.body<PushedAuthorizationRequestResponse.Failure>()
             }
 
         private fun accessTokenFormPost(httpClient: HttpClient): HttpFormPost<AccessTokenRequestResponse> =
-            object : HttpFormPost<AccessTokenRequestResponse> {
-                override suspend fun post(url: URL, formParameters: Map<String, String>): AccessTokenRequestResponse {
-                    val response = httpClient.submitForm(
-                        url = url.toString(),
-                        formParameters = Parameters.build {
-                            formParameters.entries.forEach { append(it.key, it.value) }
-                        },
-                    )
-                    return if (response.status.isSuccess()) {
-                        response.body<AccessTokenRequestResponse.Success>()
-                    } else {
-                        response.body<AccessTokenRequestResponse.Failure>()
-                    }
-                }
+            HttpFormPost<AccessTokenRequestResponse> { url, formParameters ->
+                val response = httpClient.submitForm(
+                    url = url.toString(),
+                    formParameters = Parameters.build {
+                        formParameters.entries.forEach { append(it.key, it.value) }
+                    },
+                )
+                if (response.status.isSuccess()) response.body<AccessTokenRequestResponse.Success>()
+                else response.body<AccessTokenRequestResponse.Failure>()
             }
     }
 }

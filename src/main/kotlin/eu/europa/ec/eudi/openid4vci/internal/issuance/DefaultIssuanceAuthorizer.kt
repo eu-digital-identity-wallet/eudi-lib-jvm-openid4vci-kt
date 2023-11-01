@@ -134,6 +134,7 @@ class DefaultIssuanceAuthorizer(
                 val cnonce = response.cNonce?.let { CNonce(it, response.cNonceExpiresIn) }
                 Pair(response.accessToken, cnonce)
             }
+
             is AccessTokenRequestResponse.Failure ->
                 throw CredentialIssuanceError.AccessTokenRequestFailed(
                     response.error,
@@ -157,9 +158,10 @@ class DefaultIssuanceAuthorizer(
 
         when (response) {
             is AccessTokenRequestResponse.Success -> {
-                val cnonce = response.cNonce?.let { CNonce(it, response.cNonceExpiresIn) }
-                Pair(response.accessToken, cnonce)
+                val cNonce = response.cNonce?.let { CNonce(it, response.cNonceExpiresIn) }
+                Pair(response.accessToken, cNonce)
             }
+
             is AccessTokenRequestResponse.Failure ->
                 throw CredentialIssuanceError.AccessTokenRequestFailed(
                     response.error,
@@ -170,7 +172,7 @@ class DefaultIssuanceAuthorizer(
 
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =
         this.authorizationRequest.toParameters()
-            .map { it.key to it.value.get(0) }
+            .mapValues { (_, value) -> value[0] }
             .toMap()
 }
 
@@ -178,12 +180,12 @@ sealed interface TokenEndpointForm {
 
     class AuthCodeFlow : TokenEndpointForm {
         companion object {
-            val GRANT_TYPE_PARAM = "grant_type"
-            val GRANT_TYPE_PARAM_VALUE = "authorization_code"
-            val REDIRECT_URI_PARAM = "redirect_uri"
-            val CLIENT_ID_PARAM = "client_id"
-            val CODE_VERIFIER_PARAM = "code_verifier"
-            val AUTHORIZATION_CODE_PARAM = "code"
+            const val GRANT_TYPE_PARAM = "grant_type"
+            const val GRANT_TYPE_PARAM_VALUE = "authorization_code"
+            const val REDIRECT_URI_PARAM = "redirect_uri"
+            const val CLIENT_ID_PARAM = "client_id"
+            const val CODE_VERIFIER_PARAM = "code_verifier"
+            const val AUTHORIZATION_CODE_PARAM = "code"
 
             fun of(
                 authorizationCode: String,
@@ -203,10 +205,10 @@ sealed interface TokenEndpointForm {
 
     class PreAuthCodeFlow : TokenEndpointForm {
         companion object {
-            val GRANT_TYPE_PARAM = "grant_type"
-            val GRANT_TYPE_PARAM_VALUE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
-            val USER_PIN_PARAM = "user_pin"
-            val PRE_AUTHORIZED_CODE_PARAM = "pre_authorized_code"
+            const val GRANT_TYPE_PARAM = "grant_type"
+            const val GRANT_TYPE_PARAM_VALUE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+            const val USER_PIN_PARAM = "user_pin"
+            const val PRE_AUTHORIZED_CODE_PARAM = "pre_authorized_code"
 
             fun of(preAuthorizedCode: String, userPin: String?): Map<String, String> {
                 return if (userPin != null) {

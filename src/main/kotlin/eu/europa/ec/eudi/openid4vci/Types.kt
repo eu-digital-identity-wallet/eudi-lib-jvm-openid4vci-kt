@@ -223,19 +223,17 @@ data class CNonce(
 }
 
 sealed interface Proof {
-    fun type(): ProofType
+    val type: ProofType
+        get() = when (this) {
+            is Cwt -> ProofType.CWT
+            is Jwt -> ProofType.JWT
+        }
 
-    data class Jwt(
-        val jwt: JWT,
-    ) : Proof {
-        override fun type() = ProofType.JWT
-    }
+    @JvmInline
+    value class Jwt(val jwt: JWT) : Proof
 
-    data class Cwt(
-        val cwt: String,
-    ) : Proof {
-        override fun type() = ProofType.CWT
-    }
+    @JvmInline
+    value class Cwt(val cwt: String) : Proof
 }
 
 sealed interface BindingKey {
