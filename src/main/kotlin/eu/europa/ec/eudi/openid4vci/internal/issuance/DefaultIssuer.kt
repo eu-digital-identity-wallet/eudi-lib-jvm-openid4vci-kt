@@ -238,8 +238,8 @@ internal class DefaultIssuer(
         proof: Proof?,
     ): CredentialIssuanceRequest.SingleCredential {
         proof?.let {
-            require(this.proofTypesSupported.contains(it.type())) {
-                "Provided proof type ${proof.type()} is not one of supported [${this.proofTypesSupported}]."
+            require(this.proofTypesSupported.contains(it.type)) {
+                "Provided proof type ${proof.type} is not one of supported [${this.proofTypesSupported}]."
             }
         }
         // TODO: Validate crypto alg and method
