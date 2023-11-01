@@ -62,18 +62,14 @@ class GetAuthorizationCodeURL private constructor(val url: HttpsUrl) {
     }
 
     companion object {
-        val PARAM_CLIENT_ID = "client_id"
-        val PARAM_REQUEST_URI = "request_uri"
-        val PARAM_STATE = "state"
+        const val PARAM_CLIENT_ID = "client_id"
+        const val PARAM_REQUEST_URI = "request_uri"
+        const val PARAM_STATE = "state"
         operator fun invoke(url: String): GetAuthorizationCodeURL {
             val httpsUrl = HttpsUrl(url).getOrThrow()
-            require(
-                httpsUrl.value.query != null && httpsUrl.value.query.contains("$PARAM_CLIENT_ID="),
-            ) { "URL must contain client_id query parameter" }
-            require(
-                httpsUrl.value.query != null && httpsUrl.value.query.contains("$PARAM_REQUEST_URI="),
-            ) { "URL must contain request_uri query parameter" }
-
+            val query = requireNotNull(httpsUrl.value.query) { "URL must contain query parameter" }
+            require(query.contains("$PARAM_CLIENT_ID=")) { "URL must contain client_id query parameter" }
+            require(query.contains("$PARAM_REQUEST_URI=")) { "URL must contain request_uri query parameter" }
             return GetAuthorizationCodeURL(httpsUrl)
         }
     }
