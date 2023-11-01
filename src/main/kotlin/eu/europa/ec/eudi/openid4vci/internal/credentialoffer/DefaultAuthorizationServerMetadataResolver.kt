@@ -44,7 +44,7 @@ internal class DefaultAuthorizationServerMetadataResolver(
 
     /**
      * Tries to fetch the [CIAuthorizationServerMetadata] for the provided [OpenID Connect Authorization Server][issuer].
-     * The well known location __/.well-known/openid-configuration__ is used.
+     * The well-known location __/.well-known/openid-configuration__ is used.
      */
     private suspend fun fetchOidcServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
         runCatching {
@@ -85,16 +85,10 @@ internal class DefaultAuthorizationServerMetadataResolver(
                 .mapCatching { parser(it) }
                 .getOrThrow()
         }
-
-    companion object {
-
-        /**
-         * Verifies the issuer of this [CIAuthorizationServerMetadata] equals the [expected] one.
-         */
-        private fun CIAuthorizationServerMetadata.expectIssuer(expected: HttpsUrl) {
-            if (issuer != Issuer(expected.value)) {
-                throw IllegalArgumentException("issuer does not match the expected value")
-            }
-        }
-    }
 }
+
+/**
+ * Verifies the issuer of this [CIAuthorizationServerMetadata] equals the [expected] one.
+ */
+private fun CIAuthorizationServerMetadata.expectIssuer(expected: HttpsUrl) =
+    require(issuer == Issuer(expected.value)) { "issuer does not match the expected value" }
