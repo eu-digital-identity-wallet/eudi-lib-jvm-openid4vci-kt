@@ -196,7 +196,7 @@ object SdJwtVcProfile {
                     credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null -> {
                         throw CredentialIssuanceError.InvalidIssuanceRequest(
                             "Credential response encryption algorithm must be specified if Credential " +
-                                    "response encryption method is provided",
+                                "response encryption method is provided",
                         ).asException()
                     }
                 }
