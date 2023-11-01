@@ -296,7 +296,7 @@ internal class DefaultIssuer(
         proof: Proof?,
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
         fun validateClaimSet(claimSet: SdJwtVcProfile.ClaimSet): SdJwtVcProfile.ClaimSet {
-            if ((credentialDefinition.claims == null || credentialDefinition.claims.isEmpty()) && claimSet.claims.isNotEmpty()) {
+            if (credentialDefinition.claims.isNullOrEmpty() && claimSet.claims.isNotEmpty()) {
                 CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential [${SdJwtVcProfile.FORMAT}-${this.credentialDefinition.type}]",
                 ).raise()
@@ -385,13 +385,11 @@ internal class DefaultIssuer(
 
     private fun handleIssuanceFailure(throwable: Throwable): SubmittedRequest.Errored {
         return if (throwable is CredentialIssuanceException) {
-            if (throwable.error is CredentialIssuanceError.InvalidProof) {
+            if (throwable.error is CredentialIssuanceError.InvalidProof)
                 SubmittedRequest.InvalidProof(
                     cNonce = CNonce(throwable.error.cNonce, throwable.error.cNonceExpiresIn),
                 )
-            } else {
-                SubmittedRequest.Failed(throwable.error)
-            }
+            else SubmittedRequest.Failed(throwable.error)
         } else {
             throw throwable
         }
