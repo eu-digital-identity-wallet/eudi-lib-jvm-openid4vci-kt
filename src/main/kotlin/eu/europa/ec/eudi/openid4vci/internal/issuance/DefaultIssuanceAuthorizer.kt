@@ -148,13 +148,12 @@ class DefaultIssuanceAuthorizer(
         pin: String?,
     ): Result<Pair<String, CNonce?>> = runCatching {
         val params = TokenEndpointForm.PreAuthCodeFlow.of(preAuthorizedCode, pin)
-        val response =
-            withContext(coroutineDispatcher) {
-                getAccessToken.post(
-                    authorizationServerMetadata.tokenEndpointURI.toURL(),
-                    params,
-                )
-            }
+        val response = withContext(coroutineDispatcher) {
+            getAccessToken.post(
+                authorizationServerMetadata.tokenEndpointURI.toURL(),
+                params,
+            )
+        }
 
         when (response) {
             is AccessTokenRequestResponse.Success -> {

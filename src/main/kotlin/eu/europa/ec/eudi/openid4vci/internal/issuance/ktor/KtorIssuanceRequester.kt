@@ -20,12 +20,10 @@ import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceRequester
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.serialization.json.Json
-import java.net.URL
 
 /**
  * Implementation of [IssuanceRequester] that used ktor clients for all http calls.
@@ -39,78 +37,56 @@ internal class KtorIssuanceRequester(
     override suspend fun placeIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.SingleCredential
-    ): Result<CredentialIssuanceResponse> {
-        HttpClientFactory().use { client ->
-            return requester(client).placeIssuanceRequest(accessToken, request)
-        }
-    }
+    ): Result<CredentialIssuanceResponse> =
+        HttpClientFactory().use { client -> requester(client).placeIssuanceRequest(accessToken, request) }
 
     override suspend fun placeBatchIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.BatchCredentials
-    ): Result<CredentialIssuanceResponse> {
-        HttpClientFactory().use { client ->
-            return requester(client).placeBatchIssuanceRequest(accessToken, request)
-        }
-    }
+    ): Result<CredentialIssuanceResponse> =
+        HttpClientFactory().use { client -> requester(client).placeBatchIssuanceRequest(accessToken, request) }
 
     override suspend fun placeDeferredCredentialRequest(
         accessToken: IssuanceAccessToken,
         request: DeferredCredentialRequest
-    ): CredentialIssuanceResponse {
-        HttpClientFactory().use { client ->
-            return requester(client).placeDeferredCredentialRequest(accessToken, request)
-        }
-    }
+    ): CredentialIssuanceResponse =
+        HttpClientFactory().use { client -> requester(client).placeDeferredCredentialRequest(accessToken, request) }
 
-    fun requester(client: HttpClient): DefaultIssuanceRequester =
+    private fun requester(client: HttpClient): DefaultIssuanceRequester =
         DefaultIssuanceRequester(
             coroutineDispatcher = coroutineDispatcher,
             issuerMetadata = issuerMetadata,
             postIssueRequest = postIssueRequest(client),
         )
+}
 
-    companion object {
-
-        /**
-         * Factory which produces a [Ktor Http client][HttpClient]
-         * The actual engine will be peeked up by whatever
-         * it is available in classpath
-         *
-         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
-         */
-        private val HttpClientFactory: KtorHttpClientFactory = {
-            HttpClient {
-                install(ContentNegotiation) {
-                    json(
-                        json = Json { ignoreUnknownKeys = true },
-                    )
-                }
-
-            }
+/**
+ * Factory which produces a [Ktor Http client][HttpClient]
+ * The actual engine will be peeked up by whatever
+ * it is available in classpath
+ *
+ * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
+ */
+private val HttpClientFactory: KtorHttpClientFactory = {
+    HttpClient {
+        install(ContentNegotiation) {
+            json(
+                json = Json { ignoreUnknownKeys = true },
+            )
         }
-
-        private fun postIssueRequest(httpClient: HttpClient):
-                HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
-
-            object : HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> {
-                override suspend fun post(
-                    url: URL,
-                    headers: Map<String, String>,
-                    payload: CredentialIssuanceRequestTO,
-                    responseHandler: suspend (response: HttpResponse) -> CredentialIssuanceResponse
-                ): CredentialIssuanceResponse {
-                    val response = httpClient.post(url) {
-                        headers {
-                            headers.forEach {
-                                append(it.key, it.value)
-                            }
-                        }
-                        contentType(ContentType.parse("application/json"))
-                        setBody(payload)
-                    }
-                    return responseHandler(response)
-                }
-            }
     }
 }
+
+private fun postIssueRequest(httpClient: HttpClient):
+    HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
+
+    HttpPost { url, headers, payload, responseHandler ->
+        val response = httpClient.post(url) {
+            headers {
+                headers.forEach { (k, v) -> append(k, v) }
+            }
+            contentType(ContentType.parse("application/json"))
+            setBody(payload)
+        }
+        responseHandler(response)
+    }
