@@ -16,20 +16,13 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jwt.JWTClaimsSet
-import com.nimbusds.jwt.PlainJWT
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.hamcrest.MatcherAssert.assertThat
 import java.net.URI
-import java.time.Instant
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.fail
@@ -57,7 +50,7 @@ class IssuanceRequestTest {
                         client,
                         AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
                     )
-                    val claimSet = MsoMdocProfile.ClaimSet(
+                    val claimSet = MsoMdocFormat.ClaimSet(
                         claims = mapOf(
                             "org.iso.18013.5.1" to mapOf(
                                 "given_name" to Claim(),
@@ -71,7 +64,7 @@ class IssuanceRequestTest {
                             is AuthorizedRequest.NoProofRequired -> {
                                 val credentialMetadata = offer.credentials[0]
 
-                                val submittedRequest = authorizedRequest.requestSingle(credentialMetadata, claimSet)
+                                val submittedRequest = authorizedRequest.requestSingle(credentialMetadata, claimSet, null)
                                 assertThat(
                                     "When no proof is provided while issuing result must be NonceMissing",
                                     submittedRequest.getOrThrow() is SubmittedRequest.InvalidProof,
@@ -82,21 +75,6 @@ class IssuanceRequestTest {
                                 fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
                         }
                     }
-                }
-            },
-            { call ->
-                runBlocking {
-                    call.respondText(
-                        """
-                            {
-                                "error": "invalid_proof",
-                                "c_nonce": "ERE%@^TGWYEYWEY",
-                                "c_nonce_expires_in": 34
-                            } 
-                        """.trimIndent(),
-                        ContentType.parse("application/json"),
-                        HttpStatusCode.BadRequest,
-                    )
                 }
             },
             { call ->
@@ -120,6 +98,18 @@ class IssuanceRequestTest {
                     assertThat(
                         "Wrong credential request type",
                         request is CredentialIssuanceRequestTO.SingleCredentialTO,
+                    )
+
+                    call.respondText(
+                        """
+                            {
+                                "error": "invalid_proof",
+                                "c_nonce": "ERE%@^TGWYEYWEY",
+                                "c_nonce_expires_in": 34
+                            } 
+                        """.trimIndent(),
+                        ContentType.parse("application/json"),
+                        HttpStatusCode.BadRequest,
                     )
                 }
             },
@@ -135,7 +125,7 @@ class IssuanceRequestTest {
                         client,
                         AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
                     )
-                    val claimSet = MsoMdocProfile.ClaimSet(
+                    val claimSet = MsoMdocFormat.ClaimSet(
                         claims = mapOf(
                             "org.iso.18013.5.1" to mapOf(
                                 "given_name" to Claim(),
@@ -148,38 +138,25 @@ class IssuanceRequestTest {
                         when (authorizedRequest) {
                             is AuthorizedRequest.NoProofRequired -> {
                                 val credentialMetadata = offer.credentials[0]
-                                val requestSingle = authorizedRequest.requestSingle(credentialMetadata, claimSet)
-                                requestSingle.fold(
-                                    onSuccess = {
-                                        assertThat(
-                                            "Expected CredentialIssuanceException to be thrown but was not",
-                                            it is SubmittedRequest.Failed &&
-                                                it.error is CredentialIssuanceError.ResponseUnparsable,
-                                        )
-                                    },
-                                    onFailure = {
-                                        fail("No exception expected to be thrown")
-                                    },
-                                )
+                                authorizedRequest.requestSingle(credentialMetadata, claimSet, null)
+                                    .fold(
+                                        onSuccess = {
+                                            assertThat(
+                                                "Expected CredentialIssuanceException to be thrown but was not",
+                                                it is SubmittedRequest.Failed &&
+                                                    it.error is CredentialIssuanceError.ResponseUnparsable,
+                                            )
+                                        },
+                                        onFailure = {
+                                            fail("No exception expected to be thrown")
+                                        },
+                                    )
                             }
 
                             is AuthorizedRequest.ProofRequired ->
                                 fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
                         }
                     }
-                }
-            },
-            { call ->
-                runBlocking {
-                    call.respondText(
-                        """
-                            {
-                                "error": "invalid_proof"                                
-                            } 
-                        """.trimIndent(),
-                        ContentType.parse("application/json"),
-                        HttpStatusCode.BadRequest,
-                    )
                 }
             },
             { call ->
@@ -204,6 +181,16 @@ class IssuanceRequestTest {
                         "Wrong credential request type",
                         request is CredentialIssuanceRequestTO.SingleCredentialTO,
                     )
+
+                    call.respondText(
+                        """
+                            {
+                                "error": "invalid_proof"                                
+                            } 
+                        """.trimIndent(),
+                        ContentType.parse("application/json"),
+                        HttpStatusCode.BadRequest,
+                    )
                 }
             },
         )
@@ -218,7 +205,7 @@ class IssuanceRequestTest {
                     val (offer, authorizedRequest, issuer) =
                         initIssuerWithOfferAndAuthorize(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
 
-                    val claimSet = MsoMdocProfile.ClaimSet(
+                    val claimSet = MsoMdocFormat.ClaimSet(
                         claims = mapOf(
                             "org.iso.18013.5.1" to mapOf(
                                 "given_name" to Claim(),
@@ -229,7 +216,7 @@ class IssuanceRequestTest {
                     )
                     val bindingKey = BindingKey.Jwk(
                         algorithm = JWSAlgorithm.RS256,
-                        jwk = ProofBuilder.randomRSASigningKey(2048),
+                        jwk = KeyGenerator.randomRSASigningKey(2048),
                     )
 
                     with(issuer) {
@@ -237,7 +224,7 @@ class IssuanceRequestTest {
                             is AuthorizedRequest.NoProofRequired -> {
                                 val credentialMetadata = offer.credentials[0]
                                 val submittedRequest =
-                                    authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
+                                    authorizedRequest.requestSingle(credentialMetadata, claimSet, null).getOrThrow()
                                 when (submittedRequest) {
                                     is SubmittedRequest.InvalidProof -> {
                                         val proofRequired =
@@ -246,6 +233,7 @@ class IssuanceRequestTest {
                                             credentialMetadata,
                                             claimSet,
                                             bindingKey,
+                                            null,
                                         )
                                         assertThat(
                                             "Second attempt should be successful",
@@ -270,7 +258,7 @@ class IssuanceRequestTest {
             { call ->
                 runBlocking {
                     val request =
-                        call.receive<CredentialIssuanceRequestTO>() as MsoMdocProfile.CredentialIssuanceRequestTO
+                        call.receive<CredentialIssuanceRequestTO>() as MsoMdocFormat.CredentialIssuanceRequestTO
                     println(request)
                     if (request.proof != null) {
                         call.respondText(
@@ -300,7 +288,6 @@ class IssuanceRequestTest {
                     }
                 }
             },
-            {},
         )
     }
 
@@ -334,19 +321,5 @@ class IssuanceRequestTest {
                 .requestAccessToken().getOrThrow()
         }
         return Triple(offer, flowState, issuer)
-    }
-
-    private fun CNonce.toJwtProof(): Proof.Jwt {
-        val jsonObject =
-            buildJsonObject {
-                put("iss", "wallet_client_id")
-                put("iat", Instant.now().epochSecond)
-                put("aud", CREDENTIAL_ISSUER_PUBLIC_URL)
-                put("nonce", value)
-            }
-        val jsonStr = Json.encodeToString(jsonObject)
-        return Proof.Jwt(
-            jwt = PlainJWT(JWTClaimsSet.parse(jsonStr)),
-        )
     }
 }

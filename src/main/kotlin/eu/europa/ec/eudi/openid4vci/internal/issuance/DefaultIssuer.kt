@@ -92,11 +92,12 @@ internal class DefaultIssuer(
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             credentialMetadata
                 .toIssuerSupportedCredential()
-                .toIssuanceRequest(claimSet, null)
+                .toIssuanceRequest(claimSet, null, responseEncryptionSpec)
         }
     }
 
@@ -104,12 +105,14 @@ internal class DefaultIssuer(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
         bindingKey: BindingKey,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             with(credentialMetadata.toIssuerSupportedCredential()) {
                 toIssuanceRequest(
                     claimSet,
                     bindingKey.toSupportedProof(this, cNonce.value),
+                    responseEncryptionSpec,
                 )
             }
         }
@@ -138,19 +141,15 @@ internal class DefaultIssuer(
                     CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported.raise()
                 }
 
-                Proof.Jwt(
-                    with(
-                        ProofBuilder.ofType(ProofType.JWT),
-                    ) {
-                        iss("") // TODO: Get from config??
-                        aud(issuanceRequester.issuerMetadata.credentialIssuerIdentifier.toString())
-                        jwk(this@toSupportedProof.jwk)
-                        alg(this@toSupportedProof.algorithm)
-                        nonce(cNonce)
+                ProofBuilder.ofType(ProofType.JWT) {
+                    iss("") // TODO: Get from config??
+                    aud(issuanceRequester.issuerMetadata.credentialIssuerIdentifier.toString())
+                    jwk(this@toSupportedProof.jwk)
+                    alg(this@toSupportedProof.algorithm)
+                    nonce(cNonce)
 
-                        build()
-                    },
-                )
+                    build()
+                }
             }
 
             is BindingKey.Did -> TODO("DID proof evidence not supported yet")
@@ -159,13 +158,14 @@ internal class DefaultIssuer(
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             CredentialIssuanceRequest.BatchCredentials(
                 credentialRequests = credentialsMetadata.map { pair ->
                     pair.first
                         .toIssuerSupportedCredential()
-                        .toIssuanceRequest(pair.second, null)
+                        .toIssuanceRequest(pair.second, null, responseEncryptionSpec)
                 },
             )
         }
@@ -173,6 +173,7 @@ internal class DefaultIssuer(
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             CredentialIssuanceRequest.BatchCredentials(
@@ -181,6 +182,7 @@ internal class DefaultIssuer(
                         toIssuanceRequest(
                             triple.second,
                             triple.third.toSupportedProof(this, cNonce.value),
+                            responseEncryptionSpec,
                         )
                     }
                 },
@@ -191,7 +193,7 @@ internal class DefaultIssuer(
     private fun CredentialMetadata.toIssuerSupportedCredential(): CredentialSupported =
         when (this) {
             is CredentialMetadata.ByScope -> issuanceRequester.issuerMetadata.supportedCredentialByScope(this)
-            is CredentialMetadata.ByProfile -> issuanceRequester.issuerMetadata.supportedCredentialByProfile(this)
+            is CredentialMetadata.ByFormat -> issuanceRequester.issuerMetadata.supportedCredentialByFormat(this)
         }
 
     private fun CredentialIssuerMetadata.supportedCredentialByScope(scoped: CredentialMetadata.ByScope): CredentialSupported =
@@ -199,36 +201,40 @@ internal class DefaultIssuer(
             .firstOrNull { it.scope == scoped.scope.value }
             ?: throw IllegalArgumentException("Issuer does not support issuance of credential scope: ${scoped.scope}")
 
-    private fun CredentialIssuerMetadata.supportedCredentialByProfile(
-        metadata: CredentialMetadata.ByProfile,
+    private fun CredentialIssuerMetadata.supportedCredentialByFormat(
+        metadata: CredentialMetadata.ByFormat,
     ): CredentialSupported {
         return when (metadata) {
-            is MsoMdocProfile.CredentialMetadata ->
+            is MsoMdocFormat.CredentialMetadata ->
                 credentialsSupported.firstOrNull {
-                    it is MsoMdocProfile.CredentialSupported && it.docType == metadata.docType
+                    it is MsoMdocFormat.CredentialSupported && it.docType == metadata.docType
                 }
 
-            is W3CJsonLdDataIntegrityProfile.CredentialMetadata ->
+            is W3CJsonLdDataIntegrityFormat.CredentialMetadata ->
                 credentialsSupported.firstOrNull {
-                    it is W3CJsonLdDataIntegrityProfile.CredentialSupported &&
+                    it is W3CJsonLdDataIntegrityFormat.CredentialSupported &&
                         it.credentialDefinition.context == metadata.credentialDefinition.content &&
                         it.credentialDefinition.type == metadata.credentialDefinition.type
                 }
 
-            is W3CJsonLdSignedJwtProfile.CredentialMetadata ->
+            is W3CJsonLdSignedJwtFormat.CredentialMetadata ->
                 credentialsSupported.firstOrNull {
-                    it is W3CJsonLdSignedJwtProfile.CredentialSupported &&
+                    it is W3CJsonLdSignedJwtFormat.CredentialSupported &&
                         it.credentialDefinition.context == metadata.credentialDefinition.content &&
                         it.credentialDefinition.type == metadata.credentialDefinition.type
                 }
 
-            is W3CSignedJwtProfile.CredentialMetadata ->
+            is W3CSignedJwtFormat.CredentialMetadata ->
                 credentialsSupported.firstOrNull {
-                    it is W3CSignedJwtProfile.CredentialSupported &&
+                    it is W3CSignedJwtFormat.CredentialSupported &&
                         it.credentialDefinition.type == metadata.credentialDefinition.type
                 }
 
-            is SdJwtVcProfile.CredentialMetadata -> TODO()
+            is SdJwtVcFormat.CredentialMetadata ->
+                credentialsSupported.firstOrNull {
+                    it is SdJwtVcFormat.CredentialSupported &&
+                        it.credentialDefinition.type == metadata.credentialDefinition.type
+                }
         }
             ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
     }
@@ -236,27 +242,63 @@ internal class DefaultIssuer(
     private fun CredentialSupported.toIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): CredentialIssuanceRequest.SingleCredential {
         proof?.let {
             require(this.proofTypesSupported.contains(it.type)) {
                 "Provided proof type ${proof.type} is not one of supported [${this.proofTypesSupported}]."
             }
         }
-        // TODO: Validate crypto alg and method
+        val issuerEncryption = issuanceRequester.issuerMetadata.credentialResponseEncryption
+        responseEncryptionSpec?.let {
+            when (issuerEncryption) {
+                is CredentialResponseEncryption.NotRequired ->
+                    CredentialIssuanceError.ResponseEncryptionError.IssuerDoesNotSupportEncryptedResponses.raise()
+
+                is CredentialResponseEncryption.Required -> {
+                    if (!issuerEncryption.algorithmsSupported.contains(it.algorithm)) {
+                        CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer.raise()
+                    }
+                    if (!issuerEncryption.encryptionMethodsSupported.contains(it.encryptionMethod)) {
+                        CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer.raise()
+                    }
+                }
+            }
+        }
+        if (issuerEncryption is CredentialResponseEncryption.Required && responseEncryptionSpec == null) {
+            CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided.raise()
+        }
+
         return when (this) {
-            is MsoMdocProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
-            is W3CSignedJwtProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
-            is W3CJsonLdDataIntegrityProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
-            is W3CJsonLdSignedJwtProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
-            is SdJwtVcProfile.CredentialSupported -> this.toIssuanceRequest(claimSet, proof).getOrThrow()
+            is MsoMdocFormat.CredentialSupported -> this.toIssuanceRequest(claimSet, proof, responseEncryptionSpec)
+                .getOrThrow()
+
+            is W3CSignedJwtFormat.CredentialSupported -> this.toIssuanceRequest(claimSet, proof, responseEncryptionSpec)
+                .getOrThrow()
+
+            is W3CJsonLdDataIntegrityFormat.CredentialSupported -> this.toIssuanceRequest(
+                claimSet,
+                proof,
+                responseEncryptionSpec,
+            ).getOrThrow()
+
+            is W3CJsonLdSignedJwtFormat.CredentialSupported -> this.toIssuanceRequest(
+                claimSet,
+                proof,
+                responseEncryptionSpec,
+            ).getOrThrow()
+
+            is SdJwtVcFormat.CredentialSupported -> this.toIssuanceRequest(claimSet, proof, responseEncryptionSpec)
+                .getOrThrow()
         }
     }
 
-    private fun MsoMdocProfile.CredentialSupported.toIssuanceRequest(
+    private fun MsoMdocFormat.CredentialSupported.toIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
-        fun validateClaimSet(claimSet: MsoMdocProfile.ClaimSet): MsoMdocProfile.ClaimSet {
+        fun validateClaimSet(claimSet: MsoMdocFormat.ClaimSet): MsoMdocFormat.ClaimSet {
             if (claims.isEmpty() && claimSet.claims.isNotEmpty()) {
                 CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential [MsoMdoc-${this.docType}]",
@@ -278,27 +320,31 @@ internal class DefaultIssuer(
 
         val validClaimSet = claimSet?.let {
             when (claimSet) {
-                is MsoMdocProfile.ClaimSet -> validateClaimSet(claimSet)
+                is MsoMdocFormat.ClaimSet -> validateClaimSet(claimSet)
                 else -> CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
                     .raise()
             }
         }
 
-        MsoMdocProfile.CredentialIssuanceRequest(
+        MsoMdocFormat.CredentialIssuanceRequest(
             doctype = docType,
+            credentialEncryptionJwk = responseEncryptionSpec?.jwk,
+            credentialResponseEncryptionAlg = responseEncryptionSpec?.algorithm,
+            credentialResponseEncryptionMethod = responseEncryptionSpec?.encryptionMethod,
             proof = proof,
             claimSet = validClaimSet,
         ).getOrThrow()
     }
 
-    private fun SdJwtVcProfile.CredentialSupported.toIssuanceRequest(
+    private fun SdJwtVcFormat.CredentialSupported.toIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
-        fun validateClaimSet(claimSet: SdJwtVcProfile.ClaimSet): SdJwtVcProfile.ClaimSet {
-            if (credentialDefinition.claims.isNullOrEmpty() && claimSet.claims.isNotEmpty()) {
+        fun validateClaimSet(claimSet: SdJwtVcFormat.ClaimSet): SdJwtVcFormat.ClaimSet {
+            if ((credentialDefinition.claims == null || credentialDefinition.claims.isEmpty()) && claimSet.claims.isNotEmpty()) {
                 CredentialIssuanceError.InvalidIssuanceRequest(
-                    "Issuer does not support claims for credential [${SdJwtVcProfile.FORMAT}-${this.credentialDefinition.type}]",
+                    "Issuer does not support claims for credential [${SdJwtVcFormat.FORMAT}-${this.credentialDefinition.type}]",
                 ).raise()
             }
             if (credentialDefinition.claims != null && !credentialDefinition.claims.keys.containsAll(claimSet.claims.keys)) {
@@ -311,36 +357,42 @@ internal class DefaultIssuer(
 
         val validClaimSet = claimSet?.let {
             when (claimSet) {
-                is SdJwtVcProfile.ClaimSet -> validateClaimSet(claimSet)
+                is SdJwtVcFormat.ClaimSet -> validateClaimSet(claimSet)
                 else -> CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
                     .raise()
             }
         }
 
-        SdJwtVcProfile.CredentialIssuanceRequest(
+        SdJwtVcFormat.CredentialIssuanceRequest(
             type = credentialDefinition.type,
+            credentialEncryptionJwk = responseEncryptionSpec?.jwk,
+            credentialResponseEncryptionAlg = responseEncryptionSpec?.algorithm,
+            credentialResponseEncryptionMethod = responseEncryptionSpec?.encryptionMethod,
             proof = proof,
             claimSet = validClaimSet,
         ).getOrThrow()
     }
 
-    private fun W3CSignedJwtProfile.CredentialSupported.toIssuanceRequest(
+    private fun W3CSignedJwtFormat.CredentialSupported.toIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<CredentialIssuanceRequest.SingleCredential> {
         TODO("Not yet implemented")
     }
 
-    private fun W3CJsonLdDataIntegrityProfile.CredentialSupported.toIssuanceRequest(
+    private fun W3CJsonLdDataIntegrityFormat.CredentialSupported.toIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<CredentialIssuanceRequest.SingleCredential> {
         TODO("Not yet implemented")
     }
 
-    private fun W3CJsonLdSignedJwtProfile.CredentialSupported.toIssuanceRequest(
+    private fun W3CJsonLdSignedJwtFormat.CredentialSupported.toIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<CredentialIssuanceRequest.SingleCredential> {
         TODO("Not yet implemented")
     }
@@ -385,11 +437,13 @@ internal class DefaultIssuer(
 
     private fun handleIssuanceFailure(throwable: Throwable): SubmittedRequest.Errored {
         return if (throwable is CredentialIssuanceException) {
-            if (throwable.error is CredentialIssuanceError.InvalidProof)
+            if (throwable.error is CredentialIssuanceError.InvalidProof) {
                 SubmittedRequest.InvalidProof(
                     cNonce = CNonce(throwable.error.cNonce, throwable.error.cNonceExpiresIn),
                 )
-            else SubmittedRequest.Failed(throwable.error)
+            } else {
+                SubmittedRequest.Failed(throwable.error)
+            }
         } else {
             throw throwable
         }

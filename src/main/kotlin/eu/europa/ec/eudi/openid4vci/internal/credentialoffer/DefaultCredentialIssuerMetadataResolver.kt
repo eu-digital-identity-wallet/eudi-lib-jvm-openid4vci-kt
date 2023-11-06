@@ -150,23 +150,23 @@ private fun JsonObject.toCredentialSupportedObject(): Result<CredentialSupported
         }
 
     when (format) {
-        W3CSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CSignedJwtProfile.CredentialSupportedTO>(
+        W3CSignedJwtFormat.FORMAT -> Json.decodeFromJsonElement<W3CSignedJwtFormat.CredentialSupportedTO>(
             this,
         )
 
-        W3CJsonLdSignedJwtProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdSignedJwtProfile.CredentialSupportedTO>(
+        W3CJsonLdSignedJwtFormat.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdSignedJwtFormat.CredentialSupportedTO>(
             this,
         )
 
-        W3CJsonLdDataIntegrityProfile.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdDataIntegrityProfile.CredentialSupportedTO>(
+        W3CJsonLdDataIntegrityFormat.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdDataIntegrityFormat.CredentialSupportedTO>(
             this,
         )
 
-        MsoMdocProfile.FORMAT -> Json.decodeFromJsonElement<MsoMdocProfile.CredentialSupportedTO>(
+        MsoMdocFormat.FORMAT -> Json.decodeFromJsonElement<MsoMdocFormat.CredentialSupportedTO>(
             this,
         )
 
-        SdJwtVcProfile.FORMAT -> Json.decodeFromJsonElement<SdJwtVcProfile.CredentialSupportedObject>(
+        SdJwtVcFormat.FORMAT -> Json.decodeFromJsonElement<SdJwtVcFormat.CredentialSupportedObject>(
             this,
         )
 

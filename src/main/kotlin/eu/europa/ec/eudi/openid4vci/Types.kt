@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.JWT
@@ -251,6 +253,12 @@ sealed interface BindingKey {
         val certificate: X509Certificate,
     ) : BindingKey
 }
+
+data class IssuanceResponseEncryption(
+    val jwk: JWK,
+    val algorithm: JWEAlgorithm,
+    val encryptionMethod: EncryptionMethod,
+)
 
 @JvmInline
 value class Scope private constructor(

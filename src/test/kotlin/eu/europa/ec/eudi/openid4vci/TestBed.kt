@@ -19,7 +19,6 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -27,7 +26,6 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
-import java.net.URL
 import java.util.*
 
 const val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
@@ -38,23 +36,23 @@ fun authorizationTestBed(
     parPostAssertions: (call: ApplicationCall) -> Unit,
     tokenPostAssertions: (call: ApplicationCall) -> Unit,
 ) {
-    testBed(testBlock, parPostAssertions, tokenPostAssertions, {}, {})
+    testBed(testBlock, parPostAssertions, tokenPostAssertions, {})
 }
 
 fun issuanceTestBed(
     testBlock: (client: HttpClient) -> Unit,
-    issuanceRequestResponse: (call: ApplicationCall) -> Unit,
     issuanceRequestPostAssertions: (call: ApplicationCall) -> Unit,
+    encryptedResponses: Boolean = false,
 ) {
-    testBed(testBlock, {}, {}, issuanceRequestResponse, issuanceRequestPostAssertions)
+    testBed(testBlock, {}, {}, issuanceRequestPostAssertions, encryptedResponses)
 }
 
 private fun testBed(
     testBlock: (client: HttpClient) -> Unit,
     parPostAssertions: (call: ApplicationCall) -> Unit,
     tokenPostAssertions: (call: ApplicationCall) -> Unit,
-    issuanceRequestResponse: (call: ApplicationCall) -> Unit,
     issuanceRequestAssertions: (call: ApplicationCall) -> Unit,
+    encryptedResponses: Boolean = false,
 ) = testApplication {
     externalServices {
         // Credential issuer server
@@ -65,13 +63,16 @@ private fun testBed(
             routing {
                 get("/.well-known/openid-credential-issuer") {
                     val response =
-                        getResourceAsText("well-known/openid-credential-issuer.json")
+                        if (encryptedResponses)
+                            getResourceAsText("well-known/openid-credential-issuer_encrypted_responses.json")
+                        else
+                            getResourceAsText("well-known/openid-credential-issuer_no_encryption.json")
+
                     call.respond(HttpStatusCode.OK, response)
                 }
 
                 post("/credentials") {
                     issuanceRequestAssertions(call)
-                    issuanceRequestResponse(call)
                 }
             }
         }
@@ -110,7 +111,6 @@ private fun testBed(
                         AccessTokenRequestResponse.Success(
                             accessToken = UUID.randomUUID().toString(),
                             expiresIn = 3600,
-//                            scope = "UniversityDegree PID_mso_mdoc",
                         ),
                     )
                 }
@@ -141,26 +141,24 @@ fun createPostPar(managedHttpClient: HttpClient): HttpFormPost<PushedAuthorizati
     }
 
 fun createGetAccessToken(managedHttpClient: HttpClient): HttpFormPost<AccessTokenRequestResponse> =
-    object : HttpFormPost<AccessTokenRequestResponse> {
-        override suspend fun post(url: URL, formParameters: Map<String, String>): AccessTokenRequestResponse {
-            val response = managedHttpClient.submitForm(
-                url = url.toString(),
-                formParameters = Parameters.build {
-                    formParameters.entries.forEach { append(it.key, it.value) }
-                },
-            )
-            return if (response.status.isSuccess()) {
-                response.body<AccessTokenRequestResponse.Success>()
-            } else {
-                response.body<AccessTokenRequestResponse.Failure>()
-            }
+    HttpFormPost { url, formParameters ->
+        val response = managedHttpClient.submitForm(
+            url = url.toString(),
+            formParameters = Parameters.build {
+                formParameters.entries.forEach { append(it.key, it.value) }
+            },
+        )
+        if (response.status.isSuccess()) {
+            response.body<AccessTokenRequestResponse.Success>()
+        } else {
+            response.body<AccessTokenRequestResponse.Failure>()
         }
     }
 
 fun createGetASMetadata(managedHttpClient: HttpClient): HttpGet<String> =
-    object : HttpGet<String> {
-        override suspend fun get(url: URL): Result<String> = runCatching {
-            managedHttpClient.get(url).body<String>()
+    HttpGet {
+        runCatching {
+            managedHttpClient.get(it).body<String>()
         }
     }
 
