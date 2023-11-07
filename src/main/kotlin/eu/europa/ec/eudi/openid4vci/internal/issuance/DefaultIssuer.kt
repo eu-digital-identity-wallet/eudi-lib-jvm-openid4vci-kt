@@ -132,13 +132,13 @@ internal class DefaultIssuer(
                     credentialSpec.proofTypesSupported.contains(ProofType.JWT)
 
                 if (!isAlgorithmIsSupported()) {
-                    CredentialIssuanceError.ProofGenerationError.BindingMethodNotSupported.raise()
+                    throw CredentialIssuanceError.ProofGenerationError.BindingMethodNotSupported
                 }
                 if (!isBindingMethodSupported()) {
-                    CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported.raise()
+                    throw CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported
                 }
                 if (!isProofTypeSupported()) {
-                    CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported.raise()
+                    throw CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
                 }
 
                 ProofBuilder.ofType(ProofType.JWT) {
@@ -253,20 +253,20 @@ internal class DefaultIssuer(
         responseEncryptionSpec?.let {
             when (issuerEncryption) {
                 is CredentialResponseEncryption.NotRequired ->
-                    CredentialIssuanceError.ResponseEncryptionError.IssuerDoesNotSupportEncryptedResponses.raise()
+                    throw CredentialIssuanceError.ResponseEncryptionError.IssuerDoesNotSupportEncryptedResponses
 
                 is CredentialResponseEncryption.Required -> {
                     if (!issuerEncryption.algorithmsSupported.contains(it.algorithm)) {
-                        CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer.raise()
+                        throw CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
                     }
                     if (!issuerEncryption.encryptionMethodsSupported.contains(it.encryptionMethod)) {
-                        CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer.raise()
+                        throw CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer
                     }
                 }
             }
         }
         if (issuerEncryption is CredentialResponseEncryption.Required && responseEncryptionSpec == null) {
-            CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided.raise()
+            throw CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
         }
 
         return when (this) {
@@ -299,21 +299,20 @@ internal class DefaultIssuer(
         responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
         fun validateClaimSet(claimSet: MsoMdocFormat.ClaimSet): MsoMdocFormat.ClaimSet {
-            if (claims.isEmpty() && claimSet.claims.isNotEmpty()) {
-                CredentialIssuanceError.InvalidIssuanceRequest(
+            if (claims.isEmpty() && claimSet.isNotEmpty()) {
+                throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential [MsoMdoc-${this.docType}]",
-                ).raise()
+                )
             }
-            claimSet.claims.entries.forEach { requestedClaim ->
-                this@toIssuanceRequest.claims.get(requestedClaim.key)?.let { supportedClaim ->
-                    if (!supportedClaim.keys.containsAll(requestedClaim.value.keys)) {
-                        CredentialIssuanceError.InvalidIssuanceRequest(
+            claimSet.forEach { (nameSpace, attributes) ->
+                claims[nameSpace]?.let { supportedClaim ->
+                    if (!supportedClaim.keys.containsAll(attributes.keys)) {
+                        throw CredentialIssuanceError.InvalidIssuanceRequest(
                             "Claim names requested are not supported by issuer",
-                        ).raise()
+                        )
                     }
                 }
-                    ?: CredentialIssuanceError.InvalidIssuanceRequest("Namespace ${requestedClaim.key} not supported by issuer")
-                        .raise()
+                    ?: throw CredentialIssuanceError.InvalidIssuanceRequest("Namespace $nameSpace not supported by issuer")
             }
             return claimSet
         }
@@ -321,8 +320,7 @@ internal class DefaultIssuer(
         val validClaimSet = claimSet?.let {
             when (claimSet) {
                 is MsoMdocFormat.ClaimSet -> validateClaimSet(claimSet)
-                else -> CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
-                    .raise()
+                else -> throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
             }
         }
 
@@ -343,14 +341,14 @@ internal class DefaultIssuer(
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
         fun validateClaimSet(claimSet: SdJwtVcFormat.ClaimSet): SdJwtVcFormat.ClaimSet {
             if ((credentialDefinition.claims == null || credentialDefinition.claims.isEmpty()) && claimSet.claims.isNotEmpty()) {
-                CredentialIssuanceError.InvalidIssuanceRequest(
+                throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential [${SdJwtVcFormat.FORMAT}-${this.credentialDefinition.type}]",
-                ).raise()
+                )
             }
             if (credentialDefinition.claims != null && !credentialDefinition.claims.keys.containsAll(claimSet.claims.keys)) {
-                CredentialIssuanceError.InvalidIssuanceRequest(
+                throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Claim names requested are not supported by issuer",
-                ).raise()
+                )
             }
             return claimSet
         }
@@ -358,8 +356,7 @@ internal class DefaultIssuer(
         val validClaimSet = claimSet?.let {
             when (claimSet) {
                 is SdJwtVcFormat.ClaimSet -> validateClaimSet(claimSet)
-                else -> CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
-                    .raise()
+                else -> throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
             }
         }
 
@@ -436,16 +433,12 @@ internal class DefaultIssuer(
         }
 
     private fun handleIssuanceFailure(throwable: Throwable): SubmittedRequest.Errored {
-        return if (throwable is CredentialIssuanceException) {
-            if (throwable.error is CredentialIssuanceError.InvalidProof) {
-                SubmittedRequest.InvalidProof(
-                    cNonce = CNonce(throwable.error.cNonce, throwable.error.cNonceExpiresIn),
-                )
-            } else {
-                SubmittedRequest.Failed(throwable.error)
-            }
-        } else {
-            throw throwable
+        return when (throwable) {
+            is CredentialIssuanceError.InvalidProof -> SubmittedRequest.InvalidProof(
+                cNonce = CNonce(throwable.cNonce, throwable.cNonceExpiresIn),
+            )
+            is CredentialIssuanceError -> SubmittedRequest.Failed(throwable)
+            else -> throw throwable
         }
     }
 }

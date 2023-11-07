@@ -40,18 +40,18 @@ fun authorizationTestBed(
 }
 
 fun issuanceTestBed(
-    testBlock: (client: HttpClient) -> Unit,
-    issuanceRequestAssertions: (call: ApplicationCall) -> Unit,
+    testBlock: suspend(client: HttpClient) -> Unit,
+    issuanceRequestAssertions: suspend (call: ApplicationCall) -> Unit,
     encryptedResponses: Boolean = false,
 ) {
     testBed(testBlock, {}, {}, issuanceRequestAssertions, encryptedResponses)
 }
 
 private fun testBed(
-    testBlock: (client: HttpClient) -> Unit,
-    parPostAssertions: (call: ApplicationCall) -> Unit,
-    tokenPostAssertions: (call: ApplicationCall) -> Unit,
-    issuanceRequestAssertions: (call: ApplicationCall) -> Unit,
+    testBlock: suspend(client: HttpClient) -> Unit,
+    parPostAssertions: suspend(call: ApplicationCall) -> Unit,
+    tokenPostAssertions: suspend(call: ApplicationCall) -> Unit,
+    issuanceRequestAssertions: suspend (call: ApplicationCall) -> Unit,
     encryptedResponses: Boolean = false,
 ) = testApplication {
     externalServices {
@@ -111,6 +111,7 @@ private fun testBed(
                         AccessTokenRequestResponse.Success(
                             accessToken = UUID.randomUUID().toString(),
                             expiresIn = 3600,
+//                            scope = "UniversityDegree PID_mso_mdoc",
                         ),
                     )
                 }

@@ -24,6 +24,7 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -38,7 +39,6 @@ import java.net.URI
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 import kotlin.test.fail
 
 class IssuanceEncryptedResponsesTest {
@@ -80,15 +80,13 @@ class IssuanceEncryptedResponsesTest {
 
                     val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
 
-                    var exception = assertFailsWith<CredentialIssuanceException>(
+                    assertFailsWith<ResponseEncryptionAlgorithmNotSupportedByIssuer>(
                         block = {
                             with(issuer) {
-                                noProofRequired.requestSingle(offer.credentials[0], null, issuanceResponseEncryption).getOrThrow()
+                                noProofRequired.requestSingle(offer.credentials[0], null, issuanceResponseEncryption)
+                                    .getOrThrow()
                             }
                         },
-                    )
-                    assertTrue(
-                        exception.error is CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer,
                     )
                 }
             },
@@ -115,15 +113,13 @@ class IssuanceEncryptedResponsesTest {
 
                     val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
 
-                    var exception = assertFailsWith<CredentialIssuanceException>(
+                    assertFailsWith<ResponseEncryptionMethodNotSupportedByIssuer>(
                         block = {
                             with(issuer) {
-                                noProofRequired.requestSingle(offer.credentials[0], null, issuanceResponseEncryption).getOrThrow()
+                                noProofRequired.requestSingle(offer.credentials[0], null, issuanceResponseEncryption)
+                                    .getOrThrow()
                             }
                         },
-                    )
-                    assertTrue(
-                        exception.error is CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer,
                     )
                 }
             },
@@ -148,14 +144,15 @@ class IssuanceEncryptedResponsesTest {
 
                     val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
 
-                    var exception = assertFailsWith<CredentialIssuanceException>(
+                    assertFailsWith<IssuerDoesNotSupportEncryptedResponses>(
                         block = {
                             with(issuer) {
-                                noProofRequired.requestSingle(offer.credentials[0], null, issuanceResponseEncryption).getOrThrow()
+                                noProofRequired
+                                    .requestSingle(offer.credentials[0], null, issuanceResponseEncryption)
+                                    .getOrThrow()
                             }
                         },
                     )
-                    assertTrue(exception.error is CredentialIssuanceError.ResponseEncryptionError.IssuerDoesNotSupportEncryptedResponses)
                 }
             },
             issuanceRequestAssertions = { },
@@ -175,16 +172,14 @@ class IssuanceEncryptedResponsesTest {
 
                     val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
 
-                    var exception = assertFailsWith<CredentialIssuanceException>(
+                    assertFailsWith<IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided>(
                         block = {
                             with(issuer) {
-                                noProofRequired.requestSingle(offer.credentials[0], null, null).getOrThrow()
+                                noProofRequired
+                                    .requestSingle(offer.credentials[0], null, null)
+                                    .getOrThrow()
                             }
                         },
-                    )
-                    assertTrue(
-                        exception.error is
-                            CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided,
                     )
                 }
             },
@@ -220,7 +215,11 @@ class IssuanceEncryptedResponsesTest {
                             is AuthorizedRequest.NoProofRequired -> {
                                 val credentialMetadata = offer.credentials[0]
                                 val submittedRequest =
-                                    authorizedRequest.requestSingle(credentialMetadata, claimSet, issuanceResponseEncryption).getOrThrow()
+                                    authorizedRequest.requestSingle(
+                                        credentialMetadata,
+                                        claimSet,
+                                        issuanceResponseEncryption,
+                                    ).getOrThrow()
                                 when (submittedRequest) {
                                     is SubmittedRequest.InvalidProof -> {
                                         val proofRequired =
@@ -367,11 +366,12 @@ class IssuanceEncryptedResponsesTest {
     }
 
     fun encypt(claimSet: JWTClaimsSet): Result<String> = runCatching {
-        val header = JWEHeader.Builder(issuanceResponseEncryption.algorithm, issuanceResponseEncryption.encryptionMethod)
-            .jwk(issuanceResponseEncryption.jwk.toPublicJWK())
-            .keyID(issuanceResponseEncryption.jwk.keyID)
-            .type(JOSEObjectType.JWT)
-            .build()
+        val header =
+            JWEHeader.Builder(issuanceResponseEncryption.algorithm, issuanceResponseEncryption.encryptionMethod)
+                .jwk(issuanceResponseEncryption.jwk.toPublicJWK())
+                .keyID(issuanceResponseEncryption.jwk.keyID)
+                .type(JOSEObjectType.JWT)
+                .build()
 
         val jwt = EncryptedJWT(header, claimSet)
         val encrypter =

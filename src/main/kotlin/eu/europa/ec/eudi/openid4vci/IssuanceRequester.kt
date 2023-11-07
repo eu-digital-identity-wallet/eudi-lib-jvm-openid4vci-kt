@@ -118,13 +118,12 @@ sealed interface CredentialIssuanceRequest {
                     if (credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null) {
                         encryptionMethod = EncryptionMethod.A256GCM
                     } else if (credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null) {
-                        CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
-                            .raise()
+                        throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
                     } else if (credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null) {
-                        CredentialIssuanceError.InvalidIssuanceRequest(
+                        throw CredentialIssuanceError.InvalidIssuanceRequest(
                             "Credential response encryption algorithm must be specified if Credential " +
                                 "response encryption method is provided",
-                        ).raise()
+                        )
                     }
 
                     RequestedCredentialResponseEncryption.Requested(

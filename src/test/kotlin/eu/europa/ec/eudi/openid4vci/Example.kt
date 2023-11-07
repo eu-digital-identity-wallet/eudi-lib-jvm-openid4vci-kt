@@ -129,7 +129,7 @@ private class Wallet(
     }
 
     suspend fun issueByCredentialOfferUrl(coUrl: String): String {
-        val offer = HttpClientFactory().use { client ->
+        val offer = httpClientFactory().use { client ->
             val credentialOfferRequestResolver = CredentialOfferRequestResolver(
                 httpGet = { url ->
                     runCatching {
@@ -245,7 +245,7 @@ private class Wallet(
                 }
 
                 is SubmittedRequest.Failed -> {
-                    requestOutcome.error.raise()
+                    throw requestOutcome.error
                 }
 
                 is SubmittedRequest.InvalidProof ->
@@ -265,7 +265,7 @@ private class Wallet(
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
-                    val result = requestOutcome.response.credentialResponses.get(0)
+                    val result = requestOutcome.response.credentialResponses[0]
                     when (result) {
                         is CredentialIssuanceResponse.Result.Issued -> result.credential
                         is CredentialIssuanceResponse.Result.Deferred -> result.transactionId
@@ -281,14 +281,12 @@ private class Wallet(
                     )
                 }
 
-                is SubmittedRequest.Failed -> {
-                    requestOutcome.error.raise()
-                }
+                is SubmittedRequest.Failed -> throw requestOutcome.error
             }
         }
     }
 
-    private fun HttpClientFactory(): HttpClient =
+    private fun httpClientFactory(): HttpClient =
         HttpClient {
             install(ContentNegotiation) {
                 json(
@@ -299,7 +297,7 @@ private class Wallet(
         }
 
     private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
-        HttpClientFactory().use { client ->
+        httpClientFactory().use { client ->
 
             val loginUrl = HttpGet { url ->
                 runCatching {
