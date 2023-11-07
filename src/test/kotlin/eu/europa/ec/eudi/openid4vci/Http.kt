@@ -89,12 +89,7 @@ internal suspend fun mockEngine(
             }
             expectSuccess = true
         }.use { httpClient ->
-            val httpGet = HttpGet {
-                runCatching {
-                    httpClient.get(it).bodyAsText()
-                }
-            }
-
+            val httpGet = HttpGet { httpClient.get(it).bodyAsText() }
             action(httpGet)
             verifier(mockEngine.requestHistory)
         }

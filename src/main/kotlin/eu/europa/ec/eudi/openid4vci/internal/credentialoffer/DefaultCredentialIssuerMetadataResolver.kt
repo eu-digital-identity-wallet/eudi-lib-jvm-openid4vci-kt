@@ -45,7 +45,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                         .toURL()
 
                 withContext(coroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
-                    httpGet.get(url).getOrThrow()
+                    httpGet.get(url)
                 }
             } catch (t: Throwable) {
                 throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
