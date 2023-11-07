@@ -21,15 +21,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
-import java.net.URL
 import java.util.*
 
-object W3CJsonLdSignedJwtProfile {
+object W3CSignedJwtFormat {
 
-    const val FORMAT = "jwt_vc_json-ld"
+    const val FORMAT = "jwt_vc_json"
 
     /**
-     * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
+     * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
      */
     @Serializable
     data class CredentialSupportedTO(
@@ -42,7 +41,6 @@ object W3CJsonLdSignedJwtProfile {
         @SerialName("proof_types_supported")
         override val proofTypesSupported: List<String>? = null,
         @SerialName("display") override val display: List<DisplayTO>? = null,
-        @SerialName("@context") @Required val context: List<String> = emptyList(),
         @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
         @SerialName("order") val order: List<String>? = null,
     ) : eu.europa.ec.eudi.openid4vci.CredentialSupportedTO {
@@ -52,7 +50,6 @@ object W3CJsonLdSignedJwtProfile {
 
         @Serializable
         data class CredentialDefinitionTO(
-            @SerialName("@context") val context: List<String>,
             @SerialName("type") val types: List<String>,
             @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>?,
         )
@@ -71,7 +68,6 @@ object W3CJsonLdSignedJwtProfile {
                 cryptographicSuitesSupported,
                 proofTypesSupported,
                 display,
-                context,
                 credentialDefinition.toDomain(),
                 order ?: emptyList(),
             )
@@ -80,7 +76,6 @@ object W3CJsonLdSignedJwtProfile {
 
     fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): CredentialSupported.CredentialDefinition =
         CredentialSupported.CredentialDefinition(
-            context = context.map { URL(it) },
             type = types,
             credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
                 nameAndClaim.value.let {
@@ -99,7 +94,7 @@ object W3CJsonLdSignedJwtProfile {
         )
 
     /**
-     * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
+     * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
      */
     data class CredentialSupported(
         override val scope: String? = null,
@@ -107,12 +102,11 @@ object W3CJsonLdSignedJwtProfile {
         override val cryptographicSuitesSupported: List<String> = emptyList(),
         override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
         override val display: List<Display> = emptyList(),
-        val context: List<String> = emptyList(),
         val credentialDefinition: CredentialDefinition,
         val order: List<ClaimName> = emptyList(),
     ) : eu.europa.ec.eudi.openid4vci.CredentialSupported {
+
         data class CredentialDefinition(
-            val context: List<URL>,
             val type: List<String>,
             val credentialSubject: Map<ClaimName, Claim?>?,
         )
@@ -126,20 +120,17 @@ object W3CJsonLdSignedJwtProfile {
         @Serializable
         data class CredentialDefinition(
             @SerialName("type") val type: List<String>,
-            @SerialName("@context") val context: List<String>? = null,
         )
     }
 
     /**
-     * A signed JWT using JSON-LD credential metadata object.
+     * A signed JWT (not using JSON-LD) credential metadata object.
      */
     data class CredentialMetadata(
         val credentialDefinition: CredentialDefinitionMetadata,
         val scope: String? = null,
-    ) : eu.europa.ec.eudi.openid4vci.CredentialMetadata.ByProfile {
-
+    ) : eu.europa.ec.eudi.openid4vci.CredentialMetadata.ByFormat {
         data class CredentialDefinitionMetadata(
-            val content: List<URL>,
             val type: List<String>,
         )
     }
@@ -156,15 +147,12 @@ object W3CJsonLdSignedJwtProfile {
 
         return metadata.credentialsSupported
             .firstOrNull {
-                it is CredentialSupported &&
-                    it.credentialDefinition.type == credentialDefinition.type &&
-                    it.credentialDefinition.context.map { it.toString() } == credentialDefinition.context
+                it is CredentialSupported && it.credentialDefinition.type == credentialDefinition.type
             }
             ?.let {
                 CredentialMetadata(
                     CredentialMetadata.CredentialDefinitionMetadata(
                         type = credentialDefinition.type,
-                        content = credentialDefinition.context?.map { URL(it) } ?: throw IllegalArgumentException("Unparsable"),
                     ),
                     it.scope,
                 )

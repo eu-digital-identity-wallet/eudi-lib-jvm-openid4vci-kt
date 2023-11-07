@@ -18,16 +18,15 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
-import kotlinx.serialization.*
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.util.*
 
-object MsoMdocProfile {
+object MsoMdocFormat {
 
     const val FORMAT = "mso_mdoc"
 
@@ -118,7 +117,7 @@ object MsoMdocProfile {
     data class CredentialMetadata(
         val docType: String,
         val scope: String? = null,
-    ) : eu.europa.ec.eudi.openid4vci.CredentialMetadata.ByProfile
+    ) : eu.europa.ec.eudi.openid4vci.CredentialMetadata.ByFormat
 
     fun matchSupportedAndToDomain(jsonObject: JsonObject, metadata: CredentialIssuerMetadata): CredentialMetadata {
         val docType = Json.decodeFromJsonElement<CredentialMetadataTO>(jsonObject).docType
@@ -133,29 +132,15 @@ object MsoMdocProfile {
     data class CredentialIssuanceRequestTO(
         @SerialName("doctype") val docType: String,
         @SerialName("proof") override val proof: JsonObject?,
-        @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject?,
-        @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String?,
-        @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String?,
+        @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
+        @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
+        @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String? = null,
         @SerialName("claims") val claims: JsonObject?,
     ) : eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequestTO.SingleCredentialTO
 
-    @Serializable(with = ClaimSetSerializer::class)
-    class ClaimSet(
-        claims: Map<Namespace, Map<ClaimName, Claim>>,
-    ) : Map<Namespace, Map<ClaimName, Claim>> by claims, eu.europa.ec.eudi.openid4vci.ClaimSet
-
-    private object ClaimSetSerializer : KSerializer<ClaimSet> {
-        val internal = serializer<Map<Namespace, Map<ClaimName, Claim>>>()
-        override val descriptor: SerialDescriptor =
-            internal.descriptor
-
-        override fun deserialize(decoder: Decoder): ClaimSet =
-            ClaimSet(internal.deserialize(decoder))
-
-        override fun serialize(encoder: Encoder, value: ClaimSet) {
-            internal.serialize(encoder, value as Map<Namespace, Map<ClaimName, Claim>>)
-        }
-    }
+    data class ClaimSet(
+        val claims: Map<Namespace, Map<ClaimName, Claim>>,
+    ) : eu.europa.ec.eudi.openid4vci.ClaimSet
 
     /**
      * Issuance request for a credential of mso_mdoc format
@@ -163,9 +148,7 @@ object MsoMdocProfile {
     class CredentialIssuanceRequest private constructor(
         val doctype: String,
         override val proof: Proof? = null,
-        override val credentialEncryptionJwk: JWK? = null,
-        override val credentialResponseEncryptionAlg: JWEAlgorithm? = null,
-        override val credentialResponseEncryptionMethod: EncryptionMethod? = null,
+        override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
         val claimSet: ClaimSet?,
     ) : eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequest.SingleCredential {
 
@@ -180,29 +163,14 @@ object MsoMdocProfile {
                 doctype: String,
                 claimSet: ClaimSet? = null,
             ): Result<CredentialIssuanceRequest> = runCatching {
-                var encryptionMethod = credentialResponseEncryptionMethod
-                when {
-                    credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null -> {
-                        encryptionMethod = EncryptionMethod.A256GCM
-                    }
-
-                    credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null -> {
-                        throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
-                    }
-
-                    credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null -> {
-                        throw CredentialIssuanceError.InvalidIssuanceRequest(
-                            "Credential response encryption algorithm must be specified if Credential " +
-                                "response encryption method is provided",
-                        )
-                    }
-                }
-
                 CredentialIssuanceRequest(
                     proof = proof,
-                    credentialEncryptionJwk = credentialEncryptionJwk,
-                    credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
-                    credentialResponseEncryptionMethod = encryptionMethod,
+                    requestedCredentialResponseEncryption =
+                        eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequest.SingleCredential.requestedCredentialResponseEncryption(
+                            credentialEncryptionJwk = credentialEncryptionJwk,
+                            credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
+                            credentialResponseEncryptionMethod = credentialResponseEncryptionMethod,
+                        ),
                     doctype = doctype,
                     claimSet = claimSet,
                 )

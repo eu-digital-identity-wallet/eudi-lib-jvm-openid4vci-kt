@@ -20,48 +20,51 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.*
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator
-import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import java.time.Instant
 import java.util.*
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 
 sealed interface ProofBuilder {
 
-    class JwtProofBuilder : ProofBuilder {
+    fun alg(alg: JWSAlgorithm)
+    fun jwk(jwk: JWK)
+    fun iss(iss: String)
+    fun aud(aud: String)
+    fun nonce(nonce: String)
+    fun build(): Proof
+
+    private class JwtProofBuilder : ProofBuilder {
 
         val HEADER_TYPE = "openid4vci-proof+jwt"
-
         val claimsSet = JWTClaimsSet.Builder()
-
         var alg: JWSAlgorithm? = null
         var jwk: JWK? = null
 
-        fun alg(alg: JWSAlgorithm): JwtProofBuilder {
+        override fun alg(alg: JWSAlgorithm) {
             this.alg = alg
-            return this
         }
 
-        fun jwk(jwk: JWK): JwtProofBuilder {
+        override fun jwk(jwk: JWK) {
             this.jwk = jwk
-            return this
         }
 
-        fun iss(iss: String): JwtProofBuilder {
+        override fun iss(iss: String) {
             claimsSet.issuer(iss)
-            return this
-        }
-        fun aud(aud: String): JwtProofBuilder {
-            claimsSet.audience(aud)
-            return this
-        }
-        fun nonce(nonce: String): JwtProofBuilder {
-            claimsSet.claim("nonce", nonce)
-            return this
         }
 
-        fun build(): SignedJWT {
+        override fun aud(aud: String) {
+            claimsSet.audience(aud)
+        }
+
+        override fun nonce(nonce: String) {
+            claimsSet.claim("nonce", nonce)
+        }
+
+        override fun build(): Proof.Jwt {
             checkNotNull(alg) {
                 "No signing algorithm provided"
             }
@@ -88,27 +91,25 @@ sealed interface ProofBuilder {
             val signer = DefaultJWSSignerFactory().createJWSSigner(jwk!!, alg)
             signedJWT.sign(signer)
 
-            return signedJWT
+            return Proof.Jwt(signedJWT)
         }
     }
 
     companion object {
-        fun ofType(type: ProofType) =
-            when (type) {
-                ProofType.JWT -> JwtProofBuilder()
+        @OptIn(ExperimentalContracts::class)
+        fun ofType(type: ProofType, usage: ProofBuilder.() -> Proof): Proof {
+            contract {
+                callsInPlace(usage, InvocationKind.EXACTLY_ONCE)
+            }
+            return when (type) {
+                ProofType.JWT -> {
+                    with(JwtProofBuilder()) {
+                        usage()
+                    }
+                }
+
                 ProofType.CWT -> TODO("CWT proofs not supported yet")
             }
-
-        fun randomRSASigningKey(size: Int): RSAKey = RSAKeyGenerator(size)
-            .keyUse(KeyUse.SIGNATURE)
-            .keyID(UUID.randomUUID().toString())
-            .issueTime(Date(System.currentTimeMillis()))
-            .generate()
-
-        fun randomECSigningKey(curve: Curve): ECKey = ECKeyGenerator(curve)
-            .keyUse(KeyUse.SIGNATURE)
-            .keyID(UUID.randomUUID().toString())
-            .issueTime(Date(System.currentTimeMillis()))
-            .generate()
+        }
     }
 }

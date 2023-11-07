@@ -1,8 +1,6 @@
 name: SCA - Dependency Check
 on:
   push:
-    branches: [ 'main', 'release/*', 'feature/*' ]
-    tags: [ v* ]
   workflow_dispatch:
   
 jobs:

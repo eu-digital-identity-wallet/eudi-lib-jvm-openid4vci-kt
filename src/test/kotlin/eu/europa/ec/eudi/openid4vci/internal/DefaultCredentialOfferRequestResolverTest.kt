@@ -52,7 +52,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     oidcAuthorizationServerMetadata(),
                     listOf(
                         CredentialMetadata.ByScope(Scope.of("UniversityDegree_JWT")),
-                        MsoMdocProfile.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                        MsoMdocFormat.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
@@ -107,7 +107,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        MsoMdocProfile.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                        MsoMdocFormat.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
@@ -161,8 +161,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 credentialIssuerMetadata(),
                 oidcAuthorizationServerMetadata(),
                 listOf(
-                    W3CSignedJwtProfile.CredentialMetadata(
-                        W3CSignedJwtProfile.CredentialMetadata.CredentialDefinitionMetadata(
+                    W3CSignedJwtFormat.CredentialMetadata(
+                        W3CSignedJwtFormat.CredentialMetadata.CredentialDefinitionMetadata(
                             universityDegreeJwt.credentialDefinition.type,
                         ),
                         universityDegreeJwt.scope,
@@ -220,8 +220,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        W3CJsonLdDataIntegrityProfile.CredentialMetadata(
-                            W3CJsonLdDataIntegrityProfile.CredentialMetadata.CredentialDefinitionMetadata(
+                        W3CJsonLdDataIntegrityFormat.CredentialMetadata(
+                            W3CJsonLdDataIntegrityFormat.CredentialMetadata.CredentialDefinitionMetadata(
                                 universityDegreeLdpVc.credentialDefinition.context,
                                 universityDegreeLdpVc.credentialDefinition.type,
                             ),
@@ -395,7 +395,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     oidcAuthorizationServerMetadata(),
                     listOf(
                         CredentialMetadata.ByScope(Scope.of("UniversityDegree_JWT")),
-                        MsoMdocProfile.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                        MsoMdocFormat.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),

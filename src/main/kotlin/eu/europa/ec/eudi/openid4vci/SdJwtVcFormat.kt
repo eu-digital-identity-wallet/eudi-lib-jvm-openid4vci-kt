@@ -26,7 +26,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.util.*
 
-object SdJwtVcProfile {
+object SdJwtVcFormat {
 
     const val FORMAT = "vc+sd-jwt"
 
@@ -117,9 +117,13 @@ object SdJwtVcProfile {
     }
 
     data class CredentialMetadata(
-        val type: String,
+        val credentialDefinition: CredentialDefinitionMetadata,
         val scope: String? = null,
-    ) : eu.europa.ec.eudi.openid4vci.CredentialMetadata.ByProfile
+    ) : eu.europa.ec.eudi.openid4vci.CredentialMetadata.ByFormat {
+        data class CredentialDefinitionMetadata(
+            val type: String,
+        )
+    }
 
     fun matchSupportedAndToDomain(jsonObject: JsonObject, metadata: CredentialIssuerMetadata): CredentialMetadata {
         val credentialDefinition = Json.decodeFromJsonElement<CredentialMetadataObject>(
@@ -134,7 +138,10 @@ object SdJwtVcProfile {
                 it is CredentialSupported && it.credentialDefinition.type == credentialDefinition.type
             }
             ?.let {
-                CredentialMetadata(credentialDefinition.type, (it as CredentialSupported).scope)
+                CredentialMetadata(
+                    CredentialMetadata.CredentialDefinitionMetadata(credentialDefinition.type),
+                    (it as CredentialSupported).scope,
+                )
             }
             ?: fail()
     }
@@ -162,9 +169,7 @@ object SdJwtVcProfile {
 
     class CredentialIssuanceRequest private constructor(
         override val proof: Proof? = null,
-        override val credentialEncryptionJwk: JWK? = null,
-        override val credentialResponseEncryptionAlg: JWEAlgorithm? = null,
-        override val credentialResponseEncryptionMethod: EncryptionMethod? = null,
+        override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
         val credentialDefinition: CredentialDefinition,
     ) : eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequest.SingleCredential {
 
@@ -184,27 +189,14 @@ object SdJwtVcProfile {
                 credentialResponseEncryptionMethod: EncryptionMethod? = null,
                 claimSet: ClaimSet? = null,
             ): Result<CredentialIssuanceRequest> = runCatching {
-                var encryptionMethod = credentialResponseEncryptionMethod
-                when {
-                    credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null -> {
-                        encryptionMethod = EncryptionMethod.A256GCM
-                    }
-                    credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null -> {
-                        throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
-                    }
-                    credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null -> {
-                        throw CredentialIssuanceError.InvalidIssuanceRequest(
-                            "Credential response encryption algorithm must be specified if Credential " +
-                                "response encryption method is provided",
-                        )
-                    }
-                }
-
                 CredentialIssuanceRequest(
                     proof = proof,
-                    credentialEncryptionJwk = credentialEncryptionJwk,
-                    credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
-                    credentialResponseEncryptionMethod = encryptionMethod,
+                    requestedCredentialResponseEncryption =
+                        eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequest.SingleCredential.requestedCredentialResponseEncryption(
+                            credentialEncryptionJwk = credentialEncryptionJwk,
+                            credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
+                            credentialResponseEncryptionMethod = credentialResponseEncryptionMethod,
+                        ),
                     credentialDefinition = CredentialDefinition(
                         type = type,
                         claims = claimSet,

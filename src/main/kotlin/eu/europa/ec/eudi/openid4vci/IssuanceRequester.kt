@@ -18,6 +18,8 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.KeyType
+import com.nimbusds.jose.jwk.KeyUse
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceRequester
 import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorIssuanceRequester
 import kotlinx.coroutines.CoroutineDispatcher
@@ -98,12 +100,67 @@ sealed interface CredentialIssuanceRequest {
 
         val format: String
         val proof: Proof?
-        val credentialEncryptionJwk: JWK?
-        val credentialResponseEncryptionAlg: JWEAlgorithm?
-        val credentialResponseEncryptionMethod: EncryptionMethod?
+        val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption
 
-        fun requiresEncryptedResponse(): Boolean =
-            credentialResponseEncryptionAlg != null && credentialEncryptionJwk != null && credentialResponseEncryptionMethod != null
+        companion object {
+            fun requestedCredentialResponseEncryption(
+                credentialEncryptionJwk: JWK?,
+                credentialResponseEncryptionAlg: JWEAlgorithm?,
+                credentialResponseEncryptionMethod: EncryptionMethod?,
+            ): RequestedCredentialResponseEncryption =
+                if (credentialEncryptionJwk == null &&
+                    credentialResponseEncryptionAlg == null &&
+                    credentialResponseEncryptionMethod == null
+                ) {
+                    RequestedCredentialResponseEncryption.NotRequested
+                } else {
+                    var encryptionMethod = credentialResponseEncryptionMethod
+                    if (credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null) {
+                        encryptionMethod = EncryptionMethod.A256GCM
+                    } else if (credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null) {
+                        CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
+                            .raise()
+                    } else if (credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null) {
+                        CredentialIssuanceError.InvalidIssuanceRequest(
+                            "Credential response encryption algorithm must be specified if Credential " +
+                                "response encryption method is provided",
+                        ).raise()
+                    }
+
+                    RequestedCredentialResponseEncryption.Requested(
+                        encryptionJwk = credentialEncryptionJwk!!,
+                        responseEncryptionAlg = credentialResponseEncryptionAlg!!,
+                        responseEncryptionMethod = encryptionMethod!!,
+                    )
+                }
+        }
+    }
+}
+
+sealed interface RequestedCredentialResponseEncryption : java.io.Serializable {
+    data object NotRequested : RequestedCredentialResponseEncryption {
+        private fun readResolve(): Any = NotRequested
+    }
+
+    data class Requested(
+        val encryptionJwk: JWK,
+        val responseEncryptionAlg: JWEAlgorithm,
+        val responseEncryptionMethod: EncryptionMethod,
+    ) : RequestedCredentialResponseEncryption {
+        init {
+            // Validate algorithm provided is for asymmetric encryption
+            check(JWEAlgorithm.Family.ASYMMETRIC.contains(responseEncryptionAlg)) {
+                "Provided encryption algorithm is not an asymmetric encryption algorithm"
+            }
+            // Validate algorithm matches key
+            check(encryptionJwk.keyType == KeyType.forAlgorithm(responseEncryptionAlg)) {
+                "Encryption key and encryption algorithm do not match"
+            }
+            // Validate key is for encryption operation
+            check(encryptionJwk.keyUse == KeyUse.ENCRYPTION) {
+                "Provided key use is not encryption"
+            }
+        }
     }
 }
 
@@ -117,7 +174,7 @@ data class CredentialIssuanceResponse(
     val cNonce: CNonce?,
 ) {
     sealed interface Result {
-        data class Complete(
+        data class Issued(
             val format: String,
             val credential: String,
         ) : Result

@@ -109,20 +109,24 @@ interface RequestIssuance {
     suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<SubmittedRequest>
 
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
         bindingKey: BindingKey,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<SubmittedRequest>
 
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<SubmittedRequest>
 
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
+        responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<SubmittedRequest>
 
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
@@ -247,5 +251,12 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         data object ProofTypeNotSupported : ProofGenerationError("ProofTypeNotSupported") {
             private fun readResolve(): Any = ProofTypeNotSupported
         }
+    }
+
+    sealed interface ResponseEncryptionError : CredentialIssuanceError {
+        data object IssuerDoesNotSupportEncryptedResponses : ProofGenerationError
+        data object ResponseEncryptionAlgorithmNotSupportedByIssuer : ProofGenerationError
+        data object ResponseEncryptionMethodNotSupportedByIssuer : ProofGenerationError
+        data object IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided : ProofGenerationError
     }
 }

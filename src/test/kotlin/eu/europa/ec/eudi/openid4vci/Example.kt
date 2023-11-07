@@ -15,7 +15,15 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -31,6 +39,7 @@ import org.jsoup.nodes.FormElement
 import java.lang.IllegalStateException
 import java.net.URI
 import java.net.URL
+import java.util.*
 
 val CredentialIssuer_URL = "http://localhost:8080"
 val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
@@ -64,11 +73,12 @@ val config = WalletOpenId4VCIConfig(
 fun main(): Unit = runBlocking {
     val bindingKey = BindingKey.Jwk(
         algorithm = JWSAlgorithm.RS256,
-        jwk = ProofBuilder.randomRSASigningKey(2048),
+        jwk = KeyGenerator.randomRSASigningKey(2048),
     )
+    val responseEncryptionKey = KeyGenerator.randomRSAEncryptionKey(2048)
 
     val user = ActingUser("babis", "babis")
-    val wallet = Wallet.ofUser(user, bindingKey)
+    val wallet = Wallet.ofUser(user, bindingKey, responseEncryptionKey)
 
     WalletInitiatedIssuanceWithOffer(wallet)
     WalletInitiatedIssuanceNoOffer(wallet)
@@ -100,12 +110,14 @@ data class ActingUser(
 private class Wallet(
     val actingUser: ActingUser,
     val bindingKey: BindingKey,
+    val responseEncryptionKey: RSAKey,
 ) {
 
     suspend fun issueByScope(scope: String): String {
         val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
         val issuerMetadata = CredentialIssuerMetadataResolver.ktor().resolve(credentialIssuerIdentifier).getOrThrow()
-        val authServerMetadata = AuthorizationServerMetadataResolver.ktor().resolve(issuerMetadata.authorizationServer).getOrThrow()
+        val authServerMetadata =
+            AuthorizationServerMetadataResolver.ktor().resolve(issuerMetadata.authorizationServer).getOrThrow()
 
         val offer = CredentialOffer(
             credentialIssuerIdentifier = credentialIssuerIdentifier,
@@ -137,21 +149,29 @@ private class Wallet(
             offer.credentialIssuerMetadata,
             config,
         )
+        val issuanceResponseEncryption = IssuanceResponseEncryption(
+            jwk = responseEncryptionKey,
+            algorithm = JWEAlgorithm.RSA_OAEP_256,
+            encryptionMethod = EncryptionMethod.A128CBC_HS256,
+        )
+
         // Authorize with auth code flow
         val authorized = authorizeRequestWithAuthCodeUseCase(issuer, offer)
+
         val outcome = when (authorized) {
             is AuthorizedRequest.NoProofRequired -> {
-                noProofRequiredSubmissionUseCase(issuer, authorized, offer)
+                noProofRequiredSubmissionUseCase(issuer, authorized, offer, issuanceResponseEncryption)
             }
-
             is AuthorizedRequest.ProofRequired -> {
                 proofRequiredSubmissionUseCase(
                     issuer,
                     authorized,
                     offer,
+                    issuanceResponseEncryption,
                 )
             }
         }
+
         return outcome
     }
 
@@ -197,7 +217,8 @@ private class Wallet(
             val preAuthorizationCode =
                 IssuanceAuthorization.PreAuthorizationCode(preAuthorizedCode.preAuthorizedCode, "")
 
-            val authorizedRequest = authorizeWithPreAuthorizationCode(offer.credentials, preAuthorizationCode).getOrThrow()
+            val authorizedRequest =
+                authorizeWithPreAuthorizationCode(offer.credentials, preAuthorizationCode).getOrThrow()
 
             println("--> Pre-authorization code exchanged with access token : ${authorizedRequest.token.accessToken}")
 
@@ -209,15 +230,16 @@ private class Wallet(
         issuer: Issuer,
         authorized: AuthorizedRequest.ProofRequired,
         offer: CredentialOffer,
+        issuanceResponseEncryption: IssuanceResponseEncryption?,
     ): String {
         with(issuer) {
-            val requestOutcome = authorized.requestSingle(offer.credentials[0], null, bindingKey).getOrThrow()
+            val requestOutcome = authorized.requestSingle(offer.credentials[0], null, bindingKey, issuanceResponseEncryption).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
                     val result = requestOutcome.response.credentialResponses.get(0)
                     when (result) {
-                        is CredentialIssuanceResponse.Result.Complete -> result.credential
+                        is CredentialIssuanceResponse.Result.Issued -> result.credential
                         is CredentialIssuanceResponse.Result.Deferred -> result.transactionId
                     }
                 }
@@ -236,15 +258,16 @@ private class Wallet(
         issuer: Issuer,
         noProofRequiredState: AuthorizedRequest.NoProofRequired,
         offer: CredentialOffer,
+        issuanceResponseEncryption: IssuanceResponseEncryption?,
     ): String {
         with(issuer) {
-            val requestOutcome = noProofRequiredState.requestSingle(offer.credentials[0], null).getOrThrow()
+            val requestOutcome = noProofRequiredState.requestSingle(offer.credentials[0], null, issuanceResponseEncryption).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
                     val result = requestOutcome.response.credentialResponses[0]
                     when (result) {
-                        is CredentialIssuanceResponse.Result.Complete -> result.credential
+                        is CredentialIssuanceResponse.Result.Issued -> result.credential
                         is CredentialIssuanceResponse.Result.Deferred -> result.transactionId
                     }
                 }
@@ -254,6 +277,7 @@ private class Wallet(
                         issuer,
                         noProofRequiredState.handleInvalidProof(requestOutcome.cNonce),
                         offer,
+                        issuanceResponseEncryption,
                     )
                 }
 
@@ -307,6 +331,34 @@ private class Wallet(
     }
 
     companion object {
-        fun ofUser(actingUser: ActingUser, bindingKey: BindingKey.Jwk) = Wallet(actingUser, bindingKey)
+        fun ofUser(actingUser: ActingUser, bindingKey: BindingKey.Jwk, responseEncryptionKey: RSAKey) =
+            Wallet(actingUser, bindingKey, responseEncryptionKey)
     }
+}
+
+object KeyGenerator {
+
+    fun randomRSASigningKey(size: Int): RSAKey = RSAKeyGenerator(size)
+        .keyUse(KeyUse.SIGNATURE)
+        .keyID(UUID.randomUUID().toString())
+        .issueTime(Date(System.currentTimeMillis()))
+        .generate()
+
+    fun randomECSigningKey(curve: Curve): ECKey = ECKeyGenerator(curve)
+        .keyUse(KeyUse.SIGNATURE)
+        .keyID(UUID.randomUUID().toString())
+        .issueTime(Date(System.currentTimeMillis()))
+        .generate()
+
+    fun randomRSAEncryptionKey(size: Int): RSAKey = RSAKeyGenerator(size)
+        .keyUse(KeyUse.ENCRYPTION)
+        .keyID(UUID.randomUUID().toString())
+        .issueTime(Date(System.currentTimeMillis()))
+        .generate()
+
+    fun randomECEncryptionKey(curve: Curve): ECKey = ECKeyGenerator(curve)
+        .keyUse(KeyUse.ENCRYPTION)
+        .keyID(UUID.randomUUID().toString())
+        .issueTime(Date(System.currentTimeMillis()))
+        .generate()
 }

@@ -84,7 +84,7 @@ internal fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: Http
  * Gets the 'UniversityDegree_JWT' scoped credential used throughout the tests.
  */
 internal fun universityDegreeJwt() =
-    W3CSignedJwtProfile.CredentialSupported(
+    W3CSignedJwtFormat.CredentialSupported(
         "UniversityDegree_JWT",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("ES256K"),
@@ -102,7 +102,7 @@ internal fun universityDegreeJwt() =
                 "#FFFFFF",
             ),
         ),
-        W3CSignedJwtProfile.CredentialSupported.CredentialDefinition(
+        W3CSignedJwtFormat.CredentialSupported.CredentialDefinition(
             listOf("VerifiableCredential", "UniversityDegreeCredential"),
             mapOf(
                 "given_name" to Claim(
@@ -136,7 +136,7 @@ internal fun universityDegreeJwt() =
  * Gets the 'UniversityDegree_LDP_VC' scoped credential used throughout the tests.
  */
 internal fun universityDegreeLdpVc() =
-    W3CJsonLdDataIntegrityProfile.CredentialSupported(
+    W3CJsonLdDataIntegrityFormat.CredentialSupported(
         "UniversityDegree_LDP_VC",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("Ed25519Signature2018"),
@@ -162,7 +162,7 @@ internal fun universityDegreeLdpVc() =
             "VerifiableCredential_LDP_VC",
             "UniversityDegreeCredential_LDP_VC",
         ),
-        W3CJsonLdDataIntegrityProfile.CredentialSupported.CredentialDefinition(
+        W3CJsonLdDataIntegrityFormat.CredentialSupported.CredentialDefinition(
             listOf(
                 URL("https://www.w3.org/2018/credentials/v1"),
                 URL("https://www.w3.org/2018/credentials/examples/v1"),
@@ -200,7 +200,7 @@ internal fun universityDegreeLdpVc() =
  * Gets the 'mDL' scoped credential used throughout the tests.
  */
 internal fun mobileDrivingLicense() =
-    MsoMdocProfile.CredentialSupported(
+    MsoMdocFormat.CredentialSupported(
         "mDL",
         listOf(CryptographicBindingMethod.MSO),
         listOf("ES256", "ES384", "ES512"),
