@@ -68,7 +68,7 @@ sealed interface CredentialMetadata : Serializable {
 
     data class ByScope(val scope: Scope) : CredentialMetadata
 
-    sealed interface ByProfile : CredentialMetadata
+    sealed interface ByFormat : CredentialMetadata
 }
 
 /**

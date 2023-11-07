@@ -24,7 +24,7 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import java.net.URL
 import java.util.*
 
-object W3CJsonLdDataIntegrityProfile {
+object W3CJsonLdDataIntegrityFormat {
 
     const val FORMAT = "ldp_vc"
 
@@ -140,7 +140,7 @@ object W3CJsonLdDataIntegrityProfile {
     data class CredentialMetadata(
         val credentialDefinition: CredentialDefinitionMetadata,
         val scope: String? = null,
-    ) : eu.europa.ec.eudi.openid4vci.CredentialMetadata.ByProfile {
+    ) : eu.europa.ec.eudi.openid4vci.CredentialMetadata.ByFormat {
 
         data class CredentialDefinitionMetadata(
             val content: List<URL>,
