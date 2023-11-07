@@ -149,10 +149,10 @@ object SdJwtVcFormat {
     @Serializable
     @SerialName(FORMAT)
     data class CredentialIssuanceRequestTO(
-        @SerialName("proof") override val proof: JsonObject?,
-        @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject?,
-        @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String?,
-        @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String?,
+        @SerialName("proof") override val proof: JsonObject? = null,
+        @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
+        @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
+        @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String? = null,
         @SerialName("credential_definition") val credentialDefinition: CredentialDefinitionTO,
     ) : eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequestTO.SingleCredentialTO {
 

@@ -253,10 +253,25 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         }
     }
 
-    sealed interface ResponseEncryptionError : CredentialIssuanceError {
-        data object IssuerDoesNotSupportEncryptedResponses : ProofGenerationError
-        data object ResponseEncryptionAlgorithmNotSupportedByIssuer : ProofGenerationError
-        data object ResponseEncryptionMethodNotSupportedByIssuer : ProofGenerationError
-        data object IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided : ProofGenerationError
+    sealed class ResponseEncryptionError(message: String) : CredentialIssuanceError(message) {
+        data object IssuerDoesNotSupportEncryptedResponses :
+            ProofGenerationError("IssuerDoesNotSupportEncryptedResponses") {
+            private fun readResolve(): Any = IssuerDoesNotSupportEncryptedResponses
+        }
+
+        data object ResponseEncryptionAlgorithmNotSupportedByIssuer :
+            ProofGenerationError("ResponseEncryptionAlgorithmNotSupportedByIssuer") {
+            private fun readResolve(): Any = ResponseEncryptionAlgorithmNotSupportedByIssuer
+        }
+
+        data object ResponseEncryptionMethodNotSupportedByIssuer :
+            ProofGenerationError("ResponseEncryptionMethodNotSupportedByIssuer") {
+            private fun readResolve(): Any = ResponseEncryptionMethodNotSupportedByIssuer
+        }
+
+        data object IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided :
+            ProofGenerationError("IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided") {
+            private fun readResolve(): Any = IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+        }
     }
 }

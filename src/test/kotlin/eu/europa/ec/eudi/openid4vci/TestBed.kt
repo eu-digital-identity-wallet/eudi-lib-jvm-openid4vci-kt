@@ -51,7 +51,7 @@ private fun testBed(
     testBlock: suspend(client: HttpClient) -> Unit,
     parPostAssertions: suspend(call: ApplicationCall) -> Unit,
     tokenPostAssertions: suspend(call: ApplicationCall) -> Unit,
-    issuanceRequestAssertions:suspend (call: ApplicationCall) -> Unit,
+    issuanceRequestAssertions: suspend (call: ApplicationCall) -> Unit,
     encryptedResponses: Boolean = false,
 ) = testApplication {
     externalServices {

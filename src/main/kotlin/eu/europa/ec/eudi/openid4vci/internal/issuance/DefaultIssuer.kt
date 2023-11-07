@@ -253,20 +253,20 @@ internal class DefaultIssuer(
         responseEncryptionSpec?.let {
             when (issuerEncryption) {
                 is CredentialResponseEncryption.NotRequired ->
-                    CredentialIssuanceError.ResponseEncryptionError.IssuerDoesNotSupportEncryptedResponses.raise()
+                    throw CredentialIssuanceError.ResponseEncryptionError.IssuerDoesNotSupportEncryptedResponses
 
                 is CredentialResponseEncryption.Required -> {
                     if (!issuerEncryption.algorithmsSupported.contains(it.algorithm)) {
-                        CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer.raise()
+                        throw CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
                     }
                     if (!issuerEncryption.encryptionMethodsSupported.contains(it.encryptionMethod)) {
-                        CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer.raise()
+                        throw CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer
                     }
                 }
             }
         }
         if (issuerEncryption is CredentialResponseEncryption.Required && responseEncryptionSpec == null) {
-            CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided.raise()
+            throw CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
         }
 
         return when (this) {
@@ -299,7 +299,7 @@ internal class DefaultIssuer(
         responseEncryptionSpec: IssuanceResponseEncryption?,
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
         fun validateClaimSet(claimSet: MsoMdocFormat.ClaimSet): MsoMdocFormat.ClaimSet {
-            if (claims.isEmpty() && claimSet.claims.isNotEmpty()) {
+            if (claims.isEmpty() && claimSet.isNotEmpty()) {
                 throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential [MsoMdoc-${this.docType}]",
                 )
@@ -321,7 +321,6 @@ internal class DefaultIssuer(
             when (claimSet) {
                 is MsoMdocFormat.ClaimSet -> validateClaimSet(claimSet)
                 else -> throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
-
             }
         }
 
@@ -358,7 +357,6 @@ internal class DefaultIssuer(
             when (claimSet) {
                 is SdJwtVcFormat.ClaimSet -> validateClaimSet(claimSet)
                 else -> throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
-
             }
         }
 

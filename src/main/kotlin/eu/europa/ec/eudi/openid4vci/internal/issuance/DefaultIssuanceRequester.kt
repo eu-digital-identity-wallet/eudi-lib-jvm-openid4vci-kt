@@ -154,7 +154,7 @@ private fun BatchIssuanceSuccessResponse.toBatchIssuanceResponse(): CredentialIs
     fun mapResults() = credentialResponses.map { res ->
         res.transactionId?.let { CredentialIssuanceResponse.Result.Deferred(it) }
             ?: res.credential?.let { credential -> CredentialIssuanceResponse.Result.Issued(res.format, credential) }
-            ?:throw  CredentialIssuanceError.ResponseUnparsable(
+            ?: throw CredentialIssuanceError.ResponseUnparsable(
                 "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
             )
     }
@@ -199,7 +199,7 @@ private fun SingleCredential.toTransferObject(): CredentialIssuanceRequestTO.Sin
                     docType = doctype,
                     proof = proof?.toJsonObject(),
                     claims = claimSet?.let {
-                        Json.encodeToJsonElement(it.claims).jsonObject
+                        Json.encodeToJsonElement(it).jsonObject
                     },
                 )
             }
@@ -214,7 +214,7 @@ private fun SingleCredential.toTransferObject(): CredentialIssuanceRequestTO.Sin
                     credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
                     credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
                     claims = claimSet?.let {
-                        Json.encodeToJsonElement(it.claims).jsonObject
+                        Json.encodeToJsonElement(it).jsonObject
                     },
                 )
             }
