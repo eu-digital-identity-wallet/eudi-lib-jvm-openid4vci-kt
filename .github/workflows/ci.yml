@@ -4,14 +4,12 @@ on:
     types: [opened, reopened]
   push:
 
-permissions:
-  contents: read
-  packages: read
-
 jobs:
   build-gradle:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on:  ubuntu-latest
+    outputs:
+      code-version: ${{ steps.extract.outputs.CODE_VERSION }}
     steps:
       - name: Checkout project sources
         uses: actions/checkout@v4
@@ -25,14 +23,17 @@ jobs:
         uses: gradle/gradle-build-action@v2.9.0
         with:
           gradle-version: wrapper
-          arguments: build --full-stacktrace
+          arguments: build
         env:
           CI: true
+      - id: extract
+        name: Extract code version from gradle.properties
+        run: echo "CODE_VERSION=$(awk -F= '$1~/version/{print $2}' gradle.properties)" >> $GITHUB_OUTPUT
 
   publish-to-sonatype-snapshot:
     name: Publish to sonatype.org (SNAPSHOT)
     needs: [ build-gradle ]
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release')) &&  github.repository_owner == 'eu-digital-identity-wallet'
+    if: github.event_name != 'pull_request' && endsWith(needs.build-gradle.outputs.code-version, '-SNAPSHOT') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release')) &&  github.repository_owner == 'eu-digital-identity-wallet'
     runs-on: ubuntu-latest
     permissions:
       contents: read
