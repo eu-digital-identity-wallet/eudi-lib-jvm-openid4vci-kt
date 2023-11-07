@@ -3,11 +3,24 @@ on:
   workflow_dispatch:
   release:
     types: [released]
+
 jobs:
+  extract-code-version:
+    name: Extract code version
+    runs-on: ubuntu-latest
+    outputs:
+      code-version: ${{ steps.extract.outputs.CODE_VERSION }}
+    steps:
+      - name: Checkout project sources
+        uses: actions/checkout@v4
+      - id: extract
+        name: Extract code version from gradle.properties
+        run: echo "CODE_VERSION=$(awk -F= '$1~/version/{print $2}' gradle.properties)" >> $GITHUB_OUTPUT
 
   publish-to-sonatype:
     name: Publish to sonatype.org
-    if: github.repository_owner == 'eu-digital-identity-wallet' && startsWith(github.ref, 'refs/tags')
+    needs: [ extract-code-version ]
+    if: github.repository_owner == 'eu-digital-identity-wallet' && startsWith(github.ref, 'refs/tags') && format('v{0}', needs.extract-code-version.outputs.code-version) == github.ref_name
     runs-on: ubuntu-latest
     permissions:
       contents: read
