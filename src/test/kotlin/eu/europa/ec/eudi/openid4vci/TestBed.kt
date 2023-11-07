@@ -41,10 +41,10 @@ fun authorizationTestBed(
 
 fun issuanceTestBed(
     testBlock: (client: HttpClient) -> Unit,
-    issuanceRequestPostAssertions: (call: ApplicationCall) -> Unit,
+    issuanceRequestAssertions: (call: ApplicationCall) -> Unit,
     encryptedResponses: Boolean = false,
 ) {
-    testBed(testBlock, {}, {}, issuanceRequestPostAssertions, encryptedResponses)
+    testBed(testBlock, {}, {}, issuanceRequestAssertions, encryptedResponses)
 }
 
 private fun testBed(

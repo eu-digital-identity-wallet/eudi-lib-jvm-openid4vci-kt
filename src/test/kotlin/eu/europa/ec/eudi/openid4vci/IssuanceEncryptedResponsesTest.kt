@@ -92,7 +92,7 @@ class IssuanceEncryptedResponsesTest {
                     )
                 }
             },
-            issuanceRequestPostAssertions = { },
+            issuanceRequestAssertions = { },
         )
     }
 
@@ -127,7 +127,7 @@ class IssuanceEncryptedResponsesTest {
                     )
                 }
             },
-            issuanceRequestPostAssertions = { },
+            issuanceRequestAssertions = { },
         )
     }
 
@@ -158,7 +158,7 @@ class IssuanceEncryptedResponsesTest {
                     assertTrue(exception.error is CredentialIssuanceError.ResponseEncryptionError.IssuerDoesNotSupportEncryptedResponses)
                 }
             },
-            issuanceRequestPostAssertions = { },
+            issuanceRequestAssertions = { },
         )
     }
 
@@ -188,7 +188,7 @@ class IssuanceEncryptedResponsesTest {
                     )
                 }
             },
-            issuanceRequestPostAssertions = { },
+            issuanceRequestAssertions = { },
         )
     }
 
@@ -249,7 +249,7 @@ class IssuanceEncryptedResponsesTest {
                 }
             },
 
-            issuanceRequestPostAssertions = { call ->
+            issuanceRequestAssertions = { call ->
                 runBlocking {
                     assertThat(
                         "No Authorization header passed .",
