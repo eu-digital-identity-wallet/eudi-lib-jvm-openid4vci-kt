@@ -29,7 +29,7 @@ import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -46,7 +46,7 @@ class IssuanceEncryptedResponsesTest {
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["PID_mso_mdoc"]          
+          "credentials": ["eu.europa.ec.eudiw.pid_mso_mdoc"]          
         }
     """.trimIndent()
 
@@ -66,7 +66,7 @@ class IssuanceEncryptedResponsesTest {
         issuanceTestBed(
             encryptedResponses = true,
             testBlock = { client ->
-                runBlocking {
+                runTest {
                     val (offer, authorizedRequest, issuer) = initIssuerWithOfferAndAuthorize(
                         client,
                         AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
@@ -99,7 +99,7 @@ class IssuanceEncryptedResponsesTest {
         issuanceTestBed(
             encryptedResponses = true,
             testBlock = { client ->
-                runBlocking {
+                runTest {
                     val (offer, authorizedRequest, issuer) = initIssuerWithOfferAndAuthorize(
                         client,
                         AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
@@ -132,7 +132,7 @@ class IssuanceEncryptedResponsesTest {
         issuanceTestBed(
             encryptedResponses = false,
             testBlock = { client ->
-                runBlocking {
+                runTest {
                     val (offer, authorizedRequest, issuer) =
                         initIssuerWithOfferAndAuthorize(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
 
@@ -164,7 +164,7 @@ class IssuanceEncryptedResponsesTest {
         issuanceTestBed(
             encryptedResponses = true,
             testBlock = { client ->
-                runBlocking {
+                runTest {
                     val (offer, authorizedRequest, issuer) = initIssuerWithOfferAndAuthorize(
                         client,
                         AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
@@ -192,7 +192,7 @@ class IssuanceEncryptedResponsesTest {
         issuanceTestBed(
             encryptedResponses = true,
             testBlock = { client ->
-                runBlocking {
+                runTest {
                     val claimSet = MsoMdocFormat.ClaimSet(
                         claims = mapOf(
                             "org.iso.18013.5.1" to mapOf(
@@ -249,7 +249,7 @@ class IssuanceEncryptedResponsesTest {
             },
 
             issuanceRequestAssertions = { call ->
-                runBlocking {
+                runTest {
                     assertThat(
                         "No Authorization header passed .",
                         call.request.headers["Authorization"] != null,

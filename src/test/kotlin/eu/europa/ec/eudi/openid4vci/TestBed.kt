@@ -36,22 +36,30 @@ fun authorizationTestBed(
     parPostAssertions: (call: ApplicationCall) -> Unit,
     tokenPostAssertions: (call: ApplicationCall) -> Unit,
 ) {
-    testBed(testBlock, parPostAssertions, tokenPostAssertions, {})
+    testBed(
+        testBlock = testBlock,
+        parPostAssertions = parPostAssertions,
+        tokenPostAssertions = tokenPostAssertions,
+    )
 }
 
 fun issuanceTestBed(
-    testBlock: suspend(client: HttpClient) -> Unit,
+    testBlock: suspend (client: HttpClient) -> Unit,
     issuanceRequestAssertions: suspend (call: ApplicationCall) -> Unit,
     encryptedResponses: Boolean = false,
 ) {
-    testBed(testBlock, {}, {}, issuanceRequestAssertions, encryptedResponses)
+    testBed(
+        testBlock = testBlock,
+        issuanceRequestAssertions = issuanceRequestAssertions,
+        encryptedResponses = encryptedResponses,
+    )
 }
 
 private fun testBed(
-    testBlock: suspend(client: HttpClient) -> Unit,
-    parPostAssertions: suspend(call: ApplicationCall) -> Unit,
-    tokenPostAssertions: suspend(call: ApplicationCall) -> Unit,
-    issuanceRequestAssertions: suspend (call: ApplicationCall) -> Unit,
+    testBlock: suspend (client: HttpClient) -> Unit,
+    parPostAssertions: suspend (call: ApplicationCall) -> Unit = { defaultParPostAssertions(it) },
+    tokenPostAssertions: suspend (call: ApplicationCall) -> Unit = { defaultTokenPostAssertions(it) },
+    issuanceRequestAssertions: suspend (call: ApplicationCall) -> Unit = {},
     encryptedResponses: Boolean = false,
 ) = testApplication {
     externalServices {
@@ -74,6 +82,10 @@ private fun testBed(
                 post("/credentials") {
                     issuanceRequestAssertions(call)
                 }
+
+                post("/credentials/batch") {
+                    issuanceRequestAssertions(call)
+                }
             }
         }
     }
@@ -93,27 +105,10 @@ private fun testBed(
 
                 post("/ext/par/request") {
                     parPostAssertions(call)
-
-                    call.respond(
-                        HttpStatusCode.OK,
-                        PushedAuthorizationRequestResponse.Success(
-                            "org:example:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
-                            3600,
-                        ),
-                    )
                 }
 
                 post("/token") {
                     tokenPostAssertions(call)
-
-                    call.respond(
-                        HttpStatusCode.OK,
-                        AccessTokenRequestResponse.Success(
-                            accessToken = UUID.randomUUID().toString(),
-                            expiresIn = 3600,
-//                            scope = "UniversityDegree PID_mso_mdoc",
-                        ),
-                    )
                 }
             }
         }
@@ -125,6 +120,24 @@ private fun testBed(
 
     testBlock(managedHttpClient)
 }
+
+suspend inline fun defaultParPostAssertions(call: ApplicationCall): Unit =
+    call.respond(
+        HttpStatusCode.OK,
+        PushedAuthorizationRequestResponse.Success(
+            "org:example:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
+            3600,
+        ),
+    )
+
+suspend inline fun defaultTokenPostAssertions(call: ApplicationCall): Unit =
+    call.respond(
+        HttpStatusCode.OK,
+        AccessTokenRequestResponse.Success(
+            accessToken = UUID.randomUUID().toString(),
+            expiresIn = 3600,
+        ),
+    )
 
 fun createPostPar(managedHttpClient: HttpClient): HttpFormPost<PushedAuthorizationRequestResponse> =
     HttpFormPost { url, formParameters ->

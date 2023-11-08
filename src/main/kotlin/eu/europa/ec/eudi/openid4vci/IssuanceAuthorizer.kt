@@ -32,7 +32,7 @@ sealed interface PushedAuthorizationRequestResponse {
     @Serializable
     data class Failure(
         @SerialName("error") val error: String,
-        @SerialName("error_description") val errorDescription: String?,
+        @SerialName("error_description") val errorDescription: String? = null,
     ) : PushedAuthorizationRequestResponse
 }
 
@@ -48,7 +48,7 @@ sealed interface AccessTokenRequestResponse {
     @Serializable
     data class Failure(
         @SerialName("error") val error: String,
-        @SerialName("error_description") val errorDescription: String?,
+        @SerialName("error_description") val errorDescription: String? = null,
     ) : AccessTokenRequestResponse
 }
 

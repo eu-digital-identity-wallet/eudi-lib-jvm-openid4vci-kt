@@ -18,7 +18,7 @@ package eu.europa.ec.eudi.openid4vci.internal
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialOfferRequestResolver
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.apache.http.client.utils.URIBuilder
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,7 +30,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
     internal fun `resolve success`() {
-        runBlocking {
+        runTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
@@ -86,7 +86,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
     fun `resolve success with mos_mdoc`() {
-        runBlocking {
+        runTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
@@ -140,7 +140,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
     }
 
     @Test
-    internal fun `resolve success with jwt_vc_json`() = runBlocking {
+    internal fun `resolve success with jwt_vc_json`() = runTest {
         mockEngine(
             RequestMocker(
                 match(credentialIssuerMetadataUrl().value),
@@ -199,7 +199,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
     internal fun `resolve success with ldp_vc`() {
-        runBlocking {
+        runTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
@@ -260,7 +260,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
     internal fun `resolve failure with unknown credential format`() {
-        runBlocking {
+        runTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
@@ -294,7 +294,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
     internal fun `resolve failure with blank issuer_state in grant`() {
-        runBlocking {
+        runTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
@@ -330,7 +330,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
     internal fun `resolve failure with blank pre-authorized_code in grant`() {
-        runBlocking {
+        runTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
@@ -366,7 +366,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
     internal fun `resolve success with credential_offer_uri`() {
-        runBlocking {
+        runTest {
             val credentialOfferUri = HttpsUrl("https://credential_offer/1").getOrThrow()
 
             mockEngine(
