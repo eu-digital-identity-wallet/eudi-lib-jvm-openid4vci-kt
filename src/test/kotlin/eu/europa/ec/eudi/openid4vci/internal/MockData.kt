@@ -196,6 +196,63 @@ internal fun universityDegreeLdpVc() =
         emptyList(),
     )
 
+internal fun universityDegreeJwtVcJsonLD() =
+    W3CJsonLdSignedJwtFormat.CredentialSupported(
+        "UniversityDegree_JWT_VC_JSON-LD",
+        listOf(CryptographicBindingMethod.DID("did:example")),
+        listOf("Ed25519Signature2018"),
+        listOf(ProofType.JWT),
+        listOf(
+            Display(
+                "University Credential",
+                Locale.forLanguageTag("en-US"),
+                Display.Logo(
+                    HttpsUrl("https://exampleuniversity.com/public/logo.png").getOrThrow(),
+                    "a square logo of a university",
+                ),
+                null,
+                "#12107c",
+                "#FFFFFF",
+            ),
+        ),
+        listOf(
+            "https://www.w3.org/2018/credentials/v1",
+            "https://www.w3.org/2018/credentials/examples/v1",
+        ),
+        W3CJsonLdSignedJwtFormat.CredentialSupported.CredentialDefinition(
+            listOf(
+                URL("https://www.w3.org/2018/credentials/v1"),
+                URL("https://www.w3.org/2018/credentials/examples/v1"),
+            ),
+            listOf("VerifiableCredential_JWT_VC_JSON-LD", "UniversityDegreeCredential_JWT_VC_JSON-LD"),
+            mapOf(
+                "given_name" to Claim(
+                    display = listOf(
+                        Claim.Display(
+                            "Given Name", Locale.forLanguageTag("en-US"),
+                        ),
+                    ),
+                ),
+                "family_name" to Claim(
+                    display = listOf(
+                        Claim.Display(
+                            "Surname", Locale.forLanguageTag("en-US"),
+                        ),
+                    ),
+                ),
+                "degree" to Claim(),
+                "gpa" to Claim(
+                    display = listOf(
+                        Claim.Display(
+                            "name", Locale.forLanguageTag("GPA"),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        emptyList(),
+    )
+
 /**
  * Gets the 'mDL' scoped credential used throughout the tests.
  */
@@ -259,7 +316,7 @@ internal fun credentialIssuerMetadata() =
             listOf(JWEAlgorithm.PBES2_HS512_A256KW, JWEAlgorithm.PBES2_HS384_A192KW, JWEAlgorithm.PBES2_HS256_A128KW),
             listOf(EncryptionMethod.XC20P),
         ),
-        listOf(universityDegreeJwt(), mobileDrivingLicense(), universityDegreeLdpVc()),
+        listOf(universityDegreeJwt(), mobileDrivingLicense(), universityDegreeLdpVc(), universityDegreeJwtVcJsonLD()),
         listOf(CredentialIssuerMetadata.Display("credential-issuer.example.com", "en-US")),
     )
 

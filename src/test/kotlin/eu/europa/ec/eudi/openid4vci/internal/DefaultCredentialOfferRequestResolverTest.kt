@@ -259,6 +259,67 @@ internal class DefaultCredentialOfferRequestResolverTest {
     }
 
     @Test
+    internal fun `resolve success with jwt_vc_json-ld`() {
+        runTest {
+            mockEngine(
+                RequestMocker(
+                    match(credentialIssuerMetadataUrl().value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+                ),
+                RequestMocker(
+                    match(oidcAuthorizationServerMetadataUrl().value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
+                ),
+                verifier = { assertEquals(2, it.size) },
+            ) { httpGet ->
+                val credentialOffer =
+                    getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/jwt_vc_json-ld_credential_offer.json")
+
+                val universityDegreeJwtVcJsonLD = universityDegreeJwtVcJsonLD()
+                val expected = CredentialOffer(
+                    credentialIssuerId(),
+                    credentialIssuerMetadata(),
+                    oidcAuthorizationServerMetadata(),
+                    listOf(
+                        W3CJsonLdSignedJwtFormat.CredentialMetadata(
+                            W3CJsonLdSignedJwtFormat.CredentialMetadata.CredentialDefinitionMetadata(
+                                universityDegreeJwtVcJsonLD.credentialDefinition.context,
+                                universityDegreeJwtVcJsonLD.credentialDefinition.type,
+                            ),
+                            universityDegreeJwtVcJsonLD.scope,
+                        ),
+                    ),
+                    Grants.Both(
+                        Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
+                        Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
+                    ),
+                )
+
+                val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+                    .addParameter("credential_offer", credentialOffer)
+                    .build()
+
+                DefaultCredentialOfferRequestResolver(Dispatchers.IO, httpGet)
+                    .resolve(credentialEndpointUrl.toString())
+                    .fold(
+                        {
+                            assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
+                            assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
+                            // equals not implemented by OIDCProviderMetadata
+                            assertEquals(
+                                expected.authorizationServerMetadata.toJSONObject(),
+                                it.authorizationServerMetadata.toJSONObject(),
+                            )
+                            assertEquals(expected.credentials, it.credentials)
+                            assertEquals(expected.grants, it.grants)
+                        },
+                        { fail("Credential Offer resolution should have succeeded", it) },
+                    )
+            }
+        }
+    }
+
+    @Test
     internal fun `resolve failure with unknown credential format`() {
         runTest {
             mockEngine(
