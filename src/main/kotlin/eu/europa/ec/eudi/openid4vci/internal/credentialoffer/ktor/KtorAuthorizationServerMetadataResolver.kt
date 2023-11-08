@@ -24,7 +24,6 @@ import io.ktor.client.request.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.serialization.json.Json
-import java.net.URL
 
 class KtorAuthorizationServerMetadataResolver(
     val coroutineDispatcher: CoroutineDispatcher,
@@ -60,11 +59,10 @@ class KtorAuthorizationServerMetadataResolver(
         }
 
         private fun httpGet(httpClient: HttpClient): HttpGet<String> =
-            object : HttpGet<String> {
-                override suspend fun get(url: URL): Result<String> =
-                    runCatching {
-                        httpClient.get(url).body<String>()
-                    }
+            HttpGet {
+                runCatching {
+                    httpClient.get(it).body<String>()
+                }
             }
     }
 }
