@@ -17,7 +17,7 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.http.*
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -27,7 +27,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
     @Test
     internal fun `fails when metadata cannot be fetched`() {
-        runBlocking {
+        runTest {
             mockEngine(
                 verifier = {
                     assertEquals(1, it.size)
@@ -51,7 +51,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
     @Test
     internal fun `fails when metadata cannot be parsed`() {
-        runBlocking {
+        runTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
@@ -79,7 +79,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
     @Test
     internal fun `fails with unexpected credential issuer id`() {
-        runBlocking {
+        runTest {
             val credentialIssuerId = CredentialIssuerId("https://issuer.com").getOrThrow()
             val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl(credentialIssuerId)
             mockEngine(
@@ -109,7 +109,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
     @Test
     internal fun `resolution success`() {
-        runBlocking {
+        runTest {
             val credentialIssuerId = credentialIssuerId()
             val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl()
 

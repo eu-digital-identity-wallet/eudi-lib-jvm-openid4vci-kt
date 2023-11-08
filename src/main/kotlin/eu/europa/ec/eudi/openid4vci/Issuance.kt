@@ -23,7 +23,6 @@ sealed interface UnauthorizedRequest {
      * State denoting that the pushed authorization request has been placed successfully and response processed
      */
     data class ParRequested(
-        val credentials: List<CredentialMetadata>,
         val getAuthorizationCodeURL: GetAuthorizationCodeURL,
         val pkceVerifier: PKCEVerifier,
         val state: String,
@@ -34,7 +33,6 @@ sealed interface UnauthorizedRequest {
      * from authorization server and processed successfully.
      */
     data class AuthorizationCodeRetrieved(
-        val credentials: List<CredentialMetadata>,
         val authorizationCode: IssuanceAuthorization.AuthorizationCode,
         val pkceVerifier: PKCEVerifier,
     )

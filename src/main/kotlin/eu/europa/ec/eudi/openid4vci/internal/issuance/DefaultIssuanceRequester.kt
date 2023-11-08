@@ -22,6 +22,7 @@ import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequest.BatchCredentials
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequest.SingleCredential
 import io.ktor.client.call.*
@@ -58,7 +59,7 @@ internal class DefaultIssuanceRequester(
         request: BatchCredentials,
     ): Result<CredentialIssuanceResponse> = runCatching {
         if (issuerMetadata.batchCredentialEndpoint == null) {
-            throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance
+            throw IssuerDoesNotSupportBatchIssuance
         }
         withContext(coroutineDispatcher) {
             postIssueRequest.post(
@@ -84,7 +85,11 @@ internal class DefaultIssuanceRequester(
             is CredentialResponseEncryption.Required -> {
                 val jwt = response.body<String>()
                 val encryptionSpec =
-                    request.requestedCredentialResponseEncryption as RequestedCredentialResponseEncryption.Requested
+                    when (val requestedEncryptionSpec = request.requestedCredentialResponseEncryption) {
+                        is RequestedCredentialResponseEncryption.Requested -> requestedEncryptionSpec
+                        is RequestedCredentialResponseEncryption.NotRequested ->
+                            throw ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+                    }
 
                 DefaultJWTProcessor<SecurityContext>().apply {
                     jweKeySelector = JWEDecryptionKeySelector(
@@ -115,11 +120,12 @@ internal class DefaultIssuanceRequester(
         if (response.status.isSuccess()) {
             when (issuerMetadata.credentialResponseEncryption) {
                 is CredentialResponseEncryption.NotRequired -> {
-                    TODO("NOT IMPLEMENTED")
+                    val success = response.body<BatchIssuanceSuccessResponse>()
+                    success.toDomain()
                 }
 
                 is CredentialResponseEncryption.Required -> {
-                    TODO("NOT IMPLEMENTED: Decrypt JWT, extract JWT claims and map them to IssuanceResponse")
+                    TODO("ENCRYPTED RESPONSES OF BATCH ISSUANCE NOT YET SUPPORTED")
                 }
             }
         } else {
@@ -146,47 +152,44 @@ private fun SingleIssuanceSuccessResponse.toDomain(): CredentialIssuanceResponse
             cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
             credentialResponses = listOf(CredentialIssuanceResponse.Result.Issued(format, credential)),
         )
-    } ?: throw CredentialIssuanceError.ResponseUnparsable(
+    } ?: throw ResponseUnparsable(
         "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
     )
 
-private fun BatchIssuanceSuccessResponse.toBatchIssuanceResponse(): CredentialIssuanceResponse {
-    fun mapResults() = credentialResponses.map { res ->
-        res.transactionId?.let { CredentialIssuanceResponse.Result.Deferred(it) }
-            ?: res.credential?.let { credential -> CredentialIssuanceResponse.Result.Issued(res.format, credential) }
-            ?: throw CredentialIssuanceError.ResponseUnparsable(
+private fun BatchIssuanceSuccessResponse.toDomain(): CredentialIssuanceResponse =
+    CredentialIssuanceResponse(
+        cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
+        credentialResponses = credentialResponses.map {
+            it.transactionId?.let {
+                CredentialIssuanceResponse.Result.Deferred(it)
+            } ?: it.credential?.let { credential ->
+                CredentialIssuanceResponse.Result.Issued(it.format, credential)
+            } ?: throw ResponseUnparsable(
                 "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
             )
-    }
-
-    fun mapCNonce() = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
-
-    return CredentialIssuanceResponse(
-        credentialResponses = mapResults(),
-        cNonce = mapCNonce(),
+        },
     )
-}
 
 private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError = when (error) {
     "invalid_proof" -> cNonce?.let {
-        CredentialIssuanceError.InvalidProof(
+        InvalidProof(
             cNonce = cNonce,
             cNonceExpiresIn = cNonceExpiresInSeconds,
             errorDescription = errorDescription,
         )
     }
-        ?: CredentialIssuanceError.ResponseUnparsable("Issuer responded with invalid_proof error but no c_nonce was provided")
+        ?: ResponseUnparsable("Issuer responded with invalid_proof error but no c_nonce was provided")
 
-    "issuance_pending" -> interval?.let { CredentialIssuanceError.DeferredCredentialIssuancePending(interval) }
-        ?: CredentialIssuanceError.DeferredCredentialIssuancePending()
+    "issuance_pending" -> interval?.let { DeferredCredentialIssuancePending(interval) }
+        ?: DeferredCredentialIssuancePending()
 
-    "invalid_token" -> CredentialIssuanceError.InvalidToken
-    "invalid_transaction_id " -> CredentialIssuanceError.InvalidTransactionId
-    "unsupported_credential_type " -> CredentialIssuanceError.UnsupportedCredentialType
-    "unsupported_credential_format " -> CredentialIssuanceError.UnsupportedCredentialFormat
-    "invalid_encryption_parameters " -> CredentialIssuanceError.InvalidEncryptionParameters
+    "invalid_token" -> InvalidToken
+    "invalid_transaction_id " -> InvalidTransactionId
+    "unsupported_credential_type " -> UnsupportedCredentialType
+    "unsupported_credential_format " -> UnsupportedCredentialFormat
+    "invalid_encryption_parameters " -> InvalidEncryptionParameters
 
-    else -> CredentialIssuanceError.IssuanceRequestFailed(error, errorDescription)
+    else -> IssuanceRequestFailed(error, errorDescription)
 }
 
 private fun IssuanceAccessToken.toAuthorizationHeader(): Pair<String, String> = "Authorization" to "BEARER $accessToken"

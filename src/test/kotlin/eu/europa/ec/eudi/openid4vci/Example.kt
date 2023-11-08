@@ -32,11 +32,10 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.jsoup.Jsoup
 import org.jsoup.nodes.FormElement
-import java.lang.IllegalStateException
 import java.net.URI
 import java.net.URL
 import java.util.*
@@ -70,7 +69,7 @@ val config = WalletOpenId4VCIConfig(
     authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
 )
 
-fun main(): Unit = runBlocking {
+fun main(): Unit = runTest {
     val bindingKey = BindingKey.Jwk(
         algorithm = JWSAlgorithm.RS256,
         jwk = KeyGenerator.randomRSASigningKey(2048),
@@ -95,7 +94,7 @@ private suspend fun WalletInitiatedIssuanceWithOffer(wallet: Wallet) {
 }
 
 private suspend fun WalletInitiatedIssuanceNoOffer(wallet: Wallet) {
-    println("[[Scenario: No offer passed, wallet initiates issuance by credetial scopes]]")
+    println("[[Scenario: No offer passed, wallet initiates issuance by credential scopes]]")
 
     val credential = wallet.issueByScope(PID_SdJwtVC_SCOPE)
 
@@ -115,17 +114,57 @@ private class Wallet(
 
     suspend fun issueByScope(scope: String): String {
         val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
-        val issuerMetadata = CredentialIssuerMetadataResolver.ktor().resolve(credentialIssuerIdentifier).getOrThrow()
-        val authServerMetadata =
-            AuthorizationServerMetadataResolver.ktor().resolve(issuerMetadata.authorizationServer).getOrThrow()
+        val issuerMetadata =
+            CredentialIssuerMetadataResolver.ktor()
+                .resolve(credentialIssuerIdentifier).getOrThrow()
 
-        val offer = CredentialOffer(
-            credentialIssuerIdentifier = credentialIssuerIdentifier,
-            credentials = listOf(CredentialMetadata.ByScope(Scope.of(scope))),
-            credentialIssuerMetadata = issuerMetadata,
-            authorizationServerMetadata = authServerMetadata,
+        val authServerMetadata =
+            AuthorizationServerMetadataResolver.ktor()
+                .resolve(issuerMetadata.authorizationServer).getOrThrow()
+
+        val issuer = Issuer.ktor(
+            authServerMetadata,
+            issuerMetadata,
+            config,
         )
-        return issueOfferedCredential(offer)
+
+        val credentialMetadata = CredentialMetadata.ByScope(Scope.of(scope))
+
+        val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
+            issuer,
+            listOf(credentialMetadata),
+            authServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
+        )
+
+        val issuanceResponseEncryption = IssuanceResponseEncryption(
+            jwk = responseEncryptionKey,
+            algorithm = JWEAlgorithm.RSA_OAEP_256,
+            encryptionMethod = EncryptionMethod.A128CBC_HS256,
+        )
+
+        // Authorize with auth code flow
+        val outcome =
+            when (authorizedRequest) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    noProofRequiredSubmissionUseCase(
+                        issuer,
+                        authorizedRequest,
+                        credentialMetadata,
+                        issuanceResponseEncryption,
+                    )
+                }
+
+                is AuthorizedRequest.ProofRequired -> {
+                    proofRequiredSubmissionUseCase(
+                        issuer,
+                        authorizedRequest,
+                        credentialMetadata,
+                        issuanceResponseEncryption,
+                    )
+                }
+            }
+
+        return outcome
     }
 
     suspend fun issueByCredentialOfferUrl(coUrl: String): String {
@@ -140,46 +179,62 @@ private class Wallet(
             credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
         }
 
-        return issueOfferedCredential(offer)
+        return issueByCredentialOffer(offer)
     }
 
-    private suspend fun issueOfferedCredential(offer: CredentialOffer): String {
+    suspend fun issueByCredentialOffer(offer: CredentialOffer): String {
         val issuer = Issuer.ktor(
             offer.authorizationServerMetadata,
             offer.credentialIssuerMetadata,
             config,
         )
+
+        // Authorize with auth code flow
+        val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
+            issuer,
+            offer.credentials,
+            offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
+        )
+
         val issuanceResponseEncryption = IssuanceResponseEncryption(
             jwk = responseEncryptionKey,
             algorithm = JWEAlgorithm.RSA_OAEP_256,
             encryptionMethod = EncryptionMethod.A128CBC_HS256,
         )
 
-        // Authorize with auth code flow
-        val authorized = authorizeRequestWithAuthCodeUseCase(issuer, offer)
+        val outcome =
+            when (authorizedRequest) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    noProofRequiredSubmissionUseCase(
+                        issuer,
+                        authorizedRequest,
+                        offer.credentials[0],
+                        issuanceResponseEncryption,
+                    )
+                }
 
-        val outcome = when (authorized) {
-            is AuthorizedRequest.NoProofRequired -> {
-                noProofRequiredSubmissionUseCase(issuer, authorized, offer, issuanceResponseEncryption)
+                is AuthorizedRequest.ProofRequired -> {
+                    proofRequiredSubmissionUseCase(
+                        issuer,
+                        authorizedRequest,
+                        offer.credentials[0],
+                        issuanceResponseEncryption,
+                    )
+                }
             }
-            is AuthorizedRequest.ProofRequired -> {
-                proofRequiredSubmissionUseCase(
-                    issuer,
-                    authorized,
-                    offer,
-                    issuanceResponseEncryption,
-                )
-            }
-        }
 
         return outcome
     }
 
-    private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer, offer: CredentialOffer): AuthorizedRequest {
+    private suspend fun authorizeRequestWithAuthCodeUseCase(
+        issuer: Issuer,
+        credentialMetadata: List<CredentialMetadata>,
+        parEndpoint: String,
+    ): AuthorizedRequest =
         with(issuer) {
-            println("--> Placing PAR to AS server's endpoint ${offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI}")
+            println("--> Placing PAR to AS server's endpoint $parEndpoint")
 
-            val parPlaced = pushAuthorizationCodeRequest(offer.credentials, null).getOrThrow()
+            val parPlaced = pushAuthorizationCodeRequest(credentialMetadata, null).getOrThrow()
 
             println("--> Placed PAR. Get authorization code URL is: ${parPlaced.getAuthorizationCodeURL.url.value}")
 
@@ -190,50 +245,24 @@ private class Wallet(
 
             println("--> Authorization code retrieved: $authorizationCode")
 
-            val authorized = parPlaced
+            val authorizedRequest = parPlaced
                 .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
                 .requestAccessToken().getOrThrow()
 
-            println("--> Authorization code exchanged with access token : ${authorized.token.accessToken}")
+            println("--> Authorization code exchanged with access token : ${authorizedRequest.token.accessToken}")
 
-            return authorized
+            authorizedRequest
         }
-    }
-
-    private suspend fun authorizeRequestWithPreAuthCodeUseCase(
-        issuer: Issuer,
-        offer: CredentialOffer,
-    ): AuthorizedRequest {
-        with(issuer) {
-            val preAuthorizedCode =
-                when (val grants = offer.grants) {
-                    is Grants.Both -> grants.preAuthorizedCode
-                    is Grants.PreAuthorizedCode -> grants
-                    else -> throw IllegalStateException(
-                        "Invalid proof: Grants expected should be either Grants.PreAuthorizedCode or Grants.Both",
-                    )
-                }
-
-            val preAuthorizationCode =
-                IssuanceAuthorization.PreAuthorizationCode(preAuthorizedCode.preAuthorizedCode, "")
-
-            val authorizedRequest =
-                authorizeWithPreAuthorizationCode(offer.credentials, preAuthorizationCode).getOrThrow()
-
-            println("--> Pre-authorization code exchanged with access token : ${authorizedRequest.token.accessToken}")
-
-            return authorizedRequest
-        }
-    }
 
     private suspend fun proofRequiredSubmissionUseCase(
         issuer: Issuer,
         authorized: AuthorizedRequest.ProofRequired,
-        offer: CredentialOffer,
+        credentialMetadata: CredentialMetadata,
         issuanceResponseEncryption: IssuanceResponseEncryption?,
     ): String {
         with(issuer) {
-            val requestOutcome = authorized.requestSingle(offer.credentials[0], null, bindingKey, issuanceResponseEncryption).getOrThrow()
+            val requestOutcome =
+                authorized.requestSingle(credentialMetadata, null, bindingKey, issuanceResponseEncryption).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
@@ -244,9 +273,7 @@ private class Wallet(
                     }
                 }
 
-                is SubmittedRequest.Failed -> {
-                    throw requestOutcome.error
-                }
+                is SubmittedRequest.Failed -> throw requestOutcome.error
 
                 is SubmittedRequest.InvalidProof ->
                     throw IllegalStateException("Although providing a proof with c_nonce the proof is still invalid")
@@ -257,11 +284,12 @@ private class Wallet(
     private suspend fun noProofRequiredSubmissionUseCase(
         issuer: Issuer,
         noProofRequiredState: AuthorizedRequest.NoProofRequired,
-        offer: CredentialOffer,
+        credentialMetadata: CredentialMetadata,
         issuanceResponseEncryption: IssuanceResponseEncryption?,
     ): String {
         with(issuer) {
-            val requestOutcome = noProofRequiredState.requestSingle(offer.credentials[0], null, issuanceResponseEncryption).getOrThrow()
+            val requestOutcome =
+                noProofRequiredState.requestSingle(credentialMetadata, null, issuanceResponseEncryption).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
@@ -276,7 +304,7 @@ private class Wallet(
                     proofRequiredSubmissionUseCase(
                         issuer,
                         noProofRequiredState.handleInvalidProof(requestOutcome.cNonce),
-                        offer,
+                        credentialMetadata,
                         issuanceResponseEncryption,
                     )
                 }

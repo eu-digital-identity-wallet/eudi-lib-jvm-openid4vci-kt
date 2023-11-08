@@ -15,7 +15,7 @@
 ## Overview
 
 This is a Kotlin library, targeting JVM, that supports 
-the [OpenId4VCI (draft 13)](https://openid.bitbucket.io/connect/openid-4-verifiable-credential-issuance-1_0.html) protocol.
+the [OpenId4VCI (draft 14)](https://openid.bitbucket.io/connect/openid-4-verifiable-credential-issuance-1_0.html) protocol.
 In particular, the library focus on the wallet's role in the protocol
 
 
@@ -49,11 +49,11 @@ Section [5.1.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credenti
 ### Credential Request
 In the current version of the library only integrations with issuer's [Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-credential-endpoint) are supported. No support yet for the Batch and Deferred Credential Endpoints.
 
-#### Encrypted Responses
-Specification defines that issuer's response to the credential request can be encrypted as specified either by the client's credential request (see [7.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-credential-request)) or the issuer's metadata (issuer metadata `require_credential_response_encryption` attribute [10.2.3](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-10.2.3)). The current version of the library does not support encrypted responses.   
-
 #### Credential Format Profiles
 OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library focuses only on **mso_mdoc** format as specified in section [E.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-iso-mdl)  
+
+#### Proof Types
+OpenId4VCI specification defines two types of proofs that can be included in a credential issuance request, JWT proof type and CWT proof type (see section [7.2.1](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-7.2.1)). Current version of the library supports only JWT proof types
 
 ## License
 

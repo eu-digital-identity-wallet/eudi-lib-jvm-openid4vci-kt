@@ -18,7 +18,7 @@ package eu.europa.ec.eudi.openid4vci.internal
 import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import eu.europa.ec.eudi.openid4vci.*
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions
 import kotlin.test.Test
 
@@ -26,7 +26,7 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
 
     @Test
     internal fun `resolution success`() {
-        runBlocking {
+        runTest {
             mockEngine(
                 RequestMocker(
                     match(oidcAuthorizationServerMetadataUrl().value),
@@ -49,7 +49,7 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
 
     @Test
     internal fun `fails when issuer does not match`() {
-        runBlocking {
+        runTest {
             val issuer = HttpsUrl("https://keycloak.netcompany.com/realms/pid-issuer-realm").getOrThrow()
             val metadataUrl = oidcAuthorizationServerMetadataUrl(issuer)
 
@@ -79,7 +79,7 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
 
     @Test
     internal fun `falls back to oauth server metadata`() {
-        runBlocking {
+        runTest {
             mockEngine(
                 RequestMocker(
                     match(oauthAuthorizationServerMetadataUrl().value),

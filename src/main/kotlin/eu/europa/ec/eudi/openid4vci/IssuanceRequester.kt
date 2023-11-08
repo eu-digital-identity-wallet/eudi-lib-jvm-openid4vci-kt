@@ -36,6 +36,7 @@ import kotlinx.serialization.json.JsonObject
 sealed interface CredentialIssuanceRequestTO {
 
     @Serializable
+    @SerialName("batch-credential-request")
     data class BatchCredentialsTO(
         @SerialName("credential_requests") val credentialRequests: List<SingleCredentialTO>,
     ) : CredentialIssuanceRequestTO
@@ -115,17 +116,17 @@ sealed interface CredentialIssuanceRequest {
                     RequestedCredentialResponseEncryption.NotRequested
                 } else {
                     var encryptionMethod = credentialResponseEncryptionMethod
-                    if (credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null) {
-                        encryptionMethod = EncryptionMethod.A256GCM
-                    } else if (credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null) {
-                        throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
-                    } else if (credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null) {
-                        throw CredentialIssuanceError.InvalidIssuanceRequest(
-                            "Credential response encryption algorithm must be specified if Credential " +
-                                "response encryption method is provided",
-                        )
+                    when {
+                        credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null ->
+                            encryptionMethod = EncryptionMethod.A256GCM
+                        credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null ->
+                            throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
+                        credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null ->
+                            throw CredentialIssuanceError.InvalidIssuanceRequest(
+                                "Credential response encryption algorithm must be specified if Credential " +
+                                    "response encryption method is provided",
+                            )
                     }
-
                     RequestedCredentialResponseEncryption.Requested(
                         encryptionJwk = credentialEncryptionJwk!!,
                         responseEncryptionAlg = credentialResponseEncryptionAlg!!,

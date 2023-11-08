@@ -17,8 +17,10 @@ package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.issuance.TokenEndpointForm
 import io.ktor.client.*
+import io.ktor.http.*
 import io.ktor.server.request.*
-import kotlinx.coroutines.runBlocking
+import io.ktor.server.response.*
+import kotlinx.coroutines.test.runTest
 import java.net.URI
 import java.net.URLEncoder
 import java.util.*
@@ -29,7 +31,7 @@ class IssuanceAuthorizationTest {
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["PID_mso_mdoc", "UniversityDegree"],
+          "credentials": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
           "grants": {
             "authorization_code": {
               "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
@@ -41,14 +43,14 @@ class IssuanceAuthorizationTest {
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["PID_mso_mdoc", "UniversityDegree"]          
+          "credentials": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"]          
         }
     """.trimIndent()
 
     private val PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["PID_mso_mdoc", "UniversityDegree"],
+          "credentials": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
           "grants": {
             "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
               "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
@@ -71,22 +73,22 @@ class IssuanceAuthorizationTest {
             { client ->
                 authFlowTestBlock(AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS, client)
             },
-            { postParCall ->
-                runBlocking {
-                    val formParameters = postParCall.receiveParameters()
+            { call ->
+                runTest {
+                    val formParameters = call.receiveParameters()
                     assertEquals(
                         "application/x-www-form-urlencoded; charset=UTF-8",
-                        postParCall.request.headers["Content-Type"],
+                        call.request.headers["Content-Type"],
                         "Wrong content-type, expected application/x-www-form-urlencoded",
                     )
                     val scope = formParameters["scope"].toString()
                     assertTrue(
-                        scope.contains("UniversityDegree"),
-                        "Missing scope UniversityDegree",
+                        scope.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
+                        "Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt",
                     )
                     assertTrue(
-                        scope.contains("PID_mso_mdoc"),
-                        "Missing scope PID_mso_mdoc",
+                        scope.contains("eu.europa.ec.eudiw.pid_mso_mdoc"),
+                        "Missing scope eu.europa.ec.eudiw.pid_mso_mdoc",
                     )
                     assertNull(
                         formParameters["issuer_state"],
@@ -101,14 +103,22 @@ class IssuanceAuthorizationTest {
                         formParameters["code_challenge_method"],
                         "PKCE code challenge method was expected but not sent.",
                     )
+
+                    call.respond(
+                        HttpStatusCode.OK,
+                        PushedAuthorizationRequestResponse.Success(
+                            "org:example:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
+                            3600,
+                        ),
+                    )
                 }
             },
-            { tokenPostCall ->
-                runBlocking {
-                    val formParameters = tokenPostCall.receiveParameters()
+            { call ->
+                runTest {
+                    val formParameters = call.receiveParameters()
                     assertEquals(
                         "application/x-www-form-urlencoded; charset=UTF-8",
-                        tokenPostCall.request.headers["Content-Type"],
+                        call.request.headers["Content-Type"],
                     )
 
                     assertNotNull(
@@ -141,6 +151,14 @@ class IssuanceAuthorizationTest {
                         grantType,
                         "Expected grant_type is ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but instead sent $grantType.",
                     )
+
+                    call.respond(
+                        HttpStatusCode.OK,
+                        AccessTokenRequestResponse.Success(
+                            accessToken = UUID.randomUUID().toString(),
+                            expiresIn = 3600,
+                        ),
+                    )
                 }
             },
         )
@@ -154,36 +172,44 @@ class IssuanceAuthorizationTest {
             { client ->
                 authFlowTestBlock(AUTH_CODE_GRANT_CREDENTIAL_OFFER, client)
             },
-            { postParCall ->
-                runBlocking {
-                    val formParameters = postParCall.receiveParameters()
+            { call ->
+                runTest {
+                    val formParameters = call.receiveParameters()
                     assertEquals(
                         "application/x-www-form-urlencoded; charset=UTF-8",
-                        postParCall.request.headers["Content-Type"],
+                        call.request.headers["Content-Type"],
                         "Wrong content-type, expected application/x-www-form-urlencoded",
                     )
                     val scope = formParameters["scope"].toString()
                     assertTrue(
-                        scope.contains("UniversityDegree"),
-                        "Missing scope UniversityDegree",
+                        scope.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
+                        "Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt",
                     )
                     assertTrue(
-                        scope.contains("PID_mso_mdoc"),
-                        "Missing scope PID_mso_mdoc",
+                        scope.contains("eu.europa.ec.eudiw.pid_mso_mdoc"),
+                        "Missing scope eu.europa.ec.eudiw.pid_mso_mdoc",
                     )
 
                     assertNotNull(
                         formParameters["issuer_state"],
                         "Parameter issuer_state is expected when issuance starts from issuer site",
                     )
+
+                    call.respond(
+                        HttpStatusCode.OK,
+                        PushedAuthorizationRequestResponse.Success(
+                            "org:example:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
+                            3600,
+                        ),
+                    )
                 }
             },
-            { tokenPostCall ->
-                runBlocking {
-                    val formParameters = tokenPostCall.receiveParameters()
+            { call ->
+                runTest {
+                    val formParameters = call.receiveParameters()
                     assertEquals(
                         "application/x-www-form-urlencoded; charset=UTF-8",
-                        tokenPostCall.request.headers["Content-Type"],
+                        call.request.headers["Content-Type"],
                     )
                     assertNotNull(
                         formParameters["code_verifier"],
@@ -220,6 +246,14 @@ class IssuanceAuthorizationTest {
                         grantType,
                         "Expected grant_type is ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but instead sent $grantType.",
                     )
+
+                    call.respond(
+                        HttpStatusCode.OK,
+                        AccessTokenRequestResponse.Success(
+                            accessToken = UUID.randomUUID().toString(),
+                            expiresIn = 3600,
+                        ),
+                    )
                 }
             },
         )
@@ -233,15 +267,15 @@ class IssuanceAuthorizationTest {
             { client ->
                 preAuthFlowTestBlock(PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER, client)
             },
-            { postParCall ->
+            {
                 fail("No pushed authorization request should have been sent in case of pre-authorized code flow")
             },
-            { tokenPostCall ->
-                runBlocking {
-                    val formParameters = tokenPostCall.receiveParameters()
+            { call ->
+                runTest {
+                    val formParameters = call.receiveParameters()
                     assertEquals(
                         "application/x-www-form-urlencoded; charset=UTF-8",
-                        tokenPostCall.request.headers["Content-Type"],
+                        call.request.headers["Content-Type"],
                         "Wrong content-type, expected application/x-www-form-urlencoded",
                     )
 
@@ -272,6 +306,165 @@ class IssuanceAuthorizationTest {
                         grantType,
                         "Expected grant_type is ${TokenEndpointForm.PreAuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but instead sent $grantType.",
                     )
+
+                    call.respond(
+                        HttpStatusCode.OK,
+                        AccessTokenRequestResponse.Success(
+                            accessToken = UUID.randomUUID().toString(),
+                            expiresIn = 3600,
+                        ),
+                    )
+                }
+            },
+        )
+    }
+
+    @Test
+    fun `when par endpoint responds with failure, exception PushedAuthorizationRequestFailed is thrown`() {
+        authorizationTestBed(
+            { client ->
+                runTest {
+                    val offer = credentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+                    val issuer = issuer(offer, client)
+                    val issuerState = issuerStateFromOffer(offer)
+
+                    with(issuer) {
+                        pushAuthorizationCodeRequest(offer.credentials, issuerState)
+                            .fold(
+                                onSuccess = {
+                                    fail("Exception expected to be thrown")
+                                },
+                                onFailure = {
+                                    assertTrue("Expected PushedAuthorizationRequestFailed to be thrown but was not") {
+                                        it is CredentialIssuanceError.PushedAuthorizationRequestFailed
+                                    }
+                                },
+                            )
+                    }
+                }
+            },
+            { call ->
+                runTest {
+                    call.respondText(
+                        """
+                            {
+                               "error": "invalid_request",
+                               "error_description": "The redirect_uri is not valid for the given client"
+                             }
+                        """.trimIndent(),
+                        ContentType.parse("application/json"),
+                        HttpStatusCode.BadRequest,
+                    )
+                }
+            },
+            {},
+        )
+    }
+
+    @Test
+    fun `when token endpoint responds with failure, exception PushedAuthorizationRequestFailed is thrown (auth code flow)`() {
+        authorizationTestBed(
+            { client ->
+                runTest {
+                    val offer = credentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+                    val issuer = issuer(offer, client)
+                    val issuerState = issuerStateFromOffer(offer)
+
+                    with(issuer) {
+                        val parPlaced = pushAuthorizationCodeRequest(offer.credentials, issuerState).getOrThrow()
+                        val authorizationCode = UUID.randomUUID().toString()
+                        parPlaced
+                            .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                            .requestAccessToken()
+                            .fold(
+                                onSuccess = {
+                                    fail("Exception expected to be thrown")
+                                },
+                                onFailure = {
+                                    assertTrue("Expected AccessTokenRequestFailed to be thrown but was not") {
+                                        it is CredentialIssuanceError.AccessTokenRequestFailed
+                                    }
+                                },
+                            )
+                    }
+                }
+            },
+            { call ->
+                runTest {
+                    call.respond(
+                        HttpStatusCode.OK,
+                        PushedAuthorizationRequestResponse.Success(
+                            "org:example:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
+                            3600,
+                        ),
+                    )
+                }
+            },
+            { call ->
+                runTest {
+                    call.respondText(
+                        """
+                            {
+                               "error": "unauthorized_client"
+                            }
+                        """.trimIndent(),
+                        ContentType.parse("application/json"),
+                        HttpStatusCode.BadRequest,
+                    )
+                }
+            },
+        )
+    }
+
+    @Test
+    fun `when token endpoint responds with failure, exception PushedAuthorizationRequestFailed is thrown (pre-auth code flow)`() {
+        authorizationTestBed(
+            { client ->
+                runTest {
+                    val offer = credentialOffer(client, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+                    val issuer = issuer(offer, client)
+                    val preAuthCode = preAuthCodeFromOffer(offer)
+
+                    with(issuer) {
+                        authorizeWithPreAuthorizationCode(
+                            offer.credentials,
+                            IssuanceAuthorization.PreAuthorizationCode(preAuthCode, null),
+                        )
+                            .fold(
+                                onSuccess = {
+                                    fail("Exception expected to be thrown")
+                                },
+                                onFailure = {
+                                    assertTrue("Expected AccessTokenRequestFailed to be thrown but was not") {
+                                        it is CredentialIssuanceError.AccessTokenRequestFailed
+                                    }
+                                },
+                            )
+                    }
+                }
+            },
+            { call ->
+                runTest {
+                    call.respond(
+                        HttpStatusCode.OK,
+                        PushedAuthorizationRequestResponse.Success(
+                            "org:example:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
+                            3600,
+                        ),
+                    )
+                }
+            },
+            { call ->
+                runTest {
+                    call.respondText(
+                        """
+                            {
+                               "error": "unauthorized_client"
+                            }
+                        """.trimIndent(),
+                        ContentType.parse("application/json"),
+                        HttpStatusCode.BadRequest,
+                    )
                 }
             },
         )
@@ -280,45 +473,18 @@ class IssuanceAuthorizationTest {
     private fun authFlowTestBlock(
         credentialOfferStr: String,
         client: HttpClient,
-    ) = runBlocking {
-        val offer = CredentialOfferRequestResolver(
-            httpGet = createGetASMetadata(client),
-        ).resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
-            .getOrThrow()
+    ) = runTest {
+        val offer = credentialOffer(client, credentialOfferStr)
+        val issuer = issuer(offer, client)
+        val issuerState = issuerStateFromOffer(offer)
 
-        // AUTHORIZATION CODE FLOW IS USED FOR ISSUANCE
-        val issuer = Issuer.make(
-            IssuanceAuthorizer.make(
-                offer.authorizationServerMetadata,
-                vciWalletConfiguration,
-                createPostPar(client),
-                createGetAccessToken(client),
-            ),
-            IssuanceRequester.make(
-                issuerMetadata = offer.credentialIssuerMetadata,
-                postIssueRequest = createPostIssuance(client),
-            ),
-        )
-
-        val issuerState =
-            when (val grants = offer.grants) {
-                is Grants.AuthorizationCode -> grants.issuerState
-                is Grants.Both -> grants.authorizationCode.issuerState
-                null -> null
-                else -> fail("Not expected offer grant type")
-            }
-
-        // Place PAR
-        val parRequested =
-            issuer.pushAuthorizationCodeRequest(offer.credentials, issuerState).getOrThrow()
-                .also { println(it) }
-
-        // [WALLET] CONSTRUCTS url GET request opens it in browser window and authenticates user in issuer's side
-        // [WALLET] EXTRACTS THE AUTHORIZATION CODE FROM ISSUER'S RESPONSE
-        val authorizationCode = UUID.randomUUID().toString()
-
-        // Proceed with next steps to issue certificate
         with(issuer) {
+            val parRequested =
+                pushAuthorizationCodeRequest(offer.credentials, issuerState).getOrThrow()
+                    .also { println(it) }
+
+            val authorizationCode = UUID.randomUUID().toString()
+
             parRequested
                 .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
                 .also { println(it) }
@@ -329,13 +495,36 @@ class IssuanceAuthorizationTest {
     private fun preAuthFlowTestBlock(
         credentialOfferStr: String,
         client: HttpClient,
-    ) = runBlocking {
+    ) = runTest {
+        val offer = credentialOffer(client, credentialOfferStr)
+        val issuer = issuer(offer, client)
+        val preAuthorizationCode = preAuthCodeFromOffer(offer)
+        val userPin = "pin"
+
+        with(issuer) {
+            authorizeWithPreAuthorizationCode(
+                offer.credentials,
+                IssuanceAuthorization.PreAuthorizationCode(preAuthorizationCode, userPin),
+            ).getOrThrow().also { println(it) }
+        }
+    }
+
+    private suspend fun credentialOffer(
+        client: HttpClient,
+        credentialOfferStr: String,
+    ): CredentialOffer {
         val offer = CredentialOfferRequestResolver(
             httpGet = createGetASMetadata(client),
         ).resolve(
             "https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr",
         ).getOrThrow()
+        return offer
+    }
 
+    private fun issuer(
+        offer: CredentialOffer,
+        client: HttpClient,
+    ): Issuer {
         val issuer = Issuer.make(
             IssuanceAuthorizer.make(
                 offer.authorizationServerMetadata,
@@ -348,20 +537,27 @@ class IssuanceAuthorizationTest {
                 postIssueRequest = createPostIssuance(client),
             ),
         )
+        return issuer
+    }
 
+    private fun issuerStateFromOffer(offer: CredentialOffer): String? {
+        val issuerState =
+            when (val grants = offer.grants) {
+                is Grants.AuthorizationCode -> grants.issuerState
+                is Grants.Both -> grants.authorizationCode.issuerState
+                null -> null
+                else -> fail("Not expected offer grant type")
+            }
+        return issuerState
+    }
+
+    private fun preAuthCodeFromOffer(offer: CredentialOffer): String {
         val preAuthorizationCode =
             when (val grants = offer.grants) {
                 is Grants.PreAuthorizedCode -> grants.preAuthorizedCode
                 is Grants.Both -> grants.preAuthorizedCode.preAuthorizedCode
                 else -> fail("Not expected offer grant type")
             }
-        val userPin = "pin"
-
-        with(issuer) {
-            authorizeWithPreAuthorizationCode(
-                offer.credentials,
-                IssuanceAuthorization.PreAuthorizationCode(preAuthorizationCode, userPin),
-            ).getOrThrow().also { println(it) }
-        }
+        return preAuthorizationCode
     }
 }

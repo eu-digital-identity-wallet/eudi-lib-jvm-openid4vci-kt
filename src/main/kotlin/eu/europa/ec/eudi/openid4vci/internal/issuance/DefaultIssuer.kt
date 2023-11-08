@@ -34,7 +34,6 @@ internal class DefaultIssuer(
                 authorizer.submitPushedAuthorizationRequest(scopes, state, issuerState).getOrThrow()
 
             UnauthorizedRequest.ParRequested(
-                credentials = credentials,
                 getAuthorizationCodeURL = getAuthorizationCodeUrl,
                 pkceVerifier = codeVerifier,
                 state = state,
@@ -45,7 +44,6 @@ internal class DefaultIssuer(
         authorizationCode: IssuanceAuthorization.AuthorizationCode,
     ): UnauthorizedRequest.AuthorizationCodeRetrieved =
         UnauthorizedRequest.AuthorizationCodeRetrieved(
-            credentials = credentials,
             authorizationCode = authorizationCode,
             pkceVerifier = this.pkceVerifier,
         )
