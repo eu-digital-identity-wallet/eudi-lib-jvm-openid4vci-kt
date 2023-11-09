@@ -98,9 +98,7 @@ private fun testBed(
             }
             routing {
                 get("/.well-known/openid-configuration") {
-                    val response =
-                        getResourceAsText("well-known/openid-configuration.json")
-                    call.respond(HttpStatusCode.OK, response)
+                    call.respond(HttpStatusCode.OK, getResourceAsText("well-known/openid-configuration.json"))
                 }
 
                 post("/ext/par/request") {

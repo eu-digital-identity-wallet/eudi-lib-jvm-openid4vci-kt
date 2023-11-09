@@ -22,10 +22,11 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.json.Json
 import java.net.URI
 
 internal typealias HttpRequestDataMatcher = (HttpRequestData) -> Boolean
-internal typealias HttpResponseDataBuilder = MockRequestHandleScope.() -> HttpResponseData
+internal typealias HttpResponseDataBuilder = MockRequestHandleScope.(request: HttpRequestData?) -> HttpResponseData
 
 /**
  * Gets a [HttpRequestDataMatcher] that matches the provided [url] and [method].
@@ -33,11 +34,8 @@ internal typealias HttpResponseDataBuilder = MockRequestHandleScope.() -> HttpRe
 internal fun match(url: URI, method: HttpMethod = HttpMethod.Get): HttpRequestDataMatcher =
     { request -> request.url.toURI() == url && request.method == method }
 
-/**
- * Gets a [HttpRequestDataMatcher] that matches the provided [url] and [method].
- */
-internal fun match(url: String, method: HttpMethod = HttpMethod.Get): HttpRequestDataMatcher =
-    match(URI.create(url), method)
+internal fun endsWith(endsWith: String, method: HttpMethod = HttpMethod.Get): HttpRequestDataMatcher =
+    { request -> request.url.encodedPath == endsWith && request.method == method }
 
 /**
  * Gets a [HttpResponseDataBuilder] that returns the provided [resource]
@@ -55,19 +53,17 @@ internal fun jsonResponse(resource: String, status: HttpStatusCode = HttpStatusC
     }
 
 /**
- * Gets a [HttpResponseDataBuilder] that returns '404/Not Found'.
- */
-internal fun notFound(): HttpResponseDataBuilder =
-    {
-        respondError(HttpStatusCode.NotFound)
-    }
-
-/**
  * A [requestMatcher] alongside the [responseBuilder] that must be invoked when it matches.
  */
 internal data class RequestMocker(
     val requestMatcher: HttpRequestDataMatcher,
     val responseBuilder: HttpResponseDataBuilder,
+)
+
+internal data class RequestMockerValidator(
+    val requestMatcher: HttpRequestDataMatcher,
+    val responseBuilder: HttpResponseDataBuilder,
+    val requestValidator: (request: HttpRequestData) -> Unit,
 )
 
 /**
@@ -84,7 +80,7 @@ internal suspend fun mockEngine(
         mocks
             .firstOrNull { it.requestMatcher(request) }
             ?.responseBuilder
-            ?.invoke(this)
+            ?.invoke(this, null)
             ?: respondError(HttpStatusCode.NotFound)
     }.use { mockEngine ->
         HttpClient(mockEngine) {
@@ -101,6 +97,27 @@ internal suspend fun mockEngine(
 
             action(httpGet)
             verifier(mockEngine.requestHistory)
+        }
+    }
+}
+
+internal fun mockedKtorHttpClientFactory(requestMockers: List<RequestMockerValidator>): KtorHttpClientFactory = {
+    HttpClient(MockEngine) {
+        engine {
+            addHandler { request ->
+                requestMockers
+                    .firstOrNull { it.requestMatcher(request) }
+                    ?.apply {
+                        requestValidator(request)
+                    }
+                    ?.responseBuilder?.invoke(this, request)
+                    ?: respondError(HttpStatusCode.NotFound)
+            }
+        }
+        install(ContentNegotiation) {
+            json(
+                json = Json { ignoreUnknownKeys = true },
+            )
         }
     }
 }

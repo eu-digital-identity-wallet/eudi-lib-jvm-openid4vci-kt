@@ -33,6 +33,7 @@ internal class KtorIssuanceAuthorizer(
     val authorizationServerMetadata: CIAuthorizationServerMetadata,
     val config: WalletOpenId4VCIConfig,
     val coroutineDispatcher: CoroutineDispatcher,
+    val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
 ) : IssuanceAuthorizer {
 
     override suspend fun submitPushedAuthorizationRequest(
@@ -40,7 +41,7 @@ internal class KtorIssuanceAuthorizer(
         state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>> =
-        HttpClientFactory().use { client ->
+        ktorHttpClientFactory().use { client ->
             authorizer(client).submitPushedAuthorizationRequest(scopes, state, issuerState)
         }
 
@@ -48,7 +49,7 @@ internal class KtorIssuanceAuthorizer(
         authorizationCode: String,
         codeVerifier: String,
     ): Result<Pair<String, CNonce?>> =
-        HttpClientFactory().use { client ->
+        ktorHttpClientFactory().use { client ->
             authorizer(client).requestAccessTokenAuthFlow(authorizationCode, codeVerifier)
         }
 
@@ -56,7 +57,7 @@ internal class KtorIssuanceAuthorizer(
         preAuthorizedCode: String,
         pin: String?,
     ): Result<Pair<String, CNonce?>> =
-        HttpClientFactory().use { client ->
+        ktorHttpClientFactory().use { client ->
             authorizer(client).requestAccessTokenPreAuthFlow(preAuthorizedCode, pin)
         }
 
@@ -68,21 +69,23 @@ internal class KtorIssuanceAuthorizer(
             postPar = parFormPost(client),
             getAccessToken = accessTokenFormPost(client),
         )
-}
 
-/**
- * Factory which produces a [Ktor Http client][HttpClient]
- * The actual engine will be peeked up by whatever
- * it is available in classpath
- *
- * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
- */
-private val HttpClientFactory: KtorHttpClientFactory = {
-    HttpClient {
-        install(ContentNegotiation) {
-            json(
-                json = Json { ignoreUnknownKeys = true },
-            )
+    companion object {
+        /**
+         * Factory which produces a [Ktor Http client][HttpClient]
+         * The actual engine will be peeked up by whatever
+         * it is available in classpath
+         *
+         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
+         */
+        val HttpClientFactory: KtorHttpClientFactory = {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json(
+                        json = Json { ignoreUnknownKeys = true },
+                    )
+                }
+            }
         }
     }
 }

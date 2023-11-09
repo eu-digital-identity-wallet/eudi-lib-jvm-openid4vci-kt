@@ -132,7 +132,7 @@ object MsoMdocFormat {
     @SerialName(FORMAT)
     data class CredentialIssuanceRequestTO(
         @SerialName("doctype") val docType: String,
-        @SerialName("proof") override val proof: JsonObject?,
+        @SerialName("proof") override val proof: JsonObject? = null,
         @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
         @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
         @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String? = null,

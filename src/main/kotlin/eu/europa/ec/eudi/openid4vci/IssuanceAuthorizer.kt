@@ -111,11 +111,13 @@ interface IssuanceAuthorizer {
             authorizationServerMetadata: CIAuthorizationServerMetadata,
             config: WalletOpenId4VCIConfig,
             coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            ktorHttpClientFactory: KtorHttpClientFactory = KtorIssuanceAuthorizer.HttpClientFactory,
         ): IssuanceAuthorizer =
             KtorIssuanceAuthorizer(
                 authorizationServerMetadata = authorizationServerMetadata,
                 config = config,
                 coroutineDispatcher = coroutineDispatcher,
+                ktorHttpClientFactory = ktorHttpClientFactory,
             )
     }
 }
