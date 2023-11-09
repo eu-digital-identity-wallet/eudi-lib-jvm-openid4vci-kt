@@ -27,9 +27,10 @@ import kotlinx.serialization.json.Json
 
 internal class KtorCredentialIssuerMetadataResolver(
     val coroutineDispatcher: CoroutineDispatcher,
+    val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
 ) : CredentialIssuerMetadataResolver {
     override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> =
-        HttpClientFactory().use { client ->
+        ktorHttpClientFactory().use { client ->
             resolver(client).resolve(issuer)
         }
 
@@ -48,7 +49,7 @@ internal class KtorCredentialIssuerMetadataResolver(
          *
          * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
          */
-        private val HttpClientFactory: KtorHttpClientFactory = {
+        val HttpClientFactory: KtorHttpClientFactory = {
             HttpClient {
                 install(ContentNegotiation) {
                     json(

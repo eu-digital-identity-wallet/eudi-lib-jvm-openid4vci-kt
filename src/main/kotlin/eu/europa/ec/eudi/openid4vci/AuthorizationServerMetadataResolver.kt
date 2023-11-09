@@ -47,9 +47,11 @@ fun interface AuthorizationServerMetadataResolver {
 
         fun ktor(
             coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            ktorHttpClientFactory: KtorHttpClientFactory = KtorAuthorizationServerMetadataResolver.HttpClientFactory,
         ): AuthorizationServerMetadataResolver =
             KtorAuthorizationServerMetadataResolver(
                 coroutineDispatcher = coroutineDispatcher,
+                ktorHttpClientFactory = ktorHttpClientFactory,
             )
     }
 }

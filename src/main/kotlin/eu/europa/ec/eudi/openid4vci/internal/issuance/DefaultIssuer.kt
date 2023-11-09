@@ -18,6 +18,8 @@ package eu.europa.ec.eudi.openid4vci.internal.issuance
 import eu.europa.ec.eudi.openid4vci.*
 import java.util.*
 
+private val NOT_YET_IMPLEMENTED: Nothing = TODO("Not Yet Implemented")
+
 internal class DefaultIssuer(
     private val authorizer: IssuanceAuthorizer,
     private val issuanceRequester: IssuanceRequester,
@@ -95,7 +97,7 @@ internal class DefaultIssuer(
         requestIssuance(token) {
             credentialMetadata
                 .toIssuerSupportedCredential()
-                .toIssuanceRequest(claimSet, null, responseEncryptionSpec)
+                .toIssuanceRequestMsoMdoc(claimSet, null, responseEncryptionSpec)
         }
     }
 
@@ -107,7 +109,7 @@ internal class DefaultIssuer(
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             with(credentialMetadata.toIssuerSupportedCredential()) {
-                toIssuanceRequest(
+                toIssuanceRequestMsoMdoc(
                     claimSet,
                     bindingKey.toSupportedProof(this, cNonce.value),
                     responseEncryptionSpec,
@@ -163,7 +165,7 @@ internal class DefaultIssuer(
                 credentialRequests = credentialsMetadata.map { pair ->
                     pair.first
                         .toIssuerSupportedCredential()
-                        .toIssuanceRequest(pair.second, null, responseEncryptionSpec)
+                        .toIssuanceRequestMsoMdoc(pair.second, null, responseEncryptionSpec)
                 },
             )
         }
@@ -177,7 +179,7 @@ internal class DefaultIssuer(
             CredentialIssuanceRequest.BatchCredentials(
                 credentialRequests = credentialsMetadata.map { triple ->
                     with(triple.first.toIssuerSupportedCredential()) {
-                        toIssuanceRequest(
+                        toIssuanceRequestMsoMdoc(
                             triple.second,
                             triple.third.toSupportedProof(this, cNonce.value),
                             responseEncryptionSpec,
@@ -237,7 +239,7 @@ internal class DefaultIssuer(
             ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
     }
 
-    private fun CredentialSupported.toIssuanceRequest(
+    private fun CredentialSupported.toIssuanceRequestMsoMdoc(
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryption?,
@@ -268,30 +270,22 @@ internal class DefaultIssuer(
         }
 
         return when (this) {
-            is MsoMdocFormat.CredentialSupported -> this.toIssuanceRequest(claimSet, proof, responseEncryptionSpec)
+            is MsoMdocFormat.CredentialSupported -> toIssuanceRequestMsoMdoc(claimSet, proof, responseEncryptionSpec)
                 .getOrThrow()
 
-            is W3CSignedJwtFormat.CredentialSupported -> this.toIssuanceRequest(claimSet, proof, responseEncryptionSpec)
+            is SdJwtVcFormat.CredentialSupported -> toIssuanceRequestSdJwtVc(claimSet, proof, responseEncryptionSpec)
                 .getOrThrow()
 
-            is W3CJsonLdDataIntegrityFormat.CredentialSupported -> this.toIssuanceRequest(
-                claimSet,
-                proof,
-                responseEncryptionSpec,
-            ).getOrThrow()
+            is W3CSignedJwtFormat.CredentialSupported -> NOT_YET_IMPLEMENTED
 
-            is W3CJsonLdSignedJwtFormat.CredentialSupported -> this.toIssuanceRequest(
-                claimSet,
-                proof,
-                responseEncryptionSpec,
-            ).getOrThrow()
+            is W3CJsonLdDataIntegrityFormat.CredentialSupported -> NOT_YET_IMPLEMENTED
 
-            is SdJwtVcFormat.CredentialSupported -> this.toIssuanceRequest(claimSet, proof, responseEncryptionSpec)
-                .getOrThrow()
+            is W3CJsonLdSignedJwtFormat.CredentialSupported -> NOT_YET_IMPLEMENTED
+
         }
     }
 
-    private fun MsoMdocFormat.CredentialSupported.toIssuanceRequest(
+    private fun MsoMdocFormat.CredentialSupported.toIssuanceRequestMsoMdoc(
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryption?,
@@ -332,7 +326,7 @@ internal class DefaultIssuer(
         ).getOrThrow()
     }
 
-    private fun SdJwtVcFormat.CredentialSupported.toIssuanceRequest(
+    private fun SdJwtVcFormat.CredentialSupported.toIssuanceRequestSdJwtVc(
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryption?,
@@ -366,30 +360,6 @@ internal class DefaultIssuer(
             proof = proof,
             claimSet = validClaimSet,
         ).getOrThrow()
-    }
-
-    private fun W3CSignedJwtFormat.CredentialSupported.toIssuanceRequest(
-        claimSet: ClaimSet?,
-        proof: Proof?,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
-    ): Result<CredentialIssuanceRequest.SingleCredential> {
-        TODO("Not yet implemented")
-    }
-
-    private fun W3CJsonLdDataIntegrityFormat.CredentialSupported.toIssuanceRequest(
-        claimSet: ClaimSet?,
-        proof: Proof?,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
-    ): Result<CredentialIssuanceRequest.SingleCredential> {
-        TODO("Not yet implemented")
-    }
-
-    private fun W3CJsonLdSignedJwtFormat.CredentialSupported.toIssuanceRequest(
-        claimSet: ClaimSet?,
-        proof: Proof?,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
-    ): Result<CredentialIssuanceRequest.SingleCredential> {
-        TODO("Not yet implemented")
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(

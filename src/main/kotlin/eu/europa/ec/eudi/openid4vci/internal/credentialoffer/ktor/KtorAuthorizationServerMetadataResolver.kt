@@ -27,9 +27,10 @@ import kotlinx.serialization.json.Json
 
 internal class KtorAuthorizationServerMetadataResolver(
     val coroutineDispatcher: CoroutineDispatcher,
+    val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
 ) : AuthorizationServerMetadataResolver {
     override suspend fun resolve(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
-        HttpClientFactory().use { client ->
+        ktorHttpClientFactory().use { client ->
             resolver(client).resolve(issuer)
         }
 
@@ -48,7 +49,7 @@ internal class KtorAuthorizationServerMetadataResolver(
          *
          * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
          */
-        private val HttpClientFactory: KtorHttpClientFactory = {
+        val HttpClientFactory: KtorHttpClientFactory = {
             HttpClient {
                 install(ContentNegotiation) {
                     json(

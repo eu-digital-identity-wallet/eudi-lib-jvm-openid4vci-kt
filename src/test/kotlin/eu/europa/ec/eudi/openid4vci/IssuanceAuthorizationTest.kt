@@ -66,9 +66,7 @@ class IssuanceAuthorizationTest {
     )
 
     @Test
-    fun `Successful issuance with authorization code flow (wallet initiated)`() {
-        println("[Scenario 1]: ISSUANCE INITIATED FROM WALLET")
-
+    fun `successful authorization with authorization code flow (wallet initiated)`() {
         authorizationTestBed(
             { client ->
                 authFlowTestBlock(AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS, client)
@@ -165,9 +163,7 @@ class IssuanceAuthorizationTest {
     }
 
     @Test
-    fun `Successful issuance with authorization code flow (initiated from issuer site)`() {
-        println("[Scenario 2]: ISSUANCE INITIATED FROM ISSUER SITE")
-
+    fun `successful authorization with authorization code flow (initiated from issuer site)`() {
         authorizationTestBed(
             { client ->
                 authFlowTestBlock(AUTH_CODE_GRANT_CREDENTIAL_OFFER, client)
@@ -260,9 +256,7 @@ class IssuanceAuthorizationTest {
     }
 
     @Test
-    fun `Successful issuance with pre-authorization code flow`() {
-        println("[Scenario 3]: ISSUANCE INITIATED FROM ISSUER SITE VIA A CREDENTIAL OFFER")
-
+    fun `successful authorization with pre-authorization code flow`() {
         authorizationTestBed(
             { client ->
                 preAuthFlowTestBlock(PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER, client)
@@ -316,6 +310,104 @@ class IssuanceAuthorizationTest {
                     )
                 }
             },
+        )
+    }
+
+    @Test
+    fun `(pre-auth code flow) when access token endpoint return nonce then authorized request must be ProofRequired`() {
+        authorizationTestBed(
+            { client ->
+                runTest {
+                    val offer = credentialOffer(client, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+                    val issuer = issuer(offer, client)
+                    val preAuthorizationCode = preAuthCodeFromOffer(offer)
+
+                    with(issuer) {
+                        val authorizedRequest = authorizeWithPreAuthorizationCode(
+                            offer.credentials,
+                            IssuanceAuthorization.PreAuthorizationCode(preAuthorizationCode, null),
+                        ).getOrThrow()
+
+                        assertTrue("Token endpoint provides c_nonce but authorized request is not ProofRequired") {
+                            authorizedRequest is AuthorizedRequest.ProofRequired
+                        }
+                    }
+                }
+            },
+            { call ->
+                runTest {
+                    call.respond(
+                        HttpStatusCode.OK,
+                        PushedAuthorizationRequestResponse.Success(
+                            "org:example:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
+                            3600,
+                        ),
+                    )
+                }
+            },
+            { call ->
+                runTest {
+                    call.respond(
+                        HttpStatusCode.OK,
+                        AccessTokenRequestResponse.Success(
+                            accessToken = UUID.randomUUID().toString(),
+                            expiresIn = 3600,
+                            cNonce = "dfghhj34wpCJp",
+                            cNonceExpiresIn = 86400
+                        ),
+                    )
+                }
+            }
+        )
+    }
+
+    @Test
+    fun `(auth code flow) when access token endpoint return nonce then authorized request must be ProofRequired`() {
+        authorizationTestBed(
+            { client ->
+                runTest {
+                    val offer = credentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+                    val issuer = issuer(offer, client)
+                    val issuerState = issuerStateFromOffer(offer)
+
+                    with(issuer) {
+                        val authorizedRequest = pushAuthorizationCodeRequest(
+                            offer.credentials,
+                            issuerState,
+                        ).getOrThrow()
+                            .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode("auth-code"))
+                            .requestAccessToken().getOrThrow()
+
+                        assertTrue("Token endpoint provides c_nonce but authorized request is not ProofRequired") {
+                            authorizedRequest is AuthorizedRequest.ProofRequired
+                        }
+                    }
+                }
+            },
+            { call ->
+                runTest {
+                    call.respond(
+                        HttpStatusCode.OK,
+                        PushedAuthorizationRequestResponse.Success(
+                            "org:example:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
+                            3600,
+                        ),
+                    )
+                }
+            },
+            { call ->
+                runTest {
+                    call.respond(
+                        HttpStatusCode.OK,
+                        AccessTokenRequestResponse.Success(
+                            accessToken = UUID.randomUUID().toString(),
+                            expiresIn = 3600,
+                            cNonce = "dfghhj34wpCJp",
+                            cNonceExpiresIn = 86400
+                        ),
+                    )
+                }
+            }
         )
     }
 

@@ -298,9 +298,11 @@ fun interface CredentialIssuerMetadataResolver {
 
         fun ktor(
             coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            ktorHttpClientFactory: KtorHttpClientFactory = KtorCredentialIssuerMetadataResolver.HttpClientFactory,
         ): CredentialIssuerMetadataResolver =
             KtorCredentialIssuerMetadataResolver(
                 coroutineDispatcher = coroutineDispatcher,
+                ktorHttpClientFactory = ktorHttpClientFactory,
             )
     }
 }

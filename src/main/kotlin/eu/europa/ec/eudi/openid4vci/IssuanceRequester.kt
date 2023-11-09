@@ -239,10 +239,12 @@ interface IssuanceRequester {
         fun ktor(
             issuerMetadata: CredentialIssuerMetadata,
             coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            ktorHttpClientFactory: KtorHttpClientFactory = KtorIssuanceRequester.HttpClientFactory,
         ): IssuanceRequester =
             KtorIssuanceRequester(
                 issuerMetadata = issuerMetadata,
                 coroutineDispatcher = coroutineDispatcher,
+                ktorHttpClientFactory = ktorHttpClientFactory,
             )
     }
 }

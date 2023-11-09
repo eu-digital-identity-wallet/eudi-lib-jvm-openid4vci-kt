@@ -33,6 +33,9 @@ internal typealias HttpResponseDataBuilder = MockRequestHandleScope.() -> HttpRe
 internal fun match(url: URI, method: HttpMethod = HttpMethod.Get): HttpRequestDataMatcher =
     { request -> request.url.toURI() == url && request.method == method }
 
+internal fun endsWithMatch(endsWith: String, method: HttpMethod = HttpMethod.Get): HttpRequestDataMatcher =
+    { request -> request.url.encodedPath == endsWith && request.method == method }
+
 /**
  * Gets a [HttpRequestDataMatcher] that matches the provided [url] and [method].
  */
@@ -101,6 +104,29 @@ internal suspend fun mockEngine(
 
             action(httpGet)
             verifier(mockEngine.requestHistory)
+        }
+    }
+}
+
+internal suspend fun mockEngineGeneric(
+    vararg mocks: RequestMocker,
+    verifier: (List<HttpRequestData>) -> Unit = {},
+    action: suspend (client: HttpClient) -> Unit,
+) {
+    MockEngine { request ->
+        mocks
+            .firstOrNull { it.requestMatcher(request) }
+            ?.responseBuilder
+            ?.invoke(this)
+            ?: respondError(HttpStatusCode.NotFound)
+    }.use { mockEngine ->
+        HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json()
+            }
+            expectSuccess = true
+        }.use { client ->
+           action(client)
         }
     }
 }

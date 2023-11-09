@@ -32,52 +32,56 @@ import kotlinx.serialization.json.Json
 internal class KtorIssuanceRequester(
     override val issuerMetadata: CredentialIssuerMetadata,
     val coroutineDispatcher: CoroutineDispatcher,
+    val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
 ) : IssuanceRequester {
 
     override suspend fun placeIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.SingleCredential
     ): Result<CredentialIssuanceResponse> =
-        HttpClientFactory().use { client -> requester(client).placeIssuanceRequest(accessToken, request) }
+        ktorHttpClientFactory().use { client -> requester(client).placeIssuanceRequest(accessToken, request) }
 
     override suspend fun placeBatchIssuanceRequest(
         accessToken: IssuanceAccessToken,
         request: CredentialIssuanceRequest.BatchCredentials
     ): Result<CredentialIssuanceResponse> =
-        HttpClientFactory().use { client -> requester(client).placeBatchIssuanceRequest(accessToken, request) }
+        ktorHttpClientFactory().use { client -> requester(client).placeBatchIssuanceRequest(accessToken, request) }
 
     override suspend fun placeDeferredCredentialRequest(
         accessToken: IssuanceAccessToken,
         request: DeferredCredentialRequest
     ): CredentialIssuanceResponse =
-        HttpClientFactory().use { client -> requester(client).placeDeferredCredentialRequest(accessToken, request) }
+        ktorHttpClientFactory().use { client -> requester(client).placeDeferredCredentialRequest(accessToken, request) }
 
     private fun requester(client: HttpClient): DefaultIssuanceRequester =
         DefaultIssuanceRequester(
             coroutineDispatcher = coroutineDispatcher,
             issuerMetadata = issuerMetadata,
-            postIssueRequest = postIssueRequest(client),
+            postIssueRequest = postIssuanceRequest(client),
         )
-}
 
-/**
- * Factory which produces a [Ktor Http client][HttpClient]
- * The actual engine will be peeked up by whatever
- * it is available in classpath
- *
- * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
- */
-private val HttpClientFactory: KtorHttpClientFactory = {
-    HttpClient {
-        install(ContentNegotiation) {
-            json(
-                json = Json { ignoreUnknownKeys = true },
-            )
+    companion object {
+        /**
+         * Factory which produces a [Ktor Http client][HttpClient]
+         * The actual engine will be peeked up by whatever
+         * it is available in classpath
+         *
+         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
+         */
+        val HttpClientFactory: KtorHttpClientFactory = {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json(
+                        json = Json { ignoreUnknownKeys = true },
+                    )
+                }
+            }
         }
     }
 }
 
-private fun postIssueRequest(httpClient: HttpClient):
+
+private fun postIssuanceRequest(httpClient: HttpClient):
     HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
 
     HttpPost { url, headers, payload, responseHandler ->

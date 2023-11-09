@@ -55,10 +55,9 @@ class IssuanceSingleRequestTest {
         issuanceTestBed(
             { client ->
 
-                val (offer, authorizedRequest, issuer) = initIssuerWithOfferAndAuthorize(
-                    client,
-                    AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
-                )
+                val (offer, authorizedRequest, issuer) =
+                    authorizeRequestForCredentialOffer(client,AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
+
                 val claimSet = MsoMdocFormat.ClaimSet(
                     claims = mapOf(
                         "org.iso.18013.5.1" to mapOf(
@@ -129,7 +128,7 @@ class IssuanceSingleRequestTest {
             { client ->
 
                 val (offer, authorizedRequest, issuer) =
-                    initIssuerWithOfferAndAuthorize(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
+                    authorizeRequestForCredentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
 
                 val claimSet = MsoMdocFormat.ClaimSet(
                     claims = mapOf(
@@ -150,7 +149,7 @@ class IssuanceSingleRequestTest {
                                         assertThat(
                                             "Expected CredentialIssuanceException to be thrown but was not",
                                             it is SubmittedRequest.Failed &&
-                                                it.error is CredentialIssuanceError.ResponseUnparsable,
+                                                    it.error is CredentialIssuanceError.ResponseUnparsable,
                                         )
                                     },
                                     onFailure = {
@@ -183,12 +182,13 @@ class IssuanceSingleRequestTest {
         issuanceTestBed(
             { client ->
                 val (_, authorizedRequest, issuer) =
-                    initIssuerWithOfferAndAuthorize(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
+                    authorizeRequestForCredentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
 
                 with(issuer) {
                     when (authorizedRequest) {
                         is AuthorizedRequest.NoProofRequired -> {
-                            val claimSet_mso_mdoc = MsoMdocFormat.ClaimSet(mapOf("org.iso.18013.5.1" to mapOf("degree" to Claim())))
+                            val claimSet_mso_mdoc =
+                                MsoMdocFormat.ClaimSet(mapOf("org.iso.18013.5.1" to mapOf("degree" to Claim())))
                             var credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_MsoMdoc_SCOPE))
                             authorizedRequest.requestSingle(credentialMetadata, claimSet_mso_mdoc, null)
                                 .fold(
@@ -231,7 +231,7 @@ class IssuanceSingleRequestTest {
             { client ->
 
                 val (offer, authorizedRequest, issuer) =
-                    initIssuerWithOfferAndAuthorize(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
+                    authorizeRequestForCredentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
 
                 val claimSet = MsoMdocFormat.ClaimSet(
                     claims = mapOf(
@@ -324,7 +324,7 @@ class IssuanceSingleRequestTest {
             { client ->
 
                 val (offer, authorizedRequest, issuer) =
-                    initIssuerWithOfferAndAuthorize(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt)
+                    authorizeRequestForCredentialOffer(client,AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt)
 
                 val claimSet = SdJwtVcFormat.ClaimSet(
                     claims = mapOf(
@@ -408,7 +408,7 @@ class IssuanceSingleRequestTest {
         )
     }
 
-    private suspend fun initIssuerWithOfferAndAuthorize(
+    private suspend fun authorizeRequestForCredentialOffer(
         client: HttpClient,
         credentialOfferStr: String,
     ): Triple<CredentialOffer, AuthorizedRequest, Issuer> {
