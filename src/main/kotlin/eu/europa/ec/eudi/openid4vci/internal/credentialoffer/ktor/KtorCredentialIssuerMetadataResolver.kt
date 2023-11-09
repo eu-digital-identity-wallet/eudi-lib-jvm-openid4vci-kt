@@ -25,7 +25,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.serialization.json.Json
 
-class KtorCredentialIssuerMetadataResolver(
+internal class KtorCredentialIssuerMetadataResolver(
     val coroutineDispatcher: CoroutineDispatcher,
 ) : CredentialIssuerMetadataResolver {
     override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> =

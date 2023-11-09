@@ -277,7 +277,7 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
 /**
  * Service for fetching, parsing, and validating the metadata of a Credential Issuer.
  */
-internal fun interface CredentialIssuerMetadataResolver {
+fun interface CredentialIssuerMetadataResolver {
 
     /**
      * Tries to fetch and validate the metadata of a Credential Issuer.
