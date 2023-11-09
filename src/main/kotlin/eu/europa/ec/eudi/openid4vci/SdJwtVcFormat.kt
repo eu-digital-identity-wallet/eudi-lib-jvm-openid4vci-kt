@@ -159,7 +159,7 @@ object SdJwtVcFormat {
         @Serializable
         data class CredentialDefinitionTO(
             @SerialName("type") val type: String,
-            @SerialName("claims") val claims: JsonObject?,
+            @SerialName("claims") val claims: JsonObject? = null,
         )
     }
 

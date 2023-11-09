@@ -80,10 +80,8 @@ internal class KtorIssuanceRequester(
     }
 }
 
-
 private fun postIssuanceRequest(httpClient: HttpClient):
     HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
-
     HttpPost { url, headers, payload, responseHandler ->
         val response = httpClient.post(url) {
             headers {

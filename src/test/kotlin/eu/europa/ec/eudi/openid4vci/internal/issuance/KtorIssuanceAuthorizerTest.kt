@@ -1,22 +1,27 @@
+/*
+ * Copyright (c) 2023 European Commission
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package eu.europa.ec.eudi.openid4vci.internal.issuance
 
 import eu.europa.ec.eudi.openid4vci.*
-import io.ktor.client.*
-import io.ktor.client.engine.mock.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import io.ktor.util.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.net.URI
+import java.net.URLEncoder
 import java.util.*
 import kotlin.test.*
-
 
 class KtorIssuanceAuthorizerTest {
 
@@ -28,21 +33,23 @@ class KtorIssuanceAuthorizerTest {
     )
 
     @Test
-    fun `successful authorization with authorization code flow (wallet initiated)`() {
-        runBlocking {
-
+    fun `successful authorization with authorization code flow`() {
+        runTest {
             val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
-            val ktorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 listOf(
+                    oidcWellKnownMocker(),
                     authServerWellKnownMocker(),
-                    openIdWellKnownMocker(),
                     parPostMocker { request ->
-                        assertTrue("Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}") {
+                        assertTrue(
+                            "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
+                        ) {
                             request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
                         }
                         assertTrue("Not a form post") {
                             request.body is FormDataContent
                         }
+
                         val form = request.body as FormDataContent
 
                         assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
@@ -62,7 +69,9 @@ class KtorIssuanceAuthorizerTest {
                         }
                     },
                     tokenPostMocker { request ->
-                        assertTrue("Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}") {
+                        assertTrue(
+                            "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
+                        ) {
                             request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
                         }
                         assertTrue("Not a form post") {
@@ -85,146 +94,122 @@ class KtorIssuanceAuthorizerTest {
                         assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM} was expected but not sent.") {
                             grantType != null
                         }
-                        assertTrue("Expected grant_type is ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but instead sent $grantType.") {
+                        assertTrue(
+                            "Expected grant_type is ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but instead sent $grantType.",
+                        ) {
                             grantType == TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE
                         }
-                    }
-                )
-            )
-
-            val issuerMetadata =
-                CredentialIssuerMetadataResolver.ktor(
-                    ktorHttpClientFactory = ktorHttpClientFactory
-                )
-                    .resolve(credentialIssuerIdentifier).getOrThrow()
-
-            val authServerMetadata =
-                AuthorizationServerMetadataResolver.ktor(
-                    ktorHttpClientFactory = ktorHttpClientFactory
-                )
-                    .resolve(issuerMetadata.authorizationServer).getOrThrow()
-
-            val issuer = Issuer.make(
-                IssuanceAuthorizer.ktor(
-                    authorizationServerMetadata= authServerMetadata,
-                    ktorHttpClientFactory = ktorHttpClientFactory,
-                    config = vciWalletConfiguration,
-                ),
-                IssuanceRequester.ktor(
-                    issuerMetadata = issuerMetadata,
-                    ktorHttpClientFactory = ktorHttpClientFactory,
+                    },
                 ),
             )
+
+            val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
             with(issuer) {
                 val parRequested =
                     pushAuthorizationCodeRequest(
                         listOf(
                             CredentialMetadata.ByScope(Scope.of("eu.europa.ec.eudiw.pid_mso_mdoc")),
-                            CredentialMetadata.ByScope(Scope.of("eu.europa.ec.eudiw.pid_vc_sd_jwt"))
-                        ), null).getOrThrow()
+                            CredentialMetadata.ByScope(Scope.of("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
+                        ),
+                        null,
+                    ).getOrThrow()
 
                 val authorizationCode = UUID.randomUUID().toString()
 
                 parRequested
-                    .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode)).also { println(it) }
+                    .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                    .also { println(it) }
                     .requestAccessToken().getOrThrow().also { println(it) }
             }
-
         }
-
     }
 
-    private fun openIdWellKnownMocker():  RequestMockerValidator = RequestMockerValidator(
-        requestMatcher = endsWithMatch("/.well-known/openid-credential-issuer", HttpMethod.Get),
-        responseBuilder = {
-            respond(
-                content = getResourceAsText("well-known/openid-credential-issuer_no_encryption.json"),
-                status = HttpStatusCode.OK,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf("application/json"),
+    @Test
+    fun `successful authorization with pre-authorization code flow`() {
+        runTest {
+            val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                listOf(
+                    authServerWellKnownMocker(),
+                    oidcWellKnownMocker(),
+                    parPostMocker {
+                        fail("No pushed authorization request should have been sent in case of pre-authorized code flow")
+                    },
+                    tokenPostMocker { request ->
+                        assertTrue(
+                            "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
+                        ) {
+                            request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
+                        }
+                        assertTrue("Not a form post") {
+                            request.body is FormDataContent
+                        }
+                        val form = request.body as FormDataContent
+
+                        assertTrue("PKCE code verifier was not expected but sent.") {
+                            form.formData["code_verifier"] != null
+                        }
+                        assertTrue("Parameter ${TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM} was expected but not sent.") {
+                            form.formData[TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM] != null
+                        }
+                        assertTrue("Parameter ${TokenEndpointForm.PreAuthCodeFlow.USER_PIN_PARAM} was expected but not sent.") {
+                            form.formData[TokenEndpointForm.PreAuthCodeFlow.USER_PIN_PARAM] != null
+                        }
+
+                        val grantType = form.formData[TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM]
+                        assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM} was expected but not sent.") {
+                            grantType != null
+                        }
+
+                        val grantTypeParamValueUrlEncoded =
+                            URLEncoder.encode(TokenEndpointForm.PreAuthCodeFlow.GRANT_TYPE_PARAM_VALUE, "UTF-8")
+                        assertTrue(
+                            "Expected grant_type is ${TokenEndpointForm.PreAuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but got $grantType.",
+                        ) {
+                            grantTypeParamValueUrlEncoded == grantType
+                        }
+                    },
                 ),
             )
-        },
-        validator = {},
-    )
 
-    private fun authServerWellKnownMocker():  RequestMockerValidator = RequestMockerValidator(
-        requestMatcher = endsWithMatch("/.well-known/openid-configuration", HttpMethod.Get),
-        responseBuilder = {
-            respond(
-                content = getResourceAsText("well-known/openid-configuration.json"),
-                status = HttpStatusCode.OK,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf("application/json"),
-                ),
-            )
-        },
-        validator = {},
-    )
-
-    private fun parPostMocker(validator: (request: HttpRequestData) -> Unit):  RequestMockerValidator = RequestMockerValidator(
-        requestMatcher = endsWithMatch("/ext/par/request", HttpMethod.Post),
-        responseBuilder = {
-            respond(
-                content = Json.encodeToString(
-                    PushedAuthorizationRequestResponse.Success(
-                        "org:example:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
-                        3600,
-                    )
-                ),
-                status = HttpStatusCode.OK,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf("application/json"),
-                ),
-            )
-        },
-        validator = validator,
-    )
-
-    private fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit):  RequestMockerValidator = RequestMockerValidator(
-        requestMatcher = endsWithMatch("/token", HttpMethod.Post),
-        responseBuilder = {
-            respond(
-                content = Json.encodeToString(
-                    AccessTokenRequestResponse.Success(
-                        accessToken = UUID.randomUUID().toString(),
-                        expiresIn = 3600,
-                    )
-                ),
-                status = HttpStatusCode.OK,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf("application/json"),
-                ),
-            )
-        },
-        validator = validator,
-    )
-
-    private fun mockedKtorHttpClientFactory(requestMockers: List<RequestMockerValidator>): KtorHttpClientFactory = {
-        HttpClient(MockEngine) {
-            install(ContentNegotiation) {
-                json(
-                    json = Json { ignoreUnknownKeys = true },
+            val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
+            with(issuer) {
+                authorizeWithPreAuthorizationCode(
+                    listOf(
+                        CredentialMetadata.ByScope(Scope.of("eu.europa.ec.eudiw.pid_mso_mdoc")),
+                        CredentialMetadata.ByScope(Scope.of("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
+                    ),
+                    IssuanceAuthorization.PreAuthorizationCode("eyJhbGciOiJSU0EtFYUaBy", "pin"),
                 )
             }
-            engine {
-                addHandler {request ->
-                    requestMockers
-                        .firstOrNull {it.requestMatcher(request)}
-                        ?.apply {
-                            validator(request)
-                        }
-                        ?.responseBuilder?.invoke(this)
-                        ?: respondError(HttpStatusCode.NotFound)
-
-                }
-            }
         }
     }
-}
-internal data class RequestMockerValidator(
-    val requestMatcher: HttpRequestDataMatcher,
-    val responseBuilder: HttpResponseDataBuilder,
-    val validator: (request: HttpRequestData) -> Unit,
-)
 
+    private suspend fun issuer(
+        ktorHttpClientFactory: KtorHttpClientFactory,
+        credentialIssuerIdentifier: CredentialIssuerId,
+    ): Issuer {
+        val issuerMetadata =
+            CredentialIssuerMetadataResolver.ktor(
+                ktorHttpClientFactory = ktorHttpClientFactory,
+            ).resolve(credentialIssuerIdentifier).getOrThrow()
+
+        val authServerMetadata =
+            AuthorizationServerMetadataResolver.ktor(
+                ktorHttpClientFactory = ktorHttpClientFactory,
+            ).resolve(issuerMetadata.authorizationServer).getOrThrow()
+
+        val issuer = Issuer.make(
+            IssuanceAuthorizer.ktor(
+                authorizationServerMetadata = authServerMetadata,
+                ktorHttpClientFactory = ktorHttpClientFactory,
+                config = vciWalletConfiguration,
+            ),
+            IssuanceRequester.ktor(
+                issuerMetadata = issuerMetadata,
+                ktorHttpClientFactory = ktorHttpClientFactory,
+            ),
+        )
+        return issuer
+    }
+}

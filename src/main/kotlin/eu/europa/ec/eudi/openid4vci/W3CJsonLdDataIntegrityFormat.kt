@@ -55,7 +55,7 @@ object W3CJsonLdDataIntegrityFormat {
         data class CredentialDefinitionTO(
             @SerialName("@context") val context: List<String>,
             @SerialName("type") val types: List<String>,
-            @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>?,
+            @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>? = null,
         )
 
         override fun toDomain(): eu.europa.ec.eudi.openid4vci.CredentialSupported {

@@ -51,7 +51,7 @@ object W3CSignedJwtFormat {
         @Serializable
         data class CredentialDefinitionTO(
             @SerialName("type") val types: List<String>,
-            @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>?,
+            @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>? = null,
         )
 
         override fun toDomain(): eu.europa.ec.eudi.openid4vci.CredentialSupported {

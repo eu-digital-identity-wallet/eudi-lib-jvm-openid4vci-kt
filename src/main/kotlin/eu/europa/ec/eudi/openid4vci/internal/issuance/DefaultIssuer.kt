@@ -142,7 +142,7 @@ internal class DefaultIssuer(
                 }
 
                 ProofBuilder.ofType(ProofType.JWT) {
-                    iss("") // TODO: Get from config??
+                    iss("") // ?? Get from config??
                     aud(issuanceRequester.issuerMetadata.credentialIssuerIdentifier.toString())
                     jwk(this@toSupportedProof.jwk)
                     alg(this@toSupportedProof.algorithm)
@@ -281,7 +281,6 @@ internal class DefaultIssuer(
             is W3CJsonLdDataIntegrityFormat.CredentialSupported -> NOT_YET_IMPLEMENTED
 
             is W3CJsonLdSignedJwtFormat.CredentialSupported -> NOT_YET_IMPLEMENTED
-
         }
     }
 

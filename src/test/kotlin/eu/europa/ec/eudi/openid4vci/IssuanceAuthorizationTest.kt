@@ -353,11 +353,11 @@ class IssuanceAuthorizationTest {
                             accessToken = UUID.randomUUID().toString(),
                             expiresIn = 3600,
                             cNonce = "dfghhj34wpCJp",
-                            cNonceExpiresIn = 86400
+                            cNonceExpiresIn = 86400,
                         ),
                     )
                 }
-            }
+            },
         )
     }
 
@@ -403,11 +403,11 @@ class IssuanceAuthorizationTest {
                             accessToken = UUID.randomUUID().toString(),
                             expiresIn = 3600,
                             cNonce = "dfghhj34wpCJp",
-                            cNonceExpiresIn = 86400
+                            cNonceExpiresIn = 86400,
                         ),
                     )
                 }
-            }
+            },
         )
     }
 

@@ -56,7 +56,7 @@ class IssuanceSingleRequestTest {
             { client ->
 
                 val (offer, authorizedRequest, issuer) =
-                    authorizeRequestForCredentialOffer(client,AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
+                    authorizeRequestForCredentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
 
                 val claimSet = MsoMdocFormat.ClaimSet(
                     claims = mapOf(
@@ -149,7 +149,7 @@ class IssuanceSingleRequestTest {
                                         assertThat(
                                             "Expected CredentialIssuanceException to be thrown but was not",
                                             it is SubmittedRequest.Failed &&
-                                                    it.error is CredentialIssuanceError.ResponseUnparsable,
+                                                it.error is CredentialIssuanceError.ResponseUnparsable,
                                         )
                                     },
                                     onFailure = {
@@ -225,7 +225,7 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
-    fun `successful issuance response by issuer (mso_mdoc)`() {
+    fun `successful issuance of credential in mso_mdoc format`() {
         val credential = "issued_credential_content_mso_mdoc"
         issuanceTestBed(
             { client ->
@@ -318,13 +318,13 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
-    fun `successful issuance response by issuer (vc+sd-jwt)`() {
+    fun `successful issuance of credential in vc+sd-jwt format`() {
         val credential = "issued_credential_content_vc+sd-jwt"
         issuanceTestBed(
             { client ->
 
                 val (offer, authorizedRequest, issuer) =
-                    authorizeRequestForCredentialOffer(client,AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt)
+                    authorizeRequestForCredentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt)
 
                 val claimSet = SdJwtVcFormat.ClaimSet(
                     claims = mapOf(

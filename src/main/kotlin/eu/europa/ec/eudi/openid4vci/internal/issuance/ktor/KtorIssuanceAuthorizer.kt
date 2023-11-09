@@ -90,8 +90,6 @@ internal class KtorIssuanceAuthorizer(
     }
 }
 
-
-
 private fun parFormPost(httpClient: HttpClient): HttpFormPost<PushedAuthorizationRequestResponse> =
     HttpFormPost { url, formParameters ->
         val response = httpClient.submitForm(
@@ -99,9 +97,7 @@ private fun parFormPost(httpClient: HttpClient): HttpFormPost<PushedAuthorizatio
             formParameters = Parameters.build {
                 formParameters.entries.forEach { (k, v) -> append(k, v) }
             },
-        ) {
-            contentType(ContentType.parse("application/x-www-form-urlencoded; charset=UTF-8"))
-        }
+        )
         if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
         else response.body<PushedAuthorizationRequestResponse.Failure>()
     }
@@ -113,9 +109,7 @@ private fun accessTokenFormPost(httpClient: HttpClient): HttpFormPost<AccessToke
             formParameters = Parameters.build {
                 formParameters.entries.forEach { (k, v) -> append(k, v) }
             },
-        ) {
-            contentType(ContentType.parse("application/x-www-form-urlencoded; charset=UTF-8"))
-        }
+        )
         if (response.status.isSuccess()) response.body<AccessTokenRequestResponse.Success>()
         else response.body<AccessTokenRequestResponse.Failure>()
     }
