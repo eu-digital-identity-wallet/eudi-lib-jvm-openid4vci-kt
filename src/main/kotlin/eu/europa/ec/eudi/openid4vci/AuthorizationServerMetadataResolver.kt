@@ -28,7 +28,7 @@ class AuthorizationServerMetadataResolutionException(reason: Throwable) : Except
 /**
  * Service for resolving the metadata of an Authorization Server.
  */
-internal fun interface AuthorizationServerMetadataResolver {
+fun interface AuthorizationServerMetadataResolver {
 
     /**
      * Resolves the metadata of an [issuer].

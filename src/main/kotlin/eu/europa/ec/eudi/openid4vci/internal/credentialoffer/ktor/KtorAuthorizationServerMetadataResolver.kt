@@ -25,7 +25,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.serialization.json.Json
 
-class KtorAuthorizationServerMetadataResolver(
+internal class KtorAuthorizationServerMetadataResolver(
     val coroutineDispatcher: CoroutineDispatcher,
 ) : AuthorizationServerMetadataResolver {
     override suspend fun resolve(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
