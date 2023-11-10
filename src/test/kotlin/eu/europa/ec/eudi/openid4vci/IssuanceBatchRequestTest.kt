@@ -38,7 +38,7 @@ class IssuanceBatchRequestTest {
         }
     """.trimIndent()
 
-    val vciWalletConfiguration = WalletOpenId4VCIConfig(
+    val vciWalletConfiguration = OpenId4VCIConfig(
         clientId = "MyWallet_ClientId",
         authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     )
@@ -114,7 +114,9 @@ class IssuanceBatchRequestTest {
                                     "Failed with error ${submittedRequest.error}",
                                 )
 
-                                is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
+                                is SubmittedRequest.Success -> fail(
+                                    "first attempt should be unsuccessful",
+                                )
                             }
                         }
 

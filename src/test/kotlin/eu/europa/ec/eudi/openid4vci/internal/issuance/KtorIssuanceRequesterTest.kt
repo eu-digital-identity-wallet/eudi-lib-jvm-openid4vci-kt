@@ -36,7 +36,7 @@ class KtorIssuanceRequesterTest {
 
     val CredentialIssuer_URL = "https://credential-issuer.example.com"
 
-    val vciWalletConfiguration = WalletOpenId4VCIConfig(
+    val vciWalletConfiguration = OpenId4VCIConfig(
         clientId = "MyWallet_ClientId",
         authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     )

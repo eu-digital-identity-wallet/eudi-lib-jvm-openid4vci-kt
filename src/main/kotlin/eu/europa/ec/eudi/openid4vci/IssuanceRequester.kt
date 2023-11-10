@@ -89,13 +89,17 @@ sealed interface CredentialIssuanceRequest {
 
     /**
      * Models an issuance request for a batch of credentials
+     *
+     * @param credentialRequests    List of individual credential issuance requests
+     * @return A [CredentialIssuanceRequest]
+     *
      */
     data class BatchCredentials(
         val credentialRequests: List<SingleCredential>,
     ) : CredentialIssuanceRequest
 
     /**
-     * Models an issuance request for a single credential
+     * Sealed hierarchy of credential issuance requests based on the format of the requested credential.
      */
     sealed interface SingleCredential : CredentialIssuanceRequest {
 
@@ -104,6 +108,15 @@ sealed interface CredentialIssuanceRequest {
         val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption
 
         companion object {
+
+            /**
+             * Utility method to create the [RequestedCredentialResponseEncryption] attribute of the issuance request.
+             * Construction logic is independent of the credential's format.
+             *
+             * @param credentialEncryptionJwk   Key pair in JWK format used for issuance response encryption/decryption
+             * @param credentialResponseEncryptionAlg   Encryption algorithm to be used
+             * @param credentialResponseEncryptionMethod Encryption method to be used
+             */
             fun requestedCredentialResponseEncryption(
                 credentialEncryptionJwk: JWK?,
                 credentialResponseEncryptionAlg: JWEAlgorithm?,
@@ -119,8 +132,10 @@ sealed interface CredentialIssuanceRequest {
                     when {
                         credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null ->
                             encryptionMethod = EncryptionMethod.A256GCM
+
                         credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null ->
                             throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
+
                         credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null ->
                             throw CredentialIssuanceError.InvalidIssuanceRequest(
                                 "Credential response encryption algorithm must be specified if Credential " +
@@ -137,11 +152,36 @@ sealed interface CredentialIssuanceRequest {
     }
 }
 
+/**
+ * A Deferred Credential Request.
+ *
+ * @param transactionId Identifier of the transaction under witch the credential was initially requested.
+ * @param token Access token that authorizes the request.
+ */
+data class DeferredCredentialRequest(
+    val transactionId: String,
+    val token: IssuanceAccessToken,
+)
+
+/**
+ * Sealed hierarchy for the issuance response encryption specification as it is requested to the issuer server.
+ */
 sealed interface RequestedCredentialResponseEncryption : java.io.Serializable {
+
+    /**
+     *  No encryption is requested
+     */
     data object NotRequested : RequestedCredentialResponseEncryption {
         private fun readResolve(): Any = NotRequested
     }
 
+    /**
+     *  The encryption parameters that are sent along with the issuance request.
+     *
+     * @param encryptionJwk   Key pair in JWK format used for issuance response encryption/decryption
+     * @param responseEncryptionAlg   Encryption algorithm to be used
+     * @param responseEncryptionMethod Encryption method to be used
+     */
     data class Requested(
         val encryptionJwk: JWK,
         val responseEncryptionAlg: JWEAlgorithm,
@@ -164,27 +204,49 @@ sealed interface RequestedCredentialResponseEncryption : java.io.Serializable {
     }
 }
 
-data class DeferredCredentialRequest(
-    val transactionId: String,
-    val token: IssuanceAccessToken,
-)
-
+/**
+ * Models a response of the issuer to a successful issuance request.
+ *
+ * @param credentialResponses The outcome of the issuance request. If issuance request was a batch request it will contain
+ *      the results of each individual issuance request. If it was a single issuance request list will contain only one result.
+ * @param cNonce Nonce information sent back from issuance server.
+ */
 data class CredentialIssuanceResponse(
     val credentialResponses: List<Result>,
     val cNonce: CNonce?,
 ) {
+    /**
+     * The result of a request for issuance
+     */
     sealed interface Result {
+
+        /**
+         * Credential was issued from server and the result is returned inline.
+         *
+         * @param format The format of the issued credential
+         * @param credential The issued credential
+         */
         data class Issued(
             val format: String,
             val credential: String,
         ) : Result
 
+        /**
+         * Credential could not be issued immediately. An identifier is returned from server to be used later on
+         * to request the credential from issuer's Deferred Credential Endpoint.
+         *
+         * @param transactionId  A string identifying a Deferred Issuance transaction.
+         */
         data class Deferred(
             val transactionId: String,
         ) : Result
     }
 }
 
+/**
+ * Sealed interface to model the set of specific claims that need to be included in the issued credential.
+ * This set of claims is modelled differently depending on the credential format.
+ */
 sealed interface ClaimSet
 
 /**
@@ -228,6 +290,14 @@ interface IssuanceRequester {
     ): CredentialIssuanceResponse
 
     companion object {
+
+        /**
+         * Factory method to create a default implementation of the [IssuanceRequester] interface.
+         *
+         * @param issuerMetadata  The credential issuer's metadata.
+         * @param postIssueRequest An implementation of the http POST that submits issuance requests.
+         * @return A default implementation of the [IssuanceRequester] interface.
+         */
         fun make(
             issuerMetadata: CredentialIssuerMetadata,
             postIssueRequest: HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse>,
@@ -236,6 +306,15 @@ interface IssuanceRequester {
                 issuerMetadata = issuerMetadata,
                 postIssueRequest = postIssueRequest,
             )
+
+        /**
+         * Factory method to create an [IssuanceRequester] based on ktor.
+         *
+         * @param issuerMetadata  The credential issuer's metadata.
+         * @param coroutineDispatcher A coroutine dispatcher.
+         * @param ktorHttpClientFactory Factory of ktor http clients
+         * @return An implementation of [IssuanceRequester] based on ktor.
+         */
         fun ktor(
             issuerMetadata: CredentialIssuerMetadata,
             coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,

@@ -16,12 +16,17 @@
 
 This is a Kotlin library, targeting JVM, that supports 
 the [OpenId4VCI (draft 14)](https://openid.bitbucket.io/connect/openid-4-verifiable-credential-issuance-1_0.html) protocol.
-In particular, the library focus on the wallet's role in the protocol
+In particular, the library focuses on the wallet's role in the protocol to:
+- Resolve credential issuer metadata 
+- Resolve metadata of the authorization server protecting issuance services
+- Resolve a credential offer presented by an issuer service
+- Negotiate authorization of a credential issuance request
+- Submit a credential issuance request
 
 
 ## Disclaimer
 
-The released software is a initial development release version: 
+The released software is an initial development release version: 
 -  The initial development release is an early endeavor reflecting the efforts of a short timeboxed period, and by no means can be considered as the final product.  
 -  The initial development release may be changed substantially over time, might introduce new features but also may change or remove existing ones, potentially breaking compatibility with your existing code.
 -  The initial development release is limited in functional scope.
@@ -34,7 +39,229 @@ The released software is a initial development release version:
 
 ## How to use
 
-TBD
+Library provides the following main api elements to facilitate consumers of this api with the operations related to verifiable credentials issuance  
+
+- **Metadata resolvers**: Components that interact with credential issuer and its authorization server to obtain and parse their metadata.  
+- **Credential offer resolver**: A component that interacts with credential issuer to resolve and validate a credential offer presented by the issuer.  
+- **Issuer component**: A component that offers all operation required to authorize and submit a credential issuance request.
+
+### Resolve Credential Issuer and authorization server metadata
+
+To obtain the credential issuers metadata use [CredentialIssuerMetadataResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialIssuerMetadataResolver.kt) the following way
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+val credentialIssuerIdentifier = 
+    CredentialIssuerId("https://....").getOrThrow() // credential issuer id is an https url with no query or fragment components
+val resolver = 
+    CredentialIssuerMetadataResolver.ktor() // get a ktor based implementation of the CredentialIssuerMetadataResolver interface 
+val metadata: CredentialIssuerMetadata = 
+    resolver.resolve(credentialIssuerIdentifier).getOrThrow()  // fetch and parse credential issuer metadata
+```
+In case of metadata parsing failure a `Result.failure()` will be returned to caller wrapping the exception thrown while parsing metadata.
+
+
+
+To obtain the authorization server's  metadata use [AuthorizationServerMetadataResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/AuthorizationServerMetadataResolver.kt) the following way
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+val resolver = AuthorizationServerMetadataResolver.ktor() // get a ktor based implementation of the AuthorizationServerMetadataResolver interface
+val metadata: CIAuthorizationServerMetadata = 
+    resolver.resolve(HttpsUrl("https://...")).getOrThrow() // fetch and parse authorization server metadata
+```
+
+### Resolve a credential offer presented by issuer
+
+A CredentialOfferRequestResolver uses internally the two metadata resolvers mentioned above to resolve metadata of issuer and its authorization server
+```mermaid
+erDiagram
+    CredentialOfferRequestResolver }|..|{ AuthorizationServerMetadataResolver : has    
+    CredentialOfferRequestResolver }|..|{ CredentialIssuerMetadataResolver : has    
+```
+Given a credential offer url use [CredentialOfferRequestResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) the following way to validate and resolve it to [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt)
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+val credentialOfferRequestResolver = CredentialOfferRequestResolver(
+    httpGet = { url ->
+        runCatching {
+            client.get(url).body<String>()
+        }
+    },
+)
+val credentialOffer: CredentialOffer =
+    credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
+```
+
+### Credential Issuance
+
+The process of requesting an issuance has been implemented as a stateful process whose steps are depicted as dedicated states holding the outcome of each step. 
+Depending on the state of the process, specific transitions are allowed to move the process to the next step. 
+
+VCI specification defines two flows of issuance;
+- Authorization Code Flow (wallet-initiated flow)
+- Pre-Authorization Code Flow. In this flow, before initiating the flow with the Wallet, the Credential Issuer first conducts the steps required to prepare the Credential issuance.
+
+The following state diagrams sketch each flow's states and their allowed transitions. 
+
+```mermaid 
+---
+title: Authorization Code Flow state transision diagram
+---
+stateDiagram-v2 
+    state c_nonce_returned <<choice>>    
+    [*] --> UnauthorizedRequest.ParRequested: pushAuthorizationCodeRequest
+    UnauthorizedRequest.ParRequested --> UnauthorizedRequest.AuthorizationCodeRetrieved: handleAuthorizationCode
+    UnauthorizedRequest.AuthorizationCodeRetrieved --> c_nonce_exists: requestAccessToken
+    c_nonce_exists --> c_nonce_returned 
+    c_nonce_returned --> AuthorizedRequest.NoProofRequired : no
+    c_nonce_returned --> AuthorizedRequest.ProofRequired : yes
+    AuthorizedRequest.ProofRequired --> SubmittedRequest.Success: requestSingle (with binding key)
+    AuthorizedRequest.ProofRequired --> SubmittedRequest.Success: requestBatch (with binding keys)
+    AuthorizedRequest.NoProofRequired --> SubmittedRequest.Success: requestSingle
+    AuthorizedRequest.NoProofRequired --> SubmittedRequest.Success: requestBatch
+```
+```mermaid 
+---
+title: PreAuthorization Code Flow state transision diagram
+---
+stateDiagram-v2 
+    state c_nonce_returned <<choice>>    
+    [*] --> c_nonce_exists: authorizeWithPreAuthorizationCode (providing Pre-Authorized Code and Pin)
+    c_nonce_exists --> c_nonce_returned 
+    c_nonce_returned --> AuthorizedRequest.NoProofRequired : no
+    c_nonce_returned --> AuthorizedRequest.ProofRequired : yes
+    AuthorizedRequest.NoProofRequired --> SubmittedRequest.Success: requestSingle
+    AuthorizedRequest.NoProofRequired --> SubmittedRequest.Success: requestBatch
+    AuthorizedRequest.ProofRequired --> SubmittedRequest.Success: requestSingle
+    AuthorizedRequest.ProofRequired --> SubmittedRequest.Success: requestBatch
+```
+
+
+[Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuance.kt) the following way to validate and resolve it to [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) component is the component that facilitates the authorization and submission of a credential issuance request (batch or single)
+As depicted from the below diagram it is consisted of two sub-components:
+- **IssuanceAuthorizer**: A component responsible for all interactions with an authorization server to authorize a request for credential(s) issuance.
+- **IssuerRequester**: A component responsible for all interactions with credential issuer for submitting credential issuance requests.
+
+```mermaid
+erDiagram
+    Issuer }|..|{ IssuerAuthorizer : has
+    IssuerAuthorizer ||--|{ AuthorizationServerMetadata : contains
+    Issuer }|..|{ IssuerRequester : has
+    IssuerRequester ||--|{ CredentialIssuerMetadata : contains
+```
+
+#### Initialize an Issuer
+
+The Issuer interface provides two factory methods to construct an issuer component
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+// an Issuer component providing implementation of http calls 
+val issuer = 
+    Issuer.make(
+        IssuanceAuthorizer.make(
+            authorizationServerMetadata, // read-only authorization server metadata.
+            openId4VCIConfig, // configuration attributes
+            postPar, // implementation of the http POST that submits the Pushed Authorization Request
+            getAccessToken // implementation of the http POST that submits the request to get the access token
+        ),
+        IssuanceRequester.make(
+            issuerMetadata, // credential issuer's metadata
+            postIssueRequest // implementation of the http POST that submits issuance requests
+        )
+    )
+    
+// an Issuer based on ktor 
+val issuerKtor =  
+    Issuer.ktor(
+        authorizationServerMetadata, // authorization server metadata
+        issuerMetadata,  // credential issuer metadata
+        openId4VCIConfig // configuration attributes 
+    )  
+```
+
+#### Authorize request via Authorization Code Flow
+
+Given an `issuer` use authorization code flow to authorize an issuance request     
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+with(issuer) {
+    val parPlaced = pushAuthorizationCodeRequest(credentialMetadata, null).getOrThrow()
+    val authorizationCode = ... // using url parPlaced.getAuthorizationCodeURL authenticate via front-channel on authorization server and retrieve authorization code 
+    val authorizedRequest = 
+        parPlaced
+        .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+        .requestAccessToken().getOrThrow()
+}
+```
+
+#### Authorize request via Pre-Authorization Code Flow
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+with(issuer) {
+    val preAuthorizationCode = ... // pre-authorization code as contained in a credential offer 
+    val authorizedRequest = authorizeWithPreAuthorizationCode(credentials, preAuthorizationCode).getOrThrow()    
+}
+```
+
+#### Request a single credential issuance
+
+Given an `authorizedRequest` and in the context of an `issuer` a single credential issuance request can be placed as follows
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+with(issuer) {
+    val submittedRequest =
+        authorizedRequest.requestSingle(credentialMetadata, claimSet, bindingKey, issuanceResponseEncryption).getOrThrow()
+
+    when (submittedRequest) {
+        is SubmittedRequest.Success -> {
+            val result = requestOutcome.response.credentialResponses.get(0)
+            when (result) {
+                is CredentialIssuanceResponse.Result.Issued -> result.credential
+                is CredentialIssuanceResponse.Result.Deferred -> result.transactionId
+            }
+        }
+        is SubmittedRequest.Failed -> // handle failed request
+        is SubmittedRequest.InvalidProof -> // handle specific case of missing or invalid proof(s) 
+    }
+}
+```
+
+#### Request batch credential issuance
+
+Given an `authorizedRequest` and in the context of an `issuer` a batch credential issuance request can be placed as follows
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+with(issuer) {    
+    val submittedRequest = authorizedRequest.requestBatch(credentialMetadata, issuanceResponseEncryption).getOrThrow()
+
+    when (requestOutcome) {
+        is SubmittedRequest.Success -> {
+            val results = requestOutcome.response.credentialResponses.map {
+                when (it) {
+                    is CredentialIssuanceResponse.Result.Issued -> it.credential
+                    is CredentialIssuanceResponse.Result.Deferred -> it.transactionId
+                }
+            }            
+        }
+        is SubmittedRequest.Failed -> // handle failed request
+        is SubmittedRequest.InvalidProof -> // handle specific case of missing or invalid proof 
+    }
+}
+```
 
 ## OpenId4VCI features supported
 
@@ -54,6 +281,11 @@ OpenId4VCI specification defines several extension points to accommodate the dif
 
 #### Proof Types
 OpenId4VCI specification defines two types of proofs that can be included in a credential issuance request, JWT proof type and CWT proof type (see section [7.2.1](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-7.2.1)). Current version of the library supports only JWT proof types
+
+## How to contribute
+
+We welcome contributions to this project. To ensure that the process is smooth for everyone
+involved, follow the guidelines found in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

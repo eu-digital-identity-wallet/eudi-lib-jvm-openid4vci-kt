@@ -31,7 +31,7 @@ import kotlinx.serialization.json.Json
  */
 internal class KtorIssuanceAuthorizer(
     val authorizationServerMetadata: CIAuthorizationServerMetadata,
-    val config: WalletOpenId4VCIConfig,
+    val config: OpenId4VCIConfig,
     val coroutineDispatcher: CoroutineDispatcher,
     val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
 ) : IssuanceAuthorizer {
