@@ -91,7 +91,7 @@ sealed interface CredentialIssuanceRequest {
      * Models an issuance request for a batch of credentials
      *
      * @param credentialRequests    List of individual credential issuance requests
-     * @return  A [CredentialIssuanceRequest]
+     * @return A [CredentialIssuanceRequest]
      *
      */
     data class BatchCredentials(
@@ -139,7 +139,7 @@ sealed interface CredentialIssuanceRequest {
                         credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null ->
                             throw CredentialIssuanceError.InvalidIssuanceRequest(
                                 "Credential response encryption algorithm must be specified if Credential " +
-                                        "response encryption method is provided",
+                                    "response encryption method is provided",
                             )
                     }
                     RequestedCredentialResponseEncryption.Requested(
@@ -296,7 +296,7 @@ interface IssuanceRequester {
          *
          * @param issuerMetadata  The credential issuer's metadata.
          * @param postIssueRequest An implementation of the http POST that submits issuance requests.
-         * @return  A default implementation of the [IssuanceRequester] interface.
+         * @return A default implementation of the [IssuanceRequester] interface.
          */
         fun make(
             issuerMetadata: CredentialIssuerMetadata,
@@ -313,7 +313,7 @@ interface IssuanceRequester {
          * @param issuerMetadata  The credential issuer's metadata.
          * @param coroutineDispatcher A coroutine dispatcher.
          * @param ktorHttpClientFactory Factory of ktor http clients
-         * @return  An implementation of [IssuanceRequester] based on ktor.
+         * @return An implementation of [IssuanceRequester] based on ktor.
          */
         fun ktor(
             issuerMetadata: CredentialIssuerMetadata,

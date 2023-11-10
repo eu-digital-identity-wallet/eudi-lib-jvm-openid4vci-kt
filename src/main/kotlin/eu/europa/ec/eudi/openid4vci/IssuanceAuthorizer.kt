@@ -120,7 +120,7 @@ interface IssuanceAuthorizer {
      * @param scopes    The scopes of the authorization request.
      * @param state     The oauth2 specific 'state' request parameter.
      * @param issuerState   The state passed from credential issuer during the negotiation phase of the issuance.
-     * @return  The result of the request as a pair of the PKCE verifier used during request and the authorization code
+     * @return The result of the request as a pair of the PKCE verifier used during request and the authorization code
      *      url that caller will need to follow in order to retrieve the authorization code.
      *
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
@@ -169,7 +169,7 @@ interface IssuanceAuthorizer {
          * @param config Configuration object.
          * @param postPar An implementation of the http POST that submits the Pushed Authorization Request.
          * @param getAccessToken An implementation of the http POST that submits the request to get the access token.
-         * @return  A default implementation of the [IssuanceAuthorizer] interface.
+         * @return A default implementation of the [IssuanceAuthorizer] interface.
          */
         fun make(
             authorizationServerMetadata: CIAuthorizationServerMetadata,
@@ -191,7 +191,7 @@ interface IssuanceAuthorizer {
          * @param config Configuration object.
          * @param coroutineDispatcher A coroutine dispatcher.
          * @param ktorHttpClientFactory Factory of ktor http clients
-         * @return  An implementation of [IssuanceAuthorizer] based on ktor.
+         * @return An implementation of [IssuanceAuthorizer] based on ktor.
          */
         fun ktor(
             authorizationServerMetadata: CIAuthorizationServerMetadata,

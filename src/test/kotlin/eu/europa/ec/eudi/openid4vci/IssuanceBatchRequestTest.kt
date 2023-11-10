@@ -114,7 +114,9 @@ class IssuanceBatchRequestTest {
                                     "Failed with error ${submittedRequest.error}",
                                 )
 
-                                is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
+                                is SubmittedRequest.Success -> fail(
+                                    "first attempt should be unsuccessful",
+                                )
                             }
                         }
 
