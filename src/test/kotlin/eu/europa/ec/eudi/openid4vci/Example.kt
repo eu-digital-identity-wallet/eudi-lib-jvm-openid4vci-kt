@@ -18,11 +18,8 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -64,7 +61,7 @@ val MsoMdoc_CredentialOffer = """
     }
 """.trimIndent()
 
-val config = WalletOpenId4VCIConfig(
+val config = OpenId4VCIConfig(
     clientId = "wallet-dev",
     authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
 )
@@ -372,21 +369,10 @@ object KeyGenerator {
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
 
-    fun randomECSigningKey(curve: Curve): ECKey = ECKeyGenerator(curve)
-        .keyUse(KeyUse.SIGNATURE)
-        .keyID(UUID.randomUUID().toString())
-        .issueTime(Date(System.currentTimeMillis()))
-        .generate()
-
     fun randomRSAEncryptionKey(size: Int): RSAKey = RSAKeyGenerator(size)
         .keyUse(KeyUse.ENCRYPTION)
         .keyID(UUID.randomUUID().toString())
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
 
-    fun randomECEncryptionKey(curve: Curve): ECKey = ECKeyGenerator(curve)
-        .keyUse(KeyUse.ENCRYPTION)
-        .keyID(UUID.randomUUID().toString())
-        .issueTime(Date(System.currentTimeMillis()))
-        .generate()
 }

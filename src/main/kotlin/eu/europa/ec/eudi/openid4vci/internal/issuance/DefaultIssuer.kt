@@ -70,13 +70,13 @@ internal class DefaultIssuer(
 
     override suspend fun authorizeWithPreAuthorizationCode(
         credentials: List<CredentialMetadata>,
-        authorizationCode: IssuanceAuthorization.PreAuthorizationCode,
+        preAuthorizationCode: IssuanceAuthorization.PreAuthorizationCode,
     ): Result<AuthorizedRequest> =
         runCatching {
             val (accessToken, nonce) =
                 authorizer.requestAccessTokenPreAuthFlow(
-                    authorizationCode.preAuthorizedCode,
-                    authorizationCode.pin,
+                    preAuthorizationCode.preAuthorizedCode,
+                    preAuthorizationCode.pin,
                 ).getOrThrow()
 
             nonce?.let {
@@ -135,7 +135,7 @@ internal class DefaultIssuer(
                     throw CredentialIssuanceError.ProofGenerationError.BindingMethodNotSupported
                 }
                 if (!isBindingMethodSupported()) {
-                    throw CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported
+                    throw CredentialIssuanceError.ProofGenerationError.CryptographicBindingMethodNotSupported
                 }
                 if (!isProofTypeSupported()) {
                     throw CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported

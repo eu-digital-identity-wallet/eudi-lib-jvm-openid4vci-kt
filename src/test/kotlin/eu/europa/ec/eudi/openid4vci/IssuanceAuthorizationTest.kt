@@ -60,7 +60,7 @@ class IssuanceAuthorizationTest {
         }
     """.trimIndent()
 
-    val vciWalletConfiguration = WalletOpenId4VCIConfig(
+    val vciWalletConfiguration = OpenId4VCIConfig(
         clientId = "MyWallet_ClientId",
         authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     )

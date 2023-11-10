@@ -19,7 +19,13 @@ import java.net.URI
 
 typealias ClientId = String
 
-data class WalletOpenId4VCIConfig(
+/**
+ * Configuration object to pass configuration properties to the issuance components.
+ *
+ * @param clientId  The authorization client's identifier
+ * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
+ */
+data class OpenId4VCIConfig(
     val clientId: ClientId,
     val authFlowRedirectionURI: URI,
 )

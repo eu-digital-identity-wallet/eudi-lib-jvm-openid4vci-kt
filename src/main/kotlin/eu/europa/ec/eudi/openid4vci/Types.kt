@@ -177,6 +177,9 @@ data class DisplayTO(
     )
 }
 
+/**
+ * Domain object to describe a valid PKCE verifier
+ */
 data class PKCEVerifier(
     val codeVerifier: String,
     val codeVerifierMethod: String,
@@ -187,6 +190,9 @@ data class PKCEVerifier(
     }
 }
 
+/**
+ * Domain object to describe a valid issuance access token
+ */
 data class IssuanceAccessToken(
     val accessToken: String,
 ) {
@@ -195,6 +201,9 @@ data class IssuanceAccessToken(
     }
 }
 
+/**
+ * Sealed hierarchy of authorization codes
+ */
 sealed interface IssuanceAuthorization {
 
     data class AuthorizationCode(
@@ -215,6 +224,12 @@ sealed interface IssuanceAuthorization {
     }
 }
 
+/**
+ * A c_nonce related information as provided from issuance server.
+ *
+ * @param value The c_nonce value
+ * @param expiresInSeconds  Nonce time to live in seconds.
+ */
 data class CNonce(
     val value: String,
     val expiresInSeconds: Long? = 5,
@@ -224,33 +239,64 @@ data class CNonce(
     }
 }
 
+/**
+ * Sealed hierarchy of the proofs of possession that can be included in a credential issuance request. Proofs are used
+ * to bind the issued credential to the credential requester. They contain proof of possession of a bind key that can be
+ * used to cryptographically verify that the presenter of the credential is also the holder of the credential.
+ */
 sealed interface Proof {
+
+    /**
+     * Type of proof
+     */
     val type: ProofType
         get() = when (this) {
             is Cwt -> ProofType.CWT
             is Jwt -> ProofType.JWT
         }
 
+    /**
+     * Proof of possession is structured as signed JWT
+     *
+     * @param jwt The proof JWT
+     */
     @JvmInline
     value class Jwt(val jwt: JWT) : Proof
 
+    /**
+     * Proof of possession is structured as a CWT
+     *
+     * @param cwt The proof CWT
+     */
     @JvmInline
     value class Cwt(val cwt: String) : Proof
 }
 
+/**
+ * A sealed hierarchy that defines the different key formats to be used in order to construct a Proof of Possession.
+ */
 sealed interface BindingKey {
 
+    /**
+     * A JWK biding key
+     */
     data class Jwk(
         val algorithm: JWSAlgorithm,
         val jwk: JWK,
     ) : BindingKey
 
+    /**
+     * A Did biding key
+     */
     data class Did(
         val identity: String,
     ) : BindingKey
 
+    /**
+     * An X509 biding key
+     */
     data class X509(
-        val certificate: X509Certificate,
+        val certificate: List<X509Certificate>,
     ) : BindingKey
 }
 
@@ -260,6 +306,9 @@ data class IssuanceResponseEncryption(
     val encryptionMethod: EncryptionMethod,
 )
 
+/**
+ * A credential identified as a scope
+ */
 @JvmInline
 value class Scope private constructor(
     val value: String,

@@ -17,6 +17,9 @@ package eu.europa.ec.eudi.openid4vci
 
 import java.util.*
 
+/**
+ * Utility method to convert a [DisplayTO] transfer object to the respective [Display] domain object.
+ */
 fun DisplayTO.toDomain(): Display {
     fun DisplayTO.LogoObject.toLogo(): Display.Logo =
         Display.Logo(
@@ -34,8 +37,11 @@ fun DisplayTO.toDomain(): Display {
     )
 }
 
-fun List<String>.toCryptographicBindingMethods() =
-    this.map {
+/**
+ * Utility method to convert a list of string to a list of [CryptographicBindingMethod].
+ */
+fun List<String>.toCryptographicBindingMethods(): List<CryptographicBindingMethod> =
+    map {
         when (it) {
             "jwk" -> CryptographicBindingMethod.JWK
             "cose_key" -> CryptographicBindingMethod.COSE
@@ -49,7 +55,10 @@ fun List<String>.toCryptographicBindingMethods() =
         }
     }
 
-fun List<String>?.toProofTypes() =
+/**
+ * Utility method to convert a list of string to a list of [ProofType].
+ */
+fun List<String>?.toProofTypes(): List<ProofType> =
     this?.map {
         when (it) {
             "jwt" -> ProofType.JWT

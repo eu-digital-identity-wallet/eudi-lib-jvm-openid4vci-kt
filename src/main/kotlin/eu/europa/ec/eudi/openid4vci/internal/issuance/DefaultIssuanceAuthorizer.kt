@@ -34,7 +34,7 @@ import com.nimbusds.oauth2.sdk.Scope as NimbusOauth2Scope
 internal class DefaultIssuanceAuthorizer(
     val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     val authorizationServerMetadata: CIAuthorizationServerMetadata,
-    val config: WalletOpenId4VCIConfig,
+    val config: OpenId4VCIConfig,
     val postPar: HttpFormPost<PushedAuthorizationRequestResponse>,
     val getAccessToken: HttpFormPost<AccessTokenRequestResponse>,
 ) : IssuanceAuthorizer {
