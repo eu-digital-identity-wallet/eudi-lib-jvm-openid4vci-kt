@@ -75,11 +75,7 @@ val metadata: CIAuthorizationServerMetadata =
 ### Resolve a credential offer presented by issuer
 
 A CredentialOfferRequestResolver uses internally the two metadata resolvers mentioned above to resolve metadata of issuer and its authorization server
-```mermaid
-erDiagram
-    CredentialOfferRequestResolver }|..|{ AuthorizationServerMetadataResolver : has    
-    CredentialOfferRequestResolver }|..|{ CredentialIssuerMetadataResolver : has    
-```
+
 Given a credential offer url use [CredentialOfferRequestResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) the following way to validate and resolve it to [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt)
 
 ```kotlin
@@ -113,31 +109,40 @@ title: Authorization Code Flow state transision diagram
 ---
 stateDiagram-v2 
     state c_nonce_returned <<choice>>    
+    state join_state <<join>>
     [*] --> UnauthorizedRequest.ParRequested: pushAuthorizationCodeRequest
     UnauthorizedRequest.ParRequested --> UnauthorizedRequest.AuthorizationCodeRetrieved: handleAuthorizationCode
     UnauthorizedRequest.AuthorizationCodeRetrieved --> c_nonce_exists: requestAccessToken
     c_nonce_exists --> c_nonce_returned 
-    c_nonce_returned --> AuthorizedRequest.NoProofRequired : no
     c_nonce_returned --> AuthorizedRequest.ProofRequired : yes
-    AuthorizedRequest.ProofRequired --> SubmittedRequest.Success: requestSingle (with binding key)
-    AuthorizedRequest.ProofRequired --> SubmittedRequest.Success: requestBatch (with binding keys)
-    AuthorizedRequest.NoProofRequired --> SubmittedRequest.Success: requestSingle
-    AuthorizedRequest.NoProofRequired --> SubmittedRequest.Success: requestBatch
+    c_nonce_returned --> AuthorizedRequest.NoProofRequired : no
+    AuthorizedRequest.ProofRequired --> join_state: requestSingle (with proof)
+    AuthorizedRequest.ProofRequired --> join_state: requestBatch (with proof)
+    AuthorizedRequest.NoProofRequired --> join_state: requestSingle
+    AuthorizedRequest.NoProofRequired --> join_state: requestBatch
+    join_state --> SubmittedRequest.InvalidProof
+    join_state --> SubmittedRequest.Success
+    join_state --> SubmittedRequest.Failed
+    
 ```
 ```mermaid 
 ---
 title: PreAuthorization Code Flow state transision diagram
 ---
-stateDiagram-v2 
-    state c_nonce_returned <<choice>>    
+stateDiagram-v2    
+    state c_nonce_returned <<choice>>
+    state join_state <<join>>    
     [*] --> c_nonce_exists: authorizeWithPreAuthorizationCode (providing Pre-Authorized Code and Pin)
     c_nonce_exists --> c_nonce_returned 
-    c_nonce_returned --> AuthorizedRequest.NoProofRequired : no
     c_nonce_returned --> AuthorizedRequest.ProofRequired : yes
-    AuthorizedRequest.NoProofRequired --> SubmittedRequest.Success: requestSingle
-    AuthorizedRequest.NoProofRequired --> SubmittedRequest.Success: requestBatch
-    AuthorizedRequest.ProofRequired --> SubmittedRequest.Success: requestSingle
-    AuthorizedRequest.ProofRequired --> SubmittedRequest.Success: requestBatch
+    c_nonce_returned --> AuthorizedRequest.NoProofRequired : no     
+    AuthorizedRequest.ProofRequired --> join_state: requestSingle (with proof)
+    AuthorizedRequest.ProofRequired --> join_state: requestBatch (with proof)
+    AuthorizedRequest.NoProofRequired --> join_state: requestSingle
+    AuthorizedRequest.NoProofRequired --> join_state: requestBatch
+    join_state --> SubmittedRequest.InvalidProof 
+    join_state --> SubmittedRequest.Success
+    join_state --> SubmittedRequest.Failed    
 ```
 
 
@@ -145,14 +150,6 @@ stateDiagram-v2
 As depicted from the below diagram it is consisted of two sub-components:
 - **IssuanceAuthorizer**: A component responsible for all interactions with an authorization server to authorize a request for credential(s) issuance.
 - **IssuerRequester**: A component responsible for all interactions with credential issuer for submitting credential issuance requests.
-
-```mermaid
-erDiagram
-    Issuer }|..|{ IssuerAuthorizer : has
-    IssuerAuthorizer ||--|{ AuthorizationServerMetadata : contains
-    Issuer }|..|{ IssuerRequester : has
-    IssuerRequester ||--|{ CredentialIssuerMetadata : contains
-```
 
 #### Initialize an Issuer
 

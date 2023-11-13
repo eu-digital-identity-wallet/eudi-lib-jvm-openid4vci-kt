@@ -31,6 +31,9 @@ import java.net.URI
 import java.net.URLEncoder
 import com.nimbusds.oauth2.sdk.Scope as NimbusOauth2Scope
 
+/**
+ * Default implementation of [IssuanceAuthorizer] interface.
+ */
 internal class DefaultIssuanceAuthorizer(
     val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     val authorizationServerMetadata: CIAuthorizationServerMetadata,
