@@ -33,6 +33,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 
+/**
+ * Default implementation of [IssuanceRequester] interface.
+ */
 internal class DefaultIssuanceRequester(
     val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     override val issuerMetadata: CredentialIssuerMetadata,

@@ -20,6 +20,9 @@ import java.util.*
 
 private val NOT_YET_IMPLEMENTED: Nothing = TODO("Not Yet Implemented")
 
+/**
+ * Default implementation of [Issuer] interface
+ */
 internal class DefaultIssuer(
     private val authorizer: IssuanceAuthorizer,
     private val issuanceRequester: IssuanceRequester,
