@@ -85,7 +85,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl.value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
                 ),
                 verifier = {
                     assertEquals(1, it.size)
@@ -108,6 +108,36 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
     }
 
     @Test
+    internal fun `fails with when response encryption algorithms are not asymmetric`() {
+        runTest {
+            val credentialIssuerId = CredentialIssuerId("https://issuer.com").getOrThrow()
+            val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl(credentialIssuerId)
+            mockEngine(
+                RequestMocker(
+                    match(credentialIssuerMetadataUrl.value),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_no_asymmetric_algs.json"),
+                ),
+                verifier = {
+                    assertEquals(1, it.size)
+                    assertEquals(
+                        credentialIssuerMetadataUrl.value,
+                        it[0].url.toURI(),
+                    )
+                },
+            ) { httpGet ->
+                CredentialIssuerMetadataResolver(httpGet = httpGet)
+                    .resolve(credentialIssuerId)
+                    .fold(
+                        { fail("CredentialIssuerMetadata resolution should have failed") },
+                        {
+                            assertIs<CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired>(it)
+                        },
+                    )
+            }
+        }
+    }
+
+    @Test
     internal fun `resolution success`() {
         runTest {
             val credentialIssuerId = credentialIssuerId()
@@ -116,7 +146,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl.value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
                 ),
                 verifier = {
                     assertEquals(1, it.size)

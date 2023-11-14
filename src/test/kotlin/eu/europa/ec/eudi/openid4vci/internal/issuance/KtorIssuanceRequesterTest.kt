@@ -100,7 +100,7 @@ class KtorIssuanceRequesterTest {
                 when (authorizedRequest) {
                     is AuthorizedRequest.NoProofRequired -> {
                         val submittedRequest =
-                            authorizedRequest.requestSingle(sdJwtVcPid, null, null).getOrThrow()
+                            authorizedRequest.requestSingle(sdJwtVcPid, null).getOrThrow()
                         when (submittedRequest) {
                             is SubmittedRequest.InvalidProof -> {
                                 val proofRequired =
@@ -112,7 +112,6 @@ class KtorIssuanceRequesterTest {
                                         algorithm = JWSAlgorithm.RS256,
                                         jwk = randomRSASigningKey(2048),
                                     ),
-                                    null,
                                 )
                                 org.hamcrest.MatcherAssert.assertThat(
                                     "Second attempt should be successful",
@@ -193,7 +192,7 @@ class KtorIssuanceRequesterTest {
                 when (authorizedRequest) {
                     is AuthorizedRequest.NoProofRequired -> {
                         val submittedRequest =
-                            authorizedRequest.requestSingle(msoMdocPid, null, null).getOrThrow()
+                            authorizedRequest.requestSingle(msoMdocPid, null).getOrThrow()
                         when (submittedRequest) {
                             is SubmittedRequest.InvalidProof -> {
                                 val proofRequired =
@@ -205,7 +204,6 @@ class KtorIssuanceRequesterTest {
                                         algorithm = JWSAlgorithm.RS256,
                                         jwk = randomRSASigningKey(2048),
                                     ),
-                                    null,
                                 )
                                 org.hamcrest.MatcherAssert.assertThat(
                                     "Second attempt should be successful",
@@ -299,7 +297,7 @@ class KtorIssuanceRequesterTest {
                             CredentialMetadata.ByScope(Scope.of(PID_MsoMdoc_SCOPE)) to null,
                             CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE)) to null,
                         )
-                        val submittedRequest = authorizedRequest.requestBatch(credentialMetadata, null).getOrThrow()
+                        val submittedRequest = authorizedRequest.requestBatch(credentialMetadata).getOrThrow()
 
                         when (submittedRequest) {
                             is SubmittedRequest.InvalidProof -> {
@@ -309,7 +307,7 @@ class KtorIssuanceRequesterTest {
                                     Triple(CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE)), null, bindingKey),
                                 )
 
-                                val response = proofRequired.requestBatch(credentialMetadataTriples, null).getOrThrow()
+                                val response = proofRequired.requestBatch(credentialMetadataTriples).getOrThrow()
 
                                 assertTrue("Second attempt should be successful") {
                                     response is SubmittedRequest.Success

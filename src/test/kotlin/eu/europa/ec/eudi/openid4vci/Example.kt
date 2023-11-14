@@ -15,8 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
@@ -71,10 +69,9 @@ fun main(): Unit = runTest {
         algorithm = JWSAlgorithm.RS256,
         jwk = KeyGenerator.randomRSASigningKey(2048),
     )
-    val responseEncryptionKey = KeyGenerator.randomRSAEncryptionKey(2048)
 
     val user = ActingUser("babis", "babis")
-    val wallet = Wallet.ofUser(user, bindingKey, responseEncryptionKey)
+    val wallet = Wallet.ofUser(user, bindingKey)
 
     WalletInitiatedIssuanceWithOffer(wallet)
     WalletInitiatedIssuanceNoOffer(wallet)
@@ -106,7 +103,6 @@ data class ActingUser(
 private class Wallet(
     val actingUser: ActingUser,
     val bindingKey: BindingKey,
-    val responseEncryptionKey: RSAKey,
 ) {
 
     suspend fun issueByScope(scope: String): String {
@@ -133,12 +129,6 @@ private class Wallet(
             authServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
-        val issuanceResponseEncryption = IssuanceResponseEncryption(
-            jwk = responseEncryptionKey,
-            algorithm = JWEAlgorithm.RSA_OAEP_256,
-            encryptionMethod = EncryptionMethod.A128CBC_HS256,
-        )
-
         // Authorize with auth code flow
         val outcome =
             when (authorizedRequest) {
@@ -147,7 +137,6 @@ private class Wallet(
                         issuer,
                         authorizedRequest,
                         credentialMetadata,
-                        issuanceResponseEncryption,
                     )
                 }
 
@@ -156,7 +145,6 @@ private class Wallet(
                         issuer,
                         authorizedRequest,
                         credentialMetadata,
-                        issuanceResponseEncryption,
                     )
                 }
             }
@@ -193,12 +181,6 @@ private class Wallet(
             offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
-        val issuanceResponseEncryption = IssuanceResponseEncryption(
-            jwk = responseEncryptionKey,
-            algorithm = JWEAlgorithm.RSA_OAEP_256,
-            encryptionMethod = EncryptionMethod.A128CBC_HS256,
-        )
-
         val outcome =
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
@@ -206,7 +188,6 @@ private class Wallet(
                         issuer,
                         authorizedRequest,
                         offer.credentials[0],
-                        issuanceResponseEncryption,
                     )
                 }
 
@@ -215,7 +196,6 @@ private class Wallet(
                         issuer,
                         authorizedRequest,
                         offer.credentials[0],
-                        issuanceResponseEncryption,
                     )
                 }
             }
@@ -255,11 +235,10 @@ private class Wallet(
         issuer: Issuer,
         authorized: AuthorizedRequest.ProofRequired,
         credentialMetadata: CredentialMetadata,
-        issuanceResponseEncryption: IssuanceResponseEncryption?,
     ): String {
         with(issuer) {
             val requestOutcome =
-                authorized.requestSingle(credentialMetadata, null, bindingKey, issuanceResponseEncryption).getOrThrow()
+                authorized.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
@@ -282,11 +261,10 @@ private class Wallet(
         issuer: Issuer,
         noProofRequiredState: AuthorizedRequest.NoProofRequired,
         credentialMetadata: CredentialMetadata,
-        issuanceResponseEncryption: IssuanceResponseEncryption?,
     ): String {
         with(issuer) {
             val requestOutcome =
-                noProofRequiredState.requestSingle(credentialMetadata, null, issuanceResponseEncryption).getOrThrow()
+                noProofRequiredState.requestSingle(credentialMetadata, null).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
@@ -302,7 +280,6 @@ private class Wallet(
                         issuer,
                         noProofRequiredState.handleInvalidProof(requestOutcome.cNonce),
                         credentialMetadata,
-                        issuanceResponseEncryption,
                     )
                 }
 
@@ -356,8 +333,8 @@ private class Wallet(
     }
 
     companion object {
-        fun ofUser(actingUser: ActingUser, bindingKey: BindingKey.Jwk, responseEncryptionKey: RSAKey) =
-            Wallet(actingUser, bindingKey, responseEncryptionKey)
+        fun ofUser(actingUser: ActingUser, bindingKey: BindingKey.Jwk) =
+            Wallet(actingUser, bindingKey)
     }
 }
 

@@ -95,12 +95,12 @@ internal class DefaultIssuer(
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
+        responseEncryptionSpecProvider: (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             credentialMetadata
                 .toIssuerSupportedCredential()
-                .toIssuanceRequestMsoMdoc(claimSet, null, responseEncryptionSpec)
+                .toIssuanceRequest(claimSet, null, responseEncryptionSpecProvider)
         }
     }
 
@@ -108,14 +108,14 @@ internal class DefaultIssuer(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
         bindingKey: BindingKey,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
+        responseEncryptionSpecProvider: (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             with(credentialMetadata.toIssuerSupportedCredential()) {
-                toIssuanceRequestMsoMdoc(
+                toIssuanceRequest(
                     claimSet,
                     bindingKey.toSupportedProof(this, cNonce.value),
-                    responseEncryptionSpec,
+                    responseEncryptionSpecProvider,
                 )
             }
         }
@@ -161,14 +161,14 @@ internal class DefaultIssuer(
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
+        responseEncryptionSpecProvider: (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             CredentialIssuanceRequest.BatchCredentials(
                 credentialRequests = credentialsMetadata.map { pair ->
                     pair.first
                         .toIssuerSupportedCredential()
-                        .toIssuanceRequestMsoMdoc(pair.second, null, responseEncryptionSpec)
+                        .toIssuanceRequest(pair.second, null, responseEncryptionSpecProvider)
                 },
             )
         }
@@ -176,16 +176,16 @@ internal class DefaultIssuer(
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
+        responseEncryptionSpecProvider: (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             CredentialIssuanceRequest.BatchCredentials(
                 credentialRequests = credentialsMetadata.map { triple ->
                     with(triple.first.toIssuerSupportedCredential()) {
-                        toIssuanceRequestMsoMdoc(
+                        toIssuanceRequest(
                             triple.second,
                             triple.third.toSupportedProof(this, cNonce.value),
-                            responseEncryptionSpec,
+                            responseEncryptionSpecProvider,
                         )
                     }
                 },
@@ -242,17 +242,20 @@ internal class DefaultIssuer(
             ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
     }
 
-    private fun CredentialSupported.toIssuanceRequestMsoMdoc(
+    private fun CredentialSupported.toIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
+        responseEncryptionSpecProvider: (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): CredentialIssuanceRequest.SingleCredential {
         proof?.let {
             require(this.proofTypesSupported.contains(it.type)) {
                 "Provided proof type ${proof.type} is not one of supported [${this.proofTypesSupported}]."
             }
         }
+
         val issuerEncryption = issuanceRequester.issuerMetadata.credentialResponseEncryption
+        val responseEncryptionSpec = responseEncryptionSpecProvider(issuanceRequester.issuerMetadata.credentialResponseEncryption)
+
         responseEncryptionSpec?.let {
             when (issuerEncryption) {
                 is CredentialResponseEncryption.NotRequired ->
@@ -290,7 +293,7 @@ internal class DefaultIssuer(
     private fun MsoMdocFormat.CredentialSupported.toIssuanceRequestMsoMdoc(
         claimSet: ClaimSet?,
         proof: Proof?,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
+        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
         fun validateClaimSet(claimSet: MsoMdocFormat.ClaimSet): MsoMdocFormat.ClaimSet {
             if (claims.isEmpty() && claimSet.isNotEmpty()) {
@@ -331,7 +334,7 @@ internal class DefaultIssuer(
     private fun SdJwtVcFormat.CredentialSupported.toIssuanceRequestSdJwtVc(
         claimSet: ClaimSet?,
         proof: Proof?,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
+        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
         fun validateClaimSet(claimSet: SdJwtVcFormat.ClaimSet): SdJwtVcFormat.ClaimSet {
             if ((credentialDefinition.claims == null || credentialDefinition.claims.isEmpty()) && claimSet.claims.isNotEmpty()) {

@@ -102,6 +102,12 @@ private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetada
             if (encryptionAlgorithms.isEmpty()) {
                 throw CredentialResponseEncryptionAlgorithmsRequired
             }
+            val allAreAsymmetricAlgorithms = encryptionAlgorithms.all {
+                JWEAlgorithm.Family.ASYMMETRIC.contains(it)
+            }
+            if (!allAreAsymmetricAlgorithms) {
+                throw CredentialResponseAsymmetricEncryptionAlgorithmsRequired
+            }
 
             CredentialResponseEncryption.Required(
                 encryptionAlgorithms,
