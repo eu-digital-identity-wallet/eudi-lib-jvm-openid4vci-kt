@@ -33,7 +33,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
                 ),
                 RequestMocker(
                     match(oidcAuthorizationServerMetadataUrl().value),
@@ -89,7 +89,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
                 ),
                 RequestMocker(
                     match(oidcAuthorizationServerMetadataUrl().value),
@@ -143,7 +143,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
         mockEngine(
             RequestMocker(
                 match(credentialIssuerMetadataUrl().value),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
             RequestMocker(
                 match(oidcAuthorizationServerMetadataUrl().value),
@@ -202,7 +202,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
                 ),
                 RequestMocker(
                     match(oidcAuthorizationServerMetadataUrl().value),
@@ -263,7 +263,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
                 ),
                 RequestMocker(
                     match(oidcAuthorizationServerMetadataUrl().value),
@@ -324,7 +324,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
                 ),
                 RequestMocker(
                     match(oidcAuthorizationServerMetadataUrl().value),
@@ -358,7 +358,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
                 ),
                 RequestMocker(
                     match(oidcAuthorizationServerMetadataUrl().value),
@@ -394,7 +394,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
                 ),
                 RequestMocker(
                     match(oidcAuthorizationServerMetadataUrl().value),
@@ -432,7 +432,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             mockEngine(
                 RequestMocker(
                     match(credentialIssuerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata.json"),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
                 ),
                 RequestMocker(
                     match(oidcAuthorizationServerMetadataUrl().value),

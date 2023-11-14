@@ -300,7 +300,7 @@ sealed interface BindingKey {
     ) : BindingKey
 }
 
-data class IssuanceResponseEncryption(
+data class IssuanceResponseEncryptionSpec(
     val jwk: JWK,
     val algorithm: JWEAlgorithm,
     val encryptionMethod: EncryptionMethod,

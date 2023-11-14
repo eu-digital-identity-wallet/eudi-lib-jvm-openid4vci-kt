@@ -85,7 +85,7 @@ class IssuanceBatchRequestTest {
                             )
 
                             val submittedRequest =
-                                authorizedRequest.requestBatch(credentialMetadata, null).getOrThrow()
+                                authorizedRequest.requestBatch(credentialMetadata).getOrThrow()
 
                             when (submittedRequest) {
                                 is SubmittedRequest.InvalidProof -> {
@@ -96,7 +96,7 @@ class IssuanceBatchRequestTest {
                                         Triple(CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE)), claimSet_sd_jwt_vc, bindingKey),
                                     )
 
-                                    val response = proofRequired.requestBatch(credentialMetadataTriples, null).getOrThrow()
+                                    val response = proofRequired.requestBatch(credentialMetadataTriples).getOrThrow()
 
                                     assertTrue("Second attempt should be successful") {
                                         response is SubmittedRequest.Success

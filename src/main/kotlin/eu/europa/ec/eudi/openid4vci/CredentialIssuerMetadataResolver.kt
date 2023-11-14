@@ -260,6 +260,15 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
     }
 
     /**
+     * Credential Encryption Algorithms must be of asymmetric encryption family.
+     */
+    object CredentialResponseAsymmetricEncryptionAlgorithmsRequired :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("Asymmetric ResponseEncryption Algorithms Required")) {
+
+        private fun readResolve(): Any = CredentialResponseAsymmetricEncryptionAlgorithmsRequired
+    }
+
+    /**
      * The supported Credentials not valid.
      */
     class InvalidCredentialsSupported(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)

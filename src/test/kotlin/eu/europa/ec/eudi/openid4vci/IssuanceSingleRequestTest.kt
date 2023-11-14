@@ -72,7 +72,7 @@ class IssuanceSingleRequestTest {
                         is AuthorizedRequest.NoProofRequired -> {
                             val credentialMetadata = offer.credentials[0]
 
-                            val submittedRequest = authorizedRequest.requestSingle(credentialMetadata, claimSet, null)
+                            val submittedRequest = authorizedRequest.requestSingle(credentialMetadata, claimSet)
                             assertThat(
                                 "When no proof is provided while issuing result must be NonceMissing",
                                 submittedRequest.getOrThrow() is SubmittedRequest.InvalidProof,
@@ -143,7 +143,7 @@ class IssuanceSingleRequestTest {
                     when (authorizedRequest) {
                         is AuthorizedRequest.NoProofRequired -> {
                             val credentialMetadata = offer.credentials[0]
-                            authorizedRequest.requestSingle(credentialMetadata, claimSet, null)
+                            authorizedRequest.requestSingle(credentialMetadata, claimSet)
                                 .fold(
                                     onSuccess = {
                                         assertThat(
@@ -190,7 +190,7 @@ class IssuanceSingleRequestTest {
                             val claimSet_mso_mdoc =
                                 MsoMdocFormat.ClaimSet(mapOf("org.iso.18013.5.1" to mapOf("degree" to Claim())))
                             var credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_MsoMdoc_SCOPE))
-                            authorizedRequest.requestSingle(credentialMetadata, claimSet_mso_mdoc, null)
+                            authorizedRequest.requestSingle(credentialMetadata, claimSet_mso_mdoc)
                                 .fold(
                                     onSuccess = { fail("Exception expected to be thrown") },
                                     onFailure = {
@@ -203,7 +203,7 @@ class IssuanceSingleRequestTest {
 
                             val claimSet_sd_jwt_vc = SdJwtVcFormat.ClaimSet(mapOf("degree" to Claim()))
                             credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE))
-                            authorizedRequest.requestSingle(credentialMetadata, claimSet_sd_jwt_vc, null)
+                            authorizedRequest.requestSingle(credentialMetadata, claimSet_sd_jwt_vc)
                                 .fold(
                                     onSuccess = { fail("Exception expected to be thrown") },
                                     onFailure = {
@@ -252,7 +252,7 @@ class IssuanceSingleRequestTest {
                         is AuthorizedRequest.NoProofRequired -> {
                             val credentialMetadata = offer.credentials[0]
                             val submittedRequest =
-                                authorizedRequest.requestSingle(credentialMetadata, claimSet, null).getOrThrow()
+                                authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
                             when (submittedRequest) {
                                 is SubmittedRequest.InvalidProof -> {
                                     val proofRequired =
@@ -261,7 +261,6 @@ class IssuanceSingleRequestTest {
                                         credentialMetadata,
                                         claimSet,
                                         bindingKey,
-                                        null,
                                     )
                                     assertThat(
                                         "Second attempt should be successful",
@@ -343,17 +342,12 @@ class IssuanceSingleRequestTest {
                         is AuthorizedRequest.NoProofRequired -> {
                             val credentialMetadata = offer.credentials[0]
                             val submittedRequest =
-                                authorizedRequest.requestSingle(credentialMetadata, claimSet, null).getOrThrow()
+                                authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
                             when (submittedRequest) {
                                 is SubmittedRequest.InvalidProof -> {
                                     val proofRequired =
                                         authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                                    val response = proofRequired.requestSingle(
-                                        credentialMetadata,
-                                        claimSet,
-                                        bindingKey,
-                                        null,
-                                    )
+                                    val response = proofRequired.requestSingle(credentialMetadata, claimSet, bindingKey)
                                     assertThat(
                                         "Second attempt should be successful",
                                         response.getOrThrow() is SubmittedRequest.Success,

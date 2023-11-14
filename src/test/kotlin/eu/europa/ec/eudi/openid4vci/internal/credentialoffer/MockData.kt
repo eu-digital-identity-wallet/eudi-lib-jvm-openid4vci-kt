@@ -313,7 +313,10 @@ internal fun credentialIssuerMetadata() =
         CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/batch").getOrThrow(),
         CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/deferred").getOrThrow(),
         CredentialResponseEncryption.Required(
-            listOf(JWEAlgorithm.PBES2_HS512_A256KW, JWEAlgorithm.PBES2_HS384_A192KW, JWEAlgorithm.PBES2_HS256_A128KW),
+            listOf(
+                JWEAlgorithm.ECDH_ES, JWEAlgorithm.ECDH_ES_A128KW, JWEAlgorithm.ECDH_ES_A192KW, JWEAlgorithm.ECDH_ES_A256KW,
+                JWEAlgorithm.RSA1_5, JWEAlgorithm.RSA_OAEP, JWEAlgorithm.RSA_OAEP_256, JWEAlgorithm.RSA_OAEP_384, JWEAlgorithm.RSA_OAEP_512,
+            ),
             listOf(EncryptionMethod.XC20P),
         ),
         listOf(universityDegreeJwt(), mobileDrivingLicense(), universityDegreeLdpVc(), universityDegreeJwtVcJsonLD()),

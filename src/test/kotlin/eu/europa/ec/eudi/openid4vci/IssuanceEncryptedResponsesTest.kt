@@ -19,6 +19,7 @@ import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.RSAEncrypter
 import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
@@ -55,14 +56,8 @@ class IssuanceEncryptedResponsesTest {
         authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     )
 
-    val issuanceResponseEncryption = IssuanceResponseEncryption(
-        jwk = randomRSAEncryptionKey(2048),
-        algorithm = JWEAlgorithm.RSA_OAEP_256,
-        encryptionMethod = EncryptionMethod.A128CBC_HS256,
-    )
-
     @Test
-    fun `when issuance request encryption is not supported by issuer then throw ResponseEncryptionAlgorithmNotSupportedByIssuer`() {
+    fun `when encryption algorithm is not supported by issuer then throw ResponseEncryptionAlgorithmNotSupportedByIssuer`() {
         issuanceTestBed(
             encryptedResponses = true,
             testBlock = { client ->
@@ -72,19 +67,19 @@ class IssuanceEncryptedResponsesTest {
                         AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
                     )
 
-                    val issuanceResponseEncryption = IssuanceResponseEncryption(
+                    val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
+                    val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                         jwk = randomRSAEncryptionKey(2048),
-                        algorithm = JWEAlgorithm.A128GCMKW,
+                        algorithm = JWEAlgorithm.RSA_OAEP_384,
                         encryptionMethod = EncryptionMethod.A128CBC_HS256,
                     )
-
-                    val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
 
                     assertFailsWith<ResponseEncryptionAlgorithmNotSupportedByIssuer>(
                         block = {
                             with(issuer) {
-                                noProofRequired.requestSingle(offer.credentials[0], null, issuanceResponseEncryption)
-                                    .getOrThrow()
+                                noProofRequired.requestSingle(offer.credentials[0], null) {
+                                    issuanceResponseEncryptionSpec
+                                }.getOrThrow()
                             }
                         },
                     )
@@ -104,20 +99,19 @@ class IssuanceEncryptedResponsesTest {
                         client,
                         AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
                     )
-
-                    val issuanceResponseEncryption = IssuanceResponseEncryption(
+                    val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
+                    val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                         jwk = randomRSAEncryptionKey(2048),
                         algorithm = JWEAlgorithm.RSA_OAEP_256,
-                        encryptionMethod = EncryptionMethod.A128GCM,
+                        encryptionMethod = EncryptionMethod.A256GCM,
                     )
-
-                    val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
 
                     assertFailsWith<ResponseEncryptionMethodNotSupportedByIssuer>(
                         block = {
                             with(issuer) {
-                                noProofRequired.requestSingle(offer.credentials[0], null, issuanceResponseEncryption)
-                                    .getOrThrow()
+                                noProofRequired.requestSingle(offer.credentials[0], null) {
+                                    issuanceResponseEncryptionSpec
+                                }.getOrThrow()
                             }
                         },
                     )
@@ -136,23 +130,21 @@ class IssuanceEncryptedResponsesTest {
                     val (offer, authorizedRequest, issuer) =
                         initIssuerWithOfferAndAuthorize(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
 
-                    val issuanceResponseEncryption = IssuanceResponseEncryption(
+                    val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
+                    val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                         jwk = randomRSAEncryptionKey(2048),
                         algorithm = JWEAlgorithm.RSA_OAEP_256,
-                        encryptionMethod = EncryptionMethod.A128GCM,
+                        encryptionMethod = EncryptionMethod.A128CBC_HS256,
                     )
 
-                    val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
-
-                    assertFailsWith<IssuerDoesNotSupportEncryptedResponses>(
-                        block = {
-                            with(issuer) {
-                                noProofRequired
-                                    .requestSingle(offer.credentials[0], null, issuanceResponseEncryption)
-                                    .getOrThrow()
-                            }
-                        },
-                    )
+                    assertFailsWith<IssuerDoesNotSupportEncryptedResponses> {
+                        with(issuer) {
+                            noProofRequired
+                                .requestSingle(offer.credentials[0], null) {
+                                    issuanceResponseEncryptionSpec
+                                }.getOrThrow()
+                        }
+                    }
                 }
             },
             issuanceRequestAssertions = { },
@@ -176,8 +168,9 @@ class IssuanceEncryptedResponsesTest {
                         block = {
                             with(issuer) {
                                 noProofRequired
-                                    .requestSingle(offer.credentials[0], null, null)
-                                    .getOrThrow()
+                                    .requestSingle(offer.credentials[0], null) {
+                                        null
+                                    }.getOrThrow()
                             }
                         },
                     )
@@ -188,7 +181,7 @@ class IssuanceEncryptedResponsesTest {
     }
 
     @Test
-    fun `when issuer forces encrypted responses request must include response encryption material`() {
+    fun `when issuer forces encrypted responses, request must include response encryption material`() {
         issuanceTestBed(
             encryptedResponses = true,
             testBlock = { client ->
@@ -215,21 +208,12 @@ class IssuanceEncryptedResponsesTest {
                             is AuthorizedRequest.NoProofRequired -> {
                                 val credentialMetadata = offer.credentials[0]
                                 val submittedRequest =
-                                    authorizedRequest.requestSingle(
-                                        credentialMetadata,
-                                        claimSet,
-                                        issuanceResponseEncryption,
-                                    ).getOrThrow()
+                                    authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
                                 when (submittedRequest) {
                                     is SubmittedRequest.InvalidProof -> {
                                         val proofRequired =
                                             authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                                        val response = proofRequired.requestSingle(
-                                            credentialMetadata,
-                                            claimSet,
-                                            bindingKey,
-                                            issuanceResponseEncryption,
-                                        )
+                                        val response = proofRequired.requestSingle(credentialMetadata, claimSet, bindingKey)
                                         assertThat(
                                             "Second attempt should be successful",
                                             response.getOrThrow() is SubmittedRequest.Success,
@@ -286,8 +270,11 @@ class IssuanceEncryptedResponsesTest {
                     )
 
                     if (request.proof != null) {
+                        val jwk = JWK.parse(request.credentialEncryptionJwk.toString())
+                        val alg = JWEAlgorithm.parse(request.credentialResponseEncryptionAlg)
+                        val enc = EncryptionMethod.parse(request.credentialResponseEncryptionMethod)
                         call.respondText(
-                            encryptedResponse().getOrThrow(),
+                            encryptedResponse(jwk, alg, enc).getOrThrow(),
                             ContentType.parse("application/jwt"),
                             HttpStatusCode.OK,
                         )
@@ -353,7 +340,7 @@ class IssuanceEncryptedResponsesTest {
         return Triple(offer, flowState, issuer)
     }
 
-    private fun encryptedResponse(): Result<String> {
+    private fun encryptedResponse(jwk: JWK, alg: JWEAlgorithm, enc: EncryptionMethod): Result<String> {
         val jsonObject =
             buildJsonObject {
                 put("format", "mso_mdoc")
@@ -362,20 +349,21 @@ class IssuanceEncryptedResponsesTest {
                 put("c_nonce_expires_in", 86400)
             }
         val jsonStr = Json.encodeToString(jsonObject)
-        return encypt(JWTClaimsSet.parse(jsonStr))
+        return encypt(JWTClaimsSet.parse(jsonStr), jwk, alg, enc)
     }
 
-    fun encypt(claimSet: JWTClaimsSet): Result<String> = runCatching {
+    fun encypt(claimSet: JWTClaimsSet, jwk: JWK, alg: JWEAlgorithm, enc: EncryptionMethod): Result<String> = runCatching {
+        randomRSAEncryptionKey(2048)
         val header =
-            JWEHeader.Builder(issuanceResponseEncryption.algorithm, issuanceResponseEncryption.encryptionMethod)
-                .jwk(issuanceResponseEncryption.jwk.toPublicJWK())
-                .keyID(issuanceResponseEncryption.jwk.keyID)
+            JWEHeader.Builder(alg, enc)
+                .jwk(jwk.toPublicJWK())
+                .keyID(jwk.keyID)
                 .type(JOSEObjectType.JWT)
                 .build()
 
         val jwt = EncryptedJWT(header, claimSet)
         val encrypter =
-            when (val jwk = issuanceResponseEncryption.jwk) {
+            when (jwk) {
                 is RSAKey -> RSAEncrypter(jwk)
                 is ECKey -> ECDHEncrypter(jwk)
                 else -> throw IllegalArgumentException("unsupported 'kty': '${jwk.keyType.value}'")

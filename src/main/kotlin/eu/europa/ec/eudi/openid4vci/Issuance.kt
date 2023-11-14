@@ -15,7 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuer
+import eu.europa.ec.eudi.openid4vci.internal.issuance.KeyGenerator
 
 /**
  * Sealed hierarchy of states that denote the individual steps that need to be taken in order to authorize a request for issuance
@@ -132,6 +135,7 @@ interface AuthorizeIssuance {
      *
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
      * @see <a href="https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-authorization-code-flow">OpenId4VCI</a>
+     * @return The new state of the request or error.
      */
     suspend fun pushAuthorizationCodeRequest(
         credentials: List<CredentialMetadata>,
@@ -144,6 +148,7 @@ interface AuthorizeIssuance {
      * to transition request from [UnauthorizedRequest.ParRequested] state to state [UnauthorizedRequest.AuthorizationCodeRetrieved]
      *
      * @param authorizationCode The authorization code returned from authorization server via front-channel
+     * @return The new state of the request.
      */
     suspend fun UnauthorizedRequest.ParRequested.handleAuthorizationCode(
         authorizationCode: IssuanceAuthorization.AuthorizationCode,
@@ -162,6 +167,7 @@ interface AuthorizeIssuance {
      *
      * @param credentials   Metadata of the credentials whose issuance needs to be authorized.
      * @param preAuthorizationCode  The pre-authorization code retrieved from a [CredentialOffer]
+     * @return The new state of the request or error.
      */
     suspend fun authorizeWithPreAuthorizationCode(
         credentials: List<CredentialMetadata>,
@@ -181,13 +187,15 @@ interface RequestIssuance {
      *  @param credentialMetadata   The metadata specifying the credential that will be requested.
      *  @param claimSet Optional parameter to specify the specific set of claims that are requested to be included in the
      *          credential to be issued.
-     *  @param responseEncryptionSpec   Optional parameter that expresses the expected encryption of an issuer's
-     *          encrypted response, if issuer enforces encrypted responses.
+     *  @param responseEncryptionSpecProvider   Provider method to generate the expected issuer's encrypted response,
+     *          if issuer enforces encrypted responses. A default implementation is provided to callers that internally
+     *  @return The new state of the request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
+        responseEncryptionSpecProvider:
+            (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
@@ -198,38 +206,44 @@ interface RequestIssuance {
      *  @param claimSet     Optional parameter to specify the specific set of claims that are requested to be included in the
      *          credential to be issued.
      *  @param bindingKey   Cryptographic material to be used from issuer to bind the issued credential to a holder.
-     *  @param responseEncryptionSpec   Optional parameter that expresses the expected encryption of an issuer's
-     *          encrypted response, if issuer enforces encrypted responses.
+     *  @param responseEncryptionSpecProvider   Provider method to generate the expected issuer's encrypted response,
+     *          if issuer enforces encrypted responses. A default implementation is provided to callers that internally
+     *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
         bindingKey: BindingKey,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
+        responseEncryptionSpecProvider:
+            (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.NoProofRequired] authorization.
      *
      *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-     *  @param responseEncryptionSpec   Optional parameter that expresses the expected encryption of an issuer's
-     *          encrypted response, if issuer enforces encrypted responses.
+     *  @param responseEncryptionSpecProvider   Provider method to generate the expected issuer's encrypted response,
+     *          if issuer enforces encrypted responses. A default implementation is provided to callers that internally
+     *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
+        responseEncryptionSpecProvider:
+            (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
      *
      *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-     *  @param responseEncryptionSpec   Optional parameter that expresses the expected encryption of an issuer's
-     *          encrypted response, if issuer enforces encrypted responses.
+     *  @param responseEncryptionSpecProvider   Provider method to generate the expected issuer's encrypted response,
+     *          if issuer enforces encrypted responses. A default implementation is provided to callers that internally
+     *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
-        responseEncryptionSpec: IssuanceResponseEncryption?,
+        responseEncryptionSpecProvider:
+            (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
@@ -237,10 +251,44 @@ interface RequestIssuance {
      * fresh c_nonce provided to be used with a request retry.
      *
      * @param cNonce    The c_nonce provided from issuer along with the 'invalid_proof' error code.
+     * @return The new state of the request.
      */
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
     ): AuthorizedRequest.ProofRequired
+
+    companion object {
+        fun createResponseEncryptionSpec(issuerResponseEncryptionMetadata: CredentialResponseEncryption): IssuanceResponseEncryptionSpec? {
+            return when (issuerResponseEncryptionMetadata) {
+                is CredentialResponseEncryption.NotRequired -> null
+                is CredentialResponseEncryption.Required -> {
+                    val firstAsymmetricAlgorithm =
+                        issuerResponseEncryptionMetadata.algorithmsSupported.firstOrNull {
+                            JWEAlgorithm.Family.ASYMMETRIC.contains(it)
+                        }
+
+                    val encryptionKey = when {
+                        JWEAlgorithm.Family.ECDH_ES.contains(firstAsymmetricAlgorithm) ->
+                            KeyGenerator.randomECEncryptionKey(Curve.P_256) // TODO: Curve to use should be moved to lib configuration ??
+
+                        JWEAlgorithm.Family.RSA.contains(firstAsymmetricAlgorithm) ->
+                            KeyGenerator.randomRSAEncryptionKey(2048) // TODO: Key size should be moved to lib configuration ??
+
+                        else -> null
+                    }
+
+                    if (firstAsymmetricAlgorithm == null || encryptionKey == null)
+                        null
+                    else
+                        IssuanceResponseEncryptionSpec(
+                            jwk = encryptionKey,
+                            algorithm = firstAsymmetricAlgorithm,
+                            encryptionMethod = issuerResponseEncryptionMetadata.encryptionMethodsSupported[0],
+                        )
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -258,6 +306,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance {
          *      a request for credential(s) issuance.
          * @param requester     An [IssuanceRequester] component responsible for all interactions with credential issuer for submitting
          *      credential issuance requests.
+         * @return An instance of Issuer
          */
         fun make(
             authorizer: IssuanceAuthorizer,
@@ -271,6 +320,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance {
          * @param authorizationServerMetadata   The authorization server metadata required from the underlying [IssuanceAuthorizer] component.
          * @param issuerMetadata    The credential issuer metadata required from the underlying [IssuanceRequester] component.
          * @param config    Configuration object
+         * @return An instance of Issuer based on ktor
          */
         fun ktor(
             authorizationServerMetadata: CIAuthorizationServerMetadata,
@@ -404,7 +454,8 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         /**
          * Cryptographic binding method is not supported from the issuance server for a specific credential
          */
-        data object CryptographicBindingMethodNotSupported : ProofGenerationError("CryptographicBindingMethodNotSupported") {
+        data object CryptographicBindingMethodNotSupported :
+            ProofGenerationError("CryptographicBindingMethodNotSupported") {
             private fun readResolve(): Any = CryptographicBindingMethodNotSupported
         }
 
