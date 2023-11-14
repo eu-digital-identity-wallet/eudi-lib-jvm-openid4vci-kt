@@ -135,6 +135,7 @@ interface AuthorizeIssuance {
      *
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
      * @see <a href="https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-authorization-code-flow">OpenId4VCI</a>
+     * @return The new state of the request or error.
      */
     suspend fun pushAuthorizationCodeRequest(
         credentials: List<CredentialMetadata>,
@@ -147,6 +148,7 @@ interface AuthorizeIssuance {
      * to transition request from [UnauthorizedRequest.ParRequested] state to state [UnauthorizedRequest.AuthorizationCodeRetrieved]
      *
      * @param authorizationCode The authorization code returned from authorization server via front-channel
+     * @return The new state of the request.
      */
     suspend fun UnauthorizedRequest.ParRequested.handleAuthorizationCode(
         authorizationCode: IssuanceAuthorization.AuthorizationCode,
@@ -165,6 +167,7 @@ interface AuthorizeIssuance {
      *
      * @param credentials   Metadata of the credentials whose issuance needs to be authorized.
      * @param preAuthorizationCode  The pre-authorization code retrieved from a [CredentialOffer]
+     * @return The new state of the request or error.
      */
     suspend fun authorizeWithPreAuthorizationCode(
         credentials: List<CredentialMetadata>,
@@ -186,6 +189,7 @@ interface RequestIssuance {
      *          credential to be issued.
      *  @param responseEncryptionSpecProvider   Provider method to generate the expected issuer's encrypted response,
      *          if issuer enforces encrypted responses. A default implementation is provided to callers that internally
+     *  @return The new state of the request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
@@ -202,8 +206,9 @@ interface RequestIssuance {
      *  @param claimSet     Optional parameter to specify the specific set of claims that are requested to be included in the
      *          credential to be issued.
      *  @param bindingKey   Cryptographic material to be used from issuer to bind the issued credential to a holder.
-     *  @param responseEncryptionSpecProvider   Optional parameter that expresses the expected encryption of an issuer's
-     *          encrypted response, if issuer enforces encrypted responses.
+     *  @param responseEncryptionSpecProvider   Provider method to generate the expected issuer's encrypted response,
+     *          if issuer enforces encrypted responses. A default implementation is provided to callers that internally
+     *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
@@ -217,8 +222,9 @@ interface RequestIssuance {
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.NoProofRequired] authorization.
      *
      *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-     *  @param responseEncryptionSpecProvider   Optional parameter that expresses the expected encryption of an issuer's
-     *          encrypted response, if issuer enforces encrypted responses.
+     *  @param responseEncryptionSpecProvider   Provider method to generate the expected issuer's encrypted response,
+     *          if issuer enforces encrypted responses. A default implementation is provided to callers that internally
+     *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
@@ -230,8 +236,9 @@ interface RequestIssuance {
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
      *
      *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-     *  @param responseEncryptionSpecProvider   Optional parameter that expresses the expected encryption of an issuer's
-     *          encrypted response, if issuer enforces encrypted responses.
+     *  @param responseEncryptionSpecProvider   Provider method to generate the expected issuer's encrypted response,
+     *          if issuer enforces encrypted responses. A default implementation is provided to callers that internally
+     *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
@@ -244,6 +251,7 @@ interface RequestIssuance {
      * fresh c_nonce provided to be used with a request retry.
      *
      * @param cNonce    The c_nonce provided from issuer along with the 'invalid_proof' error code.
+     * @return The new state of the request.
      */
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
@@ -298,6 +306,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance {
          *      a request for credential(s) issuance.
          * @param requester     An [IssuanceRequester] component responsible for all interactions with credential issuer for submitting
          *      credential issuance requests.
+         * @return An instance of Issuer
          */
         fun make(
             authorizer: IssuanceAuthorizer,
@@ -311,6 +320,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance {
          * @param authorizationServerMetadata   The authorization server metadata required from the underlying [IssuanceAuthorizer] component.
          * @param issuerMetadata    The credential issuer metadata required from the underlying [IssuanceRequester] component.
          * @param config    Configuration object
+         * @return An instance of Issuer based on ktor
          */
         fun ktor(
             authorizationServerMetadata: CIAuthorizationServerMetadata,
