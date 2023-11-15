@@ -155,8 +155,8 @@ class IssuanceDeferredRequestTest {
 
                                     val transactionId = when (secondSubmittedRequest) {
                                         is SubmittedRequest.Success -> {
-                                            (secondSubmittedRequest.response.credentialResponses[0] as CredentialIssuanceResponse.Result.Deferred)
-                                                .transactionId
+                                            val result = secondSubmittedRequest.response.credentialResponses[0]
+                                            (result as CredentialIssuanceResponse.Result.Deferred).transactionId
                                         }
 
                                         else -> fail("Success response expected but was not")
@@ -240,8 +240,8 @@ class IssuanceDeferredRequestTest {
 
                                     val transactionId = when (secondSubmittedRequest) {
                                         is SubmittedRequest.Success -> {
-                                            (secondSubmittedRequest.response.credentialResponses[0] as CredentialIssuanceResponse.Result.Deferred)
-                                                .transactionId
+                                            val result = secondSubmittedRequest.response.credentialResponses[0]
+                                            (result as CredentialIssuanceResponse.Result.Deferred).transactionId
                                         }
 
                                         else -> fail("Success response expected but was not")
