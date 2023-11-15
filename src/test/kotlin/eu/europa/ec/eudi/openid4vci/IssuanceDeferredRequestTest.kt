@@ -22,6 +22,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import kotlinx.serialization.json.Json
+import org.hamcrest.MatcherAssert
 import java.net.URI
 import java.util.*
 import kotlin.test.Test
@@ -79,7 +80,7 @@ class IssuanceDeferredRequestTest {
                                     }
 
                                     val requestDeferredIssuance =
-                                        authorizedRequest.requestDeferredIssuance(TransactionId(transactionId))
+                                        authorizedRequest.requestDeferredIssuance(transactionId)
                                             .getOrThrow()
 
                                     assertTrue("Expected response type Errored but was not") {
@@ -163,7 +164,7 @@ class IssuanceDeferredRequestTest {
                                     }
 
                                     val requestDeferredIssuance =
-                                        authorizedRequest.requestDeferredIssuance(TransactionId(transactionId))
+                                        authorizedRequest.requestDeferredIssuance(transactionId)
                                             .getOrThrow()
 
                                     assertTrue("Expected response type IssuancePending but was not") {
@@ -248,7 +249,7 @@ class IssuanceDeferredRequestTest {
                                     }
 
                                     val requestDeferredIssuance =
-                                        authorizedRequest.requestDeferredIssuance(TransactionId(transactionId))
+                                        authorizedRequest.requestDeferredIssuance(transactionId)
                                             .getOrThrow()
 
                                     assertTrue("Expected response type Issued but was not") {
@@ -267,6 +268,21 @@ class IssuanceDeferredRequestTest {
                 }
             },
             { call ->
+                MatcherAssert.assertThat(
+                    "No Authorization header passed .",
+                    call.request.headers["Authorization"] != null,
+                )
+                call.request.headers["Authorization"]?.let {
+                    MatcherAssert.assertThat(
+                        "No Authorization header passed .",
+                        it.contains("BEARER"),
+                    )
+                }
+                MatcherAssert.assertThat(
+                    "Content Type must be application/json",
+                    call.request.headers["Content-Type"] == "application/json",
+                )
+
                 val bodyStr = call.receive<String>()
 
                 val issuanceRequest = asIssuanceRequest(bodyStr)
@@ -277,6 +293,10 @@ class IssuanceDeferredRequestTest {
                 } else if (deferredIssuanceRequest != null) {
                     println(deferredIssuanceRequest)
                     respondToDeferredIssuanceRequest(call, true)
+                    MatcherAssert.assertThat(
+                        "No transaction id passed",
+                        !deferredIssuanceRequest.transactionId.isBlank(),
+                    )
                 } else {
                     call.respondText(
                         """

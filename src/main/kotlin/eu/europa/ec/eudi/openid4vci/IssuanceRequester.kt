@@ -238,7 +238,7 @@ data class CredentialIssuanceResponse(
          * @param transactionId  A string identifying a Deferred Issuance transaction.
          */
         data class Deferred(
-            val transactionId: String,
+            val transactionId: TransactionId,
         ) : Result
     }
 }

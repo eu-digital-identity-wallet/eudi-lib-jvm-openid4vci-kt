@@ -182,7 +182,7 @@ internal class DefaultIssuanceRequester(
         transactionId?.let {
             CredentialIssuanceResponse(
                 cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
-                credentialResponses = listOf(CredentialIssuanceResponse.Result.Deferred(transactionId)),
+                credentialResponses = listOf(CredentialIssuanceResponse.Result.Deferred(TransactionId(transactionId))),
             )
         } ?: credential?.let {
             CredentialIssuanceResponse(
@@ -198,7 +198,7 @@ internal class DefaultIssuanceRequester(
             cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
             credentialResponses = credentialResponses.map {
                 it.transactionId?.let {
-                    CredentialIssuanceResponse.Result.Deferred(it)
+                    CredentialIssuanceResponse.Result.Deferred(TransactionId(it))
                 } ?: it.credential?.let { credential ->
                     CredentialIssuanceResponse.Result.Issued(it.format, credential)
                 } ?: throw ResponseUnparsable(

@@ -195,7 +195,9 @@ interface RequestIssuance {
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
         responseEncryptionSpecProvider:
-            (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
+            (
+                issuerResponseEncryptionMetadata: CredentialResponseEncryption,
+            ) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
@@ -215,7 +217,9 @@ interface RequestIssuance {
         claimSet: ClaimSet?,
         bindingKey: BindingKey,
         responseEncryptionSpecProvider:
-            (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
+            (
+                issuerResponseEncryptionMetadata: CredentialResponseEncryption,
+            ) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
@@ -229,7 +233,9 @@ interface RequestIssuance {
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
         responseEncryptionSpecProvider:
-            (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
+            (
+                issuerResponseEncryptionMetadata: CredentialResponseEncryption,
+            ) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
@@ -243,7 +249,9 @@ interface RequestIssuance {
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
         responseEncryptionSpecProvider:
-            (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
+            (
+                issuerResponseEncryptionMetadata: CredentialResponseEncryption,
+            ) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
@@ -468,8 +476,8 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         /**
          * Binding method specified is not supported from issuer server
          */
-        data object BindingMethodNotSupported : ProofGenerationError("BindingMethodNotSupported") {
-            private fun readResolve(): Any = BindingMethodNotSupported
+        data object CryptographicSuiteNotSupported : ProofGenerationError("BindingMethodNotSupported") {
+            private fun readResolve(): Any = CryptographicSuiteNotSupported
         }
 
         /**
