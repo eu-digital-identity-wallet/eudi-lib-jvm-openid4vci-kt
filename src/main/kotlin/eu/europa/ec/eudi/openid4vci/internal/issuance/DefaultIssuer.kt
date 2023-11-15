@@ -254,7 +254,8 @@ internal class DefaultIssuer(
         }
 
         val issuerEncryption = issuanceRequester.issuerMetadata.credentialResponseEncryption
-        val responseEncryptionSpec = responseEncryptionSpecProvider(issuanceRequester.issuerMetadata.credentialResponseEncryption)
+        val responseEncryptionSpec =
+            responseEncryptionSpecProvider(issuanceRequester.issuerMetadata.credentialResponseEncryption)
 
         responseEncryptionSpec?.let {
             when (issuerEncryption) {
@@ -375,6 +376,14 @@ internal class DefaultIssuer(
             cNonce = cNonce,
         )
 
+    override suspend fun AuthorizedRequest.requestDeferredIssuance(
+        transactionId: TransactionId,
+    ): Result<DeferredCredentialIssuanceResponse> =
+        issuanceRequester.placeDeferredCredentialRequest(
+            accessToken = token,
+            transactionId = transactionId,
+        )
+
     private suspend fun requestIssuance(
         token: IssuanceAccessToken,
         issuanceRequestSupplier: () -> CredentialIssuanceRequest,
@@ -410,6 +419,7 @@ internal class DefaultIssuer(
             is CredentialIssuanceError.InvalidProof -> SubmittedRequest.InvalidProof(
                 cNonce = CNonce(throwable.cNonce, throwable.cNonceExpiresIn),
             )
+
             is CredentialIssuanceError -> SubmittedRequest.Failed(throwable)
             else -> throw throwable
         }

@@ -51,6 +51,11 @@ sealed interface CredentialIssuanceRequestTO {
 }
 
 @Serializable
+data class DeferredIssuanceRequestTO(
+    @SerialName("transaction_id") val transactionId: String,
+)
+
+@Serializable
 data class GenericErrorResponse(
     @SerialName("error") val error: String,
     @SerialName("error_description") val errorDescription: String? = null,
@@ -81,6 +86,12 @@ data class BatchIssuanceSuccessResponse(
         @SerialName("transaction_id") val transactionId: String? = null,
     )
 }
+
+@Serializable
+data class DeferredIssuanceSuccessResponse(
+    @SerialName("format") val format: String,
+    @SerialName("credential") val credential: String,
+)
 
 /**
  * Credential(s) issuance request
@@ -151,17 +162,6 @@ sealed interface CredentialIssuanceRequest {
         }
     }
 }
-
-/**
- * A Deferred Credential Request.
- *
- * @param transactionId Identifier of the transaction under witch the credential was initially requested.
- * @param token Access token that authorizes the request.
- */
-data class DeferredCredentialRequest(
-    val transactionId: String,
-    val token: IssuanceAccessToken,
-)
 
 /**
  * Sealed hierarchy for the issuance response encryption specification as it is requested to the issuer server.
@@ -243,6 +243,23 @@ data class CredentialIssuanceResponse(
     }
 }
 
+sealed interface DeferredCredentialIssuanceResponse {
+
+    data class Issued(
+        val format: String,
+        val credential: String,
+    ) : DeferredCredentialIssuanceResponse
+
+    data class IssuancePending(
+        val transactionId: TransactionId,
+    ) : DeferredCredentialIssuanceResponse
+
+    data class Errored(
+        val error: String,
+        val errorDescription: String? = null,
+    ) : DeferredCredentialIssuanceResponse
+}
+
 /**
  * Sealed interface to model the set of specific claims that need to be included in the issued credential.
  * This set of claims is modelled differently depending on the credential format.
@@ -259,6 +276,7 @@ interface IssuanceRequester {
     /**
      * Method that submits a request to credential issuer for the issuance of single credential.
      *
+     * @param accessToken Access token authorizing the request
      * @param request The single credential issuance request
      * @return credential issuer's response
      */
@@ -270,6 +288,7 @@ interface IssuanceRequester {
     /**
      * Method that submits a request to credential issuer for the batch issuance of credentials.
      *
+     * @param accessToken Access token authorizing the request
      * @param request The batch credential issuance request
      * @return credential issuer's response
      */
@@ -281,13 +300,14 @@ interface IssuanceRequester {
     /**
      * Method that submits a request to credential issuer's Deferred Credential Endpoint
      *
-     * @param request The deferred credential request
+     * @param accessToken Access token authorizing the request
+     * @param transactionId The identifier of the Deferred Issuance transaction
      * @return response from issuer. Can be either positive if credential is issued or errored in case issuance is still pending
      */
     suspend fun placeDeferredCredentialRequest(
         accessToken: IssuanceAccessToken,
-        request: DeferredCredentialRequest,
-    ): CredentialIssuanceResponse
+        transactionId: TransactionId,
+    ): Result<DeferredCredentialIssuanceResponse>
 
     companion object {
 
@@ -296,15 +316,19 @@ interface IssuanceRequester {
          *
          * @param issuerMetadata  The credential issuer's metadata.
          * @param postIssueRequest An implementation of the http POST that submits issuance requests.
+         * @param postDeferredIssueRequest An implementation of the http POST that submits deferred issuance requests.
          * @return A default implementation of the [IssuanceRequester] interface.
          */
         fun make(
             issuerMetadata: CredentialIssuerMetadata,
             postIssueRequest: HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse>,
+            postDeferredIssueRequest:
+                HttpPost<DeferredIssuanceRequestTO, DeferredCredentialIssuanceResponse, DeferredCredentialIssuanceResponse>,
         ): IssuanceRequester =
             DefaultIssuanceRequester(
                 issuerMetadata = issuerMetadata,
                 postIssueRequest = postIssueRequest,
+                postDeferredIssueRequest = postDeferredIssueRequest,
             )
 
         /**

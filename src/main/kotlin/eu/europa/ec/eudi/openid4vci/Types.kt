@@ -240,6 +240,21 @@ data class CNonce(
 }
 
 /**
+ * An identifier of a Deferred Issuance transaction.
+ *
+ * @param value The identifier's value
+ * @param interval The minimum amount of time in seconds to wait before using this identifier to the Deferred Credential Endpoint.
+ */
+data class TransactionId(
+    val value: String,
+    val interval: Long? = null,
+) {
+    init {
+        require(value.isNotEmpty()) { "Value cannot be empty" }
+    }
+}
+
+/**
  * Sealed hierarchy of the proofs of possession that can be included in a credential issuance request. Proofs are used
  * to bind the issued credential to the credential requester. They contain proof of possession of a bind key that can be
  * used to cryptographically verify that the presenter of the credential is also the holder of the credential.

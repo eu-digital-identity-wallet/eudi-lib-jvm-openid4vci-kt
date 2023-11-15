@@ -292,10 +292,24 @@ interface RequestIssuance {
 }
 
 /**
+ * An interface for submitting a deferred credential issuance request.
+ */
+fun interface RequestDeferredIssuance {
+
+    /**
+     * Given an authorized request submits a deferred credential request for an identifier of a Deferred Issuance transaction.
+     *
+     * @param transactionId The identifier of a Deferred Issuance transaction.
+     * @return The result of the submission.
+     */
+    suspend fun AuthorizedRequest.requestDeferredIssuance(transactionId: TransactionId): Result<DeferredCredentialIssuanceResponse>
+}
+
+/**
  * Aggregation interface providing all functionality required for performing a credential issuance request (batch or single)
  * Provides factory methods for creating implementations of this interface.
  */
-interface Issuer : AuthorizeIssuance, RequestIssuance {
+interface Issuer : AuthorizeIssuance, RequestIssuance, RequestDeferredIssuance {
 
     companion object {
 
@@ -424,6 +438,13 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
      */
     data object IssuerDoesNotSupportBatchIssuance : CredentialIssuanceError("IssuerDoesNotSupportBatchIssuance") {
         private fun readResolve(): Any = IssuerDoesNotSupportBatchIssuance
+    }
+
+    /**
+     * Issuance server does not support deferred credential issuance
+     */
+    data object IssuerDoesNotSupportDeferredIssuance : CredentialIssuanceError("IssuerDoesNotSupportDeferredIssuance") {
+        private fun readResolve(): Any = IssuerDoesNotSupportDeferredIssuance
     }
 
     /**
