@@ -73,7 +73,7 @@ fun main(): Unit = runTest {
     val user = ActingUser("babis", "babis")
     val wallet = Wallet.ofUser(user, bindingKey)
 
-    WalletInitiatedIssuanceWithOffer(wallet)
+//    WalletInitiatedIssuanceWithOffer(wallet)
     WalletInitiatedIssuanceNoOffer(wallet)
 }
 
@@ -245,7 +245,9 @@ private class Wallet(
                     val result = requestOutcome.response.credentialResponses.get(0)
                     when (result) {
                         is CredentialIssuanceResponse.Result.Issued -> result.credential
-                        is CredentialIssuanceResponse.Result.Deferred -> result.transactionId
+                        is CredentialIssuanceResponse.Result.Deferred -> {
+                            deferredCredentialUseCase(issuer, authorized, result.transactionId)
+                        }
                     }
                 }
 
@@ -253,6 +255,24 @@ private class Wallet(
 
                 is SubmittedRequest.InvalidProof ->
                     throw IllegalStateException("Although providing a proof with c_nonce the proof is still invalid")
+            }
+        }
+    }
+
+    private suspend fun deferredCredentialUseCase(
+        issuer: Issuer,
+        authorized: AuthorizedRequest,
+        transactionId: TransactionId,
+    ): String {
+        println("--> Got a deferred issuance response from server with transaction_id ${transactionId.value}. Retrying issuance...")
+        with(issuer) {
+            val deferredRequestResponse = authorized.requestDeferredIssuance(transactionId).getOrThrow()
+            return when (deferredRequestResponse) {
+                is DeferredCredentialIssuanceResponse.Issued -> deferredRequestResponse.credential
+                is DeferredCredentialIssuanceResponse.IssuancePending -> throw RuntimeException(
+                    "Credential not ready yet. Try after ${deferredRequestResponse.transactionId.interval}",
+                )
+                is DeferredCredentialIssuanceResponse.Errored -> throw RuntimeException(deferredRequestResponse.error)
             }
         }
     }
@@ -271,7 +291,9 @@ private class Wallet(
                     val result = requestOutcome.response.credentialResponses[0]
                     when (result) {
                         is CredentialIssuanceResponse.Result.Issued -> result.credential
-                        is CredentialIssuanceResponse.Result.Deferred -> result.transactionId
+                        is CredentialIssuanceResponse.Result.Deferred -> {
+                            deferredCredentialUseCase(issuer, noProofRequiredState, result.transactionId)
+                        }
                     }
                 }
 

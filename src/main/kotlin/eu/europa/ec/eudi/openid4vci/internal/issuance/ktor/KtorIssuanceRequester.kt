@@ -49,15 +49,16 @@ internal class KtorIssuanceRequester(
 
     override suspend fun placeDeferredCredentialRequest(
         accessToken: IssuanceAccessToken,
-        request: DeferredCredentialRequest
-    ): CredentialIssuanceResponse =
-        ktorHttpClientFactory().use { client -> requester(client).placeDeferredCredentialRequest(accessToken, request) }
+        transactionId: TransactionId,
+    ): Result<DeferredCredentialIssuanceResponse> =
+        ktorHttpClientFactory().use { client -> requester(client).placeDeferredCredentialRequest(accessToken, transactionId) }
 
     private fun requester(client: HttpClient): DefaultIssuanceRequester =
         DefaultIssuanceRequester(
             coroutineDispatcher = coroutineDispatcher,
             issuerMetadata = issuerMetadata,
             postIssueRequest = postIssuanceRequest(client),
+            postDeferredIssueRequest = postDeferredIssuanceRequest(client),
         )
 
     companion object {
@@ -82,6 +83,19 @@ internal class KtorIssuanceRequester(
 
 private fun postIssuanceRequest(httpClient: HttpClient):
     HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
+    HttpPost { url, headers, payload, responseHandler ->
+        val response = httpClient.post(url) {
+            headers {
+                headers.forEach { (k, v) -> append(k, v) }
+            }
+            contentType(ContentType.parse("application/json"))
+            setBody(payload)
+        }
+        responseHandler(response)
+    }
+
+private fun postDeferredIssuanceRequest(httpClient: HttpClient):
+    HttpPost<DeferredIssuanceRequestTO, DeferredCredentialIssuanceResponse, DeferredCredentialIssuanceResponse> =
     HttpPost { url, headers, payload, responseHandler ->
         val response = httpClient.post(url) {
             headers {

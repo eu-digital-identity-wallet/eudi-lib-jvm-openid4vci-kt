@@ -86,6 +86,10 @@ private fun testBed(
                 post("/credentials/batch") {
                     issuanceRequestAssertions(call)
                 }
+
+                post("/credentials/deferred") {
+                    issuanceRequestAssertions(call)
+                }
             }
         }
     }
@@ -177,6 +181,22 @@ fun createGetASMetadata(managedHttpClient: HttpClient): HttpGet<String> =
 fun createPostIssuance(
     managedHttpClient: HttpClient,
 ): HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
+    HttpPost { url, headers, payload, responseHandler ->
+        val response = managedHttpClient.post(url) {
+            headers {
+                headers.forEach {
+                    append(it.key, it.value)
+                }
+            }
+            contentType(ContentType.parse("application/json"))
+            setBody(payload)
+        }
+        responseHandler(response)
+    }
+
+fun createPostDeferredIssuance(
+    managedHttpClient: HttpClient,
+): HttpPost<DeferredIssuanceRequestTO, DeferredCredentialIssuanceResponse, DeferredCredentialIssuanceResponse> =
     HttpPost { url, headers, payload, responseHandler ->
         val response = managedHttpClient.post(url) {
             headers {

@@ -95,7 +95,7 @@ internal class DefaultIssuer(
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
-        responseEncryptionSpecProvider: (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
+        responseEncryptionSpecProvider: (issuerResponseEncryptionMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             credentialMetadata
@@ -108,7 +108,7 @@ internal class DefaultIssuer(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
         bindingKey: BindingKey,
-        responseEncryptionSpecProvider: (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
+        responseEncryptionSpecProvider: (issuerResponseEncryptionMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             with(credentialMetadata.toIssuerSupportedCredential()) {
@@ -125,7 +125,7 @@ internal class DefaultIssuer(
         // Validate that the provided evidence is one of those that issuer supports
         when (this) {
             is BindingKey.Jwk -> {
-                fun isAlgorithmIsSupported(): Boolean =
+                fun isAlgorithmSupported(): Boolean =
                     credentialSpec.cryptographicSuitesSupported.contains(algorithm.name)
 
                 fun isBindingMethodSupported(): Boolean =
@@ -134,8 +134,8 @@ internal class DefaultIssuer(
                 fun isProofTypeSupported(): Boolean =
                     credentialSpec.proofTypesSupported.contains(ProofType.JWT)
 
-                if (!isAlgorithmIsSupported()) {
-                    throw CredentialIssuanceError.ProofGenerationError.BindingMethodNotSupported
+                if (!isAlgorithmSupported()) {
+                    throw CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported
                 }
                 if (!isBindingMethodSupported()) {
                     throw CredentialIssuanceError.ProofGenerationError.CryptographicBindingMethodNotSupported
@@ -145,7 +145,7 @@ internal class DefaultIssuer(
                 }
 
                 ProofBuilder.ofType(ProofType.JWT) {
-                    iss("") // ?? Get from config??
+                    iss("")
                     aud(issuanceRequester.issuerMetadata.credentialIssuerIdentifier.toString())
                     jwk(this@toSupportedProof.jwk)
                     alg(this@toSupportedProof.algorithm)
@@ -161,7 +161,7 @@ internal class DefaultIssuer(
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
-        responseEncryptionSpecProvider: (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
+        responseEncryptionSpecProvider: (issuerResponseEncryptionMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             CredentialIssuanceRequest.BatchCredentials(
@@ -176,7 +176,7 @@ internal class DefaultIssuer(
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
-        responseEncryptionSpecProvider: (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
+        responseEncryptionSpecProvider: (issuerResponseEncryptionMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(token) {
             CredentialIssuanceRequest.BatchCredentials(
@@ -245,7 +245,7 @@ internal class DefaultIssuer(
     private fun CredentialSupported.toIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
-        responseEncryptionSpecProvider: (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
+        responseEncryptionSpecProvider: (issuerResponseEncryptionMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): CredentialIssuanceRequest.SingleCredential {
         proof?.let {
             require(this.proofTypesSupported.contains(it.type)) {
@@ -254,7 +254,8 @@ internal class DefaultIssuer(
         }
 
         val issuerEncryption = issuanceRequester.issuerMetadata.credentialResponseEncryption
-        val responseEncryptionSpec = responseEncryptionSpecProvider(issuanceRequester.issuerMetadata.credentialResponseEncryption)
+        val responseEncryptionSpec =
+            responseEncryptionSpecProvider(issuanceRequester.issuerMetadata.credentialResponseEncryption)
 
         responseEncryptionSpec?.let {
             when (issuerEncryption) {
@@ -337,7 +338,7 @@ internal class DefaultIssuer(
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<CredentialIssuanceRequest.SingleCredential> = runCatching {
         fun validateClaimSet(claimSet: SdJwtVcFormat.ClaimSet): SdJwtVcFormat.ClaimSet {
-            if ((credentialDefinition.claims == null || credentialDefinition.claims.isEmpty()) && claimSet.claims.isNotEmpty()) {
+            if ((credentialDefinition.claims.isNullOrEmpty()) && claimSet.claims.isNotEmpty()) {
                 throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential [${SdJwtVcFormat.FORMAT}-${this.credentialDefinition.type}]",
                 )
@@ -375,6 +376,14 @@ internal class DefaultIssuer(
             cNonce = cNonce,
         )
 
+    override suspend fun AuthorizedRequest.requestDeferredIssuance(
+        transactionId: TransactionId,
+    ): Result<DeferredCredentialIssuanceResponse> =
+        issuanceRequester.placeDeferredCredentialRequest(
+            accessToken = token,
+            transactionId = transactionId,
+        )
+
     private suspend fun requestIssuance(
         token: IssuanceAccessToken,
         issuanceRequestSupplier: () -> CredentialIssuanceRequest,
@@ -410,6 +419,7 @@ internal class DefaultIssuer(
             is CredentialIssuanceError.InvalidProof -> SubmittedRequest.InvalidProof(
                 cNonce = CNonce(throwable.cNonce, throwable.cNonceExpiresIn),
             )
+
             is CredentialIssuanceError -> SubmittedRequest.Failed(throwable)
             else -> throw throwable
         }

@@ -327,6 +327,7 @@ class IssuanceEncryptedResponsesTest {
             IssuanceRequester.make(
                 issuerMetadata = offer.credentialIssuerMetadata,
                 postIssueRequest = createPostIssuance(client),
+                postDeferredIssueRequest = createPostDeferredIssuance(client),
             ),
         )
 

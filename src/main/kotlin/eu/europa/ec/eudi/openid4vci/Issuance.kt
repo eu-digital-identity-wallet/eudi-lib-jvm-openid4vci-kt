@@ -195,7 +195,9 @@ interface RequestIssuance {
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
         responseEncryptionSpecProvider:
-            (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
+            (
+                issuerResponseEncryptionMetadata: CredentialResponseEncryption,
+            ) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
@@ -215,7 +217,9 @@ interface RequestIssuance {
         claimSet: ClaimSet?,
         bindingKey: BindingKey,
         responseEncryptionSpecProvider:
-            (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
+            (
+                issuerResponseEncryptionMetadata: CredentialResponseEncryption,
+            ) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
@@ -229,7 +233,9 @@ interface RequestIssuance {
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
         responseEncryptionSpecProvider:
-            (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
+            (
+                issuerResponseEncryptionMetadata: CredentialResponseEncryption,
+            ) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
@@ -243,7 +249,9 @@ interface RequestIssuance {
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
         responseEncryptionSpecProvider:
-            (issuerMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
+            (
+                issuerResponseEncryptionMetadata: CredentialResponseEncryption,
+            ) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
@@ -292,10 +300,24 @@ interface RequestIssuance {
 }
 
 /**
+ * An interface for submitting a deferred credential issuance request.
+ */
+fun interface RequestDeferredIssuance {
+
+    /**
+     * Given an authorized request submits a deferred credential request for an identifier of a Deferred Issuance transaction.
+     *
+     * @param transactionId The identifier of a Deferred Issuance transaction.
+     * @return The result of the submission.
+     */
+    suspend fun AuthorizedRequest.requestDeferredIssuance(transactionId: TransactionId): Result<DeferredCredentialIssuanceResponse>
+}
+
+/**
  * Aggregation interface providing all functionality required for performing a credential issuance request (batch or single)
  * Provides factory methods for creating implementations of this interface.
  */
-interface Issuer : AuthorizeIssuance, RequestIssuance {
+interface Issuer : AuthorizeIssuance, RequestIssuance, RequestDeferredIssuance {
 
     companion object {
 
@@ -427,6 +449,13 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     }
 
     /**
+     * Issuance server does not support deferred credential issuance
+     */
+    data object IssuerDoesNotSupportDeferredIssuance : CredentialIssuanceError("IssuerDoesNotSupportDeferredIssuance") {
+        private fun readResolve(): Any = IssuerDoesNotSupportDeferredIssuance
+    }
+
+    /**
      * Generic failure during issuance request
      */
     data class IssuanceRequestFailed(
@@ -447,8 +476,8 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         /**
          * Binding method specified is not supported from issuer server
          */
-        data object BindingMethodNotSupported : ProofGenerationError("BindingMethodNotSupported") {
-            private fun readResolve(): Any = BindingMethodNotSupported
+        data object CryptographicSuiteNotSupported : ProofGenerationError("BindingMethodNotSupported") {
+            private fun readResolve(): Any = CryptographicSuiteNotSupported
         }
 
         /**
