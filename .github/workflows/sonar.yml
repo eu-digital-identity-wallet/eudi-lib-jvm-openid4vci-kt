@@ -1,6 +1,8 @@
 name: SAST - SonarCloud
 on:
   push:
+    branches-ignore:
+      - 'dependabot/*'
   pull_request_target:
   workflow_dispatch:
 
