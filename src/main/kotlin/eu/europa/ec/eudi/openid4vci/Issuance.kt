@@ -19,6 +19,10 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuer
 import eu.europa.ec.eudi.openid4vci.internal.issuance.KeyGenerator
+import io.ktor.client.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.json.Json
 
 /**
  * Sealed hierarchy of states that denote the individual steps that need to be taken in order to authorize a request for issuance
@@ -342,22 +346,43 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, RequestDeferredIssuance {
          * @param authorizationServerMetadata   The authorization server metadata required from the underlying [IssuanceAuthorizer] component.
          * @param issuerMetadata    The credential issuer metadata required from the underlying [IssuanceRequester] component.
          * @param config    Configuration object
+         * @param ktorHttpClientFactory Factory of ktor http clients
          * @return An instance of Issuer based on ktor
          */
         fun ktor(
             authorizationServerMetadata: CIAuthorizationServerMetadata,
             issuerMetadata: CredentialIssuerMetadata,
             config: OpenId4VCIConfig,
+            ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
         ): Issuer =
             DefaultIssuer(
                 IssuanceAuthorizer.ktor(
                     authorizationServerMetadata = authorizationServerMetadata,
                     config = config,
+                    ktorHttpClientFactory = ktorHttpClientFactory,
                 ),
                 IssuanceRequester.ktor(
                     issuerMetadata = issuerMetadata,
+                    ktorHttpClientFactory = ktorHttpClientFactory,
                 ),
             )
+
+        /**
+         * Factory which produces a [Ktor Http client][HttpClient]
+         * The actual engine will be peeked up by whatever
+         * it is available in classpath
+         *
+         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
+         */
+        val HttpClientFactory: KtorHttpClientFactory = {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json(
+                        json = Json { ignoreUnknownKeys = true },
+                    )
+                }
+            }
+        }
     }
 }
 
