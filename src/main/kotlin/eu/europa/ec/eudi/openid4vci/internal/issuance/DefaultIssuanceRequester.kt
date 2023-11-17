@@ -23,15 +23,16 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequest.BatchCredentials
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceRequest.SingleCredential
+import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.BatchCredentials
+import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential
+import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.formats.FormatRegistry
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.*
 
 /**
  * Default implementation of [IssuanceRequester] interface.
@@ -174,7 +175,11 @@ internal class DefaultIssuanceRequester(
                 "issuance_pending" -> DeferredCredentialIssuanceResponse.IssuancePending(
                     TransactionId(transactionId.value, responsePayload.interval),
                 )
-                else -> DeferredCredentialIssuanceResponse.Errored(responsePayload.error, responsePayload.errorDescription)
+
+                else -> DeferredCredentialIssuanceResponse.Errored(
+                    responsePayload.error,
+                    responsePayload.errorDescription,
+                )
             }
         }
 
@@ -232,85 +237,8 @@ internal class DefaultIssuanceRequester(
     private fun IssuanceAccessToken.toAuthorizationHeader(): Pair<String, String> =
         "Authorization" to "BEARER $accessToken"
 
-    private fun SingleCredential.toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO = when (this) {
-        is MsoMdocFormat.CredentialIssuanceRequest -> {
-            when (val it = requestedCredentialResponseEncryption) {
-                is RequestedCredentialResponseEncryption.NotRequested -> {
-                    MsoMdocFormat.CredentialIssuanceRequestTO(
-                        docType = doctype,
-                        proof = proof?.toJsonObject(),
-                        claims = claimSet?.let {
-                            Json.encodeToJsonElement(it).jsonObject
-                        },
-                    )
-                }
-
-                is RequestedCredentialResponseEncryption.Requested -> {
-                    MsoMdocFormat.CredentialIssuanceRequestTO(
-                        docType = doctype,
-                        proof = proof?.toJsonObject(),
-                        credentialEncryptionJwk = Json.parseToJsonElement(
-                            it.encryptionJwk.toPublicJWK().toString(),
-                        ).jsonObject,
-                        credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
-                        credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
-                        claims = claimSet?.let {
-                            Json.encodeToJsonElement(it).jsonObject
-                        },
-                    )
-                }
-            }
-        }
-
-        is SdJwtVcFormat.CredentialIssuanceRequest -> {
-            when (val it = requestedCredentialResponseEncryption) {
-                is RequestedCredentialResponseEncryption.NotRequested -> SdJwtVcFormat.CredentialIssuanceRequestTO(
-                    proof = proof?.toJsonObject(),
-                    credentialDefinition = SdJwtVcFormat.CredentialIssuanceRequestTO.CredentialDefinitionTO(
-                        type = credentialDefinition.type,
-                        claims = credentialDefinition.claims?.let {
-                            Json.encodeToJsonElement(it.claims).jsonObject
-                        },
-                    ),
-                )
-
-                is RequestedCredentialResponseEncryption.Requested -> SdJwtVcFormat.CredentialIssuanceRequestTO(
-                    proof = proof?.toJsonObject(),
-                    credentialEncryptionJwk = Json.parseToJsonElement(
-                        it.encryptionJwk.toPublicJWK().toString(),
-                    ).jsonObject,
-                    credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
-                    credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
-                    credentialDefinition = SdJwtVcFormat.CredentialIssuanceRequestTO.CredentialDefinitionTO(
-                        type = credentialDefinition.type,
-                        claims = credentialDefinition.claims?.let {
-                            Json.encodeToJsonElement(it.claims).jsonObject
-                        },
-                    ),
-                )
-            }
-        }
-    }
-
-    private fun Proof.toJsonObject(): JsonObject = when (this) {
-        is Proof.Jwt -> {
-            JsonObject(
-                mapOf(
-                    "proof_type" to JsonPrimitive("jwt"),
-                    "jwt" to JsonPrimitive(jwt.serialize()),
-                ),
-            )
-        }
-
-        is Proof.Cwt -> {
-            JsonObject(
-                mapOf(
-                    "proof_type" to JsonPrimitive("cwt"),
-                    "jwt" to JsonPrimitive(cwt),
-                ),
-            )
-        }
-    }
+    private fun SingleCredential.toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO =
+        FormatRegistry.byFormat(format).mapRequestToTransferObject(this)
 
     private fun BatchCredentials.toTransferObject(): CredentialIssuanceRequestTO {
         return CredentialIssuanceRequestTO.BatchCredentialsTO(

@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.formats.*
+import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withContext
@@ -135,9 +137,9 @@ internal class DefaultCredentialOfferRequestResolver(
                 ?: throw IllegalArgumentException("Unknown scope '$scope")
 
         /**
-         * Converts this [JsonObject] to a [CredentialMetadata.ProfileSpecific] object.
+         * Converts this [JsonObject] to a [CredentialMetadata.ByFormat] object.
          *
-         * The resulting [CredentialMetadata.ProfileSpecific] must be supported by the Credential Issuer and be present in its [CredentialIssuerMetadata].
+         * The resulting [CredentialMetadata.ByFormat] must be supported by the Credential Issuer and be present in its [CredentialIssuerMetadata].
          */
         private fun JsonObject.toOfferedCredentialByProfile(metadata: CredentialIssuerMetadata): CredentialMetadata {
             val format =
@@ -150,19 +152,7 @@ internal class DefaultCredentialOfferRequestResolver(
                         }
                     }
 
-            return when (format) {
-                MsoMdocFormat.FORMAT -> MsoMdocFormat.matchSupportedAndToDomain(this, metadata)
-                W3CSignedJwtFormat.FORMAT -> W3CSignedJwtFormat.matchSupportedAndToDomain(this, metadata)
-                W3CJsonLdSignedJwtFormat.FORMAT -> W3CJsonLdSignedJwtFormat.matchSupportedAndToDomain(this, metadata)
-                W3CJsonLdDataIntegrityFormat.FORMAT -> W3CJsonLdDataIntegrityFormat.matchSupportedAndToDomain(
-                    this,
-                    metadata,
-                )
-
-                SdJwtVcFormat.FORMAT -> SdJwtVcFormat.matchSupportedAndToDomain(this, metadata)
-
-                else -> throw IllegalArgumentException("Unknown Credential format '$format'")
-            }
+            return FormatRegistry.byFormat(format).matchSupportedAndToDomain(this, metadata)
         }
     }
 }

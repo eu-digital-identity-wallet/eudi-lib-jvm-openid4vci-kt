@@ -26,6 +26,8 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
+import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.formats.MsoMdoc
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -186,7 +188,7 @@ class IssuanceEncryptedResponsesTest {
             encryptedResponses = true,
             testBlock = { client ->
                 runTest {
-                    val claimSet = MsoMdocFormat.ClaimSet(
+                    val claimSet = MsoMdoc.Model.ClaimSet(
                         claims = mapOf(
                             "org.iso.18013.5.1" to mapOf(
                                 "given_name" to Claim(),

@@ -16,6 +16,9 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
+import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.formats.SdJwtVc
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -350,7 +353,7 @@ class IssuanceDeferredRequestTest {
     }
 
     private suspend fun respondToCredentialIssuanceRequest(
-        issuanceRequest: SdJwtVcFormat.CredentialIssuanceRequestTO,
+        issuanceRequest: SdJwtVc.Model.CredentialIssuanceRequestTO,
         call: ApplicationCall,
     ) {
         if (issuanceRequest.proof != null) {
@@ -388,9 +391,9 @@ class IssuanceDeferredRequestTest {
             null
         }
 
-    private fun asIssuanceRequest(bodyStr: String): SdJwtVcFormat.CredentialIssuanceRequestTO? =
+    private fun asIssuanceRequest(bodyStr: String): SdJwtVc.Model.CredentialIssuanceRequestTO? =
         try {
-            Json.decodeFromString<CredentialIssuanceRequestTO>(bodyStr) as SdJwtVcFormat.CredentialIssuanceRequestTO
+            Json.decodeFromString<CredentialIssuanceRequestTO>(bodyStr) as SdJwtVc.Model.CredentialIssuanceRequestTO
         } catch (ex: Exception) {
             null
         }

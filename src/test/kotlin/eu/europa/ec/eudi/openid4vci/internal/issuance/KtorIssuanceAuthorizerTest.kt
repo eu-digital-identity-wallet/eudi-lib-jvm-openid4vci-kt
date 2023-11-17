@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal.issuance
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
 import io.ktor.client.request.forms.*
 import kotlinx.coroutines.test.runTest
 import java.net.URI

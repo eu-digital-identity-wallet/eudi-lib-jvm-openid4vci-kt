@@ -17,6 +17,8 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.formats.ClaimSet
+import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuer
 import eu.europa.ec.eudi.openid4vci.internal.issuance.KeyGenerator
 

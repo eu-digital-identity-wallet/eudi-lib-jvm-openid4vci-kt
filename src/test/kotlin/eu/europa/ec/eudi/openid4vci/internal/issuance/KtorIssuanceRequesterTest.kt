@@ -20,6 +20,9 @@ import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.formats.MsoMdoc
+import eu.europa.ec.eudi.openid4vci.formats.SdJwtVc
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -245,11 +248,11 @@ class KtorIssuanceRequesterTest {
                                         BatchIssuanceSuccessResponse(
                                             credentialResponses = listOf(
                                                 BatchIssuanceSuccessResponse.CertificateIssuanceResponse(
-                                                    format = MsoMdocFormat.FORMAT,
+                                                    format = MsoMdoc.FORMAT,
                                                     credential = "issued_credential_content_mso_mdoc",
                                                 ),
                                                 BatchIssuanceSuccessResponse.CertificateIssuanceResponse(
-                                                    format = SdJwtVcFormat.FORMAT,
+                                                    format = SdJwtVc.FORMAT,
                                                     credential = "issued_credential_content_sd_jwt_vc",
                                                 ),
                                             ),
@@ -316,7 +319,7 @@ class KtorIssuanceRequesterTest {
                                 assertTrue("Second attempt should be successful") {
                                     (response as SubmittedRequest.Success).response.credentialResponses.all {
                                         it is CredentialIssuanceResponse.Result.Issued &&
-                                            it.format in listOf(MsoMdocFormat.FORMAT, SdJwtVcFormat.FORMAT)
+                                            it.format in listOf(MsoMdoc.FORMAT, SdJwtVc.FORMAT)
                                     }
                                 }
                             }

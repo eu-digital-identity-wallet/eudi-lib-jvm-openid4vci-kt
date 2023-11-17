@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.formats.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.apache.http.client.utils.URIBuilder
@@ -51,7 +52,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     oidcAuthorizationServerMetadata(),
                     listOf(
                         CredentialMetadata.ByScope(Scope.of("UniversityDegree_JWT")),
-                        MsoMdocFormat.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                        MsoMdoc.Model.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
@@ -106,7 +107,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        MsoMdocFormat.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                        MsoMdoc.Model.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
@@ -160,8 +161,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 credentialIssuerMetadata(),
                 oidcAuthorizationServerMetadata(),
                 listOf(
-                    W3CSignedJwtFormat.CredentialMetadata(
-                        W3CSignedJwtFormat.CredentialMetadata.CredentialDefinitionMetadata(
+                    W3CSignedJwt.Model.CredentialMetadata(
+                        W3CSignedJwt.Model.CredentialMetadata.CredentialDefinitionMetadata(
                             universityDegreeJwt.credentialDefinition.type,
                         ),
                         universityDegreeJwt.scope,
@@ -219,8 +220,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        W3CJsonLdDataIntegrityFormat.CredentialMetadata(
-                            W3CJsonLdDataIntegrityFormat.CredentialMetadata.CredentialDefinitionMetadata(
+                        W3CJsonLdDataIntegrity.Model.CredentialMetadata(
+                            W3CJsonLdDataIntegrity.Model.CredentialMetadata.CredentialDefinitionMetadata(
                                 universityDegreeLdpVc.credentialDefinition.context,
                                 universityDegreeLdpVc.credentialDefinition.type,
                             ),
@@ -280,8 +281,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        W3CJsonLdSignedJwtFormat.CredentialMetadata(
-                            W3CJsonLdSignedJwtFormat.CredentialMetadata.CredentialDefinitionMetadata(
+                        W3CJsonLdSignedJwt.Model.CredentialMetadata(
+                            W3CJsonLdSignedJwt.Model.CredentialMetadata.CredentialDefinitionMetadata(
                                 universityDegreeJwtVcJsonLD.credentialDefinition.context,
                                 universityDegreeJwtVcJsonLD.credentialDefinition.type,
                             ),
@@ -455,7 +456,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     oidcAuthorizationServerMetadata(),
                     listOf(
                         CredentialMetadata.ByScope(Scope.of("UniversityDegree_JWT")),
-                        MsoMdocFormat.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                        MsoMdoc.Model.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
                         Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),

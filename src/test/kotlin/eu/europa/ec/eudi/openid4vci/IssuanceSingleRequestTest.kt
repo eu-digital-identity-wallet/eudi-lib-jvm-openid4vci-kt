@@ -16,6 +16,10 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
+import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.formats.MsoMdoc
+import eu.europa.ec.eudi.openid4vci.formats.SdJwtVc
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -58,7 +62,7 @@ class IssuanceSingleRequestTest {
                 val (offer, authorizedRequest, issuer) =
                     authorizeRequestForCredentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
 
-                val claimSet = MsoMdocFormat.ClaimSet(
+                val claimSet = MsoMdoc.Model.ClaimSet(
                     claims = mapOf(
                         "org.iso.18013.5.1" to mapOf(
                             "given_name" to Claim(),
@@ -130,7 +134,7 @@ class IssuanceSingleRequestTest {
                 val (offer, authorizedRequest, issuer) =
                     authorizeRequestForCredentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
 
-                val claimSet = MsoMdocFormat.ClaimSet(
+                val claimSet = MsoMdoc.Model.ClaimSet(
                     claims = mapOf(
                         "org.iso.18013.5.1" to mapOf(
                             "given_name" to Claim(),
@@ -188,7 +192,7 @@ class IssuanceSingleRequestTest {
                     when (authorizedRequest) {
                         is AuthorizedRequest.NoProofRequired -> {
                             val claimSet_mso_mdoc =
-                                MsoMdocFormat.ClaimSet(mapOf("org.iso.18013.5.1" to mapOf("degree" to Claim())))
+                                MsoMdoc.Model.ClaimSet(mapOf("org.iso.18013.5.1" to mapOf("degree" to Claim())))
                             var credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_MsoMdoc_SCOPE))
                             authorizedRequest.requestSingle(credentialMetadata, claimSet_mso_mdoc)
                                 .fold(
@@ -201,7 +205,7 @@ class IssuanceSingleRequestTest {
                                     },
                                 )
 
-                            val claimSet_sd_jwt_vc = SdJwtVcFormat.ClaimSet(mapOf("degree" to Claim()))
+                            val claimSet_sd_jwt_vc = SdJwtVc.Model.ClaimSet(mapOf("degree" to Claim()))
                             credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE))
                             authorizedRequest.requestSingle(credentialMetadata, claimSet_sd_jwt_vc)
                                 .fold(
@@ -233,7 +237,7 @@ class IssuanceSingleRequestTest {
                 val (offer, authorizedRequest, issuer) =
                     authorizeRequestForCredentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
 
-                val claimSet = MsoMdocFormat.ClaimSet(
+                val claimSet = MsoMdoc.Model.ClaimSet(
                     claims = mapOf(
                         "org.iso.18013.5.1" to mapOf(
                             "given_name" to Claim(),
@@ -284,7 +288,7 @@ class IssuanceSingleRequestTest {
             { call ->
 
                 val request =
-                    call.receive<CredentialIssuanceRequestTO>() as MsoMdocFormat.CredentialIssuanceRequestTO
+                    call.receive<CredentialIssuanceRequestTO>() as MsoMdoc.Model.CredentialIssuanceRequestTO
                 println(request)
                 if (request.proof != null) {
                     call.respondText(
@@ -325,7 +329,7 @@ class IssuanceSingleRequestTest {
                 val (offer, authorizedRequest, issuer) =
                     authorizeRequestForCredentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt)
 
-                val claimSet = SdJwtVcFormat.ClaimSet(
+                val claimSet = SdJwtVc.Model.ClaimSet(
                     claims = mapOf(
                         "given_name" to Claim(),
                         "family_name" to Claim(),
@@ -370,7 +374,7 @@ class IssuanceSingleRequestTest {
             { call ->
 
                 val request =
-                    call.receive<CredentialIssuanceRequestTO>() as SdJwtVcFormat.CredentialIssuanceRequestTO
+                    call.receive<CredentialIssuanceRequestTO>() as SdJwtVc.Model.CredentialIssuanceRequestTO
                 println(request)
                 if (request.proof != null) {
                     call.respondText(

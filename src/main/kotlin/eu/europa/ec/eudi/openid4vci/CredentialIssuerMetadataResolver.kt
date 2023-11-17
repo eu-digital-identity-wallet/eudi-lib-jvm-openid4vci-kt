@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
+import eu.europa.ec.eudi.openid4vci.formats.CredentialSupported
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.ktor.KtorCredentialIssuerMetadataResolver
 import kotlinx.coroutines.CoroutineDispatcher
@@ -127,18 +128,6 @@ internal object LocaleSerializer : KSerializer<Locale> {
 
     override fun serialize(encoder: Encoder, value: Locale) =
         encoder.encodeString(value.toString())
-}
-
-/**
- * Credentials supported by an Issuer.
- */
-sealed interface CredentialSupported : Serializable {
-
-    val scope: String?
-    val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod>
-    val cryptographicSuitesSupported: List<String>
-    val proofTypesSupported: List<ProofType>
-    val display: List<Display>
 }
 
 /**

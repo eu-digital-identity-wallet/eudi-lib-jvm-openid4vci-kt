@@ -34,6 +34,10 @@ import com.nimbusds.openid.connect.sdk.claims.ClaimType
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderEndpointMetadata
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.formats.MsoMdoc
+import eu.europa.ec.eudi.openid4vci.formats.W3CJsonLdDataIntegrity
+import eu.europa.ec.eudi.openid4vci.formats.W3CJsonLdSignedJwt
+import eu.europa.ec.eudi.openid4vci.formats.W3CSignedJwt
 import io.ktor.http.*
 import java.net.URI
 import java.net.URL
@@ -84,7 +88,7 @@ internal fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: Http
  * Gets the 'UniversityDegree_JWT' scoped credential used throughout the tests.
  */
 internal fun universityDegreeJwt() =
-    W3CSignedJwtFormat.CredentialSupported(
+    W3CSignedJwt.Model.CredentialSupported(
         "UniversityDegree_JWT",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("ES256K"),
@@ -102,7 +106,7 @@ internal fun universityDegreeJwt() =
                 "#FFFFFF",
             ),
         ),
-        W3CSignedJwtFormat.CredentialSupported.CredentialDefinition(
+        W3CSignedJwt.Model.CredentialSupported.CredentialDefinition(
             listOf("VerifiableCredential", "UniversityDegreeCredential"),
             mapOf(
                 "given_name" to Claim(
@@ -136,7 +140,7 @@ internal fun universityDegreeJwt() =
  * Gets the 'UniversityDegree_LDP_VC' scoped credential used throughout the tests.
  */
 internal fun universityDegreeLdpVc() =
-    W3CJsonLdDataIntegrityFormat.CredentialSupported(
+    W3CJsonLdDataIntegrity.Model.CredentialSupported(
         "UniversityDegree_LDP_VC",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("Ed25519Signature2018"),
@@ -162,7 +166,7 @@ internal fun universityDegreeLdpVc() =
             "VerifiableCredential_LDP_VC",
             "UniversityDegreeCredential_LDP_VC",
         ),
-        W3CJsonLdDataIntegrityFormat.CredentialSupported.CredentialDefinition(
+        W3CJsonLdDataIntegrity.Model.CredentialSupported.CredentialDefinition(
             listOf(
                 URL("https://www.w3.org/2018/credentials/v1"),
                 URL("https://www.w3.org/2018/credentials/examples/v1"),
@@ -197,7 +201,7 @@ internal fun universityDegreeLdpVc() =
     )
 
 internal fun universityDegreeJwtVcJsonLD() =
-    W3CJsonLdSignedJwtFormat.CredentialSupported(
+    W3CJsonLdSignedJwt.Model.CredentialSupported(
         "UniversityDegree_JWT_VC_JSON-LD",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("Ed25519Signature2018"),
@@ -219,7 +223,7 @@ internal fun universityDegreeJwtVcJsonLD() =
             "https://www.w3.org/2018/credentials/v1",
             "https://www.w3.org/2018/credentials/examples/v1",
         ),
-        W3CJsonLdSignedJwtFormat.CredentialSupported.CredentialDefinition(
+        W3CJsonLdSignedJwt.Model.CredentialSupported.CredentialDefinition(
             listOf(
                 URL("https://www.w3.org/2018/credentials/v1"),
                 URL("https://www.w3.org/2018/credentials/examples/v1"),
@@ -257,7 +261,7 @@ internal fun universityDegreeJwtVcJsonLD() =
  * Gets the 'mDL' scoped credential used throughout the tests.
  */
 internal fun mobileDrivingLicense() =
-    MsoMdocFormat.CredentialSupported(
+    MsoMdoc.Model.CredentialSupported(
         "mDL",
         listOf(CryptographicBindingMethod.MSO),
         listOf("ES256", "ES384", "ES512"),

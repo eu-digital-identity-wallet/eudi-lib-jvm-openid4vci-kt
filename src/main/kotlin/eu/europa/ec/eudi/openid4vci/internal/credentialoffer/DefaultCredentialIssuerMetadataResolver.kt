@@ -19,6 +19,8 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
+import eu.europa.ec.eudi.openid4vci.formats.*
+import eu.europa.ec.eudi.openid4vci.formats.CredentialSupportedTO
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
@@ -155,29 +157,7 @@ private fun JsonObject.toCredentialSupportedObject(): Result<CredentialSupported
             jsonElement.content
         }
 
-    when (format) {
-        W3CSignedJwtFormat.FORMAT -> Json.decodeFromJsonElement<W3CSignedJwtFormat.CredentialSupportedTO>(
-            this,
-        )
-
-        W3CJsonLdSignedJwtFormat.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdSignedJwtFormat.CredentialSupportedTO>(
-            this,
-        )
-
-        W3CJsonLdDataIntegrityFormat.FORMAT -> Json.decodeFromJsonElement<W3CJsonLdDataIntegrityFormat.CredentialSupportedTO>(
-            this,
-        )
-
-        MsoMdocFormat.FORMAT -> Json.decodeFromJsonElement<MsoMdocFormat.CredentialSupportedTO>(
-            this,
-        )
-
-        SdJwtVcFormat.FORMAT -> Json.decodeFromJsonElement<SdJwtVcFormat.CredentialSupportedObject>(
-            this,
-        )
-
-        else -> throw IllegalArgumentException("Unsupported Credential format '$format'")
-    }
+    FormatRegistry.byFormat(format).decodeCredentialSupportedFromJsonObject(this)
 }
 
 /**

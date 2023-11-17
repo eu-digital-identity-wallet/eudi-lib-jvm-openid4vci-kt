@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*

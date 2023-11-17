@@ -27,6 +27,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
 import java.security.cert.X509Certificate
 
@@ -117,21 +118,6 @@ data class CredentialIssuerMetadataTO(
         @SerialName("name") val name: String? = null,
         @SerialName("locale") val locale: String? = null,
     )
-}
-
-/**
- * The metadata of a Credentials that can be issued by a Credential Issuer.
- */
-sealed interface CredentialSupportedTO {
-
-    val format: String
-    val scope: String?
-    val cryptographicBindingMethodsSupported: List<String>?
-    val cryptographicSuitesSupported: List<String>?
-    val proofTypesSupported: List<String>?
-    val display: List<DisplayTO>?
-
-    fun toDomain(): CredentialSupported
 }
 
 /**
@@ -285,6 +271,26 @@ sealed interface Proof {
      */
     @JvmInline
     value class Cwt(val cwt: String) : Proof
+
+    fun toJsonObject(): JsonObject = when (this) {
+        is Jwt -> {
+            JsonObject(
+                mapOf(
+                    "proof_type" to JsonPrimitive("jwt"),
+                    "jwt" to JsonPrimitive(jwt.serialize()),
+                ),
+            )
+        }
+
+        is Cwt -> {
+            JsonObject(
+                mapOf(
+                    "proof_type" to JsonPrimitive("cwt"),
+                    "jwt" to JsonPrimitive(cwt),
+                ),
+            )
+        }
+    }
 }
 
 /**

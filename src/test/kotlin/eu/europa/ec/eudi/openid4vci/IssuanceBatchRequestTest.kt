@@ -16,6 +16,10 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
+import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.formats.MsoMdoc
+import eu.europa.ec.eudi.openid4vci.formats.SdJwtVc
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -54,7 +58,7 @@ class IssuanceBatchRequestTest {
                 val (_, authorizedRequest, issuer) =
                     initIssuerWithOfferAndAuthorize(client, CREDENTIAL_OFFER_NO_GRANTS)
 
-                val claimSet_mso_mdoc = MsoMdocFormat.ClaimSet(
+                val claimSet_mso_mdoc = MsoMdoc.Model.ClaimSet(
                     claims = mapOf(
                         "org.iso.18013.5.1" to mapOf(
                             "given_name" to Claim(),
@@ -63,7 +67,7 @@ class IssuanceBatchRequestTest {
                         ),
                     ),
                 )
-                val claimSet_sd_jwt_vc = SdJwtVcFormat.ClaimSet(
+                val claimSet_sd_jwt_vc = SdJwtVc.Model.ClaimSet(
                     claims = mapOf(
                         "given_name" to Claim(),
                         "family_name" to Claim(),
@@ -105,7 +109,7 @@ class IssuanceBatchRequestTest {
                                     assertTrue("Second attempt should be successful") {
                                         (response as SubmittedRequest.Success).response.credentialResponses.all {
                                             it is CredentialIssuanceResponse.Result.Issued &&
-                                                it.format in listOf(MsoMdocFormat.FORMAT, SdJwtVcFormat.FORMAT)
+                                                it.format in listOf(MsoMdoc.FORMAT, SdJwtVc.FORMAT)
                                         }
                                     }
                                 }
@@ -141,11 +145,11 @@ class IssuanceBatchRequestTest {
                         BatchIssuanceSuccessResponse(
                             credentialResponses = listOf(
                                 BatchIssuanceSuccessResponse.CertificateIssuanceResponse(
-                                    format = MsoMdocFormat.FORMAT,
+                                    format = MsoMdoc.FORMAT,
                                     credential = credential_mso_mdoc,
                                 ),
                                 BatchIssuanceSuccessResponse.CertificateIssuanceResponse(
-                                    format = SdJwtVcFormat.FORMAT,
+                                    format = SdJwtVc.FORMAT,
                                     credential = credential_sd_jwt_vc,
                                 ),
                             ),

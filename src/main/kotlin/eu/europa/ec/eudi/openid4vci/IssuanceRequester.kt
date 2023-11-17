@@ -20,35 +20,14 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
+import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest
+import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceRequester
 import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorIssuanceRequester
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonClassDiscriminator
-import kotlinx.serialization.json.JsonObject
-
-@Serializable
-@OptIn(ExperimentalSerializationApi::class)
-@JsonClassDiscriminator("format")
-sealed interface CredentialIssuanceRequestTO {
-
-    @Serializable
-    @SerialName("batch-credential-request")
-    data class BatchCredentialsTO(
-        @SerialName("credential_requests") val credentialRequests: List<SingleCredentialTO>,
-    ) : CredentialIssuanceRequestTO
-
-    @Serializable
-    sealed interface SingleCredentialTO : CredentialIssuanceRequestTO {
-        val proof: JsonObject?
-        val credentialEncryptionJwk: JsonObject?
-        val credentialResponseEncryptionAlg: String?
-        val credentialResponseEncryptionMethod: String?
-    }
-}
 
 @Serializable
 data class DeferredIssuanceRequestTO(
@@ -92,76 +71,6 @@ data class DeferredIssuanceSuccessResponse(
     @SerialName("format") val format: String,
     @SerialName("credential") val credential: String,
 )
-
-/**
- * Credential(s) issuance request
- */
-sealed interface CredentialIssuanceRequest {
-
-    /**
-     * Models an issuance request for a batch of credentials
-     *
-     * @param credentialRequests    List of individual credential issuance requests
-     * @return A [CredentialIssuanceRequest]
-     *
-     */
-    data class BatchCredentials(
-        val credentialRequests: List<SingleCredential>,
-    ) : CredentialIssuanceRequest
-
-    /**
-     * Sealed hierarchy of credential issuance requests based on the format of the requested credential.
-     */
-    sealed interface SingleCredential : CredentialIssuanceRequest {
-
-        val format: String
-        val proof: Proof?
-        val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption
-
-        companion object {
-
-            /**
-             * Utility method to create the [RequestedCredentialResponseEncryption] attribute of the issuance request.
-             * Construction logic is independent of the credential's format.
-             *
-             * @param credentialEncryptionJwk   Key pair in JWK format used for issuance response encryption/decryption
-             * @param credentialResponseEncryptionAlg   Encryption algorithm to be used
-             * @param credentialResponseEncryptionMethod Encryption method to be used
-             */
-            fun requestedCredentialResponseEncryption(
-                credentialEncryptionJwk: JWK?,
-                credentialResponseEncryptionAlg: JWEAlgorithm?,
-                credentialResponseEncryptionMethod: EncryptionMethod?,
-            ): RequestedCredentialResponseEncryption =
-                if (credentialEncryptionJwk == null &&
-                    credentialResponseEncryptionAlg == null &&
-                    credentialResponseEncryptionMethod == null
-                ) {
-                    RequestedCredentialResponseEncryption.NotRequested
-                } else {
-                    var encryptionMethod = credentialResponseEncryptionMethod
-                    when {
-                        credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null ->
-                            encryptionMethod = EncryptionMethod.A256GCM
-
-                        credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null ->
-                            throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
-
-                        credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null ->
-                            throw CredentialIssuanceError.InvalidIssuanceRequest(
-                                "Credential response encryption algorithm must be specified if Credential " +
-                                    "response encryption method is provided",
-                            )
-                    }
-                    RequestedCredentialResponseEncryption.Requested(
-                        encryptionJwk = credentialEncryptionJwk!!,
-                        responseEncryptionAlg = credentialResponseEncryptionAlg!!,
-                        responseEncryptionMethod = encryptionMethod!!,
-                    )
-                }
-        }
-    }
-}
 
 /**
  * Sealed hierarchy for the issuance response encryption specification as it is requested to the issuer server.
@@ -259,12 +168,6 @@ sealed interface DeferredCredentialIssuanceResponse {
         val errorDescription: String? = null,
     ) : DeferredCredentialIssuanceResponse
 }
-
-/**
- * Sealed interface to model the set of specific claims that need to be included in the issued credential.
- * This set of claims is modelled differently depending on the credential format.
- */
-sealed interface ClaimSet
 
 /**
  * Interface that specifies the interaction with a Credentials Issuer required to handle the issuance of a credential
