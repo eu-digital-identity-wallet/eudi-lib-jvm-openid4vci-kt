@@ -21,6 +21,7 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.engine.apache.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.cookies.*
 import io.ktor.client.request.*
@@ -29,13 +30,16 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import org.apache.http.conn.ssl.NoopHostnameVerifier
+import org.apache.http.conn.ssl.TrustSelfSignedStrategy
+import org.apache.http.ssl.SSLContextBuilder
 import org.jsoup.Jsoup
 import org.jsoup.nodes.FormElement
 import java.net.URI
 import java.net.URL
 import java.util.*
 
-val CredentialIssuer_URL = "http://localhost:8080"
+val CredentialIssuer_URL = "https://localhost/pid-issuer"
 val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
 val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
 
@@ -70,17 +74,17 @@ fun main(): Unit = runTest {
         jwk = KeyGenerator.randomRSASigningKey(2048),
     )
 
-    val user = ActingUser("babis", "babis")
+    val user = ActingUser("tneal", "password")
     val wallet = Wallet.ofUser(user, bindingKey)
 
-//    WalletInitiatedIssuanceWithOffer(wallet)
+    WalletInitiatedIssuanceWithOffer(wallet)
     WalletInitiatedIssuanceNoOffer(wallet)
 }
 
 private suspend fun WalletInitiatedIssuanceWithOffer(wallet: Wallet) {
     println("[[Scenario: Offer passed to wallet via url]] ")
 
-    val coUrl = "http://localhost:8080/credentialoffer?credential_offer=$SdJwtVC_CredentialOffer"
+    val coUrl = "https://localhost/pid-issuer/credentialoffer?credential_offer=$SdJwtVC_CredentialOffer"
 
     val credential = wallet.issueByCredentialOfferUrl(coUrl)
 
@@ -108,18 +112,18 @@ private class Wallet(
     suspend fun issueByScope(scope: String): String {
         val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
         val issuerMetadata =
-            CredentialIssuerMetadataResolver.ktor()
+            CredentialIssuerMetadataResolver.ktor(ktorHttpClientFactory = { httpClientFactory() })
                 .resolve(credentialIssuerIdentifier).getOrThrow()
 
         val authServerMetadata =
-            AuthorizationServerMetadataResolver.ktor()
+            AuthorizationServerMetadataResolver.ktor(ktorHttpClientFactory = { httpClientFactory() })
                 .resolve(issuerMetadata.authorizationServer).getOrThrow()
 
         val issuer = Issuer.ktor(
             authServerMetadata,
             issuerMetadata,
             config,
-        )
+        ) { httpClientFactory() }
 
         val credentialMetadata = CredentialMetadata.ByScope(Scope.of(scope))
 
@@ -172,7 +176,7 @@ private class Wallet(
             offer.authorizationServerMetadata,
             offer.credentialIssuerMetadata,
             config,
-        )
+        ) { httpClientFactory() }
 
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
@@ -272,6 +276,7 @@ private class Wallet(
                 is DeferredCredentialIssuanceResponse.IssuancePending -> throw RuntimeException(
                     "Credential not ready yet. Try after ${deferredRequestResponse.transactionId.interval}",
                 )
+
                 is DeferredCredentialIssuanceResponse.Errored -> throw RuntimeException(deferredRequestResponse.error)
             }
         }
@@ -311,13 +316,23 @@ private class Wallet(
     }
 
     private fun httpClientFactory(): HttpClient =
-        HttpClient {
+        HttpClient(Apache) {
             install(ContentNegotiation) {
                 json(
                     json = Json { ignoreUnknownKeys = true },
                 )
             }
             install(HttpCookies)
+            engine {
+                customizeClient {
+                    setSSLContext(
+                        SSLContextBuilder.create()
+                            .loadTrustMaterial(TrustSelfSignedStrategy())
+                            .build(),
+                    )
+                    setSSLHostnameVerifier(NoopHostnameVerifier())
+                }
+            }
         }
 
     private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
