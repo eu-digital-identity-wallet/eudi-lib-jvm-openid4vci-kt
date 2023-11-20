@@ -39,7 +39,7 @@ import java.net.URI
 import java.net.URL
 import java.util.*
 
-val CredentialIssuer_URL = "https://localhost/pid-issuer"
+val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
 val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
 val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
 val OPENID_SCOPE = "openid"
@@ -180,11 +180,11 @@ private class Wallet(
             IssuanceAuthorizer.ktor(
                 authorizationServerMetadata = offer.authorizationServerMetadata,
                 config = config,
-                ktorHttpClientFactory = { httpClientFactory() },
+                ktorHttpClientFactory = ::httpClientFactory,
             ),
             IssuanceRequester.ktor(
                 issuerMetadata = offer.credentialIssuerMetadata,
-                ktorHttpClientFactory = { httpClientFactory() },
+                ktorHttpClientFactory = ::httpClientFactory,
             ),
         )
 

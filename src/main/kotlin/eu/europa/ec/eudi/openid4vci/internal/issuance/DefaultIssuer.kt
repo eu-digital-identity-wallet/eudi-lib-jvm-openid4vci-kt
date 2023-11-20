@@ -145,7 +145,6 @@ internal class DefaultIssuer(
                 }
 
                 ProofBuilder.ofType(ProofType.JWT) {
-                    iss("")
                     aud(issuanceRequester.issuerMetadata.credentialIssuerIdentifier.toString())
                     jwk(this@toSupportedProof.jwk)
                     alg(this@toSupportedProof.algorithm)
