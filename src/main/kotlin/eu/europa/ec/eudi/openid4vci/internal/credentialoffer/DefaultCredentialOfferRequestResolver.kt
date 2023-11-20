@@ -152,7 +152,7 @@ internal class DefaultCredentialOfferRequestResolver(
                         }
                     }
 
-            return FormatRegistry.byFormat(format).matchSupportedAndToDomain(this, metadata)
+            return Formats.matchSupportedCredentialByTypeAndMapToDomain(format, this, metadata)
         }
     }
 }

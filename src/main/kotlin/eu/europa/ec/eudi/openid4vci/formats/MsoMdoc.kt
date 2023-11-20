@@ -27,12 +27,16 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 import java.util.*
 
-class MsoMdoc : Format<MsoMdoc.Model.CredentialMetadata, MsoMdoc.Model.CredentialSupported, MsoMdoc.Model.CredentialIssuanceRequest> {
+internal class MsoMdoc : Format<
+    MsoMdoc.Model.CredentialMetadata,
+    MsoMdoc.Model.CredentialSupported,
+    MsoMdoc.Model.CredentialIssuanceRequest,
+    > {
 
     companion object {
         const val FORMAT = "mso_mdoc"
     }
-    override fun matchSupportedAndToDomain(
+    override fun matchSupportedCredentialByTypeAndMapToDomain(
         jsonObject: JsonObject,
         issuerMetadata: CredentialIssuerMetadata,
     ): Model.CredentialMetadata {
@@ -52,7 +56,7 @@ class MsoMdoc : Format<MsoMdoc.Model.CredentialMetadata, MsoMdoc.Model.Credentia
     override fun decodeCredentialSupportedFromJsonObject(jsonObject: JsonObject): Model.CredentialSupportedTO =
         Json.decodeFromJsonElement<Model.CredentialSupportedTO>(jsonObject)
 
-    override fun supportedCredentialByFormat(
+    override fun matchSupportedCredentialByType(
         metadata: Model.CredentialMetadata,
         issuerMetadata: CredentialIssuerMetadata,
     ): CredentialSupported =
@@ -259,7 +263,7 @@ class MsoMdoc : Format<MsoMdoc.Model.CredentialMetadata, MsoMdoc.Model.Credentia
             override val proof: Proof? = null,
             override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
             val claimSet: ClaimSet?,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential {
+        ) : SingleCredential {
 
             override val format: String = "mso_mdoc"
 

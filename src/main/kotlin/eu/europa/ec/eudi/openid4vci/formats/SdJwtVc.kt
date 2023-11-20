@@ -26,14 +26,17 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.util.*
 
-class SdJwtVc :
-    Format<SdJwtVc.Model.CredentialMetadata, SdJwtVc.Model.CredentialSupported, SdJwtVc.Model.CredentialIssuanceRequest> {
+internal class SdJwtVc : Format<
+    SdJwtVc.Model.CredentialMetadata,
+    SdJwtVc.Model.CredentialSupported,
+    SdJwtVc.Model.CredentialIssuanceRequest,
+    > {
 
     companion object {
         const val FORMAT = "vc+sd-jwt"
     }
 
-    override fun matchSupportedAndToDomain(
+    override fun matchSupportedCredentialByTypeAndMapToDomain(
         jsonObject: JsonObject,
         issuerMetadata: CredentialIssuerMetadata,
     ): Model.CredentialMetadata {
@@ -59,7 +62,7 @@ class SdJwtVc :
     ): Model.CredentialSupportedTO =
         Json.decodeFromJsonElement<Model.CredentialSupportedTO>(jsonObject)
 
-    override fun supportedCredentialByFormat(
+    override fun matchSupportedCredentialByType(
         metadata: Model.CredentialMetadata,
         issuerMetadata: CredentialIssuerMetadata,
     ): CredentialSupported =
@@ -260,7 +263,7 @@ class SdJwtVc :
             override val proof: Proof? = null,
             override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
             val credentialDefinition: CredentialDefinition,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential {
+        ) : SingleCredential {
 
             override val format: String = FORMAT
 

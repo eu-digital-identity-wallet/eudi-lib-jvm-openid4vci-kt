@@ -157,7 +157,7 @@ private fun JsonObject.toCredentialSupportedObject(): Result<CredentialSupported
             jsonElement.content
         }
 
-    FormatRegistry.byFormat(format).decodeCredentialSupportedFromJsonObject(this)
+    Formats.decodeCredentialSupportedFromJsonObject(format, this)
 }
 
 /**

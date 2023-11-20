@@ -19,55 +19,12 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
-
-internal object FormatRegistry {
-
-    private val formats = mapOf(
-        MsoMdoc.FORMAT to
-            MsoMdoc() as Format<CredentialMetadata.ByFormat, CredentialSupported, SingleCredential>,
-        SdJwtVc.FORMAT to
-            SdJwtVc() as Format<CredentialMetadata.ByFormat, CredentialSupported, SingleCredential>,
-        W3CSignedJwt.FORMAT to
-            W3CSignedJwt() as Format<CredentialMetadata.ByFormat, CredentialSupported, SingleCredential>,
-        W3CJsonLdSignedJwt.FORMAT to
-            W3CJsonLdSignedJwt() as Format<CredentialMetadata.ByFormat, CredentialSupported, SingleCredential>,
-        W3CJsonLdDataIntegrity.FORMAT to
-            W3CJsonLdDataIntegrity() as Format<CredentialMetadata.ByFormat, CredentialSupported, SingleCredential>,
-    )
-
-    fun byFormat(format: String): Format<CredentialMetadata.ByFormat, CredentialSupported, SingleCredential> =
-        formats[format] ?: throw IllegalArgumentException("Unsupported Credential format '$format'")
-
-    fun byCredential(
-        credentialMetadata: CredentialMetadata.ByFormat,
-    ): Format<CredentialMetadata.ByFormat, CredentialSupported, SingleCredential> =
-        when (credentialMetadata) {
-            is MsoMdoc.Model.CredentialMetadata -> formats[MsoMdoc.FORMAT]
-            is SdJwtVc.Model.CredentialMetadata -> formats[SdJwtVc.FORMAT]
-            is W3CSignedJwt.Model.CredentialMetadata -> formats[W3CSignedJwt.FORMAT]
-            is W3CJsonLdSignedJwt.Model.CredentialMetadata -> formats[W3CJsonLdSignedJwt.FORMAT]
-            is W3CJsonLdDataIntegrity.Model.CredentialMetadata -> formats[W3CJsonLdDataIntegrity.FORMAT]
-        }
-            ?: throw IllegalArgumentException("Unsupported Credential format")
-
-    fun byCredentialSupported(
-        credentialMetadata: CredentialSupported,
-    ): Format<CredentialMetadata.ByFormat, CredentialSupported, SingleCredential> =
-        when (credentialMetadata) {
-            is MsoMdoc.Model.CredentialSupported -> formats[MsoMdoc.FORMAT]
-            is SdJwtVc.Model.CredentialSupported -> formats[SdJwtVc.FORMAT]
-            is W3CSignedJwt.Model.CredentialSupported -> formats[W3CSignedJwt.FORMAT]
-            is W3CJsonLdSignedJwt.Model.CredentialSupported -> formats[W3CJsonLdSignedJwt.FORMAT]
-            is W3CJsonLdDataIntegrity.Model.CredentialSupported -> formats[W3CJsonLdDataIntegrity.FORMAT]
-        }
-            ?: throw IllegalArgumentException("Unsupported Credential format")
-}
+import java.util.*
 
 @kotlinx.serialization.Serializable
 @OptIn(ExperimentalSerializationApi::class)
@@ -200,3 +157,56 @@ sealed interface CredentialIssuanceRequest {
         }
     }
 }
+
+/**
+ * Utility method to convert a [DisplayTO] transfer object to the respective [Display] domain object.
+ */
+fun DisplayTO.toDomain(): Display {
+    fun DisplayTO.LogoObject.toLogo(): Display.Logo =
+        Display.Logo(
+            url?.let { HttpsUrl(it).getOrThrow() },
+            alternativeText,
+        )
+
+    return Display(
+        name,
+        locale?.let { Locale.forLanguageTag(it) },
+        logo?.toLogo(),
+        description,
+        backgroundColor,
+        textColor,
+    )
+}
+
+/**
+ * Utility method to convert a list of string to a list of [CryptographicBindingMethod].
+ */
+fun List<String>.toCryptographicBindingMethods(): List<CryptographicBindingMethod> =
+    map {
+        when (it) {
+            "jwk" -> CryptographicBindingMethod.JWK
+            "cose_key" -> CryptographicBindingMethod.COSE
+            "mso" -> CryptographicBindingMethod.MSO
+            else ->
+                if (it.startsWith("did")) {
+                    CryptographicBindingMethod.DID(it)
+                } else {
+                    throw IllegalArgumentException("Unknown Cryptographic Binding Method '$it'")
+                }
+        }
+    }
+
+/**
+ * Utility method to convert a list of string to a list of [ProofType].
+ */
+fun List<String>?.toProofTypes(): List<ProofType> =
+    this?.map {
+        when (it) {
+            "jwt" -> ProofType.JWT
+            "cwt" -> ProofType.CWT
+            else -> throw IllegalArgumentException("Unknown Proof Type '$it'")
+        }
+    } ?: emptyList<ProofType>()
+        .ifEmpty {
+            listOf(ProofType.JWT)
+        }

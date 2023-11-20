@@ -199,8 +199,7 @@ internal class DefaultIssuer(
         when (this) {
             is CredentialMetadata.ByScope -> supportedCredentialByScope(this, issuanceRequester.issuerMetadata)
             is CredentialMetadata.ByFormat ->
-                FormatRegistry.byCredential(this)
-                    .supportedCredentialByFormat(this, issuanceRequester.issuerMetadata)
+                Formats.matchSupportedCredentialByType(this, issuanceRequester.issuerMetadata)
         }
 
     private fun supportedCredentialByScope(
@@ -245,9 +244,7 @@ internal class DefaultIssuer(
             throw CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
         }
 
-        return FormatRegistry.byCredentialSupported(this)
-            .constructIssuanceRequest(this, claimSet, proof, responseEncryptionSpec)
-            .getOrThrow()
+        return Formats.constructIssuanceRequest(this, claimSet, proof, responseEncryptionSpec).getOrThrow()
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(

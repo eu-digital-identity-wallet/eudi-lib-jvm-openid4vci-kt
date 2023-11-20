@@ -25,7 +25,7 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import java.net.URL
 import java.util.*
 
-class W3CJsonLdDataIntegrity : Format<
+internal class W3CJsonLdDataIntegrity : Format<
     W3CJsonLdDataIntegrity.Model.CredentialMetadata,
     W3CJsonLdDataIntegrity.Model.CredentialSupported,
     W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest,
@@ -35,7 +35,7 @@ class W3CJsonLdDataIntegrity : Format<
         const val FORMAT = "ldp_vc"
     }
 
-    override fun matchSupportedAndToDomain(
+    override fun matchSupportedCredentialByTypeAndMapToDomain(
         jsonObject: JsonObject,
         issuerMetadata: CredentialIssuerMetadata,
     ): Model.CredentialMetadata {
@@ -72,7 +72,7 @@ class W3CJsonLdDataIntegrity : Format<
     ): Model.CredentialSupportedTO =
         Json.decodeFromJsonElement<Model.CredentialSupportedTO>(jsonObject)
 
-    override fun supportedCredentialByFormat(
+    override fun matchSupportedCredentialByType(
         metadata: Model.CredentialMetadata,
         issuerMetadata: CredentialIssuerMetadata,
     ): CredentialSupported =
