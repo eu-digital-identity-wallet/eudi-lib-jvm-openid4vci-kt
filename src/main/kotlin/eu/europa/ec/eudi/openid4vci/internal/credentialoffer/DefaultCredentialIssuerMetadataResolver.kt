@@ -89,37 +89,6 @@ private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetada
     val deferredCredentialEndpoint = deferredCredentialEndpoint
         ?.let { CredentialIssuerEndpoint(it).getOrThrowAs(::InvalidDeferredCredentialEndpoint) }
 
-    fun credentialResponseEncryption(): Result<CredentialResponseEncryption> = runCatching {
-        val requireEncryption = requireCredentialResponseEncryption ?: false
-        val encryptionAlgorithms = credentialResponseEncryptionAlgorithmsSupported
-            ?.map { JWEAlgorithm.parse(it) }
-            ?: emptyList()
-        val encryptionMethods = credentialResponseEncryptionMethodsSupported
-            ?.map { EncryptionMethod.parse(it) }
-            ?: emptyList()
-
-        if (requireEncryption) {
-            if (encryptionAlgorithms.isEmpty()) {
-                throw CredentialResponseEncryptionAlgorithmsRequired
-            }
-            val allAreAsymmetricAlgorithms = encryptionAlgorithms.all {
-                JWEAlgorithm.Family.ASYMMETRIC.contains(it)
-            }
-            if (!allAreAsymmetricAlgorithms) {
-                throw CredentialResponseAsymmetricEncryptionAlgorithmsRequired
-            }
-
-            CredentialResponseEncryption.Required(
-                encryptionAlgorithms,
-                encryptionMethods,
-            )
-        } else {
-            require(encryptionAlgorithms.isEmpty())
-            require(encryptionMethods.isEmpty())
-            CredentialResponseEncryption.NotRequired
-        }
-    }
-
     val credentialsSupported = try {
         credentialsSupported.map { it.toCredentialSupportedObject().getOrThrow().toDomain() }
     } catch (it: Throwable) {
@@ -140,6 +109,37 @@ private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetada
         credentialsSupported,
         display,
     )
+}
+
+fun CredentialIssuerMetadataTO.credentialResponseEncryption(): Result<CredentialResponseEncryption> = runCatching {
+    val requireEncryption = requireCredentialResponseEncryption ?: false
+    val encryptionAlgorithms = credentialResponseEncryptionAlgorithmsSupported
+        ?.map { JWEAlgorithm.parse(it) }
+        ?: emptyList()
+    val encryptionMethods = credentialResponseEncryptionMethodsSupported
+        ?.map { EncryptionMethod.parse(it) }
+        ?: emptyList()
+
+    if (requireEncryption) {
+        if (encryptionAlgorithms.isEmpty()) {
+            throw CredentialResponseEncryptionAlgorithmsRequired
+        }
+        val allAreAsymmetricAlgorithms = encryptionAlgorithms.all {
+            JWEAlgorithm.Family.ASYMMETRIC.contains(it)
+        }
+        if (!allAreAsymmetricAlgorithms) {
+            throw CredentialResponseAsymmetricEncryptionAlgorithmsRequired
+        }
+
+        CredentialResponseEncryption.Required(
+            encryptionAlgorithms,
+            encryptionMethods,
+        )
+    } else {
+        require(encryptionAlgorithms.isEmpty())
+        require(encryptionMethods.isEmpty())
+        CredentialResponseEncryption.NotRequired
+    }
 }
 
 /**

@@ -277,10 +277,10 @@ interface RequestIssuance {
 
                     val encryptionKey = when {
                         JWEAlgorithm.Family.ECDH_ES.contains(firstAsymmetricAlgorithm) ->
-                            KeyGenerator.randomECEncryptionKey(Curve.P_256) // TODO: Curve to use should be moved to lib configuration ??
+                            KeyGenerator.randomECEncryptionKey(Curve.P_256)
 
                         JWEAlgorithm.Family.RSA.contains(firstAsymmetricAlgorithm) ->
-                            KeyGenerator.randomRSAEncryptionKey(2048) // TODO: Key size should be moved to lib configuration ??
+                            KeyGenerator.randomRSAEncryptionKey(2048)
 
                         else -> null
                     }
