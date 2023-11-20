@@ -35,9 +35,10 @@ import java.net.URI
 import java.net.URL
 import java.util.*
 
-val CredentialIssuer_URL = "http://localhost:8080"
+val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
 val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
 val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
+val OPENID_SCOPE = "openid"
 
 val SdJwtVC_CredentialOffer = """
     {
@@ -70,10 +71,10 @@ fun main(): Unit = runTest {
         jwk = KeyGenerator.randomRSASigningKey(2048),
     )
 
-    val user = ActingUser("babis", "babis")
+    val user = ActingUser("tneal", "password")
     val wallet = Wallet.ofUser(user, bindingKey)
 
-//    WalletInitiatedIssuanceWithOffer(wallet)
+    WalletInitiatedIssuanceWithOffer(wallet)
     WalletInitiatedIssuanceNoOffer(wallet)
 }
 
@@ -122,10 +123,11 @@ private class Wallet(
         )
 
         val credentialMetadata = CredentialMetadata.ByScope(Scope.of(scope))
+        val openId_scope = CredentialMetadata.ByScope(Scope.of(OPENID_SCOPE))
 
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
-            listOf(credentialMetadata),
+            listOf(credentialMetadata, openId_scope),
             authServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
@@ -170,10 +172,12 @@ private class Wallet(
             config,
         )
 
+        val openId_scope = CredentialMetadata.ByScope(Scope.of(OPENID_SCOPE))
+
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
-            offer.credentials,
+            offer.credentials + openId_scope,
             offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
