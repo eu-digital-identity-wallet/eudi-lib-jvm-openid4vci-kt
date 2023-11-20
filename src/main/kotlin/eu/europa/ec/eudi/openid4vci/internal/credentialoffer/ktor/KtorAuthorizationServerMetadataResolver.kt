@@ -60,10 +60,6 @@ internal class KtorAuthorizationServerMetadataResolver(
         }
 
         private fun httpGet(httpClient: HttpClient): HttpGet<String> =
-            HttpGet {
-                runCatching {
-                    httpClient.get(it).body<String>()
-                }
-            }
+            HttpGet { httpClient.get(it).body<String>() }
     }
 }

@@ -40,8 +40,10 @@ internal class DefaultCredentialOfferRequestResolver(
                 is CredentialOfferRequest.PassByValue -> request.value
                 is CredentialOfferRequest.PassByReference ->
                     withContext(ioCoroutineDispatcher + CoroutineName("credential-offer-request-object")) {
-                        httpGet.get(request.value.value.toURL()).getOrElse {
-                            CredentialOfferRequestError.UnableToFetchCredentialOffer(it).raise()
+                        try {
+                            httpGet.get(request.value.value.toURL())
+                        } catch (t: Throwable) {
+                            throw CredentialOfferRequestError.UnableToFetchCredentialOffer(t).toException()
                         }
                     }
             }
@@ -152,7 +154,11 @@ internal class DefaultCredentialOfferRequestResolver(
                 MsoMdocFormat.FORMAT -> MsoMdocFormat.matchSupportedAndToDomain(this, metadata)
                 W3CSignedJwtFormat.FORMAT -> W3CSignedJwtFormat.matchSupportedAndToDomain(this, metadata)
                 W3CJsonLdSignedJwtFormat.FORMAT -> W3CJsonLdSignedJwtFormat.matchSupportedAndToDomain(this, metadata)
-                W3CJsonLdDataIntegrityFormat.FORMAT -> W3CJsonLdDataIntegrityFormat.matchSupportedAndToDomain(this, metadata)
+                W3CJsonLdDataIntegrityFormat.FORMAT -> W3CJsonLdDataIntegrityFormat.matchSupportedAndToDomain(
+                    this,
+                    metadata,
+                )
+
                 SdJwtVcFormat.FORMAT -> SdJwtVcFormat.matchSupportedAndToDomain(this, metadata)
 
                 else -> throw IllegalArgumentException("Unknown Credential format '$format'")

@@ -25,7 +25,7 @@ import java.net.URL
  * to obtain [R]
  */
 fun interface HttpGet<out R> {
-    suspend fun get(url: URL): Result<R>
+    suspend fun get(url: URL): R
 }
 
 /**
@@ -40,7 +40,12 @@ fun interface HttpFormPost<out R> {
  * An abstraction of an HTP Post operation of payload [T] parsing response as [R].
  */
 fun interface HttpPost<in T, in R, out RESPONSE> {
-    suspend fun post(url: URL, headers: Map<String, String>, payload: T, responseHandler: suspend (response: HttpResponse) -> R): RESPONSE
+    suspend fun post(
+        url: URL,
+        headers: Map<String, String>,
+        payload: T,
+        responseHandler: suspend (response: HttpResponse) -> R,
+    ): RESPONSE
 }
 
 /**

@@ -155,11 +155,7 @@ private class Wallet(
     suspend fun issueByCredentialOfferUrl(coUrl: String): String {
         val offer = httpClientFactory().use { client ->
             val credentialOfferRequestResolver = CredentialOfferRequestResolver(
-                httpGet = { url ->
-                    runCatching {
-                        client.get(url).body<String>()
-                    }
-                },
+                httpGet = { url -> client.get(url).body<String>() },
             )
             credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
         }
