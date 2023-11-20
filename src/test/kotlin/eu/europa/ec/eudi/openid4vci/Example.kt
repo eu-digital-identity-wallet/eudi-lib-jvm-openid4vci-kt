@@ -42,6 +42,7 @@ import java.util.*
 val CredentialIssuer_URL = "https://localhost/pid-issuer"
 val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
 val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
+val OPENID_SCOPE = "openid"
 
 val SdJwtVC_CredentialOffer = """
     {
@@ -132,10 +133,11 @@ private class Wallet(
         )
 
         val credentialMetadata = CredentialMetadata.ByScope(Scope.of(scope))
+        val openId_scope = CredentialMetadata.ByScope(Scope.of(OPENID_SCOPE))
 
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
-            listOf(credentialMetadata),
+            listOf(credentialMetadata, openId_scope),
             authServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
@@ -165,11 +167,7 @@ private class Wallet(
     suspend fun issueByCredentialOfferUrl(coUrl: String): String {
         val offer = httpClientFactory().use { client ->
             val credentialOfferRequestResolver = CredentialOfferRequestResolver(
-                httpGet = { url ->
-                    runCatching {
-                        client.get(url).body<String>()
-                    }
-                },
+                httpGet = { url -> client.get(url).body<String>() },
             )
             credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
         }
@@ -190,10 +188,12 @@ private class Wallet(
             ),
         )
 
+        val openId_scope = CredentialMetadata.ByScope(Scope.of(OPENID_SCOPE))
+
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
-            offer.credentials,
+            offer.credentials + openId_scope,
             offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 

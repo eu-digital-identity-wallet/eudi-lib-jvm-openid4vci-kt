@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 
 import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import com.nimbusds.oauth2.sdk.id.Issuer
-import com.nimbusds.oauth2.sdk.util.JSONObjectUtils
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.mapError
@@ -78,12 +77,10 @@ internal class DefaultAuthorizationServerMetadataResolver(
      * Fetches the content of the provided [url], parses it as a [JSONObject], and further parses it
      * using the provided [parser].
      */
-    private suspend fun <T> fetchAndParse(url: URL, parser: (JSONObject) -> T): T =
+    private suspend fun <T> fetchAndParse(url: URL, parser: (String) -> T): T =
         withContext(coroutineDispatcher + CoroutineName("$url")) {
-            httpGet.get(url)
-                .mapCatching { JSONObjectUtils.parse(it) }
-                .mapCatching { parser(it) }
-                .getOrThrow()
+            val body = httpGet.get(url)
+            parser(body)
         }
 }
 

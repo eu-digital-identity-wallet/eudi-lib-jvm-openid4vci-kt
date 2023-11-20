@@ -172,11 +172,7 @@ fun createGetAccessToken(managedHttpClient: HttpClient): HttpFormPost<AccessToke
     }
 
 fun createGetASMetadata(managedHttpClient: HttpClient): HttpGet<String> =
-    HttpGet {
-        runCatching {
-            managedHttpClient.get(it).body<String>()
-        }
-    }
+    HttpGet { managedHttpClient.get(it).body<String>() }
 
 fun createPostIssuance(
     managedHttpClient: HttpClient,
