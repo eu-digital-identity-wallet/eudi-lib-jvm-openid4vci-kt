@@ -119,11 +119,17 @@ private class Wallet(
             AuthorizationServerMetadataResolver.ktor(ktorHttpClientFactory = { httpClientFactory() })
                 .resolve(issuerMetadata.authorizationServer).getOrThrow()
 
-        val issuer = Issuer.ktor(
-            authServerMetadata,
-            issuerMetadata,
-            config,
-        ) { httpClientFactory() }
+        val issuer = Issuer.make(
+            IssuanceAuthorizer.ktor(
+                authorizationServerMetadata = authServerMetadata,
+                config = config,
+                ktorHttpClientFactory = { httpClientFactory() },
+            ),
+            IssuanceRequester.ktor(
+                issuerMetadata = issuerMetadata,
+                ktorHttpClientFactory = { httpClientFactory() },
+            ),
+        )
 
         val credentialMetadata = CredentialMetadata.ByScope(Scope.of(scope))
 
@@ -172,11 +178,17 @@ private class Wallet(
     }
 
     suspend fun issueByCredentialOffer(offer: CredentialOffer): String {
-        val issuer = Issuer.ktor(
-            offer.authorizationServerMetadata,
-            offer.credentialIssuerMetadata,
-            config,
-        ) { httpClientFactory() }
+        val issuer = Issuer.make(
+            IssuanceAuthorizer.ktor(
+                authorizationServerMetadata = offer.authorizationServerMetadata,
+                config = config,
+                ktorHttpClientFactory = { httpClientFactory() },
+            ),
+            IssuanceRequester.ktor(
+                issuerMetadata = offer.credentialIssuerMetadata,
+                ktorHttpClientFactory = { httpClientFactory() },
+            ),
+        )
 
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
