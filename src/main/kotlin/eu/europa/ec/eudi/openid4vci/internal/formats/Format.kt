@@ -13,18 +13,141 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.formats
+package eu.europa.ec.eudi.openid4vci.internal.formats
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.CredentialSupportedDisplayTO
+import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.LogoObject
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
 import java.util.*
+
+internal interface Format<
+    in M : CredentialMetadata.ByFormat,
+    in S : CredentialSupported,
+    in I : CredentialIssuanceRequest.SingleCredential,
+    > {
+
+    fun matchSupportedCredentialByTypeAndMapToDomain(
+        jsonObject: JsonObject,
+        issuerMetadata: CredentialIssuerMetadata,
+    ): CredentialMetadata
+
+    fun matchSupportedCredentialByType(
+        metadata: M,
+        issuerMetadata: CredentialIssuerMetadata,
+    ): CredentialSupported
+
+    fun constructIssuanceRequest(
+        supportedCredential: S,
+        claimSet: ClaimSet?,
+        proof: Proof?,
+        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+    ): Result<CredentialIssuanceRequest.SingleCredential>
+}
+
+internal object Formats {
+
+    private val supported: Map<String, Format<*, *, *>> = mapOf(
+        MsoMdoc.FORMAT to MsoMdoc,
+        SdJwtVc.FORMAT to SdJwtVc,
+        W3CSignedJwt.FORMAT to W3CSignedJwt,
+        W3CJsonLdSignedJwt.FORMAT to W3CJsonLdSignedJwt,
+        W3CJsonLdDataIntegrity.FORMAT to W3CJsonLdDataIntegrity,
+    )
+
+    private fun formatByName(format: String): Format<*, *, *> =
+        supported[format] ?: throw IllegalArgumentException("Unsupported Credential format '$format'")
+
+    fun matchSupportedCredentialByTypeAndMapToDomain(
+        format: String,
+        jsonObject: JsonObject,
+        issuerMetadata: CredentialIssuerMetadata,
+    ): CredentialMetadata =
+        formatByName(format).matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
+
+    fun matchSupportedCredentialByType(
+        credentialMetadata: CredentialMetadata,
+        issuerMetadata: CredentialIssuerMetadata,
+    ): CredentialSupported =
+        when (credentialMetadata) {
+            is MsoMdoc.Model.CredentialMetadata -> MsoMdoc.matchSupportedCredentialByType(
+                credentialMetadata,
+                issuerMetadata,
+            )
+
+            is SdJwtVc.Model.CredentialMetadata -> SdJwtVc.matchSupportedCredentialByType(
+                credentialMetadata,
+                issuerMetadata,
+            )
+
+            is W3CSignedJwt.Model.CredentialMetadata -> W3CSignedJwt.matchSupportedCredentialByType(
+                credentialMetadata,
+                issuerMetadata,
+            )
+
+            is W3CJsonLdSignedJwt.Model.CredentialMetadata -> W3CJsonLdSignedJwt.matchSupportedCredentialByType(
+                credentialMetadata,
+                issuerMetadata,
+            )
+
+            is W3CJsonLdDataIntegrity.Model.CredentialMetadata -> W3CJsonLdDataIntegrity.matchSupportedCredentialByType(
+                credentialMetadata,
+                issuerMetadata,
+            )
+
+            else -> throw IllegalArgumentException("Unsupported Credential Metadata")
+        }
+
+    fun constructIssuanceRequest(
+        supportedCredential: CredentialSupported,
+        claimSet: ClaimSet?,
+        proof: Proof?,
+        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+    ): Result<CredentialIssuanceRequest.SingleCredential> =
+        when (supportedCredential) {
+            is MsoMdoc.Model.CredentialSupported -> MsoMdoc.constructIssuanceRequest(
+                supportedCredential,
+                claimSet,
+                proof,
+                responseEncryptionSpec,
+            )
+
+            is SdJwtVc.Model.CredentialSupported -> SdJwtVc.constructIssuanceRequest(
+                supportedCredential,
+                claimSet,
+                proof,
+                responseEncryptionSpec,
+            )
+
+            is W3CSignedJwt.Model.CredentialSupported -> W3CSignedJwt.constructIssuanceRequest(
+                supportedCredential,
+                claimSet,
+                proof,
+                responseEncryptionSpec,
+            )
+
+            is W3CJsonLdSignedJwt.Model.CredentialSupported -> W3CJsonLdSignedJwt.constructIssuanceRequest(
+                supportedCredential,
+                claimSet,
+                proof,
+                responseEncryptionSpec,
+            )
+
+            is W3CJsonLdDataIntegrity.Model.CredentialSupported -> W3CJsonLdDataIntegrity.constructIssuanceRequest(
+                supportedCredential,
+                claimSet,
+                proof,
+                responseEncryptionSpec,
+            )
+        }
+}
 
 @kotlinx.serialization.Serializable
 @OptIn(ExperimentalSerializationApi::class)
@@ -39,29 +162,11 @@ sealed interface CredentialIssuanceRequestTO {
 
     @kotlinx.serialization.Serializable
     sealed interface SingleCredentialTO : CredentialIssuanceRequestTO {
-        val proof: JsonObject?
+        val proof: Proof?
         val credentialEncryptionJwk: JsonObject?
         val credentialResponseEncryptionAlg: String?
         val credentialResponseEncryptionMethod: String?
     }
-}
-
-/**
- * The metadata of a Credentials that can be issued by a Credential Issuer.
- */
-@OptIn(ExperimentalSerializationApi::class)
-@kotlinx.serialization.Serializable
-@JsonClassDiscriminator("format")
-sealed interface CredentialSupportedTO {
-
-    val format: String
-    val scope: String?
-    val cryptographicBindingMethodsSupported: List<String>?
-    val cryptographicSuitesSupported: List<String>?
-    val proofTypesSupported: List<String>?
-    val display: List<DisplayTO>?
-
-    fun toDomain(): CredentialSupported
 }
 
 /**
@@ -164,10 +269,28 @@ sealed interface CredentialIssuanceRequest {
 }
 
 /**
- * Utility method to convert a [DisplayTO] transfer object to the respective [Display] domain object.
+ * The metadata of a Credentials that can be issued by a Credential Issuer.
  */
-fun DisplayTO.toDomain(): Display {
-    fun DisplayTO.LogoObject.toLogo(): Display.Logo =
+@OptIn(ExperimentalSerializationApi::class)
+@kotlinx.serialization.Serializable
+@JsonClassDiscriminator("format")
+internal sealed interface CredentialSupportedTO {
+
+    val format: String
+    val scope: String?
+    val cryptographicBindingMethodsSupported: List<String>?
+    val cryptographicSuitesSupported: List<String>?
+    val proofTypesSupported: List<String>?
+    val display: List<CredentialSupportedDisplayTO>?
+
+    fun toDomain(): CredentialSupported
+}
+
+/**
+ * Utility method to convert a [CredentialSupportedDisplayTO] transfer object to the respective [Display] domain object.
+ */
+internal fun CredentialSupportedDisplayTO.toDomain(): Display {
+    fun LogoObject.toLogo(): Display.Logo =
         Display.Logo(
             url?.let { HttpsUrl(it).getOrThrow() },
             alternativeText,

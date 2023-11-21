@@ -26,8 +26,8 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
-import eu.europa.ec.eudi.openid4vci.formats.MsoMdoc
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -337,7 +337,7 @@ class IssuanceEncryptedResponsesTest {
             val parRequested = issuer.pushAuthorizationCodeRequest(offer.credentials, null).getOrThrow()
             val authorizationCode = UUID.randomUUID().toString()
             parRequested
-                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                 .requestAccessToken().getOrThrow()
         }
         return Triple(offer, flowState, issuer)

@@ -13,24 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.formats
+package eu.europa.ec.eudi.openid4vci.internal.formats
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.ClaimTO
+import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.CredentialSupportedDisplayTO
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
+import java.net.URL
 import java.util.*
 
-internal data object W3CSignedJwt : Format<
-    W3CSignedJwt.Model.CredentialMetadata,
-    W3CSignedJwt.Model.CredentialSupported,
-    W3CSignedJwt.Model.CredentialIssuanceRequest,
+internal data object W3CJsonLdDataIntegrity : Format<
+    W3CJsonLdDataIntegrity.Model.CredentialMetadata,
+    W3CJsonLdDataIntegrity.Model.CredentialSupported,
+    W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest,
     > {
 
-    const val FORMAT = "jwt_vc_json"
+    const val FORMAT = "ldp_vc"
 
     override fun matchSupportedCredentialByTypeAndMapToDomain(
         jsonObject: JsonObject,
@@ -47,12 +50,16 @@ internal data object W3CSignedJwt : Format<
 
         return issuerMetadata.credentialsSupported
             .firstOrNull {
-                it is Model.CredentialSupported && it.credentialDefinition.type == credentialDefinition.type
+                it is Model.CredentialSupported &&
+                    it.credentialDefinition.type == credentialDefinition.type &&
+                    it.credentialDefinition.context.map { it.toString() } == credentialDefinition.context
             }
             ?.let {
                 Model.CredentialMetadata(
                     Model.CredentialMetadata.CredentialDefinitionMetadata(
                         type = credentialDefinition.type,
+                        content = credentialDefinition.context?.map { URL(it) }
+                            ?: throw IllegalArgumentException("Unparsable"),
                     ),
                     it.scope,
                 )
@@ -66,6 +73,7 @@ internal data object W3CSignedJwt : Format<
     ): CredentialSupported =
         issuerMetadata.credentialsSupported.firstOrNull {
             it is Model.CredentialSupported &&
+                it.credentialDefinition.context == metadata.credentialDefinition.content &&
                 it.credentialDefinition.type == metadata.credentialDefinition.type
         } ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
 
@@ -80,7 +88,7 @@ internal data object W3CSignedJwt : Format<
 
     object Model {
         /**
-         * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
+         * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
          */
         @Serializable
         @SerialName(FORMAT)
@@ -93,21 +101,24 @@ internal data object W3CSignedJwt : Format<
             override val cryptographicSuitesSupported: List<String>? = null,
             @SerialName("proof_types_supported")
             override val proofTypesSupported: List<String>? = null,
-            @SerialName("display") override val display: List<DisplayTO>? = null,
+            @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
+            @SerialName("@context") @Required val context: List<String> = emptyList(),
+            @SerialName("type") @Required val type: List<String> = emptyList(),
             @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
             @SerialName("order") val order: List<String>? = null,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialSupportedTO {
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupportedTO {
             init {
                 require(format == FORMAT) { "invalid format '$format'" }
             }
 
             @Serializable
             data class CredentialDefinitionTO(
+                @SerialName("@context") val context: List<String>,
                 @SerialName("type") val types: List<String>,
                 @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>? = null,
             )
 
-            override fun toDomain(): eu.europa.ec.eudi.openid4vci.formats.CredentialSupported {
+            override fun toDomain(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
                 val bindingMethods =
                     cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
                         ?: emptyList()
@@ -121,6 +132,8 @@ internal data object W3CSignedJwt : Format<
                     cryptographicSuitesSupported,
                     proofTypesSupported,
                     display,
+                    context,
+                    type,
                     credentialDefinition.toDomain(),
                     order ?: emptyList(),
                 )
@@ -129,6 +142,7 @@ internal data object W3CSignedJwt : Format<
 
         fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): CredentialSupported.CredentialDefinition =
             CredentialSupported.CredentialDefinition(
+                context = context.map { URL(it) },
                 type = types,
                 credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
                     nameAndClaim.value.let {
@@ -147,7 +161,7 @@ internal data object W3CSignedJwt : Format<
             )
 
         /**
-         * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
+         * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
          */
         data class CredentialSupported(
             override val scope: String? = null,
@@ -155,11 +169,14 @@ internal data object W3CSignedJwt : Format<
             override val cryptographicSuitesSupported: List<String> = emptyList(),
             override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
             override val display: List<Display> = emptyList(),
+            val context: List<String> = emptyList(),
+            val type: List<String> = emptyList(),
             val credentialDefinition: CredentialDefinition,
             val order: List<ClaimName> = emptyList(),
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialSupported {
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
 
             data class CredentialDefinition(
+                val context: List<URL>,
                 val type: List<String>,
                 val credentialSubject: Map<ClaimName, Claim?>?,
             )
@@ -173,31 +190,33 @@ internal data object W3CSignedJwt : Format<
             @Serializable
             data class CredentialDefinition(
                 @SerialName("type") val type: List<String>,
+                @SerialName("@context") val context: List<String>? = null,
             )
         }
 
         /**
-         * A signed JWT (not using JSON-LD) credential metadata object.
+         * Data Integrity using JSON-LD credential metadata object.
          */
         data class CredentialMetadata(
             val credentialDefinition: CredentialDefinitionMetadata,
             val scope: String? = null,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata.ByFormat {
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata.ByFormat {
+
             data class CredentialDefinitionMetadata(
+                val content: List<URL>,
                 val type: List<String>,
             )
         }
 
         data class ClaimSet(
             val claims: Map<ClaimName, Claim>,
-        ) : eu.europa.ec.eudi.openid4vci.formats.ClaimSet
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
 
         class CredentialIssuanceRequest(
             override val format: String,
             override val proof: Proof?,
             override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential {
-
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential {
             override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO {
                 TODO("Not yet implemented")
             }

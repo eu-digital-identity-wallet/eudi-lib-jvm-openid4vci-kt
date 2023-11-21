@@ -325,7 +325,7 @@ class IssuanceAuthorizationTest {
                     with(issuer) {
                         val authorizedRequest = authorizeWithPreAuthorizationCode(
                             offer.credentials,
-                            IssuanceAuthorization.PreAuthorizationCode(preAuthorizationCode, null),
+                            PreAuthorizationCode(preAuthorizationCode, null),
                         ).getOrThrow()
 
                         assertTrue("Token endpoint provides c_nonce but authorized request is not ProofRequired") {
@@ -375,7 +375,7 @@ class IssuanceAuthorizationTest {
                             offer.credentials,
                             issuerState,
                         ).getOrThrow()
-                            .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode("auth-code"))
+                            .handleAuthorizationCode(AuthorizationCode("auth-code"))
                             .requestAccessToken().getOrThrow()
 
                         assertTrue("Token endpoint provides c_nonce but authorized request is not ProofRequired") {
@@ -466,7 +466,7 @@ class IssuanceAuthorizationTest {
                         val parPlaced = pushAuthorizationCodeRequest(offer.credentials, issuerState).getOrThrow()
                         val authorizationCode = UUID.randomUUID().toString()
                         parPlaced
-                            .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                            .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                             .requestAccessToken()
                             .fold(
                                 onSuccess = {
@@ -520,7 +520,7 @@ class IssuanceAuthorizationTest {
                     with(issuer) {
                         authorizeWithPreAuthorizationCode(
                             offer.credentials,
-                            IssuanceAuthorization.PreAuthorizationCode(preAuthCode, null),
+                            PreAuthorizationCode(preAuthCode, null),
                         )
                             .fold(
                                 onSuccess = {
@@ -578,7 +578,7 @@ class IssuanceAuthorizationTest {
             val authorizationCode = UUID.randomUUID().toString()
 
             parRequested
-                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                 .also { println(it) }
                 .requestAccessToken().getOrThrow().also { println(it) }
         }
@@ -596,7 +596,7 @@ class IssuanceAuthorizationTest {
         with(issuer) {
             authorizeWithPreAuthorizationCode(
                 offer.credentials,
-                IssuanceAuthorization.PreAuthorizationCode(preAuthorizationCode, userPin),
+                PreAuthorizationCode(preAuthorizationCode, userPin),
             ).getOrThrow().also { println(it) }
         }
     }

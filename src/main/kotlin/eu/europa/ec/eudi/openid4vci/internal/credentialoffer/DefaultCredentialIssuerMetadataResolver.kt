@@ -19,14 +19,77 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
-import eu.europa.ec.eudi.openid4vci.formats.*
-import eu.europa.ec.eudi.openid4vci.formats.CredentialSupportedTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+
+/**
+ * Unvalidated metadata of a Credential Issuer.
+ */
+@Serializable
+private data class CredentialIssuerMetadataTO(
+    @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
+    @SerialName("authorization_server") val authorizationServer: String? = null,
+    @SerialName("credential_endpoint") @Required val credentialEndpoint: String,
+    @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
+    @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
+    @SerialName("credential_response_encryption_alg_values_supported")
+    val credentialResponseEncryptionAlgorithmsSupported: List<String>? = null,
+    @SerialName("credential_response_encryption_enc_values_supported")
+    val credentialResponseEncryptionMethodsSupported: List<String>? = null,
+    @SerialName("require_credential_response_encryption")
+    val requireCredentialResponseEncryption: Boolean? = null,
+    @SerialName("credentials_supported") val credentialsSupported: List<CredentialSupportedTO> = emptyList(),
+    @SerialName("display") val display: List<DisplayTO>? = null,
+)
+
+/**
+ * Display properties of a supported credential type for a certain language.
+ */
+@Serializable
+internal data class CredentialSupportedDisplayTO(
+    @SerialName("name") @Required val name: String,
+    @SerialName("locale") val locale: String? = null,
+    @SerialName("logo") val logo: LogoObject? = null,
+    @SerialName("description") val description: String? = null,
+    @SerialName("background_color") val backgroundColor: String? = null,
+    @SerialName("text_color") val textColor: String? = null,
+)
+
+/**
+ * Logo information.
+ */
+@Serializable
+internal data class LogoObject(
+    @SerialName("url") val url: String? = null,
+    @SerialName("alt_text") val alternativeText: String? = null,
+)
+
+/**
+ * The details of a Claim.
+ */
+@Serializable
+internal data class ClaimTO(
+    @SerialName("mandatory") val mandatory: Boolean? = null,
+    @SerialName("value_type") val valueType: String? = null,
+    @SerialName("display") val display: List<DisplayTO>? = null,
+)
+
+/**
+ * Display properties of a Claim.
+ */
+@Serializable
+internal data class DisplayTO(
+    @SerialName("name") val name: String? = null,
+    @SerialName("locale") val locale: String? = null,
+)
 
 /**
  * Default implementation of [CredentialIssuerMetadataResolver].
@@ -92,7 +155,7 @@ private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetada
         ?.let { CredentialIssuerEndpoint(it).getOrThrowAs(::InvalidDeferredCredentialEndpoint) }
 
     val credentialsSupported = try {
-        credentialsSupported.map { Json.decodeFromJsonElement<CredentialSupportedTO>(it).toDomain() }
+        credentialsSupported.map { it.toDomain() }
     } catch (it: Throwable) {
         throw InvalidCredentialsSupported(it)
     }.apply {
@@ -113,7 +176,7 @@ private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetada
     )
 }
 
-fun CredentialIssuerMetadataTO.credentialResponseEncryption(): Result<CredentialResponseEncryption> = runCatching {
+private fun CredentialIssuerMetadataTO.credentialResponseEncryption(): Result<CredentialResponseEncryption> = runCatching {
     val requireEncryption = requireCredentialResponseEncryption ?: false
     val encryptionAlgorithms = credentialResponseEncryptionAlgorithmsSupported
         ?.map { JWEAlgorithm.parse(it) }
@@ -145,9 +208,9 @@ fun CredentialIssuerMetadataTO.credentialResponseEncryption(): Result<Credential
 }
 
 /**
- * Converts a [CredentialIssuerMetadataTO.DisplayTO] to a [CredentialIssuerMetadata.Display] instance.
+ * Converts a [DisplayTO] to a [CredentialIssuerMetadata.Display] instance.
  */
-private fun CredentialIssuerMetadataTO.DisplayTO.toDomain(): CredentialIssuerMetadata.Display =
+private fun DisplayTO.toDomain(): CredentialIssuerMetadata.Display =
     CredentialIssuerMetadata.Display(name, locale)
 
 private fun <T> Result<T>.getOrThrowAs(f: (Throwable) -> Throwable): T =

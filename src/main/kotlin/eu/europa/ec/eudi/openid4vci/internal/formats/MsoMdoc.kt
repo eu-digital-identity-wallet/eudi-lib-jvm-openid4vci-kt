@@ -13,13 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.formats
+package eu.europa.ec.eudi.openid4vci.internal.formats
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential
+import eu.europa.ec.eudi.openid4vci.internal.ProofSerializer
+import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.ClaimTO
+import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.CredentialSupportedDisplayTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -118,11 +121,11 @@ internal data object MsoMdoc : Format<
             override val cryptographicSuitesSupported: List<String>? = null,
             @SerialName("proof_types_supported")
             override val proofTypesSupported: List<String>? = null,
-            @SerialName("display") override val display: List<DisplayTO>? = null,
+            @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
             @SerialName("doctype") @Required val docType: String,
             @SerialName("claims") val claims: Map<String, Map<String, ClaimTO>>? = null,
             @SerialName("order") val order: List<String>? = null,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialSupportedTO {
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupportedTO {
             init {
                 require(format == FORMAT) { "invalid format '$format'" }
             }
@@ -178,7 +181,7 @@ internal data object MsoMdoc : Format<
             val docType: String,
             val claims: MsoMdocClaims = emptyMap(),
             val order: List<ClaimName> = emptyList(),
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialSupported
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
 
         @Serializable
         data class CredentialMetadataTO(
@@ -192,23 +195,24 @@ internal data object MsoMdoc : Format<
         data class CredentialMetadata(
             val docType: String,
             val scope: String? = null,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata.ByFormat
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata.ByFormat
 
         @Serializable
         @SerialName(FORMAT)
         data class CredentialIssuanceRequestTO(
             @SerialName("doctype") val docType: String,
-            @SerialName("proof") override val proof: JsonObject? = null,
+            @Serializable(ProofSerializer::class)
+            @SerialName("proof") override val proof: Proof? = null,
             @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
             @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
             @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String? = null,
             @SerialName("claims") val claims: JsonObject?,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO.SingleCredentialTO
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO
 
         @Serializable(with = ClaimSetSerializer::class)
         class ClaimSet(
             claims: Map<Namespace, Map<ClaimName, Claim>>,
-        ) : eu.europa.ec.eudi.openid4vci.formats.ClaimSet, Map<Namespace, Map<ClaimName, Claim>> by claims
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet, Map<Namespace, Map<ClaimName, Claim>> by claims
 
         private object ClaimSetSerializer : KSerializer<ClaimSet> {
             val internal = serializer<Map<Namespace, Map<ClaimName, Claim>>>()
@@ -234,12 +238,12 @@ internal data object MsoMdoc : Format<
         ) : SingleCredential {
 
             override val format: String = "mso_mdoc"
-            override fun toTransferObject(): eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
+            override fun toTransferObject(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
                 return when (val it = requestedCredentialResponseEncryption) {
                     is RequestedCredentialResponseEncryption.NotRequested -> {
                         CredentialIssuanceRequestTO(
                             docType = this.doctype,
-                            proof = this.proof?.toJsonObject(),
+                            proof = this.proof,
                             claims = this.claimSet?.let {
                                 Json.encodeToJsonElement(it).jsonObject
                             },
@@ -249,7 +253,7 @@ internal data object MsoMdoc : Format<
                     is RequestedCredentialResponseEncryption.Requested -> {
                         CredentialIssuanceRequestTO(
                             docType = this.doctype,
-                            proof = this.proof?.toJsonObject(),
+                            proof = this.proof,
                             credentialEncryptionJwk = Json.parseToJsonElement(
                                 it.encryptionJwk.toPublicJWK().toString(),
                             ).jsonObject,

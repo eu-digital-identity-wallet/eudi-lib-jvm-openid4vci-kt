@@ -17,8 +17,8 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.formats.ClaimSet
-import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuer
 import eu.europa.ec.eudi.openid4vci.internal.issuance.KeyGenerator
 
@@ -35,9 +35,8 @@ sealed interface UnauthorizedRequest {
      * State denoting that the pushed authorization request has been placed successfully and response processed
      */
     data class ParRequested(
-        val getAuthorizationCodeURL: GetAuthorizationCodeURL,
+        val getAuthorizationCodeURL: AuthorizationUrl,
         val pkceVerifier: PKCEVerifier,
-        val state: String,
     )
 
     /**
@@ -45,7 +44,7 @@ sealed interface UnauthorizedRequest {
      * from authorization server and processed successfully.
      */
     data class AuthorizationCodeRetrieved(
-        val authorizationCode: IssuanceAuthorization.AuthorizationCode,
+        val authorizationCode: AuthorizationCode,
         val pkceVerifier: PKCEVerifier,
     )
 }
@@ -153,7 +152,7 @@ interface AuthorizeIssuance {
      * @return The new state of the request.
      */
     suspend fun UnauthorizedRequest.ParRequested.handleAuthorizationCode(
-        authorizationCode: IssuanceAuthorization.AuthorizationCode,
+        authorizationCode: AuthorizationCode,
     ): UnauthorizedRequest.AuthorizationCodeRetrieved
 
     /**
@@ -173,7 +172,7 @@ interface AuthorizeIssuance {
      */
     suspend fun authorizeWithPreAuthorizationCode(
         credentials: List<CredentialMetadata>,
-        preAuthorizationCode: IssuanceAuthorization.PreAuthorizationCode,
+        preAuthorizationCode: PreAuthorizationCode,
     ): Result<AuthorizedRequest>
 }
 
@@ -326,7 +325,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, RequestDeferredIssuance {
         /**
          * Factory method for creating an issuer component.
          *
-         * @param authorizer    An [IssuanceAuthorization] component responsible for all interactions with authorization server to authorize
+         * @param authorizer    An [IssuanceAuthorizer] component responsible for all interactions with authorization server to authorize
          *      a request for credential(s) issuance.
          * @param requester     An [IssuanceRequester] component responsible for all interactions with credential issuer for submitting
          *      credential issuance requests.

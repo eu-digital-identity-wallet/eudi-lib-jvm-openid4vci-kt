@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.formats.*
+import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.apache.http.client.utils.URIBuilder
@@ -51,7 +51,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        CredentialMetadata.ByScope(Scope.of("UniversityDegree_JWT")),
+                        CredentialMetadata.ByScope(Scope("UniversityDegree_JWT")),
                         MsoMdoc.Model.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(
@@ -455,7 +455,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                     credentialIssuerMetadata(),
                     oidcAuthorizationServerMetadata(),
                     listOf(
-                        CredentialMetadata.ByScope(Scope.of("UniversityDegree_JWT")),
+                        CredentialMetadata.ByScope(Scope("UniversityDegree_JWT")),
                         MsoMdoc.Model.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
                     ),
                     Grants.Both(

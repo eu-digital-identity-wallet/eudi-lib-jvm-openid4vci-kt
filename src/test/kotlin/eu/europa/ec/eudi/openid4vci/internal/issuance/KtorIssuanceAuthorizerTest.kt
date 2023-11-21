@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal.issuance
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import io.ktor.client.request.forms.*
 import kotlinx.coroutines.test.runTest
 import java.net.URI
@@ -109,8 +109,8 @@ class KtorIssuanceAuthorizerTest {
                 val parRequested =
                     pushAuthorizationCodeRequest(
                         listOf(
-                            CredentialMetadata.ByScope(Scope.of("eu.europa.ec.eudiw.pid_mso_mdoc")),
-                            CredentialMetadata.ByScope(Scope.of("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
+                            CredentialMetadata.ByScope(Scope("eu.europa.ec.eudiw.pid_mso_mdoc")),
+                            CredentialMetadata.ByScope(Scope("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
                         ),
                         null,
                     ).getOrThrow()
@@ -118,7 +118,7 @@ class KtorIssuanceAuthorizerTest {
                 val authorizationCode = UUID.randomUUID().toString()
 
                 parRequested
-                    .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                    .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                     .also { println(it) }
                     .requestAccessToken().getOrThrow().also { println(it) }
             }
@@ -177,10 +177,10 @@ class KtorIssuanceAuthorizerTest {
             with(issuer) {
                 authorizeWithPreAuthorizationCode(
                     listOf(
-                        CredentialMetadata.ByScope(Scope.of("eu.europa.ec.eudiw.pid_mso_mdoc")),
-                        CredentialMetadata.ByScope(Scope.of("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
+                        CredentialMetadata.ByScope(Scope("eu.europa.ec.eudiw.pid_mso_mdoc")),
+                        CredentialMetadata.ByScope(Scope("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
                     ),
-                    IssuanceAuthorization.PreAuthorizationCode("eyJhbGciOiJSU0EtFYUaBy", "pin"),
+                    PreAuthorizationCode("eyJhbGciOiJSU0EtFYUaBy", "pin"),
                 )
             }
         }

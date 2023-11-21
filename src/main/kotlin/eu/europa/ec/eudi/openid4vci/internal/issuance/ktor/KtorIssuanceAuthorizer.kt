@@ -40,7 +40,7 @@ internal class KtorIssuanceAuthorizer(
         scopes: List<Scope>,
         state: String,
         issuerState: String?,
-    ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>> =
+    ): Result<Pair<PKCEVerifier, AuthorizationUrl>> =
         ktorHttpClientFactory().use { client ->
             authorizer(client).submitPushedAuthorizationRequest(scopes, state, issuerState)
         }

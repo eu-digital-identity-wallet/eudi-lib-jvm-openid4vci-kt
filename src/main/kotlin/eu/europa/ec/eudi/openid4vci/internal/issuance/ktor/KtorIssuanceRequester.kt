@@ -16,8 +16,8 @@
 package eu.europa.ec.eudi.openid4vci.internal.issuance.ktor
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceRequester
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*

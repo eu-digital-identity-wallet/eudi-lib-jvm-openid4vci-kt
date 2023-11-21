@@ -34,10 +34,10 @@ import com.nimbusds.openid.connect.sdk.claims.ClaimType
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderEndpointMetadata
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.formats.MsoMdoc
-import eu.europa.ec.eudi.openid4vci.formats.W3CJsonLdDataIntegrity
-import eu.europa.ec.eudi.openid4vci.formats.W3CJsonLdSignedJwt
-import eu.europa.ec.eudi.openid4vci.formats.W3CSignedJwt
+import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
+import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdDataIntegrity
+import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdSignedJwt
+import eu.europa.ec.eudi.openid4vci.internal.formats.W3CSignedJwt
 import io.ktor.http.*
 import java.net.URI
 import java.net.URL

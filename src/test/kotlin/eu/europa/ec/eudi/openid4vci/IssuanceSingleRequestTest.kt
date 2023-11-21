@@ -16,10 +16,10 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
-import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
-import eu.europa.ec.eudi.openid4vci.formats.MsoMdoc
-import eu.europa.ec.eudi.openid4vci.formats.SdJwtVc
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
+import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -193,7 +193,7 @@ class IssuanceSingleRequestTest {
                         is AuthorizedRequest.NoProofRequired -> {
                             val claimSet_mso_mdoc =
                                 MsoMdoc.Model.ClaimSet(mapOf("org.iso.18013.5.1" to mapOf("degree" to Claim())))
-                            var credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_MsoMdoc_SCOPE))
+                            var credentialMetadata = CredentialMetadata.ByScope(Scope(PID_MsoMdoc_SCOPE))
                             authorizedRequest.requestSingle(credentialMetadata, claimSet_mso_mdoc)
                                 .fold(
                                     onSuccess = { fail("Exception expected to be thrown") },
@@ -206,7 +206,7 @@ class IssuanceSingleRequestTest {
                                 )
 
                             val claimSet_sd_jwt_vc = SdJwtVc.Model.ClaimSet(mapOf("degree" to Claim()))
-                            credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE))
+                            credentialMetadata = CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE))
                             authorizedRequest.requestSingle(credentialMetadata, claimSet_sd_jwt_vc)
                                 .fold(
                                     onSuccess = { fail("Exception expected to be thrown") },
@@ -433,7 +433,7 @@ class IssuanceSingleRequestTest {
             val parRequested = issuer.pushAuthorizationCodeRequest(offer.credentials, null).getOrThrow()
             val authorizationCode = UUID.randomUUID().toString()
             parRequested
-                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                 .requestAccessToken().getOrThrow()
         }
         return Triple(offer, authorizedRequest, issuer)

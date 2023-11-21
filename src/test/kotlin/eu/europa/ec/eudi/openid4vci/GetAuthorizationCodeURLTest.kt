@@ -27,7 +27,7 @@ class GetAuthorizationCodeURLTest {
         assertFailsWith<IllegalArgumentException>(
             message = "Must be an https url",
             block = {
-                GetAuthorizationCodeURL("http://issuer")
+                AuthorizationUrl("http://issuer")
             },
         )
     }
@@ -37,7 +37,7 @@ class GetAuthorizationCodeURLTest {
         var exception = assertFailsWith<IllegalArgumentException>(
             message = "URL must contain client_id query parameter",
             block = {
-                GetAuthorizationCodeURL("https://issuer")
+                AuthorizationUrl("https://issuer")
             },
         )
         assertTrue(exception.message.equals("URL must contain query parameter"))
@@ -45,7 +45,7 @@ class GetAuthorizationCodeURLTest {
         exception = assertFailsWith<IllegalArgumentException>(
             message = "URL must contain client_id query parameter",
             block = {
-                GetAuthorizationCodeURL("https://issuer?param=client_id")
+                AuthorizationUrl("https://issuer?param=client_id")
             },
         )
         assertEquals("URL must contain client_id query parameter", exception.message)
@@ -55,14 +55,14 @@ class GetAuthorizationCodeURLTest {
     fun `Fails no request_uri query param`() {
         var exception = assertFailsWith<IllegalArgumentException>(
             message = "URL must contain request_uri query parameter",
-            block = { GetAuthorizationCodeURL("https://issuer?client_id=wallet_client_id") },
+            block = { AuthorizationUrl("https://issuer?client_id=wallet_client_id") },
         )
         assertEquals("URL must contain request_uri query parameter", exception.message)
 
         exception = assertFailsWith<IllegalArgumentException>(
             message = "URL must contain request_uri query parameter",
             block = {
-                GetAuthorizationCodeURL("https://issuer?client_id=wallet_client_id")
+                AuthorizationUrl("https://issuer?client_id=wallet_client_id")
             },
         )
         assertEquals("URL must contain request_uri query parameter", exception.message)
@@ -70,6 +70,6 @@ class GetAuthorizationCodeURLTest {
 
     @Test
     fun `Succeeds when is https and client_id and request_uri query param are provided`() {
-        GetAuthorizationCodeURL("https://issuer?client_id=wallet_client_id&request_uri=uri%3Arequest_uri%3AYUIO123")
+        AuthorizationUrl("https://issuer?client_id=wallet_client_id&request_uri=uri%3Arequest_uri%3AYUIO123")
     }
 }

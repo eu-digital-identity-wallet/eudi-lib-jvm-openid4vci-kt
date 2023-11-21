@@ -16,10 +16,10 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
-import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
-import eu.europa.ec.eudi.openid4vci.formats.MsoMdoc
-import eu.europa.ec.eudi.openid4vci.formats.SdJwtVc
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
+import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -84,8 +84,8 @@ class IssuanceBatchRequestTest {
                     when (authorizedRequest) {
                         is AuthorizedRequest.NoProofRequired -> {
                             val credentialMetadata = listOf(
-                                CredentialMetadata.ByScope(Scope.of(PID_MsoMdoc_SCOPE)) to claimSet_mso_mdoc,
-                                CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE)) to claimSet_sd_jwt_vc,
+                                CredentialMetadata.ByScope(Scope(PID_MsoMdoc_SCOPE)) to claimSet_mso_mdoc,
+                                CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE)) to claimSet_sd_jwt_vc,
                             )
 
                             val submittedRequest =
@@ -96,8 +96,8 @@ class IssuanceBatchRequestTest {
                                     val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
 
                                     val credentialMetadataTriples = listOf(
-                                        Triple(CredentialMetadata.ByScope(Scope.of(PID_MsoMdoc_SCOPE)), claimSet_mso_mdoc, bindingKey),
-                                        Triple(CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE)), claimSet_sd_jwt_vc, bindingKey),
+                                        Triple(CredentialMetadata.ByScope(Scope(PID_MsoMdoc_SCOPE)), claimSet_mso_mdoc, bindingKey),
+                                        Triple(CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE)), claimSet_sd_jwt_vc, bindingKey),
                                     )
 
                                     val response = proofRequired.requestBatch(credentialMetadataTriples).getOrThrow()
@@ -201,7 +201,7 @@ class IssuanceBatchRequestTest {
             val parRequested = issuer.pushAuthorizationCodeRequest(offer.credentials, null).getOrThrow()
             val authorizationCode = UUID.randomUUID().toString()
             parRequested
-                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                 .requestAccessToken().getOrThrow()
         }
         return Triple(offer, authorizedRequest, issuer)

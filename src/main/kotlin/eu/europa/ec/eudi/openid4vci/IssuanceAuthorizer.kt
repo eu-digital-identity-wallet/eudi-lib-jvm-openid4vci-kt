@@ -90,7 +90,7 @@ sealed interface AccessTokenRequestResponse {
  * Holds a https [java.net.URL] to be used at the second step of PAR flow for retrieving the authorization code.
  * Contains the 'request_uri' retrieved from the post to PAR endpoint of authorization server and the client_id.
  */
-class GetAuthorizationCodeURL private constructor(val url: HttpsUrl) {
+class AuthorizationUrl private constructor(val url: HttpsUrl) {
     override fun toString(): String {
         return url.toString()
     }
@@ -99,12 +99,12 @@ class GetAuthorizationCodeURL private constructor(val url: HttpsUrl) {
         const val PARAM_CLIENT_ID = "client_id"
         const val PARAM_REQUEST_URI = "request_uri"
         const val PARAM_STATE = "state"
-        operator fun invoke(url: String): GetAuthorizationCodeURL {
+        operator fun invoke(url: String): AuthorizationUrl {
             val httpsUrl = HttpsUrl(url).getOrThrow()
             val query = requireNotNull(httpsUrl.value.query) { "URL must contain query parameter" }
             require(query.contains("$PARAM_CLIENT_ID=")) { "URL must contain client_id query parameter" }
             require(query.contains("$PARAM_REQUEST_URI=")) { "URL must contain request_uri query parameter" }
-            return GetAuthorizationCodeURL(httpsUrl)
+            return AuthorizationUrl(httpsUrl)
         }
     }
 }
@@ -130,7 +130,7 @@ interface IssuanceAuthorizer {
         scopes: List<Scope>,
         state: String,
         issuerState: String?,
-    ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>>
+    ): Result<Pair<PKCEVerifier, AuthorizationUrl>>
 
     /**
      * Submits a request for access token in authorization server's token endpoint passing parameters specific to the

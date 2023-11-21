@@ -19,7 +19,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
-import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.apache.*
@@ -133,8 +133,8 @@ private class Wallet(
             ),
         )
 
-        val credentialMetadata = CredentialMetadata.ByScope(Scope.of(scope))
-        val openId_scope = CredentialMetadata.ByScope(Scope.of(OPENID_SCOPE))
+        val credentialMetadata = CredentialMetadata.ByScope(Scope(scope))
+        val openId_scope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
 
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
@@ -189,7 +189,7 @@ private class Wallet(
             ),
         )
 
-        val openId_scope = CredentialMetadata.ByScope(Scope.of(OPENID_SCOPE))
+        val openId_scope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
 
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
@@ -240,7 +240,7 @@ private class Wallet(
             println("--> Authorization code retrieved: $authorizationCode")
 
             val authorizedRequest = parPlaced
-                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                 .requestAccessToken().getOrThrow()
 
             println("--> Authorization code exchanged with access token : ${authorizedRequest.token.accessToken}")

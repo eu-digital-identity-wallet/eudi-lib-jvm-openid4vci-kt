@@ -18,18 +18,13 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
-import eu.europa.ec.eudi.openid4vci.formats.CredentialSupported
+import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.ktor.KtorCredentialIssuerMetadataResolver
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 import java.io.Serializable
 import java.util.*
 
@@ -117,17 +112,6 @@ data class Claim(
         @kotlinx.serialization.Serializable(LocaleSerializer::class)
         @SerialName("locale") val locale: Locale? = null,
     ) : Serializable
-}
-
-internal object LocaleSerializer : KSerializer<Locale> {
-
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Locale", PrimitiveKind.STRING)
-
-    override fun deserialize(decoder: Decoder): Locale =
-        Locale.forLanguageTag(decoder.decodeString())
-
-    override fun serialize(encoder: Encoder, value: Locale) =
-        encoder.encodeString(value.toString())
 }
 
 /**

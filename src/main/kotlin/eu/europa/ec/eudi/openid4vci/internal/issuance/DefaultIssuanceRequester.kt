@@ -23,9 +23,9 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.BatchCredentials
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.BatchCredentials
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -80,37 +80,38 @@ internal class DefaultIssuanceRequester(
     private suspend inline fun handleResponseSingle(
         response: HttpResponse,
         request: SingleCredential,
-    ): CredentialIssuanceResponse = if (response.status.isSuccess()) {
-        when (issuerMetadata.credentialResponseEncryption) {
-            is CredentialResponseEncryption.NotRequired -> {
-                val success = response.body<SingleIssuanceSuccessResponse>()
-                success.toDomain()
-            }
+    ): CredentialIssuanceResponse =
+        if (response.status.isSuccess()) {
+            when (issuerMetadata.credentialResponseEncryption) {
+                is CredentialResponseEncryption.NotRequired -> {
+                    val success = response.body<SingleIssuanceSuccessResponse>()
+                    success.toDomain()
+                }
 
-            is CredentialResponseEncryption.Required -> {
-                val jwt = response.body<String>()
-                val encryptionSpec =
-                    when (val requestedEncryptionSpec = request.requestedCredentialResponseEncryption) {
-                        is RequestedCredentialResponseEncryption.Requested -> requestedEncryptionSpec
-                        is RequestedCredentialResponseEncryption.NotRequested ->
-                            throw ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
-                    }
+                is CredentialResponseEncryption.Required -> {
+                    val jwt = response.body<String>()
+                    val encryptionSpec =
+                        when (val requestedEncryptionSpec = request.requestedCredentialResponseEncryption) {
+                            is RequestedCredentialResponseEncryption.Requested -> requestedEncryptionSpec
+                            is RequestedCredentialResponseEncryption.NotRequested ->
+                                throw ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+                        }
 
-                DefaultJWTProcessor<SecurityContext>().apply {
-                    jweKeySelector = JWEDecryptionKeySelector(
-                        encryptionSpec.responseEncryptionAlg,
-                        encryptionSpec.responseEncryptionMethod,
-                        ImmutableJWKSet(JWKSet(encryptionSpec.encryptionJwk)),
-                    )
-                }.process(jwt, null)
-                    .toSingleIssuanceSuccessResponse()
-                    .toDomain()
+                    DefaultJWTProcessor<SecurityContext>().apply {
+                        jweKeySelector = JWEDecryptionKeySelector(
+                            encryptionSpec.responseEncryptionAlg,
+                            encryptionSpec.responseEncryptionMethod,
+                            ImmutableJWKSet(JWKSet(encryptionSpec.encryptionJwk)),
+                        )
+                    }.process(jwt, null)
+                        .toSingleIssuanceSuccessResponse()
+                        .toDomain()
+                }
             }
+        } else {
+            val error = response.body<GenericErrorResponse>()
+            throw error.toIssuanceError()
         }
-    } else {
-        val error = response.body<GenericErrorResponse>()
-        throw error.toIssuanceError()
-    }
 
     private fun JWTClaimsSet.toSingleIssuanceSuccessResponse(): SingleIssuanceSuccessResponse =
         SingleIssuanceSuccessResponse(

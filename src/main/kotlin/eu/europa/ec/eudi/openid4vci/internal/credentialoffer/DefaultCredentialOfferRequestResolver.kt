@@ -16,13 +16,53 @@
 package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.formats.*
-import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.formats.Formats
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.seconds
+
+/**
+ * The unvalidated data of a Credential Offer.
+ */
+@Serializable
+private data class CredentialOfferRequestTO(
+    @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
+    @SerialName("credentials") @Required val credentials: List<JsonElement>,
+    @SerialName("grants") val grants: GrantsTO? = null,
+)
+
+/**
+ * Data of the Grant Types the Credential Issuer is prepared to process for a Credential Offer.
+ */
+@Serializable
+private data class GrantsTO(
+    @SerialName("authorization_code") val authorizationCode: AuthorizationCodeTO? = null,
+    @SerialName("urn:ietf:params:oauth:grant-type:pre-authorized_code") val preAuthorizedCode: PreAuthorizedCodeTO? = null,
+)
+
+/**
+ * Data for an Authorization Code Grant Type.
+ */
+@Serializable
+private data class AuthorizationCodeTO(
+    @SerialName("issuer_state") val issuerState: String? = null,
+)
+
+/**
+ * Data for a Pre-Authorized Code Grant Type.
+ */
+@Serializable
+private data class PreAuthorizedCodeTO(
+    @SerialName("pre-authorized_code") @Required val preAuthorizedCode: String,
+    @SerialName("user_pin_required") val pinRequired: Boolean? = null,
+    @SerialName("interval") val interval: Long? = null,
+)
 
 /**
  * A default implementation for [CredentialOfferRequestResolver].
@@ -132,7 +172,7 @@ internal class DefaultCredentialOfferRequestResolver(
             credentialsSupported
                 .firstOrNull { it.scope == scope }
                 ?.let {
-                    CredentialMetadata.ByScope(Scope.of(scope))
+                    CredentialMetadata.ByScope(Scope(scope))
                 }
                 ?: throw IllegalArgumentException("Unknown scope '$scope")
 

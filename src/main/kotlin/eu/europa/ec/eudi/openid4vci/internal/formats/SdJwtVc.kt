@@ -13,13 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.formats
+package eu.europa.ec.eudi.openid4vci.internal.formats
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential
+import eu.europa.ec.eudi.openid4vci.internal.ProofSerializer
+import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.ClaimTO
+import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.CredentialSupportedDisplayTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -117,9 +120,9 @@ internal data object SdJwtVc : Format<
             override val cryptographicSuitesSupported: List<String>? = null,
             @SerialName("proof_types_supported")
             override val proofTypesSupported: List<String>? = null,
-            @SerialName("display") override val display: List<DisplayTO>? = null,
+            @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
             @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialSupportedTO {
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupportedTO {
             init {
                 require(format == FORMAT) { "invalid format '$format'" }
             }
@@ -130,7 +133,7 @@ internal data object SdJwtVc : Format<
                 @SerialName("claims") val claims: Map<String, ClaimTO>?,
             )
 
-            override fun toDomain(): eu.europa.ec.eudi.openid4vci.formats.CredentialSupported {
+            override fun toDomain(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
                 val bindingMethods =
                     cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
                         ?: emptyList()
@@ -175,7 +178,7 @@ internal data object SdJwtVc : Format<
             override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
             override val display: List<Display> = emptyList(),
             val credentialDefinition: CredentialDefinition,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialSupported {
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
             data class CredentialDefinition(
                 val type: String,
                 val claims: Map<ClaimName, Claim?>?,
@@ -196,7 +199,7 @@ internal data object SdJwtVc : Format<
         data class CredentialMetadata(
             val credentialDefinition: CredentialDefinitionMetadata,
             val scope: String? = null,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata.ByFormat {
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata.ByFormat {
             data class CredentialDefinitionMetadata(
                 val type: String,
             )
@@ -205,12 +208,13 @@ internal data object SdJwtVc : Format<
         @Serializable
         @SerialName(FORMAT)
         data class CredentialIssuanceRequestTO(
-            @SerialName("proof") override val proof: JsonObject? = null,
+            @Serializable(ProofSerializer::class)
+            @SerialName("proof") override val proof: Proof? = null,
             @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
             @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
             @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String? = null,
             @SerialName("credential_definition") val credentialDefinition: CredentialDefinitionTO,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
 
             @Serializable
             data class CredentialDefinitionTO(
@@ -221,7 +225,7 @@ internal data object SdJwtVc : Format<
 
         data class ClaimSet(
             val claims: Map<ClaimName, Claim>,
-        ) : eu.europa.ec.eudi.openid4vci.formats.ClaimSet
+        ) : eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
 
         class CredentialIssuanceRequest private constructor(
             override val proof: Proof? = null,
@@ -231,10 +235,10 @@ internal data object SdJwtVc : Format<
 
             override val format: String = FORMAT
 
-            override fun toTransferObject(): eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
+            override fun toTransferObject(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
                 return when (val it = this.requestedCredentialResponseEncryption) {
                     is RequestedCredentialResponseEncryption.NotRequested -> Model.CredentialIssuanceRequestTO(
-                        proof = this.proof?.toJsonObject(),
+                        proof = this.proof,
                         credentialDefinition = Model.CredentialIssuanceRequestTO.CredentialDefinitionTO(
                             type = this.credentialDefinition.type,
                             claims = this.credentialDefinition.claims?.let {
@@ -244,7 +248,7 @@ internal data object SdJwtVc : Format<
                     )
 
                     is RequestedCredentialResponseEncryption.Requested -> Model.CredentialIssuanceRequestTO(
-                        proof = this.proof?.toJsonObject(),
+                        proof = this.proof,
                         credentialEncryptionJwk = Json.parseToJsonElement(
                             it.encryptionJwk.toPublicJWK().toString(),
                         ).jsonObject,

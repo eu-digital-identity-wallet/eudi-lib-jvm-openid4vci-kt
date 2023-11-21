@@ -22,12 +22,6 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.JWT
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
 import io.ktor.client.*
-import kotlinx.serialization.Required
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
 import java.security.cert.X509Certificate
 
@@ -53,117 +47,6 @@ value class HttpsUrl private constructor(val value: URI) {
 }
 
 /**
- * The unvalidated data of a Credential Offer.
- */
-@Serializable
-data class CredentialOfferRequestTO(
-    @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
-    @SerialName("credentials") @Required val credentials: List<JsonElement>,
-    @SerialName("grants") val grants: GrantsTO? = null,
-)
-
-/**
- * Data of the Grant Types the Credential Issuer is prepared to process for a Credential Offer.
- */
-@Serializable
-data class GrantsTO(
-    @SerialName("authorization_code") val authorizationCode: AuthorizationCodeTO? = null,
-    @SerialName("urn:ietf:params:oauth:grant-type:pre-authorized_code") val preAuthorizedCode: PreAuthorizedCodeTO? = null,
-) {
-
-    /**
-     * Data for an Authorization Code Grant Type.
-     */
-    @Serializable
-    data class AuthorizationCodeTO(
-        @SerialName("issuer_state") val issuerState: String? = null,
-    )
-
-    /**
-     * Data for a Pre-Authorized Code Grant Type.
-     */
-    @Serializable
-    data class PreAuthorizedCodeTO(
-        @SerialName("pre-authorized_code") @Required val preAuthorizedCode: String,
-        @SerialName("user_pin_required") val pinRequired: Boolean? = null,
-        @SerialName("interval") val interval: Long? = null,
-    )
-}
-
-/**
- * Unvalidated metadata of a Credential Issuer.
- */
-@Serializable
-data class CredentialIssuerMetadataTO(
-    @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
-    @SerialName("authorization_server") val authorizationServer: String? = null,
-    @SerialName("credential_endpoint") @Required val credentialEndpoint: String,
-    @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
-    @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
-    @SerialName("credential_response_encryption_alg_values_supported")
-    val credentialResponseEncryptionAlgorithmsSupported: List<String>? = null,
-    @SerialName("credential_response_encryption_enc_values_supported")
-    val credentialResponseEncryptionMethodsSupported: List<String>? = null,
-    @SerialName("require_credential_response_encryption")
-    val requireCredentialResponseEncryption: Boolean? = null,
-    @SerialName("credentials_supported") val credentialsSupported: List<JsonObject> = emptyList(),
-    @SerialName("display") val display: List<DisplayTO>? = null,
-) {
-
-    /**
-     * Display properties of a Credential Issuer.
-     */
-    @Serializable
-    data class DisplayTO(
-        @SerialName("name") val name: String? = null,
-        @SerialName("locale") val locale: String? = null,
-    )
-}
-
-/**
- * The details of a Claim.
- */
-@Serializable
-data class ClaimTO(
-    @SerialName("mandatory") val mandatory: Boolean? = null,
-    @SerialName("value_type") val valueType: String? = null,
-    @SerialName("display") val display: List<DisplayTO>? = null,
-) {
-
-    /**
-     * Display properties of a Claim.
-     */
-    @Serializable
-    data class DisplayTO(
-        @SerialName("name") val name: String? = null,
-        @SerialName("locale") val locale: String? = null,
-    )
-}
-
-/**
- * Display properties of a supported credential type for a certain language.
- */
-@Serializable
-data class DisplayTO(
-    @SerialName("name") @Required val name: String,
-    @SerialName("locale") val locale: String? = null,
-    @SerialName("logo") val logo: LogoObject? = null,
-    @SerialName("description") val description: String? = null,
-    @SerialName("background_color") val backgroundColor: String? = null,
-    @SerialName("text_color") val textColor: String? = null,
-) {
-
-    /**
-     * Logo information.
-     */
-    @Serializable
-    data class LogoObject(
-        @SerialName("url") val url: String? = null,
-        @SerialName("alt_text") val alternativeText: String? = null,
-    )
-}
-
-/**
  * Domain object to describe a valid PKCE verifier
  */
 data class PKCEVerifier(
@@ -179,34 +62,32 @@ data class PKCEVerifier(
 /**
  * Domain object to describe a valid issuance access token
  */
-data class IssuanceAccessToken(
-    val accessToken: String,
-) {
+@JvmInline
+value class IssuanceAccessToken(val accessToken: String) {
     init {
         require(accessToken.isNotEmpty()) { "Access Token must not be empty" }
     }
 }
 
 /**
- * Sealed hierarchy of authorization codes
+ * Authorization code to be exchanged with an access token
  */
-sealed interface IssuanceAuthorization {
-
-    data class AuthorizationCode(
-        val authorizationCode: String,
-    ) : IssuanceAuthorization {
-        init {
-            require(authorizationCode.isNotEmpty()) { "Authorization code must not be empty" }
-        }
+@JvmInline
+value class AuthorizationCode(val code: String) {
+    init {
+        require(code.isNotEmpty()) { "Authorization code must not be empty" }
     }
+}
 
-    data class PreAuthorizationCode(
-        val preAuthorizedCode: String,
-        val pin: String?,
-    ) : IssuanceAuthorization {
-        init {
-            require(preAuthorizedCode.isNotEmpty()) { "Pre-Authorization code must not be empty" }
-        }
+/**
+ * Pre-Authorization code to be exchanged with an access token
+ */
+data class PreAuthorizationCode(
+    val preAuthorizedCode: String,
+    val pin: String?,
+) {
+    init {
+        require(preAuthorizedCode.isNotEmpty()) { "Pre-Authorization code must not be empty" }
     }
 }
 
@@ -248,15 +129,6 @@ data class TransactionId(
 sealed interface Proof {
 
     /**
-     * Type of proof
-     */
-    val type: ProofType
-        get() = when (this) {
-            is Cwt -> ProofType.CWT
-            is Jwt -> ProofType.JWT
-        }
-
-    /**
      * Proof of possession is structured as signed JWT
      *
      * @param jwt The proof JWT
@@ -271,26 +143,6 @@ sealed interface Proof {
      */
     @JvmInline
     value class Cwt(val cwt: String) : Proof
-
-    fun toJsonObject(): JsonObject = when (this) {
-        is Jwt -> {
-            JsonObject(
-                mapOf(
-                    "proof_type" to JsonPrimitive("jwt"),
-                    "jwt" to JsonPrimitive(jwt.serialize()),
-                ),
-            )
-        }
-
-        is Cwt -> {
-            JsonObject(
-                mapOf(
-                    "proof_type" to JsonPrimitive("cwt"),
-                    "jwt" to JsonPrimitive(cwt),
-                ),
-            )
-        }
-    }
 }
 
 /**
@@ -317,8 +169,12 @@ sealed interface BindingKey {
      * An X509 biding key
      */
     data class X509(
-        val certificate: List<X509Certificate>,
-    ) : BindingKey
+        val certificateChain: List<X509Certificate>,
+    ) : BindingKey {
+        init {
+            require(certificateChain.isNotEmpty()) { "Certificate chane cannot be empty" }
+        }
+    }
 }
 
 data class IssuanceResponseEncryptionSpec(
@@ -331,14 +187,9 @@ data class IssuanceResponseEncryptionSpec(
  * A credential identified as a scope
  */
 @JvmInline
-value class Scope private constructor(
-    val value: String,
-) {
-    companion object {
-        fun of(value: String): Scope {
-            require(value.isNotEmpty()) { "Scope value cannot be empty" }
-            return Scope(value)
-        }
+value class Scope(val value: String) {
+    init {
+        require(value.isNotEmpty()) { "Scope value cannot be empty" }
     }
 }
 

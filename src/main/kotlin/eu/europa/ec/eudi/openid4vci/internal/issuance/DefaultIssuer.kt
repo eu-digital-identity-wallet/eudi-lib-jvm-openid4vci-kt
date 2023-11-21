@@ -16,11 +16,8 @@
 package eu.europa.ec.eudi.openid4vci.internal.issuance
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.formats.*
-import eu.europa.ec.eudi.openid4vci.formats.ClaimSet
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest
-import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
-import eu.europa.ec.eudi.openid4vci.formats.CredentialSupported
+import eu.europa.ec.eudi.openid4vci.internal.ProofBuilder
+import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import java.util.*
 
 /**
@@ -44,12 +41,11 @@ internal class DefaultIssuer(
             UnauthorizedRequest.ParRequested(
                 getAuthorizationCodeURL = getAuthorizationCodeUrl,
                 pkceVerifier = codeVerifier,
-                state = state,
             )
         }
 
     override suspend fun UnauthorizedRequest.ParRequested.handleAuthorizationCode(
-        authorizationCode: IssuanceAuthorization.AuthorizationCode,
+        authorizationCode: AuthorizationCode,
     ): UnauthorizedRequest.AuthorizationCodeRetrieved =
         UnauthorizedRequest.AuthorizationCodeRetrieved(
             authorizationCode = authorizationCode,
@@ -60,7 +56,7 @@ internal class DefaultIssuer(
         runCatching {
             val (accessToken, nonce) =
                 authorizer.requestAccessTokenAuthFlow(
-                    this.authorizationCode.authorizationCode,
+                    this.authorizationCode.code,
                     this.pkceVerifier.codeVerifier,
                 ).getOrThrow()
 
@@ -76,7 +72,7 @@ internal class DefaultIssuer(
 
     override suspend fun authorizeWithPreAuthorizationCode(
         credentials: List<CredentialMetadata>,
-        preAuthorizationCode: IssuanceAuthorization.PreAuthorizationCode,
+        preAuthorizationCode: PreAuthorizationCode,
     ): Result<AuthorizedRequest> =
         runCatching {
             val (accessToken, nonce) =
@@ -216,8 +212,12 @@ internal class DefaultIssuer(
         responseEncryptionSpecProvider: (issuerResponseEncryptionMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): CredentialIssuanceRequest.SingleCredential {
         proof?.let {
-            require(this.proofTypesSupported.contains(it.type)) {
-                "Provided proof type ${proof.type} is not one of supported [${this.proofTypesSupported}]."
+            val proofType = when (it) {
+                is Proof.Jwt -> ProofType.JWT
+                is Proof.Cwt -> ProofType.CWT
+            }
+            require(this.proofTypesSupported.contains(proofType)) {
+                "Provided proof type $proofType is not one of supported [${this.proofTypesSupported}]."
             }
         }
 

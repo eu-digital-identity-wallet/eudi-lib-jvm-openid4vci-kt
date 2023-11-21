@@ -46,7 +46,7 @@ internal class DefaultIssuanceAuthorizer(
         scopes: List<Scope>,
         state: String,
         issuerState: String?,
-    ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>> = runCatching {
+    ): Result<Pair<PKCEVerifier, AuthorizationUrl>> = runCatching {
         require(scopes.isNotEmpty()) { "No scopes provided. Cannot submit par with no scopes." }
 
         val parEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
@@ -89,16 +89,16 @@ internal class DefaultIssuanceAuthorizer(
                 with(
                     URLBuilder(Url(authorizationServerMetadata.authorizationEndpointURI.toString())),
                 ) {
-                    parameters.append(GetAuthorizationCodeURL.PARAM_CLIENT_ID, clientID.value)
-                    parameters.append(GetAuthorizationCodeURL.PARAM_STATE, state)
+                    parameters.append(AuthorizationUrl.PARAM_CLIENT_ID, clientID.value)
+                    parameters.append(AuthorizationUrl.PARAM_STATE, state)
                     parameters.append(
-                        GetAuthorizationCodeURL.PARAM_REQUEST_URI,
+                        AuthorizationUrl.PARAM_REQUEST_URI,
                         requestURI,
                     )
                     build()
                 }
 
-            val getAuthorizationCodeURL = GetAuthorizationCodeURL(httpsUrl.toString())
+            val getAuthorizationCodeURL = AuthorizationUrl(httpsUrl.toString())
 
             Pair(
                 PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString()),

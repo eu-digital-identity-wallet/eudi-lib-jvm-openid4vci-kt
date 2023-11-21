@@ -20,9 +20,9 @@ import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
-import eu.europa.ec.eudi.openid4vci.formats.MsoMdoc
-import eu.europa.ec.eudi.openid4vci.formats.SdJwtVc
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
+import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -96,7 +96,7 @@ class KtorIssuanceRequesterTest {
             )
 
             val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
-            val sdJwtVcPid = CredentialMetadata.ByScope(Scope.of("eu.europa.ec.eudiw.pid_vc_sd_jwt"))
+            val sdJwtVcPid = CredentialMetadata.ByScope(Scope("eu.europa.ec.eudiw.pid_vc_sd_jwt"))
             val authorizedRequest = authorizeIssuanceOfWithIssuer(issuer, sdJwtVcPid)
 
             with(issuer) {
@@ -188,7 +188,7 @@ class KtorIssuanceRequesterTest {
             )
 
             val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
-            val msoMdocPid = CredentialMetadata.ByScope(Scope.of("eu.europa.ec.eudiw.pid_mso_mdoc"))
+            val msoMdocPid = CredentialMetadata.ByScope(Scope("eu.europa.ec.eudiw.pid_mso_mdoc"))
             val authorizedRequest = authorizeIssuanceOfWithIssuer(issuer, msoMdocPid)
 
             with(issuer) {
@@ -287,7 +287,7 @@ class KtorIssuanceRequesterTest {
             )
 
             val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
-            val msoMdocPid = CredentialMetadata.ByScope(Scope.of("eu.europa.ec.eudiw.pid_mso_mdoc"))
+            val msoMdocPid = CredentialMetadata.ByScope(Scope("eu.europa.ec.eudiw.pid_mso_mdoc"))
             val authorizedRequest = authorizeIssuanceOfWithIssuer(issuer, msoMdocPid)
             val bindingKey = BindingKey.Jwk(
                 algorithm = JWSAlgorithm.RS256,
@@ -297,8 +297,8 @@ class KtorIssuanceRequesterTest {
                 when (authorizedRequest) {
                     is AuthorizedRequest.NoProofRequired -> {
                         val credentialMetadata = listOf(
-                            CredentialMetadata.ByScope(Scope.of(PID_MsoMdoc_SCOPE)) to null,
-                            CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE)) to null,
+                            CredentialMetadata.ByScope(Scope(PID_MsoMdoc_SCOPE)) to null,
+                            CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE)) to null,
                         )
                         val submittedRequest = authorizedRequest.requestBatch(credentialMetadata).getOrThrow()
 
@@ -306,8 +306,8 @@ class KtorIssuanceRequesterTest {
                             is SubmittedRequest.InvalidProof -> {
                                 val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                                 val credentialMetadataTriples = listOf(
-                                    Triple(CredentialMetadata.ByScope(Scope.of(PID_MsoMdoc_SCOPE)), null, bindingKey),
-                                    Triple(CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE)), null, bindingKey),
+                                    Triple(CredentialMetadata.ByScope(Scope(PID_MsoMdoc_SCOPE)), null, bindingKey),
+                                    Triple(CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE)), null, bindingKey),
                                 )
 
                                 val response = proofRequired.requestBatch(credentialMetadataTriples).getOrThrow()
@@ -375,7 +375,7 @@ class KtorIssuanceRequesterTest {
             val parRequested = pushAuthorizationCodeRequest(credentials.asList(), null).getOrThrow()
             val authorizationCode = UUID.randomUUID().toString()
             return parRequested
-                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                 .requestAccessToken().getOrThrow()
         }
     }

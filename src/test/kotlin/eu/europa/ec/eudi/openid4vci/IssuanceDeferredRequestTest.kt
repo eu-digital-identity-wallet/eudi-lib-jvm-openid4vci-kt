@@ -16,9 +16,9 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
-import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
-import eu.europa.ec.eudi.openid4vci.formats.CredentialMetadata
-import eu.europa.ec.eudi.openid4vci.formats.SdJwtVc
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -63,7 +63,7 @@ class IssuanceDeferredRequestTest {
                 with(issuer) {
                     when (authorizedRequest) {
                         is AuthorizedRequest.NoProofRequired -> {
-                            val credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE))
+                            val credentialMetadata = CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE))
                             val submittedRequest =
                                 authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
                             when (submittedRequest) {
@@ -147,7 +147,7 @@ class IssuanceDeferredRequestTest {
                 with(issuer) {
                     when (authorizedRequest) {
                         is AuthorizedRequest.NoProofRequired -> {
-                            val credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE))
+                            val credentialMetadata = CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE))
                             val submittedRequest =
                                 authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
                             when (submittedRequest) {
@@ -232,7 +232,7 @@ class IssuanceDeferredRequestTest {
                 with(issuer) {
                     when (authorizedRequest) {
                         is AuthorizedRequest.NoProofRequired -> {
-                            val credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE))
+                            val credentialMetadata = CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE))
                             val submittedRequest =
                                 authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
                             when (submittedRequest) {
@@ -425,7 +425,7 @@ class IssuanceDeferredRequestTest {
             val parRequested = issuer.pushAuthorizationCodeRequest(offer.credentials, null).getOrThrow()
             val authorizationCode = UUID.randomUUID().toString()
             parRequested
-                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                 .requestAccessToken().getOrThrow()
         }
         return Triple(offer, authorizedRequest, issuer)
