@@ -50,35 +50,28 @@ internal interface Format<M : CredentialMetadata.ByFormat, S : CredentialSupport
 
 internal object Formats {
 
+    private fun formatByName(format: String): Format<*, *, *> =
+        when (format) {
+            MsoMdoc.FORMAT -> MsoMdoc
+            SdJwtVc.FORMAT -> SdJwtVc
+            W3CSignedJwt.FORMAT -> W3CSignedJwt
+            W3CJsonLdSignedJwt.FORMAT -> W3CJsonLdSignedJwt
+            W3CJsonLdDataIntegrity.FORMAT -> W3CJsonLdDataIntegrity
+            else -> throw IllegalArgumentException("Unsupported Credential format '$format'")
+        }
+
     fun matchSupportedCredentialByTypeAndMapToDomain(
         format: String,
         jsonObject: JsonObject,
         issuerMetadata: CredentialIssuerMetadata,
     ): CredentialMetadata =
-        when (format) {
-            MsoMdoc.FORMAT -> MsoMdoc.matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
-            SdJwtVc.FORMAT -> SdJwtVc.matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
-            W3CSignedJwt.FORMAT -> W3CSignedJwt.matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
-            W3CJsonLdSignedJwt.FORMAT -> W3CJsonLdSignedJwt.matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
-            W3CJsonLdDataIntegrity.FORMAT -> W3CJsonLdDataIntegrity.matchSupportedCredentialByTypeAndMapToDomain(
-                jsonObject,
-                issuerMetadata,
-            )
-            else -> throw IllegalArgumentException("Unsupported Credential format '$format'")
-        }
+        formatByName(format).matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
 
     fun decodeCredentialSupportedFromJsonObject(
         format: String,
         jsonObject: JsonObject,
     ): CredentialSupportedTO =
-        when (format) {
-            MsoMdoc.FORMAT -> MsoMdoc.decodeCredentialSupportedFromJsonObject(jsonObject)
-            SdJwtVc.FORMAT -> SdJwtVc.decodeCredentialSupportedFromJsonObject(jsonObject)
-            W3CSignedJwt.FORMAT -> W3CSignedJwt.decodeCredentialSupportedFromJsonObject(jsonObject)
-            W3CJsonLdSignedJwt.FORMAT -> W3CJsonLdSignedJwt.decodeCredentialSupportedFromJsonObject(jsonObject)
-            W3CJsonLdDataIntegrity.FORMAT -> W3CJsonLdDataIntegrity.decodeCredentialSupportedFromJsonObject(jsonObject)
-            else -> throw IllegalArgumentException("Unsupported Credential format '$format'")
-        }
+        formatByName(format).decodeCredentialSupportedFromJsonObject(jsonObject)
 
     fun mapRequestToTransferObject(
         credentialRequest: CredentialIssuanceRequest.SingleCredential,
@@ -87,7 +80,10 @@ internal object Formats {
             is MsoMdoc.Model.CredentialIssuanceRequest -> MsoMdoc.mapRequestToTransferObject(credentialRequest)
             is SdJwtVc.Model.CredentialIssuanceRequest -> SdJwtVc.mapRequestToTransferObject(credentialRequest)
             is W3CSignedJwt.Model.CredentialIssuanceRequest -> W3CSignedJwt.mapRequestToTransferObject(credentialRequest)
-            is W3CJsonLdSignedJwt.Model.CredentialIssuanceRequest -> W3CJsonLdSignedJwt.mapRequestToTransferObject(credentialRequest)
+            is W3CJsonLdSignedJwt.Model.CredentialIssuanceRequest -> W3CJsonLdSignedJwt.mapRequestToTransferObject(
+                credentialRequest,
+            )
+
             is W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest -> W3CJsonLdDataIntegrity.mapRequestToTransferObject(
                 credentialRequest,
             )
@@ -98,17 +94,31 @@ internal object Formats {
         issuerMetadata: CredentialIssuerMetadata,
     ): CredentialSupported =
         when (credentialMetadata) {
-            is MsoMdoc.Model.CredentialMetadata -> MsoMdoc.matchSupportedCredentialByType(credentialMetadata, issuerMetadata)
-            is SdJwtVc.Model.CredentialMetadata -> SdJwtVc.matchSupportedCredentialByType(credentialMetadata, issuerMetadata)
-            is W3CSignedJwt.Model.CredentialMetadata -> W3CSignedJwt.matchSupportedCredentialByType(credentialMetadata, issuerMetadata)
+            is MsoMdoc.Model.CredentialMetadata -> MsoMdoc.matchSupportedCredentialByType(
+                credentialMetadata,
+                issuerMetadata,
+            )
+
+            is SdJwtVc.Model.CredentialMetadata -> SdJwtVc.matchSupportedCredentialByType(
+                credentialMetadata,
+                issuerMetadata,
+            )
+
+            is W3CSignedJwt.Model.CredentialMetadata -> W3CSignedJwt.matchSupportedCredentialByType(
+                credentialMetadata,
+                issuerMetadata,
+            )
+
             is W3CJsonLdSignedJwt.Model.CredentialMetadata -> W3CJsonLdSignedJwt.matchSupportedCredentialByType(
                 credentialMetadata,
                 issuerMetadata,
             )
+
             is W3CJsonLdDataIntegrity.Model.CredentialMetadata -> W3CJsonLdDataIntegrity.matchSupportedCredentialByType(
                 credentialMetadata,
                 issuerMetadata,
             )
+
             else -> throw IllegalArgumentException("Unsupported Credential Metadata")
         }
 
@@ -125,24 +135,28 @@ internal object Formats {
                 proof,
                 responseEncryptionSpec,
             )
+
             is SdJwtVc.Model.CredentialSupported -> SdJwtVc.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
+
             is W3CSignedJwt.Model.CredentialSupported -> W3CSignedJwt.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
+
             is W3CJsonLdSignedJwt.Model.CredentialSupported -> W3CJsonLdSignedJwt.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
+
             is W3CJsonLdDataIntegrity.Model.CredentialSupported -> W3CJsonLdDataIntegrity.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
