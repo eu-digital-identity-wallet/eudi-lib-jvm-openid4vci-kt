@@ -46,26 +46,25 @@ internal data object SdJwtVc : Format<
         ).credentialDefinition
 
         return issuerMetadata.credentialsSupported
-            .firstOrNull {
-                it is Model.CredentialSupported && it.credentialDefinition.type == credentialDefinition.type
-            }
+            .filterIsInstance<Model.CredentialSupported>()
+            .firstOrNull { it.credentialDefinition.type == credentialDefinition.type }
             ?.let {
                 Model.CredentialMetadata(
                     Model.CredentialMetadata.CredentialDefinitionMetadata(credentialDefinition.type),
                     it.scope,
                 )
             }
-            ?: throw IllegalArgumentException("Unsupported metadata with format $FORMAT' and type '${credentialDefinition.type}'")
+            ?: error("Unsupported metadata with format $FORMAT' and type '${credentialDefinition.type}'")
     }
 
     override fun matchSupportedCredentialByType(
         metadata: Model.CredentialMetadata,
         issuerMetadata: CredentialIssuerMetadata,
     ): CredentialSupported =
-        issuerMetadata.credentialsSupported.firstOrNull {
-            it is Model.CredentialSupported &&
-                it.credentialDefinition.type == metadata.credentialDefinition.type
-        } ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
+        issuerMetadata.credentialsSupported
+            .filterIsInstance<Model.CredentialSupported>()
+            .firstOrNull { it.credentialDefinition.type == metadata.credentialDefinition.type }
+            ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
 
     override fun constructIssuanceRequest(
         supportedCredential: Model.CredentialSupported,

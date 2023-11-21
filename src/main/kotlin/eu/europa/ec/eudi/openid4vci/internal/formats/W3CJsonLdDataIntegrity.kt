@@ -49,17 +49,16 @@ internal data object W3CJsonLdDataIntegrity : Format<
             )
 
         return issuerMetadata.credentialsSupported
-            .firstOrNull {
-                it is Model.CredentialSupported &&
-                    it.credentialDefinition.type == credentialDefinition.type &&
-                    it.credentialDefinition.context.map { it.toString() } == credentialDefinition.context
+            .filterIsInstance<Model.CredentialSupported>()
+            .firstOrNull { cs ->
+                cs.credentialDefinition.type == credentialDefinition.type &&
+                    cs.credentialDefinition.context.map(URL::toString) == credentialDefinition.context
             }
             ?.let {
                 Model.CredentialMetadata(
                     Model.CredentialMetadata.CredentialDefinitionMetadata(
                         type = credentialDefinition.type,
-                        content = credentialDefinition.context?.map { URL(it) }
-                            ?: throw IllegalArgumentException("Unparsable"),
+                        content = credentialDefinition.context?.map(::URL) ?: error("Unparsable"),
                     ),
                     it.scope,
                 )
@@ -75,7 +74,7 @@ internal data object W3CJsonLdDataIntegrity : Format<
             it is Model.CredentialSupported &&
                 it.credentialDefinition.context == metadata.credentialDefinition.content &&
                 it.credentialDefinition.type == metadata.credentialDefinition.type
-        } ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
+        } ?: error("Issuer does not support issuance of credential : $metadata")
 
     override fun constructIssuanceRequest(
         supportedCredential: Model.CredentialSupported,

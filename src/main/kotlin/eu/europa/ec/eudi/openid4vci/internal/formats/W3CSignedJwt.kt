@@ -48,9 +48,8 @@ internal data object W3CSignedJwt : Format<
             )
 
         return issuerMetadata.credentialsSupported
-            .firstOrNull {
-                it is Model.CredentialSupported && it.credentialDefinition.type == credentialDefinition.type
-            }
+            .filterIsInstance<Model.CredentialSupported>()
+            .firstOrNull { it.credentialDefinition.type == credentialDefinition.type }
             ?.let {
                 Model.CredentialMetadata(
                     Model.CredentialMetadata.CredentialDefinitionMetadata(
@@ -69,7 +68,7 @@ internal data object W3CSignedJwt : Format<
         issuerMetadata.credentialsSupported.firstOrNull {
             it is Model.CredentialSupported &&
                 it.credentialDefinition.type == metadata.credentialDefinition.type
-        } ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
+        } ?: error("Issuer does not support issuance of credential : $metadata")
 
     override fun constructIssuanceRequest(
         supportedCredential: Model.CredentialSupported,

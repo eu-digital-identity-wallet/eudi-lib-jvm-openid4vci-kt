@@ -44,15 +44,9 @@ internal data object MsoMdoc : Format<
     ): Model.CredentialMetadata {
         val docType = Json.decodeFromJsonElement<Model.CredentialMetadataTO>(jsonObject).docType
         return issuerMetadata.credentialsSupported
-            .firstOrNull {
-                it is Model.CredentialSupported && it.docType == docType
-            }
-            ?.let {
-                Model.CredentialMetadata(
-                    docType,
-                    (it as Model.CredentialSupported).scope,
-                )
-            }
+            .filterIsInstance<Model.CredentialSupported>()
+            .firstOrNull { it.docType == docType }
+            ?.let { Model.CredentialMetadata(docType, it.scope) }
             ?: error("Unsupported MsoMdocCredential with format '$FORMAT' and docType '$docType'")
     }
 
@@ -60,9 +54,9 @@ internal data object MsoMdoc : Format<
         metadata: Model.CredentialMetadata,
         issuerMetadata: CredentialIssuerMetadata,
     ): CredentialSupported =
-        issuerMetadata.credentialsSupported.firstOrNull {
-            it is Model.CredentialSupported && it.docType == metadata.docType
-        } ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
+        issuerMetadata.credentialsSupported
+            .firstOrNull { it is Model.CredentialSupported && it.docType == metadata.docType }
+            ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
 
     override fun constructIssuanceRequest(
         supportedCredential: Model.CredentialSupported,
