@@ -50,15 +50,16 @@ internal interface Format<M : CredentialMetadata.ByFormat, S : CredentialSupport
 
 internal object Formats {
 
+    private val supported: Map<String, Format<*, *, *>> = mapOf(
+        MsoMdoc.FORMAT to MsoMdoc,
+        SdJwtVc.FORMAT to SdJwtVc,
+        W3CSignedJwt.FORMAT to W3CSignedJwt,
+        W3CJsonLdSignedJwt.FORMAT to W3CJsonLdSignedJwt,
+        W3CJsonLdDataIntegrity.FORMAT to W3CJsonLdDataIntegrity,
+    )
+
     private fun formatByName(format: String): Format<*, *, *> =
-        when (format) {
-            MsoMdoc.FORMAT -> MsoMdoc
-            SdJwtVc.FORMAT -> SdJwtVc
-            W3CSignedJwt.FORMAT -> W3CSignedJwt
-            W3CJsonLdSignedJwt.FORMAT -> W3CJsonLdSignedJwt
-            W3CJsonLdDataIntegrity.FORMAT -> W3CJsonLdDataIntegrity
-            else -> throw IllegalArgumentException("Unsupported Credential format '$format'")
-        }
+        supported[format] ?: throw IllegalArgumentException("Unsupported Credential format '$format'")
 
     fun matchSupportedCredentialByTypeAndMapToDomain(
         format: String,
