@@ -92,7 +92,7 @@ private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetada
         ?.let { CredentialIssuerEndpoint(it).getOrThrowAs(::InvalidDeferredCredentialEndpoint) }
 
     val credentialsSupported = try {
-        credentialsSupported.map { it.toCredentialSupportedObject().getOrThrow().toDomain() }
+        credentialsSupported.map { Json.decodeFromJsonElement<CredentialSupportedTO>(it).toDomain() }
     } catch (it: Throwable) {
         throw InvalidCredentialsSupported(it)
     }.apply {
@@ -142,22 +142,6 @@ fun CredentialIssuerMetadataTO.credentialResponseEncryption(): Result<Credential
         require(encryptionMethods.isEmpty())
         CredentialResponseEncryption.NotRequired
     }
-}
-
-/**
- * Converts a [JsonObject] to a [CredentialSupportedTO].
- */
-private fun JsonObject.toCredentialSupportedObject(): Result<CredentialSupportedTO> = runCatching {
-    val format =
-        getOrDefault("format", JsonNull).let { jsonElement ->
-
-            require(jsonElement is JsonPrimitive && jsonElement.isString) {
-                "'format' must be a JsonPrimitive that contains a string"
-            }
-            jsonElement.content
-        }
-
-    Formats.decodeCredentialSupportedFromJsonObject(format, this)
 }
 
 /**

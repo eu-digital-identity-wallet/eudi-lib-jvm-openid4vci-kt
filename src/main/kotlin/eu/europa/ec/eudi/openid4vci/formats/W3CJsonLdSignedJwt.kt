@@ -65,11 +65,6 @@ internal data object W3CJsonLdSignedJwt : Format<
             ?: fail()
     }
 
-    override fun decodeCredentialSupportedFromJsonObject(
-        jsonObject: JsonObject,
-    ): Model.CredentialSupportedTO =
-        Json.decodeFromJsonElement<Model.CredentialSupportedTO>(jsonObject)
-
     override fun matchSupportedCredentialByType(
         metadata: Model.CredentialMetadata,
         issuerMetadata: CredentialIssuerMetadata,
@@ -95,8 +90,9 @@ internal data object W3CJsonLdSignedJwt : Format<
          * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
          */
         @Serializable
+        @SerialName(FORMAT)
         data class CredentialSupportedTO(
-            @SerialName("format") @Required override val format: String,
+            @SerialName("format") @Required override val format: String = FORMAT,
             @SerialName("scope") override val scope: String? = null,
             @SerialName("cryptographic_binding_methods_supported")
             override val cryptographicBindingMethodsSupported: List<String>? = null,

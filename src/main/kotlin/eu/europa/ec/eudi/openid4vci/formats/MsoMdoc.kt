@@ -53,9 +53,6 @@ internal data object MsoMdoc : Format<
             ?: error("Unsupported MsoMdocCredential with format '$FORMAT' and docType '$docType'")
     }
 
-    override fun decodeCredentialSupportedFromJsonObject(jsonObject: JsonObject): Model.CredentialSupportedTO =
-        Json.decodeFromJsonElement<Model.CredentialSupportedTO>(jsonObject)
-
     override fun matchSupportedCredentialByType(
         metadata: Model.CredentialMetadata,
         issuerMetadata: CredentialIssuerMetadata,
@@ -111,8 +108,9 @@ internal data object MsoMdoc : Format<
          * The data of a Verifiable Credentials issued as an ISO mDL.
          */
         @Serializable
+        @SerialName(FORMAT)
         data class CredentialSupportedTO(
-            @SerialName("format") @Required override val format: String,
+            @SerialName("format") @Required override val format: String = FORMAT,
             @SerialName("scope") override val scope: String? = null,
             @SerialName("cryptographic_binding_methods_supported")
             override val cryptographicBindingMethodsSupported: List<String>? = null,

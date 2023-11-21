@@ -49,6 +49,9 @@ sealed interface CredentialIssuanceRequestTO {
 /**
  * The metadata of a Credentials that can be issued by a Credential Issuer.
  */
+@OptIn(ExperimentalSerializationApi::class)
+@kotlinx.serialization.Serializable
+@JsonClassDiscriminator("format")
 sealed interface CredentialSupportedTO {
 
     val format: String

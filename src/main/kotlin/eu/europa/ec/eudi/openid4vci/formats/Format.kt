@@ -31,10 +31,6 @@ internal interface Format<
         issuerMetadata: CredentialIssuerMetadata,
     ): CredentialMetadata
 
-    fun decodeCredentialSupportedFromJsonObject(
-        jsonObject: JsonObject,
-    ): CredentialSupportedTO
-
     fun matchSupportedCredentialByType(
         metadata: M,
         issuerMetadata: CredentialIssuerMetadata,
@@ -67,12 +63,6 @@ internal object Formats {
         issuerMetadata: CredentialIssuerMetadata,
     ): CredentialMetadata =
         formatByName(format).matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
-
-    fun decodeCredentialSupportedFromJsonObject(
-        format: String,
-        jsonObject: JsonObject,
-    ): CredentialSupportedTO =
-        formatByName(format).decodeCredentialSupportedFromJsonObject(jsonObject)
 
     fun matchSupportedCredentialByType(
         credentialMetadata: CredentialMetadata,
