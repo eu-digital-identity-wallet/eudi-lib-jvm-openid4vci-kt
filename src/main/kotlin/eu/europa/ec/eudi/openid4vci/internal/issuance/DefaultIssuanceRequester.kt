@@ -26,7 +26,6 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
 import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.BatchCredentials
 import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential
 import eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO
-import eu.europa.ec.eudi.openid4vci.formats.Formats
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -236,9 +235,6 @@ internal class DefaultIssuanceRequester(
 
     private fun IssuanceAccessToken.toAuthorizationHeader(): Pair<String, String> =
         "Authorization" to "BEARER $accessToken"
-
-    private fun SingleCredential.toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO =
-        Formats.mapRequestToTransferObject(this)
 
     private fun BatchCredentials.toTransferObject(): CredentialIssuanceRequestTO {
         return CredentialIssuanceRequestTO.BatchCredentialsTO(

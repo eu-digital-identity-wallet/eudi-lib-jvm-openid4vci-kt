@@ -24,7 +24,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.util.*
 
-internal object W3CSignedJwt : Format<
+internal data object W3CSignedJwt : Format<
     W3CSignedJwt.Model.CredentialMetadata,
     W3CSignedJwt.Model.CredentialSupported,
     W3CSignedJwt.Model.CredentialIssuanceRequest,
@@ -80,12 +80,6 @@ internal object W3CSignedJwt : Format<
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<CredentialIssuanceRequest.SingleCredential> {
-        TODO("Not yet implemented")
-    }
-
-    override fun mapRequestToTransferObject(
-        credentialRequest: Model.CredentialIssuanceRequest,
-    ): CredentialIssuanceRequestTO.SingleCredentialTO {
         TODO("Not yet implemented")
     }
 
@@ -206,6 +200,11 @@ internal object W3CSignedJwt : Format<
             override val format: String,
             override val proof: Proof?,
             override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential
+        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential {
+
+            override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO {
+                TODO("Not yet implemented")
+            }
+        }
     }
 }

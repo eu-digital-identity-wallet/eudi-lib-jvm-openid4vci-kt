@@ -20,7 +20,11 @@ import eu.europa.ec.eudi.openid4vci.IssuanceResponseEncryptionSpec
 import eu.europa.ec.eudi.openid4vci.Proof
 import kotlinx.serialization.json.JsonObject
 
-internal interface Format<M : CredentialMetadata.ByFormat, S : CredentialSupported, I : CredentialIssuanceRequest.SingleCredential> {
+internal interface Format<
+    in M : CredentialMetadata.ByFormat,
+    in S : CredentialSupported,
+    in I : CredentialIssuanceRequest.SingleCredential,
+    > {
 
     fun matchSupportedCredentialByTypeAndMapToDomain(
         jsonObject: JsonObject,
@@ -42,10 +46,6 @@ internal interface Format<M : CredentialMetadata.ByFormat, S : CredentialSupport
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<CredentialIssuanceRequest.SingleCredential>
-
-    fun mapRequestToTransferObject(
-        credentialRequest: I,
-    ): CredentialIssuanceRequestTO.SingleCredentialTO
 }
 
 internal object Formats {
@@ -73,22 +73,6 @@ internal object Formats {
         jsonObject: JsonObject,
     ): CredentialSupportedTO =
         formatByName(format).decodeCredentialSupportedFromJsonObject(jsonObject)
-
-    fun mapRequestToTransferObject(
-        credentialRequest: CredentialIssuanceRequest.SingleCredential,
-    ): CredentialIssuanceRequestTO.SingleCredentialTO =
-        when (credentialRequest) {
-            is MsoMdoc.Model.CredentialIssuanceRequest -> MsoMdoc.mapRequestToTransferObject(credentialRequest)
-            is SdJwtVc.Model.CredentialIssuanceRequest -> SdJwtVc.mapRequestToTransferObject(credentialRequest)
-            is W3CSignedJwt.Model.CredentialIssuanceRequest -> W3CSignedJwt.mapRequestToTransferObject(credentialRequest)
-            is W3CJsonLdSignedJwt.Model.CredentialIssuanceRequest -> W3CJsonLdSignedJwt.mapRequestToTransferObject(
-                credentialRequest,
-            )
-
-            is W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest -> W3CJsonLdDataIntegrity.mapRequestToTransferObject(
-                credentialRequest,
-            )
-        }
 
     fun matchSupportedCredentialByType(
         credentialMetadata: CredentialMetadata,

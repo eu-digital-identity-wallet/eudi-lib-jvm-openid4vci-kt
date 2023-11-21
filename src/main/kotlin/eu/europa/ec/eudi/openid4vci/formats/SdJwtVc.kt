@@ -26,7 +26,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.util.*
 
-internal object SdJwtVc : Format<
+internal data object SdJwtVc : Format<
     SdJwtVc.Model.CredentialMetadata,
     SdJwtVc.Model.CredentialSupported,
     SdJwtVc.Model.CredentialIssuanceRequest,
@@ -108,36 +108,6 @@ internal object SdJwtVc : Format<
             claimSet = validClaimSet,
         ).getOrThrow()
     }
-
-    override fun mapRequestToTransferObject(
-        credentialRequest: Model.CredentialIssuanceRequest,
-    ): CredentialIssuanceRequestTO.SingleCredentialTO =
-        when (val it = credentialRequest.requestedCredentialResponseEncryption) {
-            is RequestedCredentialResponseEncryption.NotRequested -> Model.CredentialIssuanceRequestTO(
-                proof = credentialRequest.proof?.toJsonObject(),
-                credentialDefinition = Model.CredentialIssuanceRequestTO.CredentialDefinitionTO(
-                    type = credentialRequest.credentialDefinition.type,
-                    claims = credentialRequest.credentialDefinition.claims?.let {
-                        Json.encodeToJsonElement(it.claims).jsonObject
-                    },
-                ),
-            )
-
-            is RequestedCredentialResponseEncryption.Requested -> Model.CredentialIssuanceRequestTO(
-                proof = credentialRequest.proof?.toJsonObject(),
-                credentialEncryptionJwk = Json.parseToJsonElement(
-                    it.encryptionJwk.toPublicJWK().toString(),
-                ).jsonObject,
-                credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
-                credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
-                credentialDefinition = Model.CredentialIssuanceRequestTO.CredentialDefinitionTO(
-                    type = credentialRequest.credentialDefinition.type,
-                    claims = credentialRequest.credentialDefinition.claims?.let {
-                        Json.encodeToJsonElement(it.claims).jsonObject
-                    },
-                ),
-            )
-        }
 
     object Model {
 
@@ -264,6 +234,35 @@ internal object SdJwtVc : Format<
         ) : SingleCredential {
 
             override val format: String = FORMAT
+
+            override fun toTransferObject(): eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
+                return when (val it = this.requestedCredentialResponseEncryption) {
+                    is RequestedCredentialResponseEncryption.NotRequested -> Model.CredentialIssuanceRequestTO(
+                        proof = this.proof?.toJsonObject(),
+                        credentialDefinition = Model.CredentialIssuanceRequestTO.CredentialDefinitionTO(
+                            type = this.credentialDefinition.type,
+                            claims = this.credentialDefinition.claims?.let {
+                                Json.encodeToJsonElement(it.claims).jsonObject
+                            },
+                        ),
+                    )
+
+                    is RequestedCredentialResponseEncryption.Requested -> Model.CredentialIssuanceRequestTO(
+                        proof = this.proof?.toJsonObject(),
+                        credentialEncryptionJwk = Json.parseToJsonElement(
+                            it.encryptionJwk.toPublicJWK().toString(),
+                        ).jsonObject,
+                        credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
+                        credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
+                        credentialDefinition = Model.CredentialIssuanceRequestTO.CredentialDefinitionTO(
+                            type = this.credentialDefinition.type,
+                            claims = this.credentialDefinition.claims?.let {
+                                Json.encodeToJsonElement(it.claims).jsonObject
+                            },
+                        ),
+                    )
+                }
+            }
 
             data class CredentialDefinition(
                 val type: String,

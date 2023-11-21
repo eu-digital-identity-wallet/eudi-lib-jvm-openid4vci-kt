@@ -25,7 +25,7 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import java.net.URL
 import java.util.*
 
-internal object W3CJsonLdDataIntegrity : Format<
+internal data object W3CJsonLdDataIntegrity : Format<
     W3CJsonLdDataIntegrity.Model.CredentialMetadata,
     W3CJsonLdDataIntegrity.Model.CredentialSupported,
     W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest,
@@ -86,12 +86,6 @@ internal object W3CJsonLdDataIntegrity : Format<
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<CredentialIssuanceRequest.SingleCredential> {
-        TODO("Not yet implemented")
-    }
-
-    override fun mapRequestToTransferObject(
-        credentialRequest: Model.CredentialIssuanceRequest,
-    ): CredentialIssuanceRequestTO.SingleCredentialTO {
         TODO("Not yet implemented")
     }
 
@@ -224,6 +218,10 @@ internal object W3CJsonLdDataIntegrity : Format<
             override val format: String,
             override val proof: Proof?,
             override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
-        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential
+        ) : eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequest.SingleCredential {
+            override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO {
+                TODO("Not yet implemented")
+            }
+        }
     }
 }

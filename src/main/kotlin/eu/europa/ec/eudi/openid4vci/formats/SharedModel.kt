@@ -113,6 +113,8 @@ sealed interface CredentialIssuanceRequest {
         val proof: Proof?
         val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption
 
+        fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO
+
         companion object {
 
             /**

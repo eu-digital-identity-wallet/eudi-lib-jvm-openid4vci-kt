@@ -27,7 +27,7 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 import java.util.*
 
-internal object MsoMdoc : Format<
+internal data object MsoMdoc : Format<
     MsoMdoc.Model.CredentialMetadata,
     MsoMdoc.Model.CredentialSupported,
     MsoMdoc.Model.CredentialIssuanceRequest,
@@ -105,36 +105,6 @@ internal object MsoMdoc : Format<
             claimSet = validClaimSet,
         ).getOrThrow()
     }
-
-    override fun mapRequestToTransferObject(
-        credentialRequest: Model.CredentialIssuanceRequest,
-    ): CredentialIssuanceRequestTO.SingleCredentialTO =
-        when (val it = credentialRequest.requestedCredentialResponseEncryption) {
-            is RequestedCredentialResponseEncryption.NotRequested -> {
-                Model.CredentialIssuanceRequestTO(
-                    docType = credentialRequest.doctype,
-                    proof = credentialRequest.proof?.toJsonObject(),
-                    claims = credentialRequest.claimSet?.let {
-                        Json.encodeToJsonElement(it).jsonObject
-                    },
-                )
-            }
-
-            is RequestedCredentialResponseEncryption.Requested -> {
-                Model.CredentialIssuanceRequestTO(
-                    docType = credentialRequest.doctype,
-                    proof = credentialRequest.proof?.toJsonObject(),
-                    credentialEncryptionJwk = Json.parseToJsonElement(
-                        it.encryptionJwk.toPublicJWK().toString(),
-                    ).jsonObject,
-                    credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
-                    credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
-                    claims = credentialRequest.claimSet?.let {
-                        Json.encodeToJsonElement(it).jsonObject
-                    },
-                )
-            }
-        }
 
     object Model {
         /**
@@ -266,6 +236,34 @@ internal object MsoMdoc : Format<
         ) : SingleCredential {
 
             override val format: String = "mso_mdoc"
+            override fun toTransferObject(): eu.europa.ec.eudi.openid4vci.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
+                return when (val it = requestedCredentialResponseEncryption) {
+                    is RequestedCredentialResponseEncryption.NotRequested -> {
+                        CredentialIssuanceRequestTO(
+                            docType = this.doctype,
+                            proof = this.proof?.toJsonObject(),
+                            claims = this.claimSet?.let {
+                                Json.encodeToJsonElement(it).jsonObject
+                            },
+                        )
+                    }
+
+                    is RequestedCredentialResponseEncryption.Requested -> {
+                        CredentialIssuanceRequestTO(
+                            docType = this.doctype,
+                            proof = this.proof?.toJsonObject(),
+                            credentialEncryptionJwk = Json.parseToJsonElement(
+                                it.encryptionJwk.toPublicJWK().toString(),
+                            ).jsonObject,
+                            credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
+                            credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
+                            claims = this.claimSet?.let {
+                                Json.encodeToJsonElement(it).jsonObject
+                            },
+                        )
+                    }
+                }
+            }
 
             companion object {
                 operator fun invoke(
