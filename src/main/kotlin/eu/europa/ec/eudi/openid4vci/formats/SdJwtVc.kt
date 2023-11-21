@@ -26,15 +26,13 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.util.*
 
-internal class SdJwtVc : Format<
+internal object SdJwtVc : Format<
     SdJwtVc.Model.CredentialMetadata,
     SdJwtVc.Model.CredentialSupported,
     SdJwtVc.Model.CredentialIssuanceRequest,
     > {
 
-    companion object {
-        const val FORMAT = "vc+sd-jwt"
-    }
+    const val FORMAT = "vc+sd-jwt"
 
     override fun matchSupportedCredentialByTypeAndMapToDomain(
         jsonObject: JsonObject,

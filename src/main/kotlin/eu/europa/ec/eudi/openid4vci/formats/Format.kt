@@ -56,11 +56,11 @@ internal object Formats {
         issuerMetadata: CredentialIssuerMetadata,
     ): CredentialMetadata =
         when (format) {
-            MsoMdoc.FORMAT -> MsoMdoc().matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
-            SdJwtVc.FORMAT -> SdJwtVc().matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
-            W3CSignedJwt.FORMAT -> W3CSignedJwt().matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
-            W3CJsonLdSignedJwt.FORMAT -> W3CJsonLdSignedJwt().matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
-            W3CJsonLdDataIntegrity.FORMAT -> W3CJsonLdDataIntegrity().matchSupportedCredentialByTypeAndMapToDomain(
+            MsoMdoc.FORMAT -> MsoMdoc.matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
+            SdJwtVc.FORMAT -> SdJwtVc.matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
+            W3CSignedJwt.FORMAT -> W3CSignedJwt.matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
+            W3CJsonLdSignedJwt.FORMAT -> W3CJsonLdSignedJwt.matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
+            W3CJsonLdDataIntegrity.FORMAT -> W3CJsonLdDataIntegrity.matchSupportedCredentialByTypeAndMapToDomain(
                 jsonObject,
                 issuerMetadata,
             )
@@ -72,11 +72,11 @@ internal object Formats {
         jsonObject: JsonObject,
     ): CredentialSupportedTO =
         when (format) {
-            MsoMdoc.FORMAT -> MsoMdoc().decodeCredentialSupportedFromJsonObject(jsonObject)
-            SdJwtVc.FORMAT -> SdJwtVc().decodeCredentialSupportedFromJsonObject(jsonObject)
-            W3CSignedJwt.FORMAT -> W3CSignedJwt().decodeCredentialSupportedFromJsonObject(jsonObject)
-            W3CJsonLdSignedJwt.FORMAT -> W3CJsonLdSignedJwt().decodeCredentialSupportedFromJsonObject(jsonObject)
-            W3CJsonLdDataIntegrity.FORMAT -> W3CJsonLdDataIntegrity().decodeCredentialSupportedFromJsonObject(jsonObject)
+            MsoMdoc.FORMAT -> MsoMdoc.decodeCredentialSupportedFromJsonObject(jsonObject)
+            SdJwtVc.FORMAT -> SdJwtVc.decodeCredentialSupportedFromJsonObject(jsonObject)
+            W3CSignedJwt.FORMAT -> W3CSignedJwt.decodeCredentialSupportedFromJsonObject(jsonObject)
+            W3CJsonLdSignedJwt.FORMAT -> W3CJsonLdSignedJwt.decodeCredentialSupportedFromJsonObject(jsonObject)
+            W3CJsonLdDataIntegrity.FORMAT -> W3CJsonLdDataIntegrity.decodeCredentialSupportedFromJsonObject(jsonObject)
             else -> throw IllegalArgumentException("Unsupported Credential format '$format'")
         }
 
@@ -84,11 +84,11 @@ internal object Formats {
         credentialRequest: CredentialIssuanceRequest.SingleCredential,
     ): CredentialIssuanceRequestTO.SingleCredentialTO =
         when (credentialRequest) {
-            is MsoMdoc.Model.CredentialIssuanceRequest -> MsoMdoc().mapRequestToTransferObject(credentialRequest)
-            is SdJwtVc.Model.CredentialIssuanceRequest -> SdJwtVc().mapRequestToTransferObject(credentialRequest)
-            is W3CSignedJwt.Model.CredentialIssuanceRequest -> W3CSignedJwt().mapRequestToTransferObject(credentialRequest)
-            is W3CJsonLdSignedJwt.Model.CredentialIssuanceRequest -> W3CJsonLdSignedJwt().mapRequestToTransferObject(credentialRequest)
-            is W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest -> W3CJsonLdDataIntegrity().mapRequestToTransferObject(
+            is MsoMdoc.Model.CredentialIssuanceRequest -> MsoMdoc.mapRequestToTransferObject(credentialRequest)
+            is SdJwtVc.Model.CredentialIssuanceRequest -> SdJwtVc.mapRequestToTransferObject(credentialRequest)
+            is W3CSignedJwt.Model.CredentialIssuanceRequest -> W3CSignedJwt.mapRequestToTransferObject(credentialRequest)
+            is W3CJsonLdSignedJwt.Model.CredentialIssuanceRequest -> W3CJsonLdSignedJwt.mapRequestToTransferObject(credentialRequest)
+            is W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest -> W3CJsonLdDataIntegrity.mapRequestToTransferObject(
                 credentialRequest,
             )
         }
@@ -98,14 +98,14 @@ internal object Formats {
         issuerMetadata: CredentialIssuerMetadata,
     ): CredentialSupported =
         when (credentialMetadata) {
-            is MsoMdoc.Model.CredentialMetadata -> MsoMdoc().matchSupportedCredentialByType(credentialMetadata, issuerMetadata)
-            is SdJwtVc.Model.CredentialMetadata -> SdJwtVc().matchSupportedCredentialByType(credentialMetadata, issuerMetadata)
-            is W3CSignedJwt.Model.CredentialMetadata -> W3CSignedJwt().matchSupportedCredentialByType(credentialMetadata, issuerMetadata)
-            is W3CJsonLdSignedJwt.Model.CredentialMetadata -> W3CJsonLdSignedJwt().matchSupportedCredentialByType(
+            is MsoMdoc.Model.CredentialMetadata -> MsoMdoc.matchSupportedCredentialByType(credentialMetadata, issuerMetadata)
+            is SdJwtVc.Model.CredentialMetadata -> SdJwtVc.matchSupportedCredentialByType(credentialMetadata, issuerMetadata)
+            is W3CSignedJwt.Model.CredentialMetadata -> W3CSignedJwt.matchSupportedCredentialByType(credentialMetadata, issuerMetadata)
+            is W3CJsonLdSignedJwt.Model.CredentialMetadata -> W3CJsonLdSignedJwt.matchSupportedCredentialByType(
                 credentialMetadata,
                 issuerMetadata,
             )
-            is W3CJsonLdDataIntegrity.Model.CredentialMetadata -> W3CJsonLdDataIntegrity().matchSupportedCredentialByType(
+            is W3CJsonLdDataIntegrity.Model.CredentialMetadata -> W3CJsonLdDataIntegrity.matchSupportedCredentialByType(
                 credentialMetadata,
                 issuerMetadata,
             )
@@ -119,31 +119,31 @@ internal object Formats {
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<CredentialIssuanceRequest.SingleCredential> =
         when (supportedCredential) {
-            is MsoMdoc.Model.CredentialSupported -> MsoMdoc().constructIssuanceRequest(
+            is MsoMdoc.Model.CredentialSupported -> MsoMdoc.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
-            is SdJwtVc.Model.CredentialSupported -> SdJwtVc().constructIssuanceRequest(
+            is SdJwtVc.Model.CredentialSupported -> SdJwtVc.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
-            is W3CSignedJwt.Model.CredentialSupported -> W3CSignedJwt().constructIssuanceRequest(
+            is W3CSignedJwt.Model.CredentialSupported -> W3CSignedJwt.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
-            is W3CJsonLdSignedJwt.Model.CredentialSupported -> W3CJsonLdSignedJwt().constructIssuanceRequest(
+            is W3CJsonLdSignedJwt.Model.CredentialSupported -> W3CJsonLdSignedJwt.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
-            is W3CJsonLdDataIntegrity.Model.CredentialSupported -> W3CJsonLdDataIntegrity().constructIssuanceRequest(
+            is W3CJsonLdDataIntegrity.Model.CredentialSupported -> W3CJsonLdDataIntegrity.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,

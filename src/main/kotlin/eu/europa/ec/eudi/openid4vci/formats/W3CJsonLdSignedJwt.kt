@@ -25,15 +25,13 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import java.net.URL
 import java.util.*
 
-internal class W3CJsonLdSignedJwt : Format<
+internal object W3CJsonLdSignedJwt : Format<
     W3CJsonLdSignedJwt.Model.CredentialMetadata,
     W3CJsonLdSignedJwt.Model.CredentialSupported,
     W3CJsonLdSignedJwt.Model.CredentialIssuanceRequest,
     > {
 
-    companion object {
-        const val FORMAT = "jwt_vc_json-ld"
-    }
+    const val FORMAT = "jwt_vc_json-ld"
 
     override fun matchSupportedCredentialByTypeAndMapToDomain(
         jsonObject: JsonObject,

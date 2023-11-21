@@ -27,15 +27,14 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 import java.util.*
 
-internal class MsoMdoc : Format<
+internal object MsoMdoc : Format<
     MsoMdoc.Model.CredentialMetadata,
     MsoMdoc.Model.CredentialSupported,
     MsoMdoc.Model.CredentialIssuanceRequest,
     > {
 
-    companion object {
-        const val FORMAT = "mso_mdoc"
-    }
+    const val FORMAT = "mso_mdoc"
+
     override fun matchSupportedCredentialByTypeAndMapToDomain(
         jsonObject: JsonObject,
         issuerMetadata: CredentialIssuerMetadata,
@@ -53,6 +52,7 @@ internal class MsoMdoc : Format<
             }
             ?: error("Unsupported MsoMdocCredential with format '$FORMAT' and docType '$docType'")
     }
+
     override fun decodeCredentialSupportedFromJsonObject(jsonObject: JsonObject): Model.CredentialSupportedTO =
         Json.decodeFromJsonElement<Model.CredentialSupportedTO>(jsonObject)
 
