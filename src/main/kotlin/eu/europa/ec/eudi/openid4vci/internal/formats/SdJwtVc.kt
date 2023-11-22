@@ -19,7 +19,6 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.ProofSerializer
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.ClaimTO
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.CredentialSupportedDisplayTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential
@@ -207,7 +206,6 @@ internal data object SdJwtVc : Format<
         @Serializable
         @SerialName(FORMAT)
         data class CredentialIssuanceRequestTO(
-            @Serializable(ProofSerializer::class)
             @SerialName("proof") override val proof: Proof? = null,
             @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
             @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
@@ -236,9 +234,9 @@ internal data object SdJwtVc : Format<
 
             override fun toTransferObject(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
                 return when (val it = this.requestedCredentialResponseEncryption) {
-                    is RequestedCredentialResponseEncryption.NotRequested -> Model.CredentialIssuanceRequestTO(
+                    is RequestedCredentialResponseEncryption.NotRequested -> CredentialIssuanceRequestTO(
                         proof = this.proof,
-                        credentialDefinition = Model.CredentialIssuanceRequestTO.CredentialDefinitionTO(
+                        credentialDefinition = CredentialIssuanceRequestTO.CredentialDefinitionTO(
                             type = this.credentialDefinition.type,
                             claims = this.credentialDefinition.claims?.let {
                                 Json.encodeToJsonElement(it.claims).jsonObject
@@ -246,14 +244,14 @@ internal data object SdJwtVc : Format<
                         ),
                     )
 
-                    is RequestedCredentialResponseEncryption.Requested -> Model.CredentialIssuanceRequestTO(
+                    is RequestedCredentialResponseEncryption.Requested -> CredentialIssuanceRequestTO(
                         proof = this.proof,
                         credentialEncryptionJwk = Json.parseToJsonElement(
                             it.encryptionJwk.toPublicJWK().toString(),
                         ).jsonObject,
                         credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
                         credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
-                        credentialDefinition = Model.CredentialIssuanceRequestTO.CredentialDefinitionTO(
+                        credentialDefinition = CredentialIssuanceRequestTO.CredentialDefinitionTO(
                             type = this.credentialDefinition.type,
                             claims = this.credentialDefinition.claims?.let {
                                 Json.encodeToJsonElement(it.claims).jsonObject

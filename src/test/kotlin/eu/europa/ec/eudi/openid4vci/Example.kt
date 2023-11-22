@@ -41,6 +41,7 @@ import java.net.URL
 import java.util.*
 
 val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
+
 val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
 val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
 val OPENID_SCOPE = "openid"
@@ -114,22 +115,22 @@ private class Wallet(
     suspend fun issueByScope(scope: String): String {
         val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
         val issuerMetadata =
-            CredentialIssuerMetadataResolver.ktor(ktorHttpClientFactory = { httpClientFactory() })
+            CredentialIssuerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
                 .resolve(credentialIssuerIdentifier).getOrThrow()
 
         val authServerMetadata =
-            AuthorizationServerMetadataResolver.ktor(ktorHttpClientFactory = { httpClientFactory() })
+            AuthorizationServerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
                 .resolve(issuerMetadata.authorizationServer).getOrThrow()
 
         val issuer = Issuer.make(
-            IssuanceAuthorizer.ktor(
+            IssuanceAuthorizer.make(
                 authorizationServerMetadata = authServerMetadata,
                 config = config,
-                ktorHttpClientFactory = { httpClientFactory() },
+                ktorHttpClientFactory = ::httpClientFactory,
             ),
-            IssuanceRequester.ktor(
+            IssuanceRequester.make(
                 issuerMetadata = issuerMetadata,
-                ktorHttpClientFactory = { httpClientFactory() },
+                ktorHttpClientFactory = ::httpClientFactory,
             ),
         )
 
@@ -166,24 +167,19 @@ private class Wallet(
     }
 
     suspend fun issueByCredentialOfferUrl(coUrl: String): String {
-        val offer = httpClientFactory().use { client ->
-            val credentialOfferRequestResolver = CredentialOfferRequestResolver(
-                httpGet = { url -> client.get(url).body<String>() },
-            )
-            credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
-        }
-
+        val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory = ::httpClientFactory)
+        val offer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
         return issueByCredentialOffer(offer)
     }
 
     suspend fun issueByCredentialOffer(offer: CredentialOffer): String {
         val issuer = Issuer.make(
-            IssuanceAuthorizer.ktor(
+            IssuanceAuthorizer.make(
                 authorizationServerMetadata = offer.authorizationServerMetadata,
                 config = config,
                 ktorHttpClientFactory = ::httpClientFactory,
             ),
-            IssuanceRequester.ktor(
+            IssuanceRequester.make(
                 issuerMetadata = offer.credentialIssuerMetadata,
                 ktorHttpClientFactory = ::httpClientFactory,
             ),

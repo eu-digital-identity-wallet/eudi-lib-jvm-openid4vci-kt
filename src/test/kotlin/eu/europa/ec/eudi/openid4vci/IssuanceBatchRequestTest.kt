@@ -16,14 +16,15 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
 import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
-import io.ktor.client.*
+import io.ktor.client.engine.mock.*
 import io.ktor.http.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
+import io.ktor.http.content.*
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.net.URI
 import java.util.*
 import kotlin.test.Test
@@ -31,6 +32,8 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 class IssuanceBatchRequestTest {
+
+    val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
 
     val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
     val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
@@ -48,152 +51,156 @@ class IssuanceBatchRequestTest {
     )
 
     @Test
-    fun `successful batch issuance`() {
-        val credential_mso_mdoc = "issued_credential_content_mso_mdoc"
-        val credential_sd_jwt_vc = "issued_credential_content_sd_jwt_vc"
-        issuanceTestBed(
-            encryptedResponses = false,
-            testBlock = { client ->
-
-                val (_, authorizedRequest, issuer) =
-                    initIssuerWithOfferAndAuthorize(client, CREDENTIAL_OFFER_NO_GRANTS)
-
-                val claimSet_mso_mdoc = MsoMdoc.Model.ClaimSet(
-                    claims = mapOf(
-                        "org.iso.18013.5.1" to mapOf(
-                            "given_name" to Claim(),
-                            "family_name" to Claim(),
-                            "birth_date" to Claim(),
-                        ),
-                    ),
-                )
-                val claimSet_sd_jwt_vc = SdJwtVc.Model.ClaimSet(
-                    claims = mapOf(
-                        "given_name" to Claim(),
-                        "family_name" to Claim(),
-                        "birth_date" to Claim(),
-                    ),
-                )
-
-                val bindingKey = BindingKey.Jwk(
-                    algorithm = JWSAlgorithm.RS256,
-                    jwk = KeyGenerator.randomRSASigningKey(2048),
-                )
-
-                with(issuer) {
-                    when (authorizedRequest) {
-                        is AuthorizedRequest.NoProofRequired -> {
-                            val credentialMetadata = listOf(
-                                CredentialMetadata.ByScope(Scope(PID_MsoMdoc_SCOPE)) to claimSet_mso_mdoc,
-                                CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE)) to claimSet_sd_jwt_vc,
-                            )
-
-                            val submittedRequest =
-                                authorizedRequest.requestBatch(credentialMetadata).getOrThrow()
-
-                            when (submittedRequest) {
-                                is SubmittedRequest.InvalidProof -> {
-                                    val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-
-                                    val credentialMetadataTriples = listOf(
-                                        Triple(CredentialMetadata.ByScope(Scope(PID_MsoMdoc_SCOPE)), claimSet_mso_mdoc, bindingKey),
-                                        Triple(CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE)), claimSet_sd_jwt_vc, bindingKey),
-                                    )
-
-                                    val response = proofRequired.requestBatch(credentialMetadataTriples).getOrThrow()
-
-                                    assertTrue("Second attempt should be successful") {
-                                        response is SubmittedRequest.Success
-                                    }
-
-                                    assertTrue("Second attempt should be successful") {
-                                        (response as SubmittedRequest.Success).response.credentialResponses.all {
-                                            it is CredentialIssuanceResponse.Result.Issued &&
-                                                it.format in listOf(MsoMdoc.FORMAT, SdJwtVc.FORMAT)
-                                        }
-                                    }
-                                }
-
-                                is SubmittedRequest.Failed -> fail(
-                                    "Failed with error ${submittedRequest.error}",
-                                )
-
-                                is SubmittedRequest.Success -> fail(
-                                    "first attempt should be unsuccessful",
-                                )
-                            }
-                        }
-
-                        is AuthorizedRequest.ProofRequired ->
-                            fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
-                    }
-                }
-            },
-            issuanceRequestAssertions = { call ->
-                val request =
-                    call.receive<CredentialIssuanceRequestTO>() as CredentialIssuanceRequestTO.BatchCredentialsTO
-
-                println(request)
-
-                val proofsProvided = request.credentialRequests.any {
-                    it.proof != null
-                }
-
-                if (proofsProvided) {
-                    call.respond(
-                        HttpStatusCode.OK,
-                        BatchIssuanceSuccessResponse(
-                            credentialResponses = listOf(
-                                BatchIssuanceSuccessResponse.CertificateIssuanceResponse(
-                                    format = MsoMdoc.FORMAT,
-                                    credential = credential_mso_mdoc,
-                                ),
-                                BatchIssuanceSuccessResponse.CertificateIssuanceResponse(
-                                    format = SdJwtVc.FORMAT,
-                                    credential = credential_sd_jwt_vc,
+    fun `successful batch issuance`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            batchIssuanceRequestMocker(
+                responseBuilder = {
+                    val textContent = it?.body as TextContent
+                    if (textContent.text.contains("\"proof\":")) {
+                        respond(
+                            content = Json.encodeToString(
+                                BatchIssuanceSuccessResponse(
+                                    credentialResponses = listOf(
+                                        BatchIssuanceSuccessResponse.CertificateIssuanceResponse(
+                                            format = MsoMdoc.FORMAT,
+                                            credential = "issued_credential_content_mso_mdoc",
+                                        ),
+                                        BatchIssuanceSuccessResponse.CertificateIssuanceResponse(
+                                            format = SdJwtVc.FORMAT,
+                                            credential = "issued_credential_content_sd_jwt_vc",
+                                        ),
+                                    ),
+                                    cNonce = "wlbQc6pCJp",
+                                    cNonceExpiresInSeconds = 86400,
                                 ),
                             ),
-                            cNonce = "wlbQc6pCJp",
-                            cNonceExpiresInSeconds = 86400,
-                        ),
-                    )
-                } else {
-                    call.respondText(
-                        """
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(
+                                HttpHeaders.ContentType to listOf("application/json"),
+                            ),
+                        )
+                    } else {
+                        respond(
+                            content = """
                             {
                                 "error": "invalid_proof",
                                 "c_nonce": "ERE%@^TGWYEYWEY",
                                 "c_nonce_expires_in": 34
                             } 
-                        """.trimIndent(),
-                        ContentType.parse("application/json"),
-                        HttpStatusCode.BadRequest,
-                    )
-                }
-            },
+                            """.trimIndent(),
+                            status = HttpStatusCode.BadRequest,
+                            headers = headersOf(
+                                HttpHeaders.ContentType to listOf("application/json"),
+                            ),
+                        )
+                    }
+                },
+            ) {},
         )
+        val (_, authorizedRequest, issuer) =
+            initIssuerWithOfferAndAuthorize(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
+
+        val claimSet_mso_mdoc = MsoMdoc.Model.ClaimSet(
+            claims = mapOf(
+                "org.iso.18013.5.1" to mapOf(
+                    "given_name" to Claim(),
+                    "family_name" to Claim(),
+                    "birth_date" to Claim(),
+                ),
+            ),
+        )
+        val claimSet_sd_jwt_vc = SdJwtVc.Model.ClaimSet(
+            claims = mapOf(
+                "given_name" to Claim(),
+                "family_name" to Claim(),
+                "birth_date" to Claim(),
+            ),
+        )
+
+        val bindingKey = BindingKey.Jwk(
+            algorithm = JWSAlgorithm.RS256,
+            jwk = KeyGenerator.randomRSASigningKey(2048),
+        )
+
+        with(issuer) {
+            when (authorizedRequest) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    val credentialMetadata = listOf(
+                        CredentialMetadata.ByScope(Scope(PID_MsoMdoc_SCOPE)) to claimSet_mso_mdoc,
+                        CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE)) to claimSet_sd_jwt_vc,
+                    )
+
+                    val submittedRequest =
+                        authorizedRequest.requestBatch(credentialMetadata).getOrThrow()
+
+                    when (submittedRequest) {
+                        is SubmittedRequest.InvalidProof -> {
+                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+
+                            val credentialMetadataTriples = listOf(
+                                Triple(
+                                    CredentialMetadata.ByScope(Scope(PID_MsoMdoc_SCOPE)),
+                                    claimSet_mso_mdoc,
+                                    bindingKey,
+                                ),
+                                Triple(
+                                    CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE)),
+                                    claimSet_sd_jwt_vc,
+                                    bindingKey,
+                                ),
+                            )
+
+                            val response = proofRequired.requestBatch(credentialMetadataTriples).getOrThrow()
+
+                            assertTrue("Second attempt should be successful") {
+                                response is SubmittedRequest.Success
+                            }
+
+                            assertTrue("Second attempt should be successful") {
+                                (response as SubmittedRequest.Success).response.credentialResponses.all {
+                                    it is CredentialIssuanceResponse.Result.Issued &&
+                                        it.format in listOf(MsoMdoc.FORMAT, SdJwtVc.FORMAT)
+                                }
+                            }
+                        }
+
+                        is SubmittedRequest.Failed -> fail(
+                            "Failed with error ${submittedRequest.error}",
+                        )
+
+                        is SubmittedRequest.Success -> fail(
+                            "first attempt should be unsuccessful",
+                        )
+                    }
+                }
+
+                is AuthorizedRequest.ProofRequired ->
+                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+            }
+        }
     }
 
     private suspend fun initIssuerWithOfferAndAuthorize(
-        client: HttpClient,
+        ktorHttpClientFactory: KtorHttpClientFactory,
         credentialOfferStr: String,
     ): Triple<CredentialOffer, AuthorizedRequest, Issuer> {
-        val offer = CredentialOfferRequestResolver(
-            httpGet = createGetASMetadata(client),
-        ).resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
+        val offer = CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
+            .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
             .getOrThrow()
 
         val issuer = Issuer.make(
             IssuanceAuthorizer.make(
-                offer.authorizationServerMetadata,
-                vciWalletConfiguration,
-                createPostPar(client),
-                createGetAccessToken(client),
+                authorizationServerMetadata = offer.authorizationServerMetadata,
+                config = vciWalletConfiguration,
+                ktorHttpClientFactory = ktorHttpClientFactory,
             ),
             IssuanceRequester.make(
                 issuerMetadata = offer.credentialIssuerMetadata,
-                postIssueRequest = createPostIssuance(client),
-                postDeferredIssueRequest = createPostDeferredIssuance(client),
+                ktorHttpClientFactory = ktorHttpClientFactory,
             ),
         )
 

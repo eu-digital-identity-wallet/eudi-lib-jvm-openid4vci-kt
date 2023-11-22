@@ -262,7 +262,11 @@ fun interface CredentialOfferRequestResolver {
          */
         operator fun invoke(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            httpGet: HttpGet<String>,
-        ): CredentialOfferRequestResolver = DefaultCredentialOfferRequestResolver(ioCoroutineDispatcher, httpGet)
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultCredentialOfferRequestResolver.HttpClientFactory,
+        ): CredentialOfferRequestResolver =
+            DefaultCredentialOfferRequestResolver(
+                ioCoroutineDispatcher = ioCoroutineDispatcher,
+                ktorHttpClientFactory = ktorHttpClientFactory,
+            )
     }
 }

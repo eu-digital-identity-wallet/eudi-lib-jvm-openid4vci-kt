@@ -20,7 +20,6 @@ import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
 import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialIssuerMetadataResolver
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.ktor.KtorCredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -270,20 +269,13 @@ fun interface CredentialIssuerMetadataResolver {
 
         /**
          * Creates a new [CredentialIssuerMetadataResolver] instance.
-         *
-         * [httpGet] execution are dispatched on [ioCoroutineDispatcher].
          */
         operator fun invoke(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            httpGet: HttpGet<String>,
-        ): CredentialIssuerMetadataResolver = DefaultCredentialIssuerMetadataResolver(ioCoroutineDispatcher, httpGet)
-
-        fun ktor(
-            coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            ktorHttpClientFactory: KtorHttpClientFactory = KtorCredentialIssuerMetadataResolver.HttpClientFactory,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultCredentialIssuerMetadataResolver.HttpClientFactory,
         ): CredentialIssuerMetadataResolver =
-            KtorCredentialIssuerMetadataResolver(
-                coroutineDispatcher = coroutineDispatcher,
+            DefaultCredentialIssuerMetadataResolver(
+                coroutineDispatcher = ioCoroutineDispatcher,
                 ktorHttpClientFactory = ktorHttpClientFactory,
             )
     }

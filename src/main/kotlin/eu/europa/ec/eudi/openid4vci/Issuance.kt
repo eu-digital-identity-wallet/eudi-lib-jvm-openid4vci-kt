@@ -19,6 +19,7 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceAuthorizer
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuer
 import eu.europa.ec.eudi.openid4vci.internal.issuance.KeyGenerator
 
@@ -338,25 +339,28 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, RequestDeferredIssuance {
             DefaultIssuer(authorizer, requester)
 
         /**
-         * Factory method to create an [Issuer] based on ktor
+         * Factory method to create an [Issuer] using the passed http client factory
          *
          * @param authorizationServerMetadata   The authorization server metadata required from the underlying [IssuanceAuthorizer] component.
          * @param issuerMetadata    The credential issuer metadata required from the underlying [IssuanceRequester] component.
          * @param config    Configuration object
          * @return An instance of Issuer based on ktor
          */
-        fun ktor(
+        fun make(
             authorizationServerMetadata: CIAuthorizationServerMetadata,
             issuerMetadata: CredentialIssuerMetadata,
             config: OpenId4VCIConfig,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultIssuanceAuthorizer.HttpClientFactory,
         ): Issuer =
             DefaultIssuer(
-                IssuanceAuthorizer.ktor(
+                IssuanceAuthorizer.make(
                     authorizationServerMetadata = authorizationServerMetadata,
                     config = config,
+                    ktorHttpClientFactory = ktorHttpClientFactory,
                 ),
-                IssuanceRequester.ktor(
+                IssuanceRequester.make(
                     issuerMetadata = issuerMetadata,
+                    ktorHttpClientFactory = ktorHttpClientFactory,
                 ),
             )
     }

@@ -18,8 +18,14 @@ package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import eu.europa.ec.eudi.openid4vci.internal.formats.Formats
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
@@ -68,13 +74,13 @@ private data class PreAuthorizedCodeTO(
  * A default implementation for [CredentialOfferRequestResolver].
  */
 internal class DefaultCredentialOfferRequestResolver(
-    private val ioCoroutineDispatcher: CoroutineDispatcher,
-    private val httpGet: HttpGet<String>,
+    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
 ) : CredentialOfferRequestResolver {
 
-    private val credentialIssuerMetadataResolver = CredentialIssuerMetadataResolver(ioCoroutineDispatcher, httpGet)
+    private val credentialIssuerMetadataResolver = CredentialIssuerMetadataResolver(ioCoroutineDispatcher, ktorHttpClientFactory)
     private val authorizationServerMetadataResolver =
-        AuthorizationServerMetadataResolver(ioCoroutineDispatcher, httpGet)
+        AuthorizationServerMetadataResolver(ioCoroutineDispatcher, ktorHttpClientFactory)
 
     override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> =
         runCatching {
@@ -83,7 +89,9 @@ internal class DefaultCredentialOfferRequestResolver(
                 is CredentialOfferRequest.PassByReference ->
                     withContext(ioCoroutineDispatcher + CoroutineName("credential-offer-request-object")) {
                         try {
-                            httpGet.get(request.value.value.toURL())
+                            ktorHttpClientFactory().use { client ->
+                                httpGet(client).get(request.value.value.toURL())
+                            }
                         } catch (t: Throwable) {
                             throw CredentialOfferRequestError.UnableToFetchCredentialOffer(t).toException()
                         }
@@ -125,6 +133,26 @@ internal class DefaultCredentialOfferRequestResolver(
         }
 
     companion object {
+
+        /**
+         * Factory which produces a [Ktor Http client][HttpClient]
+         * The actual engine will be peeked up by whatever
+         * it is available in classpath
+         *
+         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
+         */
+        val HttpClientFactory: KtorHttpClientFactory = {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json(
+                        json = Json { ignoreUnknownKeys = true },
+                    )
+                }
+            }
+        }
+
+        private fun httpGet(httpClient: HttpClient): HttpGet<String> =
+            HttpGet { httpClient.get(it).body<String>() }
 
         /**
          * Tries to parse a [GrantsTO] to a [Grants] instance.

@@ -23,10 +23,16 @@ import com.nimbusds.oauth2.sdk.id.State
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import com.nimbusds.oauth2.sdk.pkce.CodeVerifier
 import eu.europa.ec.eudi.openid4vci.*
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import java.net.URI
 import java.net.URLEncoder
 import com.nimbusds.oauth2.sdk.Scope as NimbusOauth2Scope
@@ -38,8 +44,7 @@ internal class DefaultIssuanceAuthorizer(
     val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     val authorizationServerMetadata: CIAuthorizationServerMetadata,
     val config: OpenId4VCIConfig,
-    val postPar: HttpFormPost<PushedAuthorizationRequestResponse>,
-    val getAccessToken: HttpFormPost<AccessTokenRequestResponse>,
+    val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
 ) : IssuanceAuthorizer {
 
     override suspend fun submitPushedAuthorizationRequest(
@@ -71,10 +76,7 @@ internal class DefaultIssuanceAuthorizer(
 
         val pushedAuthorizationRequest = PushedAuthorizationRequest(parEndpoint, authzRequest)
 
-        val response =
-            withContext(coroutineDispatcher) {
-                postPar.post(parEndpoint.toURL(), pushedAuthorizationRequest.asFormPostParams())
-            }
+        val response = pushAuthorizationRequest(parEndpoint, pushedAuthorizationRequest)
 
         response.toPair(clientID, codeVerifier, state)
     }
@@ -124,13 +126,7 @@ internal class DefaultIssuanceAuthorizer(
             codeVerifier,
         )
 
-        val response =
-            withContext(coroutineDispatcher) {
-                getAccessToken.post(
-                    authorizationServerMetadata.tokenEndpointURI.toURL(),
-                    params,
-                )
-            }
+        val response = requestAccessToken(params)
 
         when (response) {
             is AccessTokenRequestResponse.Success -> {
@@ -151,12 +147,7 @@ internal class DefaultIssuanceAuthorizer(
         pin: String?,
     ): Result<Pair<String, CNonce?>> = runCatching {
         val params = TokenEndpointForm.PreAuthCodeFlow.of(preAuthorizedCode, pin)
-        val response = withContext(coroutineDispatcher) {
-            getAccessToken.post(
-                authorizationServerMetadata.tokenEndpointURI.toURL(),
-                params,
-            )
-        }
+        val response = requestAccessToken(params)
 
         when (response) {
             is AccessTokenRequestResponse.Success -> {
@@ -172,10 +163,68 @@ internal class DefaultIssuanceAuthorizer(
         }
     }
 
+    private suspend fun requestAccessToken(params: Map<String, String>): AccessTokenRequestResponse =
+        withContext(coroutineDispatcher) {
+            ktorHttpClientFactory().use { client ->
+                HttpFormPost { url, formParameters ->
+                    val response = client.submitForm(
+                        url = url.toString(),
+                        formParameters = Parameters.build {
+                            formParameters.entries.forEach { (k, v) -> append(k, v) }
+                        },
+                    )
+                    if (response.status.isSuccess()) response.body<AccessTokenRequestResponse.Success>()
+                    else response.body<AccessTokenRequestResponse.Failure>()
+                }.post(
+                    authorizationServerMetadata.tokenEndpointURI.toURL(),
+                    params,
+                )
+            }
+        }
+
+    private suspend fun pushAuthorizationRequest(
+        parEndpoint: URI,
+        pushedAuthorizationRequest: PushedAuthorizationRequest,
+    ): PushedAuthorizationRequestResponse =
+        withContext(coroutineDispatcher) {
+            ktorHttpClientFactory().use { client ->
+                HttpFormPost { url, formParameters ->
+                    val response = client.submitForm(
+                        url = url.toString(),
+                        formParameters = Parameters.build {
+                            formParameters.entries.forEach { (k, v) -> append(k, v) }
+                        },
+                    )
+                    if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
+                    else response.body<PushedAuthorizationRequestResponse.Failure>()
+                }
+                    .post(parEndpoint.toURL(), pushedAuthorizationRequest.asFormPostParams())
+            }
+        }
+
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =
         this.authorizationRequest.toParameters()
             .mapValues { (_, value) -> value[0] }
             .toMap()
+
+    companion object {
+        /**
+         * Factory which produces a [Ktor Http client][HttpClient]
+         * The actual engine will be peeked up by whatever
+         * it is available in classpath
+         *
+         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
+         */
+        val HttpClientFactory: KtorHttpClientFactory = {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json(
+                        json = Json { ignoreUnknownKeys = true },
+                    )
+                }
+            }
+        }
+    }
 }
 
 sealed interface TokenEndpointForm {

@@ -13,12 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal.issuance
+package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.RequestMockerValidator
-import eu.europa.ec.eudi.openid4vci.endsWith
-import eu.europa.ec.eudi.openid4vci.getResourceAsText
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -26,7 +22,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.*
 
-internal fun oidcWellKnownMocker(): RequestMockerValidator = RequestMockerValidator(
+internal fun oidcWellKnownMocker(): RequestMocker = RequestMocker(
     requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
     responseBuilder = {
         respond(
@@ -37,10 +33,9 @@ internal fun oidcWellKnownMocker(): RequestMockerValidator = RequestMockerValida
             ),
         )
     },
-    requestValidator = {},
 )
 
-internal fun authServerWellKnownMocker(): RequestMockerValidator = RequestMockerValidator(
+internal fun authServerWellKnownMocker(): RequestMocker = RequestMocker(
     requestMatcher = endsWith("/.well-known/openid-configuration", HttpMethod.Get),
     responseBuilder = {
         respond(
@@ -51,11 +46,10 @@ internal fun authServerWellKnownMocker(): RequestMockerValidator = RequestMocker
             ),
         )
     },
-    requestValidator = {},
 )
 
-internal fun parPostMocker(validator: (request: HttpRequestData) -> Unit): RequestMockerValidator =
-    RequestMockerValidator(
+internal fun parPostMocker(validator: (request: HttpRequestData) -> Unit = {}): RequestMocker =
+    RequestMocker(
         requestMatcher = endsWith("/ext/par/request", HttpMethod.Post),
         responseBuilder = {
             respond(
@@ -74,8 +68,8 @@ internal fun parPostMocker(validator: (request: HttpRequestData) -> Unit): Reque
         requestValidator = validator,
     )
 
-internal fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit): RequestMockerValidator =
-    RequestMockerValidator(
+internal fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit = {}): RequestMocker =
+    RequestMocker(
         requestMatcher = endsWith("/token", HttpMethod.Post),
         responseBuilder = {
             respond(
@@ -96,20 +90,30 @@ internal fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit): Req
 
 internal fun singleIssuanceRequestMocker(
     responseBuilder: HttpResponseDataBuilder,
-    validator: (request: HttpRequestData) -> Unit,
-): RequestMockerValidator =
-    RequestMockerValidator(
+    requestValidator: (request: HttpRequestData) -> Unit = {},
+): RequestMocker =
+    RequestMocker(
         requestMatcher = endsWith("/credentials", HttpMethod.Post),
         responseBuilder = responseBuilder,
-        requestValidator = validator,
+        requestValidator = requestValidator,
     )
 
 internal fun batchIssuanceRequestMocker(
     responseBuilder: HttpResponseDataBuilder,
-    validator: (request: HttpRequestData) -> Unit,
-): RequestMockerValidator =
-    RequestMockerValidator(
+    requestValidator: (request: HttpRequestData) -> Unit = {},
+): RequestMocker =
+    RequestMocker(
         requestMatcher = endsWith("/credentials/batch", HttpMethod.Post),
         responseBuilder = responseBuilder,
-        requestValidator = validator,
+        requestValidator = requestValidator,
+    )
+
+internal fun deferredIssuanceRequestMocker(
+    responseBuilder: HttpResponseDataBuilder,
+    requestValidator: (request: HttpRequestData) -> Unit = {},
+): RequestMocker =
+    RequestMocker(
+        requestMatcher = endsWith("/credentials/deferred", HttpMethod.Post),
+        responseBuilder = responseBuilder,
+        requestValidator = requestValidator,
     )

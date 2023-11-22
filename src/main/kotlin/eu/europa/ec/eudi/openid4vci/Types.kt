@@ -21,7 +21,9 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.JWT
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
+import eu.europa.ec.eudi.openid4vci.internal.ProofSerializer
 import io.ktor.client.*
+import kotlinx.serialization.Serializable
 import java.net.URI
 import java.security.cert.X509Certificate
 
@@ -126,6 +128,7 @@ data class TransactionId(
  * to bind the issued credential to the credential requester. They contain proof of possession of a bind key that can be
  * used to cryptographically verify that the presenter of the credential is also the holder of the credential.
  */
+@Serializable(ProofSerializer::class)
 sealed interface Proof {
 
     /**

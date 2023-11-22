@@ -20,7 +20,12 @@ import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.*
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.coroutineScope
@@ -96,7 +101,7 @@ internal data class DisplayTO(
  */
 internal class DefaultCredentialIssuerMetadataResolver(
     private val coroutineDispatcher: CoroutineDispatcher,
-    private val httpGet: HttpGet<String>,
+    private val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
 ) : CredentialIssuerMetadataResolver {
 
     override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> = coroutineScope {
@@ -110,7 +115,9 @@ internal class DefaultCredentialIssuerMetadataResolver(
                         .toURL()
 
                 withContext(coroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
-                    httpGet.get(url)
+                    ktorHttpClientFactory().use { client ->
+                        httpGet(client).get(url)
+                    }
                 }
             } catch (t: Throwable) {
                 throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
@@ -131,6 +138,29 @@ internal class DefaultCredentialIssuerMetadataResolver(
             }
             result
         }
+    }
+
+    companion object {
+
+        /**
+         * Factory which produces a [Ktor Http client][HttpClient]
+         * The actual engine will be peeked up by whatever
+         * it is available in classpath
+         *
+         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
+         */
+        val HttpClientFactory: KtorHttpClientFactory = {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json(
+                        json = Json { ignoreUnknownKeys = true },
+                    )
+                }
+            }
+        }
+
+        private fun httpGet(httpClient: HttpClient): HttpGet<String> =
+            HttpGet { httpClient.get(it).body<String>() }
     }
 }
 

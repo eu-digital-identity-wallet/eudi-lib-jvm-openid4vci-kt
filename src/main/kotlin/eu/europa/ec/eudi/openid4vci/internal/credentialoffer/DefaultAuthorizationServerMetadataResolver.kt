@@ -20,10 +20,16 @@ import com.nimbusds.oauth2.sdk.id.Issuer
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.mapError
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import net.minidev.json.JSONObject
 import java.net.URL
 
@@ -32,7 +38,7 @@ import java.net.URL
  */
 internal class DefaultAuthorizationServerMetadataResolver(
     private val coroutineDispatcher: CoroutineDispatcher,
-    private val httpGet: HttpGet<String>,
+    private val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
 ) : AuthorizationServerMetadataResolver {
 
     override suspend fun resolve(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
@@ -79,9 +85,34 @@ internal class DefaultAuthorizationServerMetadataResolver(
      */
     private suspend fun <T> fetchAndParse(url: URL, parser: (String) -> T): T =
         withContext(coroutineDispatcher + CoroutineName("$url")) {
-            val body = httpGet.get(url)
-            parser(body)
+            ktorHttpClientFactory().use { client ->
+                val body = httpGet(client).get(url)
+                parser(body)
+            }
         }
+
+    companion object {
+
+        /**
+         * Factory which produces a [Ktor Http client][HttpClient]
+         * The actual engine will be peeked up by whatever
+         * it is available in classpath
+         *
+         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
+         */
+        val HttpClientFactory: KtorHttpClientFactory = {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json(
+                        json = Json { ignoreUnknownKeys = true },
+                    )
+                }
+            }
+        }
+
+        private fun httpGet(httpClient: HttpClient): HttpGet<String> =
+            HttpGet { httpClient.get(it).body<String>() }
+    }
 }
 
 /**

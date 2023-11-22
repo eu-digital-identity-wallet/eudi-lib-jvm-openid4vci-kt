@@ -19,14 +19,11 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.ProofSerializer
+import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.ClaimTO
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.CredentialSupportedDisplayTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential
 import kotlinx.serialization.*
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 import java.util.*
 
@@ -195,7 +192,6 @@ internal data object MsoMdoc : Format<
         @SerialName(FORMAT)
         data class CredentialIssuanceRequestTO(
             @SerialName("doctype") val docType: String,
-            @Serializable(ProofSerializer::class)
             @SerialName("proof") override val proof: Proof? = null,
             @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
             @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
@@ -207,19 +203,6 @@ internal data object MsoMdoc : Format<
         class ClaimSet(
             claims: Map<Namespace, Map<ClaimName, Claim>>,
         ) : eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet, Map<Namespace, Map<ClaimName, Claim>> by claims
-
-        private object ClaimSetSerializer : KSerializer<ClaimSet> {
-            val internal = serializer<Map<Namespace, Map<ClaimName, Claim>>>()
-            override val descriptor: SerialDescriptor =
-                internal.descriptor
-
-            override fun deserialize(decoder: Decoder): ClaimSet =
-                ClaimSet(internal.deserialize(decoder))
-
-            override fun serialize(encoder: Encoder, value: ClaimSet) {
-                internal.serialize(encoder, value as Map<Namespace, Map<ClaimName, Claim>>)
-            }
-        }
 
         /**
          * Issuance request for a credential of mso_mdoc format

@@ -16,9 +16,6 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceAuthorizer
-import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorIssuanceAuthorizer
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -167,42 +164,17 @@ interface IssuanceAuthorizer {
          *
          * @param authorizationServerMetadata Read-only authorization server metadata.
          * @param config Configuration object.
-         * @param postPar An implementation of the http POST that submits the Pushed Authorization Request.
-         * @param getAccessToken An implementation of the http POST that submits the request to get the access token.
+         * @param ktorHttpClientFactory Factory method to generate ktor http clients
          * @return A default implementation of the [IssuanceAuthorizer] interface.
          */
         fun make(
             authorizationServerMetadata: CIAuthorizationServerMetadata,
             config: OpenId4VCIConfig,
-            postPar: HttpFormPost<PushedAuthorizationRequestResponse>,
-            getAccessToken: HttpFormPost<AccessTokenRequestResponse>,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultIssuanceAuthorizer.HttpClientFactory,
         ): IssuanceAuthorizer =
             DefaultIssuanceAuthorizer(
                 authorizationServerMetadata = authorizationServerMetadata,
                 config = config,
-                postPar = postPar,
-                getAccessToken = getAccessToken,
-            )
-
-        /**
-         * Factory method to create an [IssuanceAuthorizer] based on ktor.
-         *
-         * @param authorizationServerMetadata Read-only authorization server metadata
-         * @param config Configuration object.
-         * @param coroutineDispatcher A coroutine dispatcher.
-         * @param ktorHttpClientFactory Factory of ktor http clients
-         * @return An implementation of [IssuanceAuthorizer] based on ktor.
-         */
-        fun ktor(
-            authorizationServerMetadata: CIAuthorizationServerMetadata,
-            config: OpenId4VCIConfig,
-            coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            ktorHttpClientFactory: KtorHttpClientFactory = KtorIssuanceAuthorizer.HttpClientFactory,
-        ): IssuanceAuthorizer =
-            KtorIssuanceAuthorizer(
-                authorizationServerMetadata = authorizationServerMetadata,
-                config = config,
-                coroutineDispatcher = coroutineDispatcher,
                 ktorHttpClientFactory = ktorHttpClientFactory,
             )
     }

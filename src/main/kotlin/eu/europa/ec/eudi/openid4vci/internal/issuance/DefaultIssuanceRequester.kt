@@ -26,12 +26,17 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.BatchCredentials
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
+import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 
 /**
  * Default implementation of [IssuanceRequester] interface.
@@ -39,9 +44,7 @@ import kotlinx.coroutines.withContext
 internal class DefaultIssuanceRequester(
     val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     override val issuerMetadata: CredentialIssuerMetadata,
-    val postIssueRequest: HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse>,
-    val postDeferredIssueRequest:
-        HttpPost<DeferredIssuanceRequestTO, DeferredCredentialIssuanceResponse, DeferredCredentialIssuanceResponse>,
+    val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
 ) : IssuanceRequester {
 
     override suspend fun placeIssuanceRequest(
@@ -49,12 +52,14 @@ internal class DefaultIssuanceRequester(
         request: SingleCredential,
     ): Result<CredentialIssuanceResponse> = withContext(coroutineDispatcher) {
         runCatching {
-            postIssueRequest.post(
-                issuerMetadata.credentialEndpoint.value.value.toURL(),
-                mapOf(accessToken.toAuthorizationHeader()),
-                request.toTransferObject(),
-            ) {
-                handleResponseSingle(it, request)
+            ktorHttpClientFactory().use { client ->
+                postIssuanceRequest(client).post(
+                    issuerMetadata.credentialEndpoint.value.value.toURL(),
+                    mapOf(accessToken.toAuthorizationHeader()),
+                    request.toTransferObject(),
+                ) {
+                    handleResponseSingle(it, request)
+                }
             }
         }
     }
@@ -67,12 +72,14 @@ internal class DefaultIssuanceRequester(
             throw IssuerDoesNotSupportBatchIssuance
         }
         withContext(coroutineDispatcher) {
-            postIssueRequest.post(
-                issuerMetadata.batchCredentialEndpoint.value.value.toURL(),
-                mapOf(accessToken.toAuthorizationHeader()),
-                request.toTransferObject(),
-            ) {
-                handleResponseBatch(it)
+            ktorHttpClientFactory().use { client ->
+                postIssuanceRequest(client).post(
+                    issuerMetadata.batchCredentialEndpoint.value.value.toURL(),
+                    mapOf(accessToken.toAuthorizationHeader()),
+                    request.toTransferObject(),
+                ) {
+                    handleResponseBatch(it)
+                }
             }
         }
     }
@@ -147,12 +154,14 @@ internal class DefaultIssuanceRequester(
             throw IssuerDoesNotSupportDeferredIssuance
         }
         withContext(coroutineDispatcher) {
-            postDeferredIssueRequest.post(
-                issuerMetadata.deferredCredentialEndpoint.value.value.toURL(),
-                mapOf(accessToken.toAuthorizationHeader()),
-                transactionId.toDeferredRequestTO(),
-            ) {
-                handleResponseDeferred(it, transactionId)
+            ktorHttpClientFactory().use { client ->
+                postDeferredIssuanceRequest(client).post(
+                    issuerMetadata.deferredCredentialEndpoint.value.value.toURL(),
+                    mapOf(accessToken.toAuthorizationHeader()),
+                    transactionId.toDeferredRequestTO(),
+                ) {
+                    handleResponseDeferred(it, transactionId)
+                }
             }
         }
     }
@@ -241,5 +250,50 @@ internal class DefaultIssuanceRequester(
         return CredentialIssuanceRequestTO.BatchCredentialsTO(
             credentialRequests = credentialRequests.map { it.toTransferObject() },
         )
+    }
+
+    companion object {
+        /**
+         * Factory which produces a [Ktor Http client][HttpClient]
+         * The actual engine will be peeked up by whatever
+         * it is available in classpath
+         *
+         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
+         */
+        val HttpClientFactory: KtorHttpClientFactory = {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json(
+                        json = Json { ignoreUnknownKeys = true },
+                    )
+                }
+            }
+        }
+
+        private fun postIssuanceRequest(httpClient: HttpClient):
+            HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
+            HttpPost { url, headers, payload, responseHandler ->
+                val response = httpClient.post(url) {
+                    headers {
+                        headers.forEach { (k, v) -> append(k, v) }
+                    }
+                    contentType(ContentType.parse("application/json"))
+                    setBody(payload)
+                }
+                responseHandler(response)
+            }
+
+        private fun postDeferredIssuanceRequest(httpClient: HttpClient):
+            HttpPost<DeferredIssuanceRequestTO, DeferredCredentialIssuanceResponse, DeferredCredentialIssuanceResponse> =
+            HttpPost { url, headers, payload, responseHandler ->
+                val response = httpClient.post(url) {
+                    headers {
+                        headers.forEach { (k, v) -> append(k, v) }
+                    }
+                    contentType(ContentType.parse("application/json"))
+                    setBody(payload)
+                }
+                responseHandler(response)
+            }
     }
 }

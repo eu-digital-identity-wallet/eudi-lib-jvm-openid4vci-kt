@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
+package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
@@ -33,7 +33,6 @@ import com.nimbusds.openid.connect.sdk.claims.ACR
 import com.nimbusds.openid.connect.sdk.claims.ClaimType
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderEndpointMetadata
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
-import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
 import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdDataIntegrity
 import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdSignedJwt

@@ -21,11 +21,7 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceRequester
-import eu.europa.ec.eudi.openid4vci.internal.issuance.ktor.KtorIssuanceRequester
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -218,38 +214,15 @@ interface IssuanceRequester {
          * Factory method to create a default implementation of the [IssuanceRequester] interface.
          *
          * @param issuerMetadata  The credential issuer's metadata.
-         * @param postIssueRequest An implementation of the http POST that submits issuance requests.
-         * @param postDeferredIssueRequest An implementation of the http POST that submits deferred issuance requests.
+         * @param ktorHttpClientFactory Factory method to generate ktor http clients
          * @return A default implementation of the [IssuanceRequester] interface.
          */
         fun make(
             issuerMetadata: CredentialIssuerMetadata,
-            postIssueRequest: HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse>,
-            postDeferredIssueRequest:
-                HttpPost<DeferredIssuanceRequestTO, DeferredCredentialIssuanceResponse, DeferredCredentialIssuanceResponse>,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultIssuanceRequester.HttpClientFactory,
         ): IssuanceRequester =
             DefaultIssuanceRequester(
                 issuerMetadata = issuerMetadata,
-                postIssueRequest = postIssueRequest,
-                postDeferredIssueRequest = postDeferredIssueRequest,
-            )
-
-        /**
-         * Factory method to create an [IssuanceRequester] based on ktor.
-         *
-         * @param issuerMetadata  The credential issuer's metadata.
-         * @param coroutineDispatcher A coroutine dispatcher.
-         * @param ktorHttpClientFactory Factory of ktor http clients
-         * @return An implementation of [IssuanceRequester] based on ktor.
-         */
-        fun ktor(
-            issuerMetadata: CredentialIssuerMetadata,
-            coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            ktorHttpClientFactory: KtorHttpClientFactory = KtorIssuanceRequester.HttpClientFactory,
-        ): IssuanceRequester =
-            KtorIssuanceRequester(
-                issuerMetadata = issuerMetadata,
-                coroutineDispatcher = coroutineDispatcher,
                 ktorHttpClientFactory = ktorHttpClientFactory,
             )
     }
