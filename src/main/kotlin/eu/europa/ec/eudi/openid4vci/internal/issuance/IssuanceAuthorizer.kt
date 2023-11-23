@@ -23,7 +23,6 @@ import com.nimbusds.oauth2.sdk.id.State
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import com.nimbusds.oauth2.sdk.pkce.CodeVerifier
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.HttpFormPost
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -259,21 +258,18 @@ internal class IssuanceAuthorizer(
     private suspend fun requestAccessToken(params: Map<String, String>): AccessTokenRequestResponse =
         withContext(coroutineDispatcher) {
             ktorHttpClientFactory().use { client ->
-                HttpFormPost { url, formParameters ->
-                    val response = client.submitForm(
-                        url = url.toString(),
-                        formParameters = Parameters.build {
-                            formParameters.entries.forEach { (k, v) -> append(k, v) }
-                        },
-                    )
-                    if (response.status.isSuccess()) response.body<AccessTokenRequestResponse.Success>()
-                    else response.body<AccessTokenRequestResponse.Failure>()
-                }.post(
-                    authorizationServerMetadata.tokenEndpointURI.toURL(),
-                    params,
+                val url = authorizationServerMetadata.tokenEndpointURI.toURL()
+                val response = client.submitForm(
+                    url = url.toString(),
+                    formParameters = Parameters.build {
+                        params.entries.forEach { (k, v) -> append(k, v) }
+                    },
                 )
+                if (response.status.isSuccess()) response.body<AccessTokenRequestResponse.Success>()
+                else response.body<AccessTokenRequestResponse.Failure>()
             }
         }
+
 
     private suspend fun pushAuthorizationRequest(
         parEndpoint: URI,
@@ -281,17 +277,17 @@ internal class IssuanceAuthorizer(
     ): PushedAuthorizationRequestResponse =
         withContext(coroutineDispatcher) {
             ktorHttpClientFactory().use { client ->
-                HttpFormPost { url, formParameters ->
-                    val response = client.submitForm(
-                        url = url.toString(),
-                        formParameters = Parameters.build {
-                            formParameters.entries.forEach { (k, v) -> append(k, v) }
-                        },
-                    )
-                    if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
-                    else response.body<PushedAuthorizationRequestResponse.Failure>()
-                }
-                    .post(parEndpoint.toURL(), pushedAuthorizationRequest.asFormPostParams())
+                val url = parEndpoint.toURL()
+                val formParameters = pushedAuthorizationRequest.asFormPostParams()
+                val response = client.submitForm(
+                    url = url.toString(),
+                    formParameters = Parameters.build {
+                        formParameters.entries.forEach { (k, v) -> append(k, v) }
+                    },
+                )
+                if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
+                else response.body<PushedAuthorizationRequestResponse.Failure>()
+
             }
         }
 

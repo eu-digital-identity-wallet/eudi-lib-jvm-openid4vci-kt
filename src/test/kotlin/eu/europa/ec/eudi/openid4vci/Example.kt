@@ -19,8 +19,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
-import eu.europa.ec.eudi.openid4vci.internal.HttpFormPost
-import eu.europa.ec.eudi.openid4vci.internal.HttpGet
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -340,30 +338,23 @@ private class Wallet(
         }
 
     private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
-        httpClientFactory().use { client ->
+        return httpClientFactory().use { client ->
 
-            val loginUrl = HttpGet { url ->
-                runCatching {
-                    client.get(url).body<String>()
-                }
-            }.get(getAuthorizationCodeUrl).getOrThrow().extractASLoginUrl()
+            val loginUrl =
+                client.get(getAuthorizationCodeUrl).body<String>().extractASLoginUrl()
 
-            return HttpFormPost { url, formParameters ->
-                val response = client.submitForm(
-                    url = url.toString(),
-                    formParameters = Parameters.build {
-                        formParameters.entries.forEach { append(it.key, it.value) }
-                    },
-                )
-                val redirectLocation = response.headers.get("Location").toString()
-                URLBuilder(redirectLocation).parameters.get("code")
-            }.post(
-                loginUrl,
-                mapOf(
-                    "username" to actingUser.username,
-                    "password" to actingUser.password,
-                ),
+            val formParameters = mapOf(
+                "username" to actingUser.username,
+                "password" to actingUser.password,
             )
+            val response = client.submitForm(
+                url = loginUrl.toString(),
+                formParameters = Parameters.build {
+                    formParameters.entries.forEach { append(it.key, it.value) }
+                },
+            )
+            val redirectLocation = response.headers.get("Location").toString()
+            URLBuilder(redirectLocation).parameters.get("code")
         }
     }
 

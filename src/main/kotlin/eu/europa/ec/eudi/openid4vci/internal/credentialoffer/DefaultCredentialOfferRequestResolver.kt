@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.HttpGet
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import eu.europa.ec.eudi.openid4vci.internal.formats.Formats
 import io.ktor.client.*
@@ -79,7 +78,8 @@ internal class DefaultCredentialOfferRequestResolver(
     private val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
 ) : CredentialOfferRequestResolver {
 
-    private val credentialIssuerMetadataResolver = CredentialIssuerMetadataResolver(ioCoroutineDispatcher, ktorHttpClientFactory)
+    private val credentialIssuerMetadataResolver =
+        CredentialIssuerMetadataResolver(ioCoroutineDispatcher, ktorHttpClientFactory)
     private val authorizationServerMetadataResolver =
         AuthorizationServerMetadataResolver(ioCoroutineDispatcher, ktorHttpClientFactory)
 
@@ -91,7 +91,7 @@ internal class DefaultCredentialOfferRequestResolver(
                     withContext(ioCoroutineDispatcher + CoroutineName("credential-offer-request-object")) {
                         try {
                             ktorHttpClientFactory().use { client ->
-                                httpGet(client).get(request.value.value.toURL())
+                                client.get(request.value.value.toURL()).body()
                             }
                         } catch (t: Throwable) {
                             throw CredentialOfferRequestError.UnableToFetchCredentialOffer(t).toException()
@@ -152,8 +152,6 @@ internal class DefaultCredentialOfferRequestResolver(
             }
         }
 
-        private fun httpGet(httpClient: HttpClient): HttpGet<String> =
-            HttpGet { httpClient.get(it).body<String>() }
 
         /**
          * Tries to parse a [GrantsTO] to a [Grants] instance.

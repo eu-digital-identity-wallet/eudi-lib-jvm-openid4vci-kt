@@ -19,7 +19,6 @@ import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import com.nimbusds.oauth2.sdk.id.Issuer
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.HttpGet
 import eu.europa.ec.eudi.openid4vci.internal.mapError
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -87,7 +86,7 @@ internal class DefaultAuthorizationServerMetadataResolver(
     private suspend fun <T> fetchAndParse(url: URL, parser: (String) -> T): T =
         withContext(coroutineDispatcher + CoroutineName("$url")) {
             ktorHttpClientFactory().use { client ->
-                val body = httpGet(client).get(url)
+                val body = client.get(url).body<String>()
                 parser(body)
             }
         }
@@ -111,8 +110,7 @@ internal class DefaultAuthorizationServerMetadataResolver(
             }
         }
 
-        private fun httpGet(httpClient: HttpClient): HttpGet<String> =
-            HttpGet { httpClient.get(it).body<String>() }
+
     }
 }
 

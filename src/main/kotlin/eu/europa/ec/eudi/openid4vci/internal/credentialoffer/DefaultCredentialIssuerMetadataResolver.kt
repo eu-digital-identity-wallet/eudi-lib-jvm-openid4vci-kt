@@ -19,8 +19,7 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
-import eu.europa.ec.eudi.openid4vci.internal.HttpGet
-import eu.europa.ec.eudi.openid4vci.internal.formats.*
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupportedTO
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -34,7 +33,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
 
 /**
  * Unvalidated metadata of a Credential Issuer.
@@ -116,9 +115,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                         .toURL()
 
                 withContext(coroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
-                    ktorHttpClientFactory().use { client ->
-                        httpGet(client).get(url)
-                    }
+                    ktorHttpClientFactory().use { client -> client.get(url).body<String>() }
                 }
             } catch (t: Throwable) {
                 throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
@@ -160,8 +157,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
             }
         }
 
-        private fun httpGet(httpClient: HttpClient): HttpGet<String> =
-            HttpGet { httpClient.get(it).body<String>() }
+
     }
 }
 
@@ -207,36 +203,37 @@ private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetada
     )
 }
 
-private fun CredentialIssuerMetadataTO.credentialResponseEncryption(): Result<CredentialResponseEncryption> = runCatching {
-    val requireEncryption = requireCredentialResponseEncryption ?: false
-    val encryptionAlgorithms = credentialResponseEncryptionAlgorithmsSupported
-        ?.map { JWEAlgorithm.parse(it) }
-        ?: emptyList()
-    val encryptionMethods = credentialResponseEncryptionMethodsSupported
-        ?.map { EncryptionMethod.parse(it) }
-        ?: emptyList()
+private fun CredentialIssuerMetadataTO.credentialResponseEncryption(): Result<CredentialResponseEncryption> =
+    runCatching {
+        val requireEncryption = requireCredentialResponseEncryption ?: false
+        val encryptionAlgorithms = credentialResponseEncryptionAlgorithmsSupported
+            ?.map { JWEAlgorithm.parse(it) }
+            ?: emptyList()
+        val encryptionMethods = credentialResponseEncryptionMethodsSupported
+            ?.map { EncryptionMethod.parse(it) }
+            ?: emptyList()
 
-    if (requireEncryption) {
-        if (encryptionAlgorithms.isEmpty()) {
-            throw CredentialResponseEncryptionAlgorithmsRequired
-        }
-        val allAreAsymmetricAlgorithms = encryptionAlgorithms.all {
-            JWEAlgorithm.Family.ASYMMETRIC.contains(it)
-        }
-        if (!allAreAsymmetricAlgorithms) {
-            throw CredentialResponseAsymmetricEncryptionAlgorithmsRequired
-        }
+        if (requireEncryption) {
+            if (encryptionAlgorithms.isEmpty()) {
+                throw CredentialResponseEncryptionAlgorithmsRequired
+            }
+            val allAreAsymmetricAlgorithms = encryptionAlgorithms.all {
+                JWEAlgorithm.Family.ASYMMETRIC.contains(it)
+            }
+            if (!allAreAsymmetricAlgorithms) {
+                throw CredentialResponseAsymmetricEncryptionAlgorithmsRequired
+            }
 
-        CredentialResponseEncryption.Required(
-            encryptionAlgorithms,
-            encryptionMethods,
-        )
-    } else {
-        require(encryptionAlgorithms.isEmpty())
-        require(encryptionMethods.isEmpty())
-        CredentialResponseEncryption.NotRequired
+            CredentialResponseEncryption.Required(
+                encryptionAlgorithms,
+                encryptionMethods,
+            )
+        } else {
+            require(encryptionAlgorithms.isEmpty())
+            require(encryptionMethods.isEmpty())
+            CredentialResponseEncryption.NotRequired
+        }
     }
-}
 
 /**
  * Converts a [DisplayTO] to a [CredentialIssuerMetadata.Display] instance.

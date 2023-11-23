@@ -27,22 +27,16 @@ import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.HttpPost
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
-import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 @Serializable
 internal data class DeferredIssuanceRequestTO(
@@ -143,21 +137,12 @@ internal data class CredentialIssuanceResponse(
 
 
 /**
- * Factory method to create a default implementation of the [IssuanceRequester] interface.
- *
- * @param issuerMetadata  The credential issuer's metadata.
- * @param ktorHttpClientFactory Factory method to generate ktor http clients
- * @return A default implementation of the [IssuanceRequester] interface.
- */
-
-
-/**
  * Default implementation of [IssuanceRequester] interface.
  */
 internal class IssuanceRequester(
-    private val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val coroutineDispatcher: CoroutineDispatcher,
     private val issuerMetadata: CredentialIssuerMetadata,
-    private val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
+    private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
 
     /**
@@ -173,16 +158,17 @@ internal class IssuanceRequester(
     ): Result<CredentialIssuanceResponse> = withContext(coroutineDispatcher) {
         runCatching {
             ktorHttpClientFactory().use { client ->
-                postIssuanceRequest(client).post(
-                    issuerMetadata.credentialEndpoint.value.value.toURL(),
-                    mapOf(accessToken.toAuthorizationHeader()),
-                    request.toTransferObject(),
-                ) {
-                    handleResponseSingle(it, request)
+                val url = issuerMetadata.credentialEndpoint.value.value.toURL()
+                val response = client.post(url) {
+                    headers { bearerAuth(accessToken.accessToken) }
+                    contentType(ContentType.parse("application/json"))
+                    setBody(request.toTransferObject())
                 }
+                handleResponseSingle(response, request)
             }
         }
     }
+
 
     /**
      * Method that submits a request to credential issuer for the batch issuance of credentials.
@@ -200,16 +186,18 @@ internal class IssuanceRequester(
         }
         withContext(coroutineDispatcher) {
             ktorHttpClientFactory().use { client ->
-                postIssuanceRequest(client).post(
-                    issuerMetadata.batchCredentialEndpoint.value.value.toURL(),
-                    mapOf(accessToken.toAuthorizationHeader()),
-                    request.toTransferObject(),
-                ) {
-                    handleResponseBatch(it)
+                val url = issuerMetadata.batchCredentialEndpoint.value.value.toURL()
+                val payload = request.toTransferObject()
+                val response = client.post(url) {
+                    headers { bearerAuth(accessToken.accessToken) }
+                    contentType(ContentType.parse("application/json"))
+                    setBody(payload)
                 }
+                handleResponseBatch(response)
             }
         }
     }
+
 
     private suspend inline fun handleResponseSingle(
         response: HttpResponse,
@@ -289,16 +277,22 @@ internal class IssuanceRequester(
         }
         withContext(coroutineDispatcher) {
             ktorHttpClientFactory().use { client ->
-                postDeferredIssuanceRequest(client).post(
-                    issuerMetadata.deferredCredentialEndpoint.value.value.toURL(),
-                    mapOf(accessToken.toAuthorizationHeader()),
-                    transactionId.toDeferredRequestTO(),
-                ) { handleResponseDeferred(it) }
+                val url = issuerMetadata.deferredCredentialEndpoint.value.value.toURL()
+                val response = client.post(url) {
+                    headers {
+                        bearerAuth(accessToken.accessToken)
+                    }
+                    contentType(ContentType.parse("application/json"))
+                    setBody(transactionId.toDeferredRequestTO())
+                }
+                handleResponseDeferred(response)
             }
         }
     }
 
-    private fun TransactionId.toDeferredRequestTO(): DeferredIssuanceRequestTO = DeferredIssuanceRequestTO(value)
+
+    private fun TransactionId.toDeferredRequestTO(): DeferredIssuanceRequestTO =
+        DeferredIssuanceRequestTO(value)
 
     private suspend inline fun handleResponseDeferred(
         response: HttpResponse,
@@ -374,8 +368,6 @@ internal class IssuanceRequester(
         else -> CredentialIssuanceError.IssuanceRequestFailed(error, errorDescription)
     }
 
-    private fun AccessToken.toAuthorizationHeader(): Pair<String, String> =
-        "Authorization" to "BEARER $accessToken"
 
     private fun CredentialIssuanceRequest.BatchCredentials.toTransferObject(): CredentialIssuanceRequestTO {
         return CredentialIssuanceRequestTO.BatchCredentialsTO(
@@ -383,48 +375,4 @@ internal class IssuanceRequester(
         )
     }
 
-    companion object {
-        /**
-         * Factory which produces a [Ktor Http client][HttpClient]
-         * The actual engine will be peeked up by whatever
-         * it is available in classpath
-         *
-         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
-         */
-        val HttpClientFactory: KtorHttpClientFactory = {
-            HttpClient {
-                install(ContentNegotiation) {
-                    json(
-                        json = Json { ignoreUnknownKeys = true },
-                    )
-                }
-            }
-        }
-
-        private fun postIssuanceRequest(httpClient: HttpClient):
-                HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
-            HttpPost { url, headers, payload, responseHandler ->
-                val response = httpClient.post(url) {
-                    headers {
-                        headers.forEach { (k, v) -> append(k, v) }
-                    }
-                    contentType(ContentType.parse("application/json"))
-                    setBody(payload)
-                }
-                responseHandler(response)
-            }
-
-        private fun postDeferredIssuanceRequest(httpClient: HttpClient):
-                HttpPost<DeferredIssuanceRequestTO, DeferredCredentialQueryOutcome, DeferredCredentialQueryOutcome> =
-            HttpPost { url, headers, payload, responseHandler ->
-                val response = httpClient.post(url) {
-                    headers {
-                        headers.forEach { (k, v) -> append(k, v) }
-                    }
-                    contentType(ContentType.parse("application/json"))
-                    setBody(payload)
-                }
-                responseHandler(response)
-            }
-    }
 }

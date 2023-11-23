@@ -18,30 +18,6 @@ package eu.europa.ec.eudi.openid4vci.internal
 import io.ktor.client.statement.*
 import java.net.URL
 
-/**
- * An abstraction of an HTTP Get operation
- * to obtain [R]
- */
-internal fun interface HttpGet<out R> {
-    suspend fun get(url: URL): R
-}
 
-/**
- * An abstraction of an HTTP Post operation with application/x-www-form-urlencoded media type
- * parsing response as [R].
- */
-internal fun interface HttpFormPost<out R> {
-    suspend fun post(url: URL, formParameters: Map<String, String>): R
-}
 
-/**
- * An abstraction of an HTP Post operation of payload [T] parsing response as [R].
- */
-internal fun interface HttpPost<in T, in R, out RESPONSE> {
-    suspend fun post(
-        url: URL,
-        headers: Map<String, String>,
-        payload: T,
-        responseHandler: suspend (response: HttpResponse) -> R,
-    ): RESPONSE
-}
+
