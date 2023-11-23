@@ -19,10 +19,7 @@ import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.NonParsableCrede
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestValidationError.InvalidCredentialOfferUri
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri
 import org.apache.http.client.utils.URIBuilder
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.fail
+import kotlin.test.*
 
 internal class CredentialOfferRequestTest {
 
@@ -103,12 +100,6 @@ internal class CredentialOfferRequestTest {
 }
 
 private inline fun <reified T : CredentialOfferRequestError> Result<*>.assertFailsWithNestedError(): T =
-    fold(
-        onSuccess = { fail("Should have failed") },
-        onFailure = nestedErrorIs(),
-    )
-
-inline fun <reified T : CredentialOfferRequestError> nestedErrorIs(): (Throwable) -> T = { t ->
-    val error = assertIs<CredentialOfferRequestException>(t)
-    assertIs<T>(error.error)
-}
+    assertFailsWith<CredentialOfferRequestException> {
+        getOrThrow()
+    }.run { assertIs<T>(error) }

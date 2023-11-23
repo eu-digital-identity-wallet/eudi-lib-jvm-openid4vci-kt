@@ -169,22 +169,17 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        CredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-            .resolve(credentialEndpointUrl.toString())
-            .fold(
-                {
-                    assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
-                    assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
-                    // equals not implemented by OIDCProviderMetadata
-                    assertEquals(
-                        expected.authorizationServerMetadata.toJSONObject(),
-                        it.authorizationServerMetadata.toJSONObject(),
-                    )
-                    assertEquals(expected.credentials, it.credentials)
-                    assertEquals(expected.grants, it.grants)
-                },
-                { fail("Credential Offer resolution should have succeeded", it) },
-            )
+        val offer = CredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
+            .resolve(credentialEndpointUrl.toString()).getOrThrow()
+        assertEquals(expected.credentialIssuerIdentifier, offer.credentialIssuerIdentifier)
+        assertEquals(expected.credentialIssuerMetadata, offer.credentialIssuerMetadata)
+        // equals not implemented by OIDCProviderMetadata
+        assertEquals(
+            expected.authorizationServerMetadata.toJSONObject(),
+            offer.authorizationServerMetadata.toJSONObject(),
+        )
+        assertEquals(expected.credentials, offer.credentials)
+        assertEquals(expected.grants, offer.grants)
     }
 
     @Test

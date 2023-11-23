@@ -15,166 +15,142 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.fail
+import kotlin.test.*
 
 internal class DefaultCredentialIssuerMetadataResolverTest {
 
     @Test
-    internal fun `fails when metadata cannot be fetched`() {
-        runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                RequestMocker(
-                    requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
-                    responseBuilder = {
-                        respond(
-                            content = "Not Found",
-                            status = HttpStatusCode.NotFound,
-                            headers = headersOf(
-                                HttpHeaders.ContentType to listOf("application/json"),
-                            ),
-                        )
-                    },
-                    requestValidator = {
-                        assertEquals(
-                            credentialIssuerMetadataUrl().value,
-                            it.url.toURI(),
-                        )
-                    },
-                ),
-                expectSuccessOnly = true,
-            )
-            CredentialIssuerMetadataResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-                .resolve(credentialIssuerId())
-                .fold(
-                    { fail("CredentialIssuerMetadata resolution should have failed") },
-                    {
-                        assertIs<CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata>(it)
-                    },
-                )
+    internal fun `fails when metadata cannot be fetched`() = runTest {
+        val resolver = resolver(
+            RequestMocker(
+                requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
+                responseBuilder = {
+                    respond(
+                        content = "Not Found",
+                        status = HttpStatusCode.NotFound,
+                        headers = headersOf(
+                            HttpHeaders.ContentType to listOf("application/json"),
+                        ),
+                    )
+                },
+                requestValidator = {
+                    assertEquals(
+                        credentialIssuerMetadataUrl().value,
+                        it.url.toURI(),
+                    )
+                },
+            ),
+            expectSuccessOnly = true,
+        )
+        assertFailsWith<UnableToFetchCredentialIssuerMetadata> {
+            resolver.resolve(credentialIssuerId()).getOrThrow()
         }
     }
 
     @Test
-    internal fun `fails when metadata cannot be parsed`() {
-        runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                RequestMocker(
-                    requestMatcher = match(credentialIssuerMetadataUrl().value),
-                    responseBuilder = jsonResponse("eu/europa/ec/eudi/openid4vci/internal/invalid_credential_issuer_metadata.json"),
-                    requestValidator = {
-                        assertEquals(
-                            credentialIssuerMetadataUrl().value,
-                            it.url.toURI(),
-                        )
-                    },
-                ),
-            )
-            CredentialIssuerMetadataResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-                .resolve(credentialIssuerId())
-                .fold(
-                    { fail("CredentialIssuerMetadata resolution should have failed") },
-                    {
-                        assertIs<CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata>(it)
-                    },
-                )
+    internal fun `fails when metadata cannot be parsed`() = runTest {
+        val resolver = resolver(
+            RequestMocker(
+                requestMatcher = match(credentialIssuerMetadataUrl().value),
+                responseBuilder = jsonResponse("eu/europa/ec/eudi/openid4vci/internal/invalid_credential_issuer_metadata.json"),
+                requestValidator = {
+                    assertEquals(
+                        credentialIssuerMetadataUrl().value,
+                        it.url.toURI(),
+                    )
+                },
+            ),
+        )
+        assertFailsWith<NonParseableCredentialIssuerMetadata> {
+            resolver.resolve(credentialIssuerId()).getOrThrow()
         }
     }
 
     @Test
-    internal fun `fails with unexpected credential issuer id`() {
-        runTest {
-            val credentialIssuerId = CredentialIssuerId("https://issuer.com").getOrThrow()
-            val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl(credentialIssuerId)
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                RequestMocker(
-                    requestMatcher = match(credentialIssuerMetadataUrl.value),
-                    responseBuilder = jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
-                    requestValidator = {
-                        assertEquals(
-                            credentialIssuerMetadataUrl.value,
-                            it.url.toURI(),
-                        )
-                    },
-                ),
-            )
-            CredentialIssuerMetadataResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-                .resolve(credentialIssuerId)
-                .fold(
-                    { fail("CredentialIssuerMetadata resolution should have failed") },
-                    {
-                        assertIs<CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId>(it)
-                    },
-                )
+    internal fun `fails with unexpected credential issuer id`() = runTest {
+        val credentialIssuerId = CredentialIssuerId("https://issuer.com").getOrThrow()
+        val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl(credentialIssuerId)
+        val resolver = resolver(
+            RequestMocker(
+                requestMatcher = match(credentialIssuerMetadataUrl.value),
+                responseBuilder = jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
+                requestValidator = {
+                    assertEquals(
+                        credentialIssuerMetadataUrl.value,
+                        it.url.toURI(),
+                    )
+                },
+            ),
+        )
+
+        assertFailsWith<InvalidCredentialIssuerId> {
+            resolver.resolve(credentialIssuerId).getOrThrow()
         }
     }
 
     @Test
-    internal fun `fails with when response encryption algorithms are not asymmetric`() {
-        runTest {
-            val credentialIssuerId = CredentialIssuerId("https://issuer.com").getOrThrow()
-            val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl(credentialIssuerId)
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                RequestMocker(
-                    requestMatcher = match(credentialIssuerMetadataUrl.value),
-                    responseBuilder = jsonResponse(
-                        "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_no_asymmetric_algs.json",
-                    ),
-                    requestValidator = {
-                        assertEquals(
-                            credentialIssuerMetadataUrl.value,
-                            it.url.toURI(),
-                        )
-                    },
+    internal fun `fails with when response encryption algorithms are not asymmetric`() = runTest {
+        val credentialIssuerId = CredentialIssuerId("https://issuer.com").getOrThrow()
+        val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl(credentialIssuerId)
+
+        val resolver = resolver(
+            RequestMocker(
+                requestMatcher = match(credentialIssuerMetadataUrl.value),
+                responseBuilder = jsonResponse(
+                    "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_no_asymmetric_algs.json",
                 ),
-            )
-            CredentialIssuerMetadataResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-                .resolve(credentialIssuerId)
-                .fold(
-                    { fail("CredentialIssuerMetadata resolution should have failed") },
-                    {
-                        assertIs<CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired>(
-                            it,
-                        )
-                    },
-                )
+                requestValidator = {
+                    assertEquals(
+                        credentialIssuerMetadataUrl.value,
+                        it.url.toURI(),
+                    )
+                },
+            ),
+        )
+        assertFailsWith<CredentialResponseAsymmetricEncryptionAlgorithmsRequired> {
+            resolver.resolve(credentialIssuerId).getOrThrow()
         }
     }
 
     @Test
-    internal fun `resolution success`() {
-        runTest {
-            val credentialIssuerId = credentialIssuerId()
-            val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl()
+    internal fun `resolution success`() = runTest {
+        val credentialIssuerId = credentialIssuerId()
+        val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl()
 
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                RequestMocker(
-                    requestMatcher = match(credentialIssuerMetadataUrl.value),
-                    responseBuilder = jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
-                    requestValidator = {
-                        assertEquals(
-                            credentialIssuerMetadataUrl.value,
-                            it.url.toURI(),
-                        )
-                    },
-                ),
+        val resolver = resolver(
+            RequestMocker(
+                requestMatcher = match(credentialIssuerMetadataUrl.value),
+                responseBuilder = jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
+                requestValidator = {
+                    assertEquals(
+                        credentialIssuerMetadataUrl.value,
+                        it.url.toURI(),
+                    )
+                },
+            ),
+        )
+        resolver
+            .resolve(credentialIssuerId)
+            .fold(
+                { assertEquals(credentialIssuerMetadata(), it) },
+                {
+                    assertEquals(
+                        IllegalArgumentException("CredentialIssuerMetadata resolution should have succeeded"),
+                        it,
+                    )
+                },
             )
-            CredentialIssuerMetadataResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-                .resolve(credentialIssuerId)
-                .fold(
-                    { assertEquals(credentialIssuerMetadata(), it) },
-                    {
-                        assertEquals(
-                            IllegalArgumentException("CredentialIssuerMetadata resolution should have succeeded"),
-                            it,
-                        )
-                    },
-                )
-        }
     }
 }
+
+private fun resolver(request: RequestMocker, expectSuccessOnly: Boolean = false): CredentialIssuerMetadataResolver =
+    CredentialIssuerMetadataResolver(
+        ktorHttpClientFactory = mockedKtorHttpClientFactory(request, expectSuccessOnly = expectSuccessOnly),
+    )
