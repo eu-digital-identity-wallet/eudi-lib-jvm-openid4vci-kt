@@ -86,7 +86,7 @@ class IssuanceSingleRequestTest {
                         it.headers.contains("Authorization")
                     }
                     assertTrue("Authorization header malformed.") {
-                        it.headers.get("Authorization")?.contains("BEARER") ?: false
+                        it.headers.get("Authorization")?.contains("Bearer") ?: false
                     }
                     assertTrue("Content Type must be application/json") {
                         it.body.contentType == ContentType.parse("application/json")
@@ -104,7 +104,7 @@ class IssuanceSingleRequestTest {
         val (offer, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
             )
 
         val claimSet = MsoMdoc.Model.ClaimSet(
@@ -149,7 +149,7 @@ class IssuanceSingleRequestTest {
                             {
                                 "error": "invalid_proof"                               
                             } 
-                        """.trimIndent(),
+                            """.trimIndent(),
                             status = HttpStatusCode.BadRequest,
                             headers = headersOf(
                                 HttpHeaders.ContentType to listOf("application/json"),
@@ -161,7 +161,7 @@ class IssuanceSingleRequestTest {
             val (offer, authorizedRequest, issuer) =
                 authorizeRequestForCredentialOffer(
                     mockedKtorHttpClientFactory,
-                    AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc
+                    AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
                 )
 
             val claimSet = MsoMdoc.Model.ClaimSet(
@@ -183,7 +183,7 @@ class IssuanceSingleRequestTest {
                                     assertThat(
                                         "Expected CredentialIssuanceException to be thrown but was not",
                                         it is SubmittedRequest.Failed &&
-                                                it.error is CredentialIssuanceError.ResponseUnparsable,
+                                            it.error is CredentialIssuanceError.ResponseUnparsable,
                                     )
                                 },
                                 onFailure = {
@@ -209,7 +209,7 @@ class IssuanceSingleRequestTest {
         val (_, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
             )
 
         with(issuer) {
@@ -309,7 +309,7 @@ class IssuanceSingleRequestTest {
         val (offer, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
             )
 
         val claimSet = MsoMdoc.Model.ClaimSet(
@@ -411,7 +411,7 @@ class IssuanceSingleRequestTest {
         val (offer, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
             )
 
         val claimSet = SdJwtVc.Model.ClaimSet(

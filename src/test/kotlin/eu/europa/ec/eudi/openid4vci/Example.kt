@@ -129,7 +129,6 @@ private class Wallet(
             issuerMetadata = issuerMetadata,
         )
 
-
         val credentialMetadata = CredentialMetadata.ByScope(Scope(scope))
         val openIdScope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
 

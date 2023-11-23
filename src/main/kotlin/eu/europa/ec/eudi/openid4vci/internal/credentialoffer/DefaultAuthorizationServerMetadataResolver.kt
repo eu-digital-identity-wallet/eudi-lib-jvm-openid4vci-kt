@@ -109,8 +109,6 @@ internal class DefaultAuthorizationServerMetadataResolver(
                 }
             }
         }
-
-
     }
 }
 

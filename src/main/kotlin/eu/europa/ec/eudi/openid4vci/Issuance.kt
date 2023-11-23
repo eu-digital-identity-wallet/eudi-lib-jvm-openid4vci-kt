@@ -36,9 +36,7 @@ import kotlinx.serialization.json.Json
  */
 class AuthorizationUrl private constructor(val url: HttpsUrl) {
 
-
     override fun toString(): String = url.toString()
-
 
     companion object {
         const val PARAM_CLIENT_ID = "client_id"
@@ -277,7 +275,7 @@ interface RequestIssuance {
         claimSet: ClaimSet?,
         bindingKey: BindingKey,
 
-        ): Result<SubmittedRequest>
+    ): Result<SubmittedRequest>
 
     /**
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.NoProofRequired] authorization.
@@ -312,8 +310,6 @@ interface RequestIssuance {
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
     ): AuthorizedRequest.ProofRequired
-
-
 }
 
 sealed interface DeferredCredentialQueryOutcome {
@@ -354,7 +350,6 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
 
     companion object {
 
-
         /**
          * Factory method to create an [Issuer] using the passed http client factory
          *
@@ -369,14 +364,14 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             config: OpenId4VCIConfig,
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultKtorHttpClientFactory,
             coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Issuer = DefaultIssuer(
             authorizationServerMetadata,
             issuerMetadata,
             config,
             ktorHttpClientFactory,
             coroutineDispatcher,
-            responseEncryptionSpecFactory
+            responseEncryptionSpecFactory,
         )
 
         /**

@@ -16,8 +16,3 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import io.ktor.client.statement.*
-import java.net.URL
-
-
-
-

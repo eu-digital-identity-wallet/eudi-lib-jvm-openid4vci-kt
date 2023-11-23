@@ -275,15 +275,15 @@ class IssuanceEncryptedResponsesTest {
                         }
                         assertTrue("Missing response encryption JWK") {
                             issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
-                                    issuanceRequestTO.credentialEncryptionJwk != null
+                                issuanceRequestTO.credentialEncryptionJwk != null
                         }
                         assertTrue("Missing response encryption algorithm") {
                             issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
-                                    issuanceRequestTO.credentialResponseEncryptionAlg != null
+                                issuanceRequestTO.credentialResponseEncryptionAlg != null
                         }
                         assertTrue("Missing response encryption method") {
                             issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
-                                    issuanceRequestTO.credentialResponseEncryptionMethod != null
+                                issuanceRequestTO.credentialResponseEncryptionMethod != null
                         }
                     },
                 ),

@@ -98,7 +98,6 @@ internal sealed interface AccessTokenRequestResponse {
     ) : AccessTokenRequestResponse
 }
 
-
 /**
  * Default implementation of [IssuanceAuthorizer] interface.
  */
@@ -270,7 +269,6 @@ internal class IssuanceAuthorizer(
             }
         }
 
-
     private suspend fun pushAuthorizationRequest(
         parEndpoint: URI,
         pushedAuthorizationRequest: PushedAuthorizationRequest,
@@ -287,7 +285,6 @@ internal class IssuanceAuthorizer(
                 )
                 if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
                 else response.body<PushedAuthorizationRequestResponse.Failure>()
-
             }
         }
 
@@ -295,8 +292,6 @@ internal class IssuanceAuthorizer(
         this.authorizationRequest.toParameters()
             .mapValues { (_, value) -> value[0] }
             .toMap()
-
-
 }
 
 internal sealed interface TokenEndpointForm {

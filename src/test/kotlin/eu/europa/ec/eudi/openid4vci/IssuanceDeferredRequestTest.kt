@@ -223,8 +223,9 @@ class IssuanceDeferredRequestTest {
                     assertTrue("No Authorization header passed.") {
                         it.headers.contains("Authorization")
                     }
+
                     assertTrue("Authorization header malformed.") {
-                        it.headers.get("Authorization")?.contains("BEARER") ?: false
+                        it.headers.get("Authorization")?.contains("Bearer") ?: false
                     }
                     assertTrue("Content Type must be application/json") {
                         it.body.contentType == ContentType.parse("application/json")
@@ -400,10 +401,10 @@ class IssuanceDeferredRequestTest {
             .getOrThrow()
 
         val issuer = Issuer.make(
-                authorizationServerMetadata = offer.authorizationServerMetadata,
-                config = vciWalletConfiguration,
-                issuerMetadata = offer.credentialIssuerMetadata,
-                ktorHttpClientFactory = ktorHttpClientFactory,
+            authorizationServerMetadata = offer.authorizationServerMetadata,
+            config = vciWalletConfiguration,
+            issuerMetadata = offer.credentialIssuerMetadata,
+            ktorHttpClientFactory = ktorHttpClientFactory,
         )
 
         val authorizedRequest = with(issuer) {

@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

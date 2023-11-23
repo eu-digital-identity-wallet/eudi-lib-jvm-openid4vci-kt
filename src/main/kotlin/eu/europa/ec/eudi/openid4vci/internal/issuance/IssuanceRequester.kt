@@ -27,6 +27,7 @@ import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import io.ktor.client.call.*
@@ -122,7 +123,6 @@ sealed interface RequestedCredentialResponseEncryption : java.io.Serializable {
     }
 }
 
-
 /**
  * Models a response of the issuer to a successful issuance request.
  *
@@ -134,7 +134,6 @@ internal data class CredentialIssuanceResponse(
     val credentials: List<IssuedCredential>,
     val cNonce: CNonce?,
 )
-
 
 /**
  * Default implementation of [IssuanceRequester] interface.
@@ -158,9 +157,13 @@ internal class IssuanceRequester(
     ): Result<CredentialIssuanceResponse> = withContext(coroutineDispatcher) {
         runCatching {
             ktorHttpClientFactory().use { client ->
+
+
                 val url = issuerMetadata.credentialEndpoint.value.value.toURL()
+
+
                 val response = client.post(url) {
-                    headers { bearerAuth(accessToken.accessToken) }
+                    bearerAuth(accessToken.accessToken)
                     contentType(ContentType.parse("application/json"))
                     setBody(request.toTransferObject())
                 }
@@ -168,7 +171,6 @@ internal class IssuanceRequester(
             }
         }
     }
-
 
     /**
      * Method that submits a request to credential issuer for the batch issuance of credentials.
@@ -189,7 +191,7 @@ internal class IssuanceRequester(
                 val url = issuerMetadata.batchCredentialEndpoint.value.value.toURL()
                 val payload = request.toTransferObject()
                 val response = client.post(url) {
-                    headers { bearerAuth(accessToken.accessToken) }
+                    bearerAuth(accessToken.accessToken)
                     contentType(ContentType.parse("application/json"))
                     setBody(payload)
                 }
@@ -197,7 +199,6 @@ internal class IssuanceRequester(
             }
         }
     }
-
 
     private suspend inline fun handleResponseSingle(
         response: HttpResponse,
@@ -216,7 +217,7 @@ internal class IssuanceRequester(
                         when (val requestedEncryptionSpec = request.requestedCredentialResponseEncryption) {
                             is RequestedCredentialResponseEncryption.Requested -> requestedEncryptionSpec
                             is RequestedCredentialResponseEncryption.NotRequested ->
-                                throw CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+                                throw IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
                         }
 
                     DefaultJWTProcessor<SecurityContext>().apply {
@@ -279,9 +280,7 @@ internal class IssuanceRequester(
             ktorHttpClientFactory().use { client ->
                 val url = issuerMetadata.deferredCredentialEndpoint.value.value.toURL()
                 val response = client.post(url) {
-                    headers {
-                        bearerAuth(accessToken.accessToken)
-                    }
+                    bearerAuth(accessToken.accessToken)
                     contentType(ContentType.parse("application/json"))
                     setBody(transactionId.toDeferredRequestTO())
                 }
@@ -289,7 +288,6 @@ internal class IssuanceRequester(
             }
         }
     }
-
 
     private fun TransactionId.toDeferredRequestTO(): DeferredIssuanceRequestTO =
         DeferredIssuanceRequestTO(value)
@@ -368,11 +366,9 @@ internal class IssuanceRequester(
         else -> CredentialIssuanceError.IssuanceRequestFailed(error, errorDescription)
     }
 
-
     private fun CredentialIssuanceRequest.BatchCredentials.toTransferObject(): CredentialIssuanceRequestTO {
         return CredentialIssuanceRequestTO.BatchCredentialsTO(
             credentialRequests = credentialRequests.map { it.toTransferObject() },
         )
     }
-
 }

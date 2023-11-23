@@ -152,7 +152,6 @@ internal class DefaultCredentialOfferRequestResolver(
             }
         }
 
-
         /**
          * Tries to parse a [GrantsTO] to a [Grants] instance.
          */
