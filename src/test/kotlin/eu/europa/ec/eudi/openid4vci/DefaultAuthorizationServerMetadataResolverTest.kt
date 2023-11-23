@@ -18,84 +18,67 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Assertions
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.fail
 
 internal class DefaultAuthorizationServerMetadataResolverTest {
 
     @Test
-    internal fun `resolution success`() {
-        runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                RequestMocker(
-                    match(oidcAuthorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-                ),
-            )
-            AuthorizationServerMetadataResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-                .resolve(authorizationServerIssuer())
-                .fold(
-                    {
-                        Assertions.assertInstanceOf(OIDCProviderMetadata::class.java, it)
-                        // equals not implemented by OIDCProviderMetadata
-                        Assertions.assertEquals(oidcAuthorizationServerMetadata().toJSONObject(), it.toJSONObject())
-                    },
-                    { Assertions.fail("Authorization Server metadata resolution should have succeeded", it) },
-                )
-        }
+    internal fun `resolution success`() = runTest {
+        val resolver = mockResolver(
+            RequestMocker(
+                match(oidcAuthorizationServerMetadataUrl().value),
+                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
+            ),
+        )
+        val meta = resolver.resolve(authorizationServerIssuer()).getOrThrow()
+        assertIs<OIDCProviderMetadata>(meta)
+        // equals not implemented by OIDCProviderMetadata
+        assertEquals(oidcAuthorizationServerMetadata().toJSONObject(), meta.toJSONObject())
     }
 
     @Test
-    internal fun `fails when issuer does not match`() {
-        runTest {
-            val issuer = HttpsUrl("https://keycloak.netcompany.com/realms/pid-issuer-realm").getOrThrow()
-            val metadataUrl = oidcAuthorizationServerMetadataUrl(issuer)
-
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                RequestMocker(
-                    match(metadataUrl.value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-                ),
-            )
-            AuthorizationServerMetadataResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-                .resolve(issuer)
-                .fold(
-                    { Assertions.fail("Authorization Server metadata resolution should have failed") },
-                    {
-                        val exception = Assertions.assertInstanceOf(
-                            AuthorizationServerMetadataResolutionException::class.java,
-                            it,
-                        )
-                        val cause =
-                            Assertions.assertInstanceOf(IllegalArgumentException::class.java, exception.cause)
-                        Assertions.assertEquals("issuer does not match the expected value", cause.message)
-                    },
-                )
-        }
+    internal fun `fails when issuer does not match`() = runTest {
+        val issuer = HttpsUrl("https://keycloak.netcompany.com/realms/pid-issuer-realm").getOrThrow()
+        val metadataUrl = oidcAuthorizationServerMetadataUrl(issuer)
+        val resolver = mockResolver(
+            RequestMocker(
+                match(metadataUrl.value),
+                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
+            ),
+        )
+        val cause = resolver.resolve(issuer).fold(
+            onSuccess = { fail("Authorization Server metadata resolution should have failed") },
+            onFailure = causeIs<IllegalArgumentException>(),
+        )
+        assertEquals("issuer does not match the expected value", cause.message)
     }
 
     @Test
-    internal fun `falls back to oauth server metadata`() {
-        runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                RequestMocker(
-                    match(oauthAuthorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oauth_authorization_server_metadata.json"),
-                ),
-            )
-            AuthorizationServerMetadataResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-                .resolve(authorizationServerIssuer())
-                .fold(
-                    {
-                        Assertions.assertInstanceOf(AuthorizationServerMetadata::class.java, it)
-                        // equals not implemented by AuthorizationServerMetadata
-                        Assertions.assertEquals(
-                            oauthAuthorizationServerMetadata().toJSONObject(),
-                            it.toJSONObject(),
-                        )
-                    },
-                    { Assertions.fail("Authorization Server metadata resolution should have succeeded", it) },
-                )
-        }
+    internal fun `falls back to oauth server metadata`() = runTest {
+        val resolver = mockResolver(
+            RequestMocker(
+                match(oauthAuthorizationServerMetadataUrl().value),
+                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oauth_authorization_server_metadata.json"),
+            ),
+        )
+
+        val metadata = resolver.resolve(authorizationServerIssuer()).getOrThrow()
+        assertIs<AuthorizationServerMetadata>(metadata)
+        // equals not implemented by AuthorizationServerMetadata
+        assertEquals(oauthAuthorizationServerMetadata().toJSONObject(), metadata.toJSONObject())
+    }
+
+    private inline fun <reified T : Throwable> causeIs(): (Throwable) -> T = { t ->
+        val error = assertIs<AuthorizationServerMetadataResolutionException>(t)
+        assertIs<T>(error.cause)
     }
 }
+
+private fun mockResolver(mocker: RequestMocker): AuthorizationServerMetadataResolver =
+    AuthorizationServerMetadataResolver(
+        ktorHttpClientFactory =
+            mockedKtorHttpClientFactory(mocker),
+    )

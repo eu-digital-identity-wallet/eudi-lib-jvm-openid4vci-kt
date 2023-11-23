@@ -15,21 +15,17 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialOfferRequestResolver
 import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import kotlinx.coroutines.test.runTest
 import org.apache.http.client.utils.URIBuilder
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.fail
+import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
 internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
     internal fun `resolve success`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val resolver = resolver(
             RequestMocker(
                 match(credentialIssuerMetadataUrl().value),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
@@ -62,27 +58,13 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-            .resolve(credentialEndpointUrl.toString())
-            .fold(
-                {
-                    assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
-                    assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
-                    // equals not implemented by OIDCProviderMetadata
-                    assertEquals(
-                        expected.authorizationServerMetadata.toJSONObject(),
-                        it.authorizationServerMetadata.toJSONObject(),
-                    )
-                    assertEquals(expected.credentials, it.credentials)
-                    assertEquals(expected.grants, it.grants)
-                },
-                { fail("Credential Offer resolution should have succeeded", it) },
-            )
+        val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+        assertEquals(expected, offer)
     }
 
     @Test
     fun `resolve success with mos_mdoc`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val resolver = resolver(
             RequestMocker(
                 match(credentialIssuerMetadataUrl().value),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
@@ -114,27 +96,13 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-            .resolve(credentialEndpointUrl.toString())
-            .fold(
-                {
-                    assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
-                    assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
-                    // equals not implemented by OIDCProviderMetadata
-                    assertEquals(
-                        expected.authorizationServerMetadata.toJSONObject(),
-                        it.authorizationServerMetadata.toJSONObject(),
-                    )
-                    assertEquals(expected.credentials, it.credentials)
-                    assertEquals(expected.grants, it.grants)
-                },
-                { fail("Credential Offer resolution should have succeeded", it) },
-            )
+        val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+        assertEquals(expected, offer)
     }
 
     @Test
     internal fun `resolve success with jwt_vc_json`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val resolver = resolver(
             RequestMocker(
                 match(credentialIssuerMetadataUrl().value),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
@@ -170,27 +138,13 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-            .resolve(credentialEndpointUrl.toString())
-            .fold(
-                {
-                    assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
-                    assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
-                    // equals not implemented by OIDCProviderMetadata
-                    assertEquals(
-                        expected.authorizationServerMetadata.toJSONObject(),
-                        it.authorizationServerMetadata.toJSONObject(),
-                    )
-                    assertEquals(expected.credentials, it.credentials)
-                    assertEquals(expected.grants, it.grants)
-                },
-                { fail("Credential Offer resolution should have succeeded", it) },
-            )
+        val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+        assertEquals(expected, offer)
     }
 
     @Test
     internal fun `resolve success with ldp_vc`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val resolver = resolver(
             RequestMocker(
                 match(credentialIssuerMetadataUrl().value),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
@@ -227,27 +181,14 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-            .resolve(credentialEndpointUrl.toString())
-            .fold(
-                {
-                    assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
-                    assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
-                    // equals not implemented by OIDCProviderMetadata
-                    assertEquals(
-                        expected.authorizationServerMetadata.toJSONObject(),
-                        it.authorizationServerMetadata.toJSONObject(),
-                    )
-                    assertEquals(expected.credentials, it.credentials)
-                    assertEquals(expected.grants, it.grants)
-                },
-                { fail("Credential Offer resolution should have succeeded", it) },
-            )
+        val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+
+        assertEquals(expected, offer)
     }
 
     @Test
     internal fun `resolve success with jwt_vc_json-ld`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val resolver = resolver(
             RequestMocker(
                 match(credentialIssuerMetadataUrl().value),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
@@ -285,27 +226,14 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-            .resolve(credentialEndpointUrl.toString())
-            .fold(
-                {
-                    assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
-                    assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
-                    // equals not implemented by OIDCProviderMetadata
-                    assertEquals(
-                        expected.authorizationServerMetadata.toJSONObject(),
-                        it.authorizationServerMetadata.toJSONObject(),
-                    )
-                    assertEquals(expected.credentials, it.credentials)
-                    assertEquals(expected.grants, it.grants)
-                },
-                { fail("Credential Offer resolution should have succeeded", it) },
-            )
+        val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+
+        assertEquals(expected, offer)
     }
 
     @Test
     internal fun `resolve failure with unknown credential format`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val resolver = resolver(
             RequestMocker(
                 match(credentialIssuerMetadataUrl().value),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
@@ -322,20 +250,15 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-            .resolve(credentialEndpointUrl.toString())
-            .fold(
-                { fail("Credential Offer resolution should have failed") },
-                {
-                    val exception = assertIs<CredentialOfferRequestException>(it)
-                    assertIs<CredentialOfferRequestValidationError.InvalidCredentials>(exception.error)
-                },
-            )
+        val exception = assertFailsWith<CredentialOfferRequestException> {
+            resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+        }
+        assertIs<CredentialOfferRequestValidationError.InvalidCredentials>(exception.error)
     }
 
     @Test
     internal fun `resolve failure with blank issuer_state in grant`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val resolver = resolver(
             RequestMocker(
                 match(credentialIssuerMetadataUrl().value),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
@@ -352,22 +275,15 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-            .resolve(credentialEndpointUrl.toString())
-            .fold(
-                { fail("Credential Offer resolution should have failed") },
-                {
-                    val exception = assertIs<CredentialOfferRequestException>(it)
-                    assertIs<CredentialOfferRequestValidationError>(
-                        exception.error,
-                    )
-                },
-            )
+        val exception = assertFailsWith<CredentialOfferRequestException> {
+            resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+        }
+        assertIs<CredentialOfferRequestValidationError>(exception.error)
     }
 
     @Test
     internal fun `resolve failure with blank pre-authorized_code in grant`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val resolver = resolver(
             RequestMocker(
                 match(credentialIssuerMetadataUrl().value),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
@@ -384,24 +300,17 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-            .resolve(credentialEndpointUrl.toString())
-            .fold(
-                { fail("Credential Offer resolution should have failed") },
-                {
-                    val exception = assertIs<CredentialOfferRequestException>(it)
-                    assertIs<CredentialOfferRequestValidationError.InvalidGrants>(
-                        exception.error,
-                    )
-                },
-            )
+        val exception = assertFailsWith<CredentialOfferRequestException> {
+            resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+        }
+        assertIs<CredentialOfferRequestValidationError.InvalidGrants>(exception.error)
     }
 
     @Test
     internal fun `resolve success with credential_offer_uri`() = runTest {
         val credentialOfferUri = HttpsUrl("https://credential_offer/1").getOrThrow()
 
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val resolver = resolver(
             RequestMocker(
                 match(credentialIssuerMetadataUrl().value),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
@@ -434,21 +343,24 @@ internal class DefaultCredentialOfferRequestResolverTest {
             ),
         )
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-            .resolve(credentialEndpointUrl.toString())
-            .fold(
-                {
-                    assertEquals(expected.credentialIssuerIdentifier, it.credentialIssuerIdentifier)
-                    assertEquals(expected.credentialIssuerMetadata, it.credentialIssuerMetadata)
-                    // equals not implemented by OIDCProviderMetadata
-                    assertEquals(
-                        expected.authorizationServerMetadata.toJSONObject(),
-                        it.authorizationServerMetadata.toJSONObject(),
-                    )
-                    assertEquals(expected.credentials, it.credentials)
-                    assertEquals(expected.grants, it.grants)
-                },
-                { fail("Credential Offer resolution should have succeeded", it) },
-            )
+        val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+        assertEquals(expected, offer)
     }
 }
+
+private fun assertEquals(expected: CredentialOffer, offer: CredentialOffer) {
+    assertEquals(expected.credentialIssuerIdentifier, offer.credentialIssuerIdentifier)
+    assertEquals(expected.credentialIssuerMetadata, offer.credentialIssuerMetadata)
+    // equals not implemented by OIDCProviderMetadata
+    assertEquals(
+        expected.authorizationServerMetadata.toJSONObject(),
+        offer.authorizationServerMetadata.toJSONObject(),
+    )
+    assertEquals(expected.credentials, offer.credentials)
+    assertEquals(expected.grants, offer.grants)
+}
+
+private fun resolver(vararg request: RequestMocker): CredentialOfferRequestResolver =
+    CredentialOfferRequestResolver(
+        ktorHttpClientFactory = mockedKtorHttpClientFactory(requestMockers = request),
+    )

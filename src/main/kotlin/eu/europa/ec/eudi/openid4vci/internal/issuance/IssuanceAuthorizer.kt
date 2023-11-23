@@ -23,6 +23,8 @@ import com.nimbusds.oauth2.sdk.id.State
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import com.nimbusds.oauth2.sdk.pkce.CodeVerifier
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -88,7 +90,7 @@ internal sealed interface AccessTokenRequestResponse {
     /**
      * Request failed
      *
-     * @param error The error reported from authorization server.
+     * @param error The error reported from the authorization server.
      * @param errorDescription A description of the error.
      */
     @Serializable
@@ -115,7 +117,7 @@ internal class IssuanceAuthorizer(
      * @param state     The oauth2 specific 'state' request parameter.
      * @param issuerState   The state passed from credential issuer during the negotiation phase of the issuance.
      * @return The result of the request as a pair of the PKCE verifier used during request and the authorization code
-     *      url that caller will need to follow in order to retrieve the authorization code.
+     *      url that caller will need to follow to retrieve the authorization code.
      *
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
      * @see <a href="https://www.rfc-editor.org/rfc/rfc9126.html">RFC9126</a>
@@ -132,29 +134,23 @@ internal class IssuanceAuthorizer(
         val codeVerifier = CodeVerifier()
 
         val authzRequest: AuthorizationRequest = with(
-            AuthorizationRequest.Builder(
-                ResponseType("code"),
-                clientID,
-            ),
+            AuthorizationRequest.Builder(ResponseType("code"), clientID),
         ) {
             redirectionURI(config.authFlowRedirectionURI)
             codeChallenge(codeVerifier, CodeChallengeMethod.S256)
             scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray()))
             state(State(state))
-            issuerState?.let {
-                customParameter("issuer_state", issuerState)
-            }
+            issuerState?.let { customParameter("issuer_state", issuerState) }
             build()
         }
 
         val pushedAuthorizationRequest = PushedAuthorizationRequest(parEndpoint, authzRequest)
-
         val response = pushAuthorizationRequest(parEndpoint, pushedAuthorizationRequest)
 
-        response.toPair(clientID, codeVerifier, state)
+        response.authorizationCodeUrlOrFail(clientID, codeVerifier, state)
     }
 
-    private fun PushedAuthorizationRequestResponse.toPair(
+    private fun PushedAuthorizationRequestResponse.authorizationCodeUrlOrFail(
         clientID: ClientID,
         codeVerifier: CodeVerifier,
         state: String,
@@ -174,18 +170,12 @@ internal class IssuanceAuthorizer(
                 }
 
             val getAuthorizationCodeURL = AuthorizationUrl(httpsUrl.toString())
-
-            Pair(
-                PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString()),
-                getAuthorizationCodeURL,
-            )
+            val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())
+            pkceVerifier to getAuthorizationCodeURL
         }
 
         is PushedAuthorizationRequestResponse.Failure ->
-            throw CredentialIssuanceError.PushedAuthorizationRequestFailed(
-                error,
-                errorDescription,
-            )
+            throw PushedAuthorizationRequestFailed(error, errorDescription)
     }
 
     /**
@@ -200,28 +190,14 @@ internal class IssuanceAuthorizer(
     suspend fun requestAccessTokenAuthFlow(
         authorizationCode: String,
         codeVerifier: String,
-    ): Result<Pair<String, CNonce?>> = runCatching {
+    ): Result<Pair<AccessToken, CNonce?>> = runCatching {
         val params = TokenEndpointForm.AuthCodeFlow.of(
             authorizationCode,
             config.authFlowRedirectionURI,
             config.clientId,
             codeVerifier,
         )
-
-        val response = requestAccessToken(params)
-
-        when (response) {
-            is AccessTokenRequestResponse.Success -> {
-                val cnonce = response.cNonce?.let { CNonce(it, response.cNonceExpiresIn) }
-                Pair(response.accessToken, cnonce)
-            }
-
-            is AccessTokenRequestResponse.Failure ->
-                throw CredentialIssuanceError.AccessTokenRequestFailed(
-                    response.error,
-                    response.errorDescription,
-                )
-        }
+        requestAccessToken(params).accessTokenOrFail()
     }
 
     /**
@@ -236,23 +212,20 @@ internal class IssuanceAuthorizer(
     suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: String,
         pin: String?,
-    ): Result<Pair<String, CNonce?>> = runCatching {
+    ): Result<Pair<AccessToken, CNonce?>> = runCatching {
         val params = TokenEndpointForm.PreAuthCodeFlow.of(preAuthorizedCode, pin)
-        val response = requestAccessToken(params)
-
-        when (response) {
-            is AccessTokenRequestResponse.Success -> {
-                val cNonce = response.cNonce?.let { CNonce(it, response.cNonceExpiresIn) }
-                Pair(response.accessToken, cNonce)
-            }
-
-            is AccessTokenRequestResponse.Failure ->
-                throw CredentialIssuanceError.AccessTokenRequestFailed(
-                    response.error,
-                    response.errorDescription,
-                )
-        }
+        requestAccessToken(params).accessTokenOrFail()
     }
+
+    private fun AccessTokenRequestResponse.accessTokenOrFail(): Pair<AccessToken, CNonce?> =
+        when (this) {
+            is AccessTokenRequestResponse.Success -> {
+                val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
+                AccessToken(accessToken) to cNonce
+            }
+            is AccessTokenRequestResponse.Failure ->
+                throw AccessTokenRequestFailed(error, errorDescription)
+        }
 
     private suspend fun requestAccessToken(params: Map<String, String>): AccessTokenRequestResponse =
         withContext(coroutineDispatcher) {
@@ -282,6 +255,7 @@ internal class IssuanceAuthorizer(
                     formParameters = Parameters.build {
                         formParameters.entries.forEach { (k, v) -> append(k, v) }
                     },
+
                 )
                 if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
                 else response.body<PushedAuthorizationRequestResponse.Failure>()
@@ -289,7 +263,7 @@ internal class IssuanceAuthorizer(
         }
 
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =
-        this.authorizationRequest.toParameters()
+        authorizationRequest.toParameters()
             .mapValues { (_, value) -> value[0] }
             .toMap()
 }

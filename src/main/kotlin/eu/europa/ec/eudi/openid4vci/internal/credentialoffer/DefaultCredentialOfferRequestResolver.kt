@@ -18,19 +18,18 @@ package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import eu.europa.ec.eudi.openid4vci.internal.formats.Formats
-import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -74,8 +73,8 @@ private data class PreAuthorizedCodeTO(
  * A default implementation for [CredentialOfferRequestResolver].
  */
 internal class DefaultCredentialOfferRequestResolver(
-    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
+    private val ioCoroutineDispatcher: CoroutineDispatcher,
+    private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) : CredentialOfferRequestResolver {
 
     private val credentialIssuerMetadataResolver =
@@ -132,93 +131,65 @@ internal class DefaultCredentialOfferRequestResolver(
                 grants,
             )
         }
+}
 
-    companion object {
-
-        /**
-         * Factory which produces a [Ktor Http client][HttpClient]
-         * The actual engine will be peeked up by whatever
-         * it is available in classpath
-         *
-         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
-         */
-        val HttpClientFactory: KtorHttpClientFactory = {
-            HttpClient {
-                install(ContentNegotiation) {
-                    json(
-                        json = Json { ignoreUnknownKeys = true },
-                    )
-                }
-            }
+/**
+ * Tries to parse a [GrantsTO] to a [Grants] instance.
+ */
+private fun GrantsTO.toGrants(): Grants? {
+    val maybeAuthorizationCodeGrant =
+        authorizationCode?.let { Grants.AuthorizationCode(it.issuerState) }
+    val maybePreAuthorizedCodeGrant =
+        preAuthorizedCode?.let {
+            Grants.PreAuthorizedCode(
+                it.preAuthorizedCode,
+                it.pinRequired ?: false,
+                it.interval?.seconds ?: 5.seconds,
+            )
         }
 
-        /**
-         * Tries to parse a [GrantsTO] to a [Grants] instance.
-         */
-        private fun GrantsTO.toGrants(): Grants? {
-            val maybeAuthorizationCodeGrant =
-                authorizationCode?.let { Grants.AuthorizationCode(it.issuerState) }
-            val maybePreAuthorizedCodeGrant =
-                preAuthorizedCode?.let {
-                    Grants.PreAuthorizedCode(
-                        it.preAuthorizedCode,
-                        it.pinRequired ?: false,
-                        it.interval?.seconds ?: 5.seconds,
-                    )
-                }
+    return when {
+        maybeAuthorizationCodeGrant != null && maybePreAuthorizedCodeGrant != null -> Grants.Both(
+            maybeAuthorizationCodeGrant,
+            maybePreAuthorizedCodeGrant,
+        )
 
-            return when {
-                maybeAuthorizationCodeGrant != null && maybePreAuthorizedCodeGrant != null -> Grants.Both(
-                    maybeAuthorizationCodeGrant,
-                    maybePreAuthorizedCodeGrant,
-                )
-
-                maybeAuthorizationCodeGrant == null && maybePreAuthorizedCodeGrant == null -> null
-                maybeAuthorizationCodeGrant != null -> maybeAuthorizationCodeGrant
-                else -> maybePreAuthorizedCodeGrant
-            }
-        }
-
-        /**
-         * Tries to parse a [JsonElement] as an [CredentialMetadata].
-         */
-        private fun JsonElement.toOfferedCredentialByProfile(metadata: CredentialIssuerMetadata): CredentialMetadata =
-            if (this is JsonPrimitive && isString) {
-                metadata.toOfferedCredentialByScope(content)
-            } else if (this is JsonObject) {
-                toOfferedCredentialByProfile(metadata)
-            } else {
-                throw IllegalArgumentException("Invalid JsonElement for Credential. Found '$javaClass'")
-            }
-
-        /**
-         * Gets an [CredentialMetadata] by its scope.
-         */
-        private fun CredentialIssuerMetadata.toOfferedCredentialByScope(scope: String): CredentialMetadata =
-            credentialsSupported
-                .firstOrNull { it.scope == scope }
-                ?.let {
-                    CredentialMetadata.ByScope(Scope(scope))
-                }
-                ?: throw IllegalArgumentException("Unknown scope '$scope")
-
-        /**
-         * Converts this [JsonObject] to a [CredentialMetadata.ByFormat] object.
-         *
-         * The resulting [CredentialMetadata.ByFormat] must be supported by the Credential Issuer and be present in its [CredentialIssuerMetadata].
-         */
-        private fun JsonObject.toOfferedCredentialByProfile(metadata: CredentialIssuerMetadata): CredentialMetadata {
-            val format =
-                getOrDefault("format", JsonNull)
-                    .let {
-                        if (it is JsonPrimitive && it.isString) {
-                            it.content
-                        } else {
-                            throw IllegalArgumentException("Invalid 'format'")
-                        }
-                    }
-
-            return Formats.matchSupportedCredentialByTypeAndMapToDomain(format, this, metadata)
-        }
+        maybeAuthorizationCodeGrant == null && maybePreAuthorizedCodeGrant == null -> null
+        maybeAuthorizationCodeGrant != null -> maybeAuthorizationCodeGrant
+        else -> maybePreAuthorizedCodeGrant
     }
+}
+
+/**
+ * Tries to parse a [JsonElement] as an [CredentialMetadata].
+ */
+private fun JsonElement.toOfferedCredentialByProfile(metadata: CredentialIssuerMetadata): CredentialMetadata =
+    when {
+        this is JsonPrimitive && isString -> metadata.toOfferedCredentialByScope(content)
+        this is JsonObject -> toOfferedCredentialByProfile(metadata)
+        else -> error("Invalid JsonElement for Credential. Found '$javaClass'")
+    }
+
+/**
+ * Gets an [CredentialMetadata] by its scope.
+ */
+private fun CredentialIssuerMetadata.toOfferedCredentialByScope(scope: String): CredentialMetadata =
+    credentialsSupported
+        .firstOrNull { it.scope == scope }
+        ?.let { CredentialMetadata.ByScope(Scope(scope)) }
+        ?: error("Unknown scope '$scope")
+
+/**
+ * Converts this [JsonObject] to a [CredentialMetadata.ByFormat] object.
+ *
+ * The resulting [CredentialMetadata.ByFormat] must be supported by the Credential Issuer and be present in its [CredentialIssuerMetadata].
+ */
+private fun JsonObject.toOfferedCredentialByProfile(metadata: CredentialIssuerMetadata): CredentialMetadata {
+    val format = get("format")
+        ?.let {
+            if (it is JsonPrimitive && it.isString) it.content
+            else null
+        } ?: error("Invalid 'format'")
+
+    return Formats.matchSupportedCredentialByTypeAndMapToDomain(format, this, metadata)
 }

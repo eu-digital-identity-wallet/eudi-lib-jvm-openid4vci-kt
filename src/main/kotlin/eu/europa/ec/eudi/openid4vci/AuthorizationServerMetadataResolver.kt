@@ -41,7 +41,7 @@ fun interface AuthorizationServerMetadataResolver {
          */
         operator fun invoke(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultAuthorizationServerMetadataResolver.HttpClientFactory,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): AuthorizationServerMetadataResolver =
             DefaultAuthorizationServerMetadataResolver(
                 coroutineDispatcher = ioCoroutineDispatcher,

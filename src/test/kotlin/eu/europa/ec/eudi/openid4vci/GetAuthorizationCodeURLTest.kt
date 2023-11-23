@@ -18,53 +18,39 @@ package eu.europa.ec.eudi.openid4vci
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 
 class GetAuthorizationCodeURLTest {
 
     @Test
     fun `Fails when not an https URL`() {
-        assertFailsWith<IllegalArgumentException>(
-            message = "Must be an https url",
-            block = {
-                AuthorizationUrl("http://issuer")
-            },
-        )
+        assertFailsWith<IllegalArgumentException>("Must be an https url") {
+            AuthorizationUrl("http://issuer")
+        }
     }
 
     @Test
     fun `Fails no client_id query param`() {
-        var exception = assertFailsWith<IllegalArgumentException>(
-            message = "URL must contain client_id query parameter",
-            block = {
-                AuthorizationUrl("https://issuer")
-            },
-        )
-        assertTrue(exception.message.equals("URL must contain query parameter"))
+        var exception = assertFailsWith<IllegalArgumentException>("URL must contain client_id query parameter") {
+            AuthorizationUrl("https://issuer")
+        }
+        assertEquals("URL must contain query parameter", exception.message)
 
-        exception = assertFailsWith<IllegalArgumentException>(
-            message = "URL must contain client_id query parameter",
-            block = {
-                AuthorizationUrl("https://issuer?param=client_id")
-            },
-        )
+        exception = assertFailsWith<IllegalArgumentException>("URL must contain client_id query parameter") {
+            AuthorizationUrl("https://issuer?param=client_id")
+        }
         assertEquals("URL must contain client_id query parameter", exception.message)
     }
 
     @Test
     fun `Fails no request_uri query param`() {
-        var exception = assertFailsWith<IllegalArgumentException>(
-            message = "URL must contain request_uri query parameter",
-            block = { AuthorizationUrl("https://issuer?client_id=wallet_client_id") },
-        )
+        var exception = assertFailsWith<IllegalArgumentException>("URL must contain request_uri query parameter") {
+            AuthorizationUrl("https://issuer?client_id=wallet_client_id")
+        }
         assertEquals("URL must contain request_uri query parameter", exception.message)
 
-        exception = assertFailsWith<IllegalArgumentException>(
-            message = "URL must contain request_uri query parameter",
-            block = {
-                AuthorizationUrl("https://issuer?client_id=wallet_client_id")
-            },
-        )
+        exception = assertFailsWith<IllegalArgumentException>("URL must contain request_uri query parameter") {
+            AuthorizationUrl("https://issuer?client_id=wallet_client_id")
+        }
         assertEquals("URL must contain request_uri query parameter", exception.message)
     }
 

@@ -15,39 +15,12 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.issuance
 
-import com.nimbusds.jwt.JWT
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.ProofBuilder
-import eu.europa.ec.eudi.openid4vci.internal.ProofSerializer
+import eu.europa.ec.eudi.openid4vci.internal.Proof
+import eu.europa.ec.eudi.openid4vci.internal.createProof
 import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.serialization.Serializable
 import java.util.*
-
-/**
- * Sealed hierarchy of the proofs of possession that can be included in a credential issuance request. Proofs are used
- * to bind the issued credential to the credential requester. They contain proof of possession of a bind key that can be
- * used to cryptographically verify that the presenter of the credential is also the holder of the credential.
- */
-@Serializable(ProofSerializer::class)
-sealed interface Proof {
-
-    /**
-     * Proof of possession is structured as signed JWT
-     *
-     * @param jwt The proof JWT
-     */
-    @JvmInline
-    value class Jwt(val jwt: JWT) : Proof
-
-    /**
-     * Proof of possession is structured as a CWT
-     *
-     * @param cwt The proof CWT
-     */
-    @JvmInline
-    value class Cwt(val cwt: String) : Proof
-}
 
 /**
  * Default implementation of [Issuer] interface
@@ -106,28 +79,17 @@ internal class DefaultIssuer(
         UnauthorizedRequest.AuthorizationCodeRetrieved(authorizationCode, pkceVerifier)
 
     override suspend fun UnauthorizedRequest.AuthorizationCodeRetrieved.requestAccessToken(): Result<AuthorizedRequest> =
-        runCatching {
-            val (accessToken, nonce) =
-                authorizer.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier).getOrThrow()
-            nonce
-                ?.let { AuthorizedRequest.ProofRequired(AccessToken(accessToken), nonce) }
-                ?: AuthorizedRequest.NoProofRequired(AccessToken(accessToken))
-        }
+        authorizer.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier)
+            .map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
 
     override suspend fun authorizeWithPreAuthorizationCode(
         credentials: List<CredentialMetadata>,
         preAuthorizationCode: PreAuthorizationCode,
-    ): Result<AuthorizedRequest> = runCatching {
-        val (accessToken, nonce) =
-            authorizer.requestAccessTokenPreAuthFlow(
-                preAuthorizationCode.preAuthorizedCode,
-                preAuthorizationCode.pin,
-            ).getOrThrow()
-
-        nonce
-            ?.let { AuthorizedRequest.ProofRequired(AccessToken(accessToken), nonce) }
-            ?: AuthorizedRequest.NoProofRequired(AccessToken(accessToken))
-    }
+    ): Result<AuthorizedRequest> =
+        authorizer.requestAccessTokenPreAuthFlow(
+            preAuthorizationCode.preAuthorizedCode,
+            preAuthorizationCode.pin,
+        ).map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
@@ -149,50 +111,11 @@ internal class DefaultIssuer(
             with(credentialMetadata.matchIssuerSupportedCredential()) {
                 constructIssuanceRequest(
                     claimSet,
-                    bindingKey.createProofWithKey(this, cNonce.value),
+                    createProof(issuerMetadata, bindingKey, this, cNonce.value),
                 )
             }
         }
     }
-
-    /**
-     * Validate that the provided evidence is one of those that issuer supports
-     */
-    private fun BindingKey.createProofWithKey(credentialSpec: CredentialSupported, cNonce: String): Proof =
-        when (this) {
-            is BindingKey.Jwk -> {
-                fun isAlgorithmSupported(): Boolean =
-                    credentialSpec.cryptographicSuitesSupported.contains(algorithm.name)
-
-                fun isBindingMethodSupported(): Boolean =
-                    credentialSpec.cryptographicBindingMethodsSupported.contains(CryptographicBindingMethod.JWK)
-
-                fun isProofTypeSupported(): Boolean =
-                    credentialSpec.proofTypesSupported.contains(ProofType.JWT)
-
-                if (!isAlgorithmSupported()) {
-                    throw CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported
-                }
-                if (!isBindingMethodSupported()) {
-                    throw CredentialIssuanceError.ProofGenerationError.CryptographicBindingMethodNotSupported
-                }
-                if (!isProofTypeSupported()) {
-                    throw CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
-                }
-
-                ProofBuilder.ofType(ProofType.JWT) {
-                    aud(issuerMetadata.credentialIssuerIdentifier.toString())
-                    jwk(this@createProofWithKey.jwk)
-                    alg(this@createProofWithKey.algorithm)
-                    nonce(cNonce)
-
-                    build()
-                }
-            }
-
-            is BindingKey.Did -> TODO("DID proof evidence not supported yet")
-            is BindingKey.X509 -> TODO("X509 proof evidence not supported yet")
-        }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
@@ -214,7 +137,7 @@ internal class DefaultIssuer(
                 with(meta.matchIssuerSupportedCredential()) {
                     constructIssuanceRequest(
                         claimSet,
-                        bindingKey.createProofWithKey(this, cNonce.value),
+                        createProof(issuerMetadata, bindingKey, this, cNonce.value),
                     )
                 }
             }
