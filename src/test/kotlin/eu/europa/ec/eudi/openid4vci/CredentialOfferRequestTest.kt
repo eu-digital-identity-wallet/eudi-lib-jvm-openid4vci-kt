@@ -28,18 +28,13 @@ internal class CredentialOfferRequestTest {
 
     @Test
     internal fun `Fails with non parsable Credential Offer Endpoint URL`() {
-        CredentialOfferRequest("file:").fold(
-            onSuccess = { fail("Credential Offer Endpoint URL should not have been parsed") },
-            onFailure = assertContains<NonParsableCredentialOfferEndpointUrl>(),
-        )
+        CredentialOfferRequest("file:").assertFailsWithNestedError<NonParsableCredentialOfferEndpointUrl>()
     }
 
     @Test
     internal fun `Fails when neither 'credential_offer' nor 'credential_offer_uri' is provided`() {
-        CredentialOfferRequest("wallet://credential_offer").fold(
-            onSuccess = { fail("Credential Offer Endpoint URL should not have been parsed") },
-            onFailure = assertContains<OneOfCredentialOfferOrCredentialOfferUri>(),
-        )
+        CredentialOfferRequest("wallet://credential_offer")
+            .assertFailsWithNestedError<OneOfCredentialOfferOrCredentialOfferUri>()
     }
 
     @Test
@@ -48,10 +43,8 @@ internal class CredentialOfferRequestTest {
             .addParameter("credential_offer", "{}")
             .addParameter("credential_offer_uri", "https://credential.offer/1")
             .build()
-        CredentialOfferRequest(uri.toString()).fold(
-            onSuccess = { fail("Credential Offer Endpoint URL should not have been parsed") },
-            onFailure = assertContains<OneOfCredentialOfferOrCredentialOfferUri>(),
-        )
+            .toString()
+        CredentialOfferRequest(uri).assertFailsWithNestedError<OneOfCredentialOfferOrCredentialOfferUri>()
     }
 
     @Test
@@ -81,8 +74,8 @@ internal class CredentialOfferRequestTest {
         val credentialOfferEndpointUri = URIBuilder("wallet://credential_offer")
             .addParameter("credential_offer", credentialOffer)
             .build()
-
-        val offer = CredentialOfferRequest(credentialOfferEndpointUri.toString()).getOrThrow()
+            .toString()
+        val offer = CredentialOfferRequest(credentialOfferEndpointUri).getOrThrow()
         val passByValue = assertIs<CredentialOfferRequest.PassByValue>(offer)
         assertEquals(credentialOffer, passByValue.value)
     }
@@ -93,10 +86,8 @@ internal class CredentialOfferRequestTest {
         val credentialOfferEndpointUri = URIBuilder("wallet://credential_offer")
             .addParameter("credential_offer_uri", credentialOfferUri)
             .build()
-        CredentialOfferRequest(credentialOfferEndpointUri.toString()).fold(
-            onSuccess = { fail("Credential Offer Endpoint URL should not have been parsed") },
-            onFailure = assertContains<InvalidCredentialOfferUri>(),
-        )
+            .toString()
+        CredentialOfferRequest(credentialOfferEndpointUri).assertFailsWithNestedError<InvalidCredentialOfferUri>()
     }
 
     @Test
@@ -105,20 +96,19 @@ internal class CredentialOfferRequestTest {
         val credentialOfferEndpointUri = URIBuilder("wallet://credential_offer")
             .addParameter("credential_offer_uri", credentialOfferUri)
             .build()
-        CredentialOfferRequest(credentialOfferEndpointUri.toString()).fold(
-            onSuccess = {
-                val passByReference =
-                    assertIs<CredentialOfferRequest.PassByReference>(it)
-                assertEquals(credentialOfferUri, passByReference.value.toString())
-            },
-            onFailure = {
-                fail("Credential Offer Endpoint URL should have been parsed")
-            },
-        )
+        val request = CredentialOfferRequest(credentialOfferEndpointUri.toString()).getOrThrow()
+        val passByReference = assertIs<CredentialOfferRequest.PassByReference>(request)
+        assertEquals(credentialOfferUri, passByReference.value.toString())
     }
 }
 
-inline fun <reified T : CredentialOfferRequestError> assertContains(): (Throwable) -> Unit = { t ->
+private inline fun <reified T : CredentialOfferRequestError> Result<*>.assertFailsWithNestedError(): T =
+    fold(
+        onSuccess = { fail("Should have failed") },
+        onFailure = nestedErrorIs(),
+    )
+
+inline fun <reified T : CredentialOfferRequestError> nestedErrorIs(): (Throwable) -> T = { t ->
     val error = assertIs<CredentialOfferRequestException>(t)
     assertIs<T>(error.error)
 }
