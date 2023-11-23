@@ -20,6 +20,7 @@ import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
 import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
 import eu.europa.ec.eudi.openid4vci.internal.issuance.BatchIssuanceSuccessResponse
+import eu.europa.ec.eudi.openid4vci.internal.issuance.CertificateIssuanceResponse
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -66,11 +67,11 @@ class IssuanceBatchRequestTest {
                             content = Json.encodeToString(
                                 BatchIssuanceSuccessResponse(
                                     credentialResponses = listOf(
-                                        BatchIssuanceSuccessResponse.CertificateIssuanceResponse(
+                                        CertificateIssuanceResponse(
                                             format = MsoMdoc.FORMAT,
                                             credential = "issued_credential_content_mso_mdoc",
                                         ),
-                                        BatchIssuanceSuccessResponse.CertificateIssuanceResponse(
+                                        CertificateIssuanceResponse(
                                             format = SdJwtVc.FORMAT,
                                             credential = "issued_credential_content_sd_jwt_vc",
                                         ),

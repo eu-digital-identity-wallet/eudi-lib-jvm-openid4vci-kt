@@ -86,9 +86,6 @@ internal class DefaultAuthorizationServerMetadataResolver(
                 parser(body)
             }
         }
-
-    companion object {
-    }
 }
 
 /**

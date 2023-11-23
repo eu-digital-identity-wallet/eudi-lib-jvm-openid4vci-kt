@@ -15,10 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.issuance
 
-import com.nimbusds.jwt.JWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.ProofBuilder
+import eu.europa.ec.eudi.openid4vci.internal.createProof
 import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import kotlinx.coroutines.CoroutineDispatcher
 import java.util.*
@@ -123,50 +122,11 @@ internal class DefaultIssuer(
             with(credentialMetadata.matchIssuerSupportedCredential()) {
                 constructIssuanceRequest(
                     claimSet,
-                    bindingKey.createProofWithKey(this, cNonce.value),
+                    createProof(issuerMetadata, bindingKey, this, cNonce.value),
                 )
             }
         }
     }
-
-    /**
-     * Validate that the provided evidence is one of those that issuer supports
-     */
-    private fun BindingKey.createProofWithKey(credentialSpec: CredentialSupported, cNonce: String): Proof =
-        when (this) {
-            is BindingKey.Jwk -> {
-                fun isAlgorithmSupported(): Boolean =
-                    credentialSpec.cryptographicSuitesSupported.contains(algorithm.name)
-
-                fun isBindingMethodSupported(): Boolean =
-                    credentialSpec.cryptographicBindingMethodsSupported.contains(CryptographicBindingMethod.JWK)
-
-                fun isProofTypeSupported(): Boolean =
-                    credentialSpec.proofTypesSupported.contains(ProofType.JWT)
-
-                if (!isAlgorithmSupported()) {
-                    throw CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported
-                }
-                if (!isBindingMethodSupported()) {
-                    throw CredentialIssuanceError.ProofGenerationError.CryptographicBindingMethodNotSupported
-                }
-                if (!isProofTypeSupported()) {
-                    throw CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
-                }
-
-                ProofBuilder.ofType(ProofType.JWT) {
-                    aud(issuerMetadata.credentialIssuerIdentifier.toString())
-                    jwk(this@createProofWithKey.jwk)
-                    alg(this@createProofWithKey.algorithm)
-                    nonce(cNonce)
-
-                    build()
-                }
-            }
-
-            is BindingKey.Did -> TODO("DID proof evidence not supported yet")
-            is BindingKey.X509 -> TODO("X509 proof evidence not supported yet")
-        }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
@@ -188,7 +148,7 @@ internal class DefaultIssuer(
                 with(meta.matchIssuerSupportedCredential()) {
                     constructIssuanceRequest(
                         claimSet,
-                        bindingKey.createProofWithKey(this, cNonce.value),
+                        createProof(issuerMetadata, bindingKey, this, cNonce.value),
                     )
                 }
             }

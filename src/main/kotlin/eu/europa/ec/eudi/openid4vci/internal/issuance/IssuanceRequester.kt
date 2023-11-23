@@ -63,18 +63,18 @@ private data class SingleIssuanceSuccessResponse(
 )
 
 @Serializable
+internal data class CertificateIssuanceResponse(
+    @SerialName("format") val format: String,
+    @SerialName("credential") val credential: String? = null,
+    @SerialName("transaction_id") val transactionId: String? = null,
+)
+
+@Serializable
 internal data class BatchIssuanceSuccessResponse(
     @SerialName("credential_responses") val credentialResponses: List<CertificateIssuanceResponse>,
     @SerialName("c_nonce") val cNonce: String? = null,
     @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
-) {
-    @Serializable
-    data class CertificateIssuanceResponse(
-        @SerialName("format") val format: String,
-        @SerialName("credential") val credential: String? = null,
-        @SerialName("transaction_id") val transactionId: String? = null,
-    )
-}
+)
 
 @Serializable
 private data class DeferredIssuanceSuccessResponse(

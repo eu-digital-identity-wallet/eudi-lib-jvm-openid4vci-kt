@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jwt.JWT
+import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
 import kotlinx.serialization.Serializable
 
 /**
@@ -41,4 +43,47 @@ internal sealed interface Proof {
      */
     @JvmInline
     value class Cwt(val cwt: String) : Proof
+}
+
+/**
+ * Validate that the provided evidence is one of those that issuer supports
+ */
+internal fun createProof(
+    issuerMetadata: CredentialIssuerMetadata,
+    bindingKey: BindingKey,
+    credentialSpec: CredentialSupported,
+    cNonce: String,
+): Proof = when (bindingKey) {
+    is BindingKey.Jwk -> {
+        fun isAlgorithmSupported(): Boolean =
+            credentialSpec.cryptographicSuitesSupported.contains(bindingKey.algorithm.name)
+
+        fun isBindingMethodSupported(): Boolean =
+            credentialSpec.cryptographicBindingMethodsSupported.contains(CryptographicBindingMethod.JWK)
+
+        fun isProofTypeSupported(): Boolean =
+            credentialSpec.proofTypesSupported.contains(ProofType.JWT)
+
+        if (!isAlgorithmSupported()) {
+            throw CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported
+        }
+        if (!isBindingMethodSupported()) {
+            throw CredentialIssuanceError.ProofGenerationError.CryptographicBindingMethodNotSupported
+        }
+        if (!isProofTypeSupported()) {
+            throw CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
+        }
+
+        ProofBuilder.ofType(ProofType.JWT) {
+            aud(issuerMetadata.credentialIssuerIdentifier.toString())
+            jwk(bindingKey.jwk)
+            alg(bindingKey.algorithm)
+            nonce(cNonce)
+
+            build()
+        }
+    }
+
+    is BindingKey.Did -> TODO("DID proof evidence not supported yet")
+    is BindingKey.X509 -> TODO("X509 proof evidence not supported yet")
 }
