@@ -15,6 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.NonParsableCredentialOfferEndpointUrl
+import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestValidationError.InvalidCredentialOfferUri
+import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri
 import org.apache.http.client.utils.URIBuilder
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,31 +28,18 @@ internal class CredentialOfferRequestTest {
 
     @Test
     internal fun `Fails with non parsable Credential Offer Endpoint URL`() {
-        CredentialOfferRequest("file:")
-            .fold(
-                { fail("Credential Offer Endpoint URL should not have been parsed") },
-                {
-                    val error = assertIs<CredentialOfferRequestException>(it)
-                    assertIs<CredentialOfferRequestError.NonParsableCredentialOfferEndpointUrl>(
-                        error.error,
-                    )
-                },
-            )
+        CredentialOfferRequest("file:").fold(
+            onSuccess = { fail("Credential Offer Endpoint URL should not have been parsed") },
+            onFailure = assertContains<NonParsableCredentialOfferEndpointUrl>(),
+        )
     }
 
     @Test
     internal fun `Fails when neither 'credential_offer' nor 'credential_offer_uri' is provided`() {
-        CredentialOfferRequest("wallet://credential_offer")
-            .fold(
-                { fail("Credential Offer Endpoint URL should not have been parsed") },
-                {
-                    val error = assertIs<CredentialOfferRequestException>(it)
-                    assertIs<CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri>(
-
-                        error.error,
-                    )
-                },
-            )
+        CredentialOfferRequest("wallet://credential_offer").fold(
+            onSuccess = { fail("Credential Offer Endpoint URL should not have been parsed") },
+            onFailure = assertContains<OneOfCredentialOfferOrCredentialOfferUri>(),
+        )
     }
 
     @Test
@@ -58,17 +48,10 @@ internal class CredentialOfferRequestTest {
             .addParameter("credential_offer", "{}")
             .addParameter("credential_offer_uri", "https://credential.offer/1")
             .build()
-        CredentialOfferRequest(uri.toString())
-            .fold(
-                { fail("Credential Offer Endpoint URL should not have been parsed") },
-                {
-                    val error = assertIs<CredentialOfferRequestException>(it)
-                    assertIs<CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri>(
-
-                        error.error,
-                    )
-                },
-            )
+        CredentialOfferRequest(uri.toString()).fold(
+            onSuccess = { fail("Credential Offer Endpoint URL should not have been parsed") },
+            onFailure = assertContains<OneOfCredentialOfferOrCredentialOfferUri>(),
+        )
     }
 
     @Test
@@ -99,14 +82,9 @@ internal class CredentialOfferRequestTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        CredentialOfferRequest(credentialOfferEndpointUri.toString())
-            .fold(
-                {
-                    val passByValue = assertIs<CredentialOfferRequest.PassByValue>(it)
-                    assertEquals(credentialOffer, passByValue.value)
-                },
-                { fail("Credential Offer Endpoint URL should not have been parsed") },
-            )
+        val offer = CredentialOfferRequest(credentialOfferEndpointUri.toString()).getOrThrow()
+        val passByValue = assertIs<CredentialOfferRequest.PassByValue>(offer)
+        assertEquals(credentialOffer, passByValue.value)
     }
 
     @Test
@@ -115,16 +93,10 @@ internal class CredentialOfferRequestTest {
         val credentialOfferEndpointUri = URIBuilder("wallet://credential_offer")
             .addParameter("credential_offer_uri", credentialOfferUri)
             .build()
-        CredentialOfferRequest(credentialOfferEndpointUri.toString())
-            .fold(
-                { fail("Credential Offer Endpoint URL should not have been parsed") },
-                {
-                    val error = assertIs<CredentialOfferRequestException>(it)
-                    assertIs<CredentialOfferRequestValidationError.InvalidCredentialOfferUri>(
-                        error.error,
-                    )
-                },
-            )
+        CredentialOfferRequest(credentialOfferEndpointUri.toString()).fold(
+            onSuccess = { fail("Credential Offer Endpoint URL should not have been parsed") },
+            onFailure = assertContains<InvalidCredentialOfferUri>(),
+        )
     }
 
     @Test
@@ -133,16 +105,20 @@ internal class CredentialOfferRequestTest {
         val credentialOfferEndpointUri = URIBuilder("wallet://credential_offer")
             .addParameter("credential_offer_uri", credentialOfferUri)
             .build()
-        CredentialOfferRequest(credentialOfferEndpointUri.toString())
-            .fold(
-                {
-                    val passByReference =
-                        assertIs<CredentialOfferRequest.PassByReference>(it)
-                    assertEquals(credentialOfferUri, passByReference.value.toString())
-                },
-                {
-                    fail("Credential Offer Endpoint URL should have been parsed")
-                },
-            )
+        CredentialOfferRequest(credentialOfferEndpointUri.toString()).fold(
+            onSuccess = {
+                val passByReference =
+                    assertIs<CredentialOfferRequest.PassByReference>(it)
+                assertEquals(credentialOfferUri, passByReference.value.toString())
+            },
+            onFailure = {
+                fail("Credential Offer Endpoint URL should have been parsed")
+            },
+        )
     }
+}
+
+inline fun <reified T : CredentialOfferRequestError> assertContains(): (Throwable) -> Unit = { t ->
+    val error = assertIs<CredentialOfferRequestException>(t)
+    assertIs<T>(error.error)
 }

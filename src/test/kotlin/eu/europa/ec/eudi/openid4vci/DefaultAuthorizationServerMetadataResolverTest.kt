@@ -24,25 +24,23 @@ import kotlin.test.Test
 internal class DefaultAuthorizationServerMetadataResolverTest {
 
     @Test
-    internal fun `resolution success`() {
-        runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                RequestMocker(
-                    match(oidcAuthorizationServerMetadataUrl().value),
-                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-                ),
+    internal fun `resolution success`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            RequestMocker(
+                match(oidcAuthorizationServerMetadataUrl().value),
+                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
+            ),
+        )
+        AuthorizationServerMetadataResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
+            .resolve(authorizationServerIssuer())
+            .fold(
+                {
+                    Assertions.assertInstanceOf(OIDCProviderMetadata::class.java, it)
+                    // equals not implemented by OIDCProviderMetadata
+                    Assertions.assertEquals(oidcAuthorizationServerMetadata().toJSONObject(), it.toJSONObject())
+                },
+                { Assertions.fail("Authorization Server metadata resolution should have succeeded", it) },
             )
-            AuthorizationServerMetadataResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
-                .resolve(authorizationServerIssuer())
-                .fold(
-                    {
-                        Assertions.assertInstanceOf(OIDCProviderMetadata::class.java, it)
-                        // equals not implemented by OIDCProviderMetadata
-                        Assertions.assertEquals(oidcAuthorizationServerMetadata().toJSONObject(), it.toJSONObject())
-                    },
-                    { Assertions.fail("Authorization Server metadata resolution should have succeeded", it) },
-                )
-        }
     }
 
     @Test

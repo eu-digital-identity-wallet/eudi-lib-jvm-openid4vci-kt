@@ -562,10 +562,9 @@ class IssuanceAuthorizationTest {
         ktorHttpClientFactory: KtorHttpClientFactory,
         credentialOfferStr: String,
     ): CredentialOffer {
-        val offer = CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
+        return CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
             .resolve("https://$CredentialIssuer_URL/credentialoffer?credential_offer=$credentialOfferStr")
             .getOrThrow()
-        return offer
     }
 
     private fun issuerStateFromOffer(offer: CredentialOffer): String? {
