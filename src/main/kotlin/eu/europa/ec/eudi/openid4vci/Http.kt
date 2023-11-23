@@ -15,9 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.mapError
 import io.ktor.client.statement.*
-import java.net.URI
 import java.net.URL
 
 /**
@@ -47,15 +45,3 @@ fun interface HttpPost<in T, in R, out RESPONSE> {
         responseHandler: suspend (response: HttpResponse) -> R,
     ): RESPONSE
 }
-
-/**
- * Convenient method for parsing a string into a [URL]
- */
-internal fun String.asURL(onError: (Throwable) -> Throwable = { it }): Result<URL> =
-    runCatching { URL(this) }.mapError(onError)
-
-/**
- * Convenient method for parsing a string into a [URI]
- */
-internal fun String.asURI(onError: (Throwable) -> Throwable = { it }): Result<URI> =
-    runCatching { URI(this) }.mapError(onError)
