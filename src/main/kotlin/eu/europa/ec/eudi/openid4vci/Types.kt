@@ -65,7 +65,7 @@ data class PKCEVerifier(
  * Domain object to describe a valid issuance access token
  */
 @JvmInline
-value class IssuanceAccessToken(val accessToken: String) {
+value class AccessToken(val accessToken: String) {
     init {
         require(accessToken.isNotEmpty()) { "Access Token must not be empty" }
     }

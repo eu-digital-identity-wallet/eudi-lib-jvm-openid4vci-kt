@@ -59,26 +59,26 @@ sealed interface AuthorizedRequest {
     /**
      * Access token authorizing the request(s) to issue credential(s)
      */
-    val token: IssuanceAccessToken
+    val accessToken: AccessToken
 
     /**
      * Issuer authorized issuance
      *
-     * @param token Access token authorizing credential issuance
+     * @param accessToken Access token authorizing credential issuance
      */
     data class NoProofRequired(
-        override val token: IssuanceAccessToken,
+        override val accessToken: AccessToken,
     ) : AuthorizedRequest
 
     /**
      * Issuer authorized issuance and requires the provision of proof of holder's binding to be provided
      * along with the request
      *
-     * @param token  Access token authorizing certificate issuance
+     * @param accessToken  Access token authorizing certificate issuance
      * @param cNonce Nonce value provided by issuer to be included in proof of holder's binding
      */
     data class ProofRequired(
-        override val token: IssuanceAccessToken,
+        override val accessToken: AccessToken,
         val cNonce: CNonce,
     ) : AuthorizedRequest
 }

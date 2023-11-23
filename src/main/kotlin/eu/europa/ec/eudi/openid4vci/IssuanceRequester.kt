@@ -180,7 +180,7 @@ interface IssuanceRequester {
      * @return credential issuer's response
      */
     suspend fun placeIssuanceRequest(
-        accessToken: IssuanceAccessToken,
+        accessToken: AccessToken,
         request: CredentialIssuanceRequest.SingleCredential,
     ): Result<CredentialIssuanceResponse>
 
@@ -192,7 +192,7 @@ interface IssuanceRequester {
      * @return credential issuer's response
      */
     suspend fun placeBatchIssuanceRequest(
-        accessToken: IssuanceAccessToken,
+        accessToken: AccessToken,
         request: CredentialIssuanceRequest.BatchCredentials,
     ): Result<CredentialIssuanceResponse>
 
@@ -204,7 +204,7 @@ interface IssuanceRequester {
      * @return response from issuer. Can be either positive if credential is issued or errored in case issuance is still pending
      */
     suspend fun placeDeferredCredentialRequest(
-        accessToken: IssuanceAccessToken,
+        accessToken: AccessToken,
         transactionId: TransactionId,
     ): Result<DeferredCredentialIssuanceResponse>
 

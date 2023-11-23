@@ -48,7 +48,7 @@ internal class DefaultIssuanceRequester(
 ) : IssuanceRequester {
 
     override suspend fun placeIssuanceRequest(
-        accessToken: IssuanceAccessToken,
+        accessToken: AccessToken,
         request: SingleCredential,
     ): Result<CredentialIssuanceResponse> = withContext(coroutineDispatcher) {
         runCatching {
@@ -65,7 +65,7 @@ internal class DefaultIssuanceRequester(
     }
 
     override suspend fun placeBatchIssuanceRequest(
-        accessToken: IssuanceAccessToken,
+        accessToken: AccessToken,
         request: BatchCredentials,
     ): Result<CredentialIssuanceResponse> = runCatching {
         if (issuerMetadata.batchCredentialEndpoint == null) {
@@ -147,7 +147,7 @@ internal class DefaultIssuanceRequester(
         }
 
     override suspend fun placeDeferredCredentialRequest(
-        accessToken: IssuanceAccessToken,
+        accessToken: AccessToken,
         transactionId: TransactionId,
     ): Result<DeferredCredentialIssuanceResponse> = runCatching {
         if (issuerMetadata.deferredCredentialEndpoint == null) {
@@ -243,7 +243,7 @@ internal class DefaultIssuanceRequester(
         else -> IssuanceRequestFailed(error, errorDescription)
     }
 
-    private fun IssuanceAccessToken.toAuthorizationHeader(): Pair<String, String> =
+    private fun AccessToken.toAuthorizationHeader(): Pair<String, String> =
         "Authorization" to "BEARER $accessToken"
 
     private fun BatchCredentials.toTransferObject(): CredentialIssuanceRequestTO {

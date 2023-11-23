@@ -239,7 +239,7 @@ private class Wallet(
                 .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                 .requestAccessToken().getOrThrow()
 
-            println("--> Authorization code exchanged with access token : ${authorizedRequest.token.accessToken}")
+            println("--> Authorization code exchanged with access token : ${authorizedRequest.accessToken.accessToken}")
 
             authorizedRequest
         }

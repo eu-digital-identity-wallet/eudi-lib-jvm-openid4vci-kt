@@ -62,11 +62,11 @@ internal class DefaultIssuer(
 
             nonce?.let {
                 AuthorizedRequest.ProofRequired(
-                    token = IssuanceAccessToken(accessToken),
+                    accessToken = AccessToken(accessToken),
                     cNonce = nonce,
                 )
             } ?: AuthorizedRequest.NoProofRequired(
-                token = IssuanceAccessToken(accessToken),
+                accessToken = AccessToken(accessToken),
             )
         }
 
@@ -83,11 +83,11 @@ internal class DefaultIssuer(
 
             nonce?.let {
                 AuthorizedRequest.ProofRequired(
-                    token = IssuanceAccessToken(accessToken),
+                    accessToken = AccessToken(accessToken),
                     cNonce = nonce,
                 )
             } ?: AuthorizedRequest.NoProofRequired(
-                token = IssuanceAccessToken(accessToken),
+                accessToken = AccessToken(accessToken),
             )
         }
 
@@ -96,7 +96,7 @@ internal class DefaultIssuer(
         claimSet: ClaimSet?,
         responseEncryptionSpecProvider: (issuerResponseEncryptionMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): Result<SubmittedRequest> = runCatching {
-        requestIssuance(token) {
+        requestIssuance(accessToken) {
             credentialMetadata
                 .matchIssuerSupportedCredential()
                 .constructIssuanceRequest(claimSet, null, responseEncryptionSpecProvider)
@@ -109,7 +109,7 @@ internal class DefaultIssuer(
         bindingKey: BindingKey,
         responseEncryptionSpecProvider: (issuerResponseEncryptionMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): Result<SubmittedRequest> = runCatching {
-        requestIssuance(token) {
+        requestIssuance(accessToken) {
             with(credentialMetadata.matchIssuerSupportedCredential()) {
                 constructIssuanceRequest(
                     claimSet,
@@ -161,7 +161,7 @@ internal class DefaultIssuer(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
         responseEncryptionSpecProvider: (issuerResponseEncryptionMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): Result<SubmittedRequest> = runCatching {
-        requestIssuance(token) {
+        requestIssuance(accessToken) {
             CredentialIssuanceRequest.BatchCredentials(
                 credentialRequests = credentialsMetadata.map { pair ->
                     pair.first
@@ -176,7 +176,7 @@ internal class DefaultIssuer(
         credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
         responseEncryptionSpecProvider: (issuerResponseEncryptionMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec?,
     ): Result<SubmittedRequest> = runCatching {
-        requestIssuance(token) {
+        requestIssuance(accessToken) {
             CredentialIssuanceRequest.BatchCredentials(
                 credentialRequests = credentialsMetadata.map { triple ->
                     with(triple.first.matchIssuerSupportedCredential()) {
@@ -251,7 +251,7 @@ internal class DefaultIssuer(
         cNonce: CNonce,
     ): AuthorizedRequest.ProofRequired =
         AuthorizedRequest.ProofRequired(
-            token = token,
+            accessToken = accessToken,
             cNonce = cNonce,
         )
 
@@ -259,12 +259,12 @@ internal class DefaultIssuer(
         transactionId: TransactionId,
     ): Result<DeferredCredentialIssuanceResponse> =
         issuanceRequester.placeDeferredCredentialRequest(
-            accessToken = token,
+            accessToken = accessToken,
             transactionId = transactionId,
         )
 
     private suspend fun requestIssuance(
-        token: IssuanceAccessToken,
+        token: AccessToken,
         issuanceRequestSupplier: () -> CredentialIssuanceRequest,
     ): SubmittedRequest =
         when (val credentialRequest = issuanceRequestSupplier()) {
