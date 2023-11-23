@@ -19,6 +19,8 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import eu.europa.ec.eudi.openid4vci.internal.HttpFormPost
+import eu.europa.ec.eudi.openid4vci.internal.HttpGet
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import io.ktor.client.*
 import io.ktor.client.call.*

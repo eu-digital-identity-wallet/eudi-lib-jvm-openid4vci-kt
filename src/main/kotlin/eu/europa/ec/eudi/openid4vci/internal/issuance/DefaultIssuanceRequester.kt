@@ -23,6 +23,7 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
+import eu.europa.ec.eudi.openid4vci.internal.HttpPost
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.BatchCredentials
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
@@ -268,7 +269,7 @@ internal class DefaultIssuanceRequester(
         }
 
         private fun postIssuanceRequest(httpClient: HttpClient):
-            HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
+                HttpPost<CredentialIssuanceRequestTO, CredentialIssuanceResponse, CredentialIssuanceResponse> =
             HttpPost { url, headers, payload, responseHandler ->
                 val response = httpClient.post(url) {
                     headers {
@@ -281,7 +282,7 @@ internal class DefaultIssuanceRequester(
             }
 
         private fun postDeferredIssuanceRequest(httpClient: HttpClient):
-            HttpPost<DeferredIssuanceRequestTO, DeferredCredentialQueryOutcome, DeferredCredentialQueryOutcome> =
+                HttpPost<DeferredIssuanceRequestTO, DeferredCredentialQueryOutcome, DeferredCredentialQueryOutcome> =
             HttpPost { url, headers, payload, responseHandler ->
                 val response = httpClient.post(url) {
                     headers {

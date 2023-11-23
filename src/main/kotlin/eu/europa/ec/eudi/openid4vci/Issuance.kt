@@ -90,8 +90,9 @@ sealed interface SubmittedRequest {
 
     /**
      * State that denotes the successful submission of an issuance request
-     *
-     * @param response The response from credential issuer
+     * @param credentials The outcome of the issuance request. If issuance request was a batch request it will contain
+     *      the results of each individual issuance request. If it was a single issuance request list will contain only one result.
+     * @param cNonce Nonce information sent back from issuance server.
      */
     data class Success(
         val credentials: List<IssuedCredential>,
