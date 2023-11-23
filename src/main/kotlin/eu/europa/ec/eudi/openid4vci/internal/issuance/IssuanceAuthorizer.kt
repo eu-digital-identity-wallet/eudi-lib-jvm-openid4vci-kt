@@ -132,29 +132,23 @@ internal class IssuanceAuthorizer(
         val codeVerifier = CodeVerifier()
 
         val authzRequest: AuthorizationRequest = with(
-            AuthorizationRequest.Builder(
-                ResponseType("code"),
-                clientID,
-            ),
+            AuthorizationRequest.Builder(ResponseType("code"), clientID),
         ) {
             redirectionURI(config.authFlowRedirectionURI)
             codeChallenge(codeVerifier, CodeChallengeMethod.S256)
             scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray()))
             state(State(state))
-            issuerState?.let {
-                customParameter("issuer_state", issuerState)
-            }
+            issuerState?.let { customParameter("issuer_state", issuerState) }
             build()
         }
 
         val pushedAuthorizationRequest = PushedAuthorizationRequest(parEndpoint, authzRequest)
-
         val response = pushAuthorizationRequest(parEndpoint, pushedAuthorizationRequest)
 
-        response.toPair(clientID, codeVerifier, state)
+        response.authorizationCodeUrlOrFail(clientID, codeVerifier, state)
     }
 
-    private fun PushedAuthorizationRequestResponse.toPair(
+    private fun PushedAuthorizationRequestResponse.authorizationCodeUrlOrFail(
         clientID: ClientID,
         codeVerifier: CodeVerifier,
         state: String,
@@ -174,11 +168,8 @@ internal class IssuanceAuthorizer(
                 }
 
             val getAuthorizationCodeURL = AuthorizationUrl(httpsUrl.toString())
-
-            Pair(
-                PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString()),
-                getAuthorizationCodeURL,
-            )
+            val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())
+            pkceVerifier to getAuthorizationCodeURL
         }
 
         is PushedAuthorizationRequestResponse.Failure ->
@@ -207,19 +198,7 @@ internal class IssuanceAuthorizer(
             config.clientId,
             codeVerifier,
         )
-
-        when (val response = requestAccessToken(params)) {
-            is AccessTokenRequestResponse.Success -> {
-                val cNonce = response.cNonce?.let { CNonce(it, response.cNonceExpiresIn) }
-                AccessToken(response.accessToken) to cNonce
-            }
-
-            is AccessTokenRequestResponse.Failure ->
-                throw CredentialIssuanceError.AccessTokenRequestFailed(
-                    response.error,
-                    response.errorDescription,
-                )
-        }
+        requestAccessToken(params).accessTokenOrFail()
     }
 
     /**
@@ -236,19 +215,21 @@ internal class IssuanceAuthorizer(
         pin: String?,
     ): Result<Pair<AccessToken, CNonce?>> = runCatching {
         val params = TokenEndpointForm.PreAuthCodeFlow.of(preAuthorizedCode, pin)
-        when (val response = requestAccessToken(params)) {
-            is AccessTokenRequestResponse.Success -> {
-                val cNonce = response.cNonce?.let { CNonce(it, response.cNonceExpiresIn) }
-                AccessToken(response.accessToken) to cNonce
-            }
+        requestAccessToken(params).accessTokenOrFail()
+    }
 
+    private fun AccessTokenRequestResponse.accessTokenOrFail(): Pair<AccessToken, CNonce?> =
+        when (this) {
+            is AccessTokenRequestResponse.Success -> {
+                val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
+                AccessToken(accessToken) to cNonce
+            }
             is AccessTokenRequestResponse.Failure ->
                 throw CredentialIssuanceError.AccessTokenRequestFailed(
-                    response.error,
-                    response.errorDescription,
+                    error,
+                    errorDescription,
                 )
         }
-    }
 
     private suspend fun requestAccessToken(params: Map<String, String>): AccessTokenRequestResponse =
         withContext(coroutineDispatcher) {
