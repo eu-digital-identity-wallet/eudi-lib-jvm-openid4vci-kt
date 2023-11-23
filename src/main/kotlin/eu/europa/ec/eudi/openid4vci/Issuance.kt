@@ -101,6 +101,12 @@ sealed interface AuthorizedRequest {
         override val accessToken: AccessToken,
         val cNonce: CNonce,
     ) : AuthorizedRequest
+
+    companion object {
+        operator fun invoke(accessToken: AccessToken, cNonce: CNonce?): AuthorizedRequest =
+            if (cNonce != null) ProofRequired(accessToken, cNonce)
+            else NoProofRequired(accessToken)
+    }
 }
 
 /**

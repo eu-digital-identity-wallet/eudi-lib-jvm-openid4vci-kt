@@ -79,28 +79,17 @@ internal class DefaultIssuer(
         UnauthorizedRequest.AuthorizationCodeRetrieved(authorizationCode, pkceVerifier)
 
     override suspend fun UnauthorizedRequest.AuthorizationCodeRetrieved.requestAccessToken(): Result<AuthorizedRequest> =
-        runCatching {
-            val (accessToken, nonce) =
-                authorizer.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier).getOrThrow()
-            nonce
-                ?.let { AuthorizedRequest.ProofRequired(AccessToken(accessToken), nonce) }
-                ?: AuthorizedRequest.NoProofRequired(AccessToken(accessToken))
-        }
+        authorizer.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier)
+            .map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
 
     override suspend fun authorizeWithPreAuthorizationCode(
         credentials: List<CredentialMetadata>,
         preAuthorizationCode: PreAuthorizationCode,
-    ): Result<AuthorizedRequest> = runCatching {
-        val (accessToken, nonce) =
-            authorizer.requestAccessTokenPreAuthFlow(
-                preAuthorizationCode.preAuthorizedCode,
-                preAuthorizationCode.pin,
-            ).getOrThrow()
-
-        nonce
-            ?.let { AuthorizedRequest.ProofRequired(AccessToken(accessToken), nonce) }
-            ?: AuthorizedRequest.NoProofRequired(AccessToken(accessToken))
-    }
+    ): Result<AuthorizedRequest> =
+        authorizer.requestAccessTokenPreAuthFlow(
+            preAuthorizationCode.preAuthorizedCode,
+            preAuthorizationCode.pin,
+        ).map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,

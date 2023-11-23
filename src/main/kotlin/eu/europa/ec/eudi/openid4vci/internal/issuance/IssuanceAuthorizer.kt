@@ -200,7 +200,7 @@ internal class IssuanceAuthorizer(
     suspend fun requestAccessTokenAuthFlow(
         authorizationCode: String,
         codeVerifier: String,
-    ): Result<Pair<String, CNonce?>> = runCatching {
+    ): Result<Pair<AccessToken, CNonce?>> = runCatching {
         val params = TokenEndpointForm.AuthCodeFlow.of(
             authorizationCode,
             config.authFlowRedirectionURI,
@@ -208,12 +208,10 @@ internal class IssuanceAuthorizer(
             codeVerifier,
         )
 
-        val response = requestAccessToken(params)
-
-        when (response) {
+        when (val response = requestAccessToken(params)) {
             is AccessTokenRequestResponse.Success -> {
-                val cnonce = response.cNonce?.let { CNonce(it, response.cNonceExpiresIn) }
-                Pair(response.accessToken, cnonce)
+                val cNonce = response.cNonce?.let { CNonce(it, response.cNonceExpiresIn) }
+                AccessToken(response.accessToken) to cNonce
             }
 
             is AccessTokenRequestResponse.Failure ->
@@ -236,14 +234,12 @@ internal class IssuanceAuthorizer(
     suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: String,
         pin: String?,
-    ): Result<Pair<String, CNonce?>> = runCatching {
+    ): Result<Pair<AccessToken, CNonce?>> = runCatching {
         val params = TokenEndpointForm.PreAuthCodeFlow.of(preAuthorizedCode, pin)
-        val response = requestAccessToken(params)
-
-        when (response) {
+        when (val response = requestAccessToken(params)) {
             is AccessTokenRequestResponse.Success -> {
                 val cNonce = response.cNonce?.let { CNonce(it, response.cNonceExpiresIn) }
-                Pair(response.accessToken, cNonce)
+                AccessToken(response.accessToken) to cNonce
             }
 
             is AccessTokenRequestResponse.Failure ->
