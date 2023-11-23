@@ -304,22 +304,24 @@ interface RequestIssuance {
 /**
  * An interface for submitting a deferred credential issuance request.
  */
-fun interface RequestDeferredIssuance {
+fun interface QueryForDeferredCredential {
 
     /**
      * Given an authorized request submits a deferred credential request for an identifier of a Deferred Issuance transaction.
      *
-     * @param transactionId The identifier of a Deferred Issuance transaction.
+     * @param deferredCredential The identifier of a Deferred Issuance transaction.
      * @return The result of the submission.
      */
-    suspend fun AuthorizedRequest.requestDeferredIssuance(transactionId: TransactionId): Result<DeferredCredentialIssuanceResponse>
+    suspend fun AuthorizedRequest.queryForDeferredCredential(
+        deferredCredential: IssuedCredential.Deferred,
+    ): Result<DeferredCredentialQueryOutcome>
 }
 
 /**
  * Aggregation interface providing all functionality required for performing a credential issuance request (batch or single)
  * Provides factory methods for creating implementations of this interface.
  */
-interface Issuer : AuthorizeIssuance, RequestIssuance, RequestDeferredIssuance {
+interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredential {
 
     companion object {
 

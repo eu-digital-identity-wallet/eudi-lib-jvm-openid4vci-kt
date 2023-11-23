@@ -116,7 +116,7 @@ data class CNonce(
  */
 data class TransactionId(
     val value: String,
-    val interval: Long? = null,
+
 ) {
     init {
         require(value.isNotEmpty()) { "Value cannot be empty" }

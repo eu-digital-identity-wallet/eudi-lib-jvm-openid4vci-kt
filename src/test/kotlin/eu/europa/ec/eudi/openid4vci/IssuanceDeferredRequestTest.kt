@@ -27,9 +27,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import java.net.URI
 import java.util.*
-import kotlin.test.Test
-import kotlin.test.assertTrue
-import kotlin.test.fail
+import kotlin.test.*
 
 class IssuanceDeferredRequestTest {
 
@@ -70,7 +68,10 @@ class IssuanceDeferredRequestTest {
             ),
         )
         val (_, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt)
+            authorizeRequestForCredentialOffer(
+                mockedKtorHttpClientFactory,
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
+            )
 
         val bindingKey = BindingKey.Jwk(
             algorithm = JWSAlgorithm.RS256,
@@ -90,25 +91,26 @@ class IssuanceDeferredRequestTest {
                             val secondSubmittedRequest =
                                 proofRequired.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
 
-                            val transactionId = when (secondSubmittedRequest) {
+                            val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
-                                    val result = secondSubmittedRequest.response.credentialResponses[0]
-                                    (result as CredentialIssuanceResponse.Result.Deferred).transactionId
+                                    val issuedCredential = secondSubmittedRequest.response.credentials[0]
+                                    require(issuedCredential is IssuedCredential.Deferred)
+                                    issuedCredential
                                 }
 
                                 else -> fail("Success response expected but was not")
                             }
 
                             val requestDeferredIssuance =
-                                authorizedRequest.requestDeferredIssuance(transactionId)
+                                authorizedRequest.queryForDeferredCredential(deferred)
                                     .getOrThrow()
 
                             assertTrue("Expected response type Errored but was not") {
-                                requestDeferredIssuance is DeferredCredentialIssuanceResponse.Errored
+                                requestDeferredIssuance is DeferredCredentialQueryOutcome.Errored
                             }
 
                             assertTrue("Expected interval but was not present") {
-                                (requestDeferredIssuance as DeferredCredentialIssuanceResponse.Errored)
+                                (requestDeferredIssuance as DeferredCredentialQueryOutcome.Errored)
                                     .error != "invalid_transaction_id"
                             }
                         }
@@ -146,7 +148,10 @@ class IssuanceDeferredRequestTest {
         )
 
         val (_, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt)
+            authorizeRequestForCredentialOffer(
+                mockedKtorHttpClientFactory,
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
+            )
 
         val bindingKey = BindingKey.Jwk(
             algorithm = JWSAlgorithm.RS256,
@@ -166,27 +171,22 @@ class IssuanceDeferredRequestTest {
                             val secondSubmittedRequest =
                                 proofRequired.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
 
-                            val transactionId = when (secondSubmittedRequest) {
+                            val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
-                                    val result = secondSubmittedRequest.response.credentialResponses[0]
-                                    (result as CredentialIssuanceResponse.Result.Deferred).transactionId
+                                    val issuedCredential = secondSubmittedRequest.response.credentials[0]
+                                    require(issuedCredential is IssuedCredential.Deferred)
+                                    issuedCredential
                                 }
 
                                 else -> fail("Success response expected but was not")
                             }
 
                             val requestDeferredIssuance =
-                                authorizedRequest.requestDeferredIssuance(transactionId)
+                                authorizedRequest.queryForDeferredCredential(deferred)
                                     .getOrThrow()
 
-                            assertTrue("Expected response type IssuancePending but was not") {
-                                requestDeferredIssuance is DeferredCredentialIssuanceResponse.IssuancePending
-                            }
-
-                            assertTrue("Expected interval but was not present") {
-                                (requestDeferredIssuance as DeferredCredentialIssuanceResponse.IssuancePending)
-                                    .transactionId.interval != null
-                            }
+                            assertIs<DeferredCredentialQueryOutcome.IssuancePending>(requestDeferredIssuance)
+                            assertNotNull(requestDeferredIssuance.interval) { "Expected interval but was not present" }
                         }
 
                         is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
@@ -240,7 +240,10 @@ class IssuanceDeferredRequestTest {
         )
 
         val (_, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt)
+            authorizeRequestForCredentialOffer(
+                mockedKtorHttpClientFactory,
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
+            )
 
         val bindingKey = BindingKey.Jwk(
             algorithm = JWSAlgorithm.RS256,
@@ -260,22 +263,19 @@ class IssuanceDeferredRequestTest {
                             val secondSubmittedRequest =
                                 proofRequired.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
 
-                            val transactionId = when (secondSubmittedRequest) {
+                            val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
-                                    val result = secondSubmittedRequest.response.credentialResponses[0]
-                                    (result as CredentialIssuanceResponse.Result.Deferred).transactionId
+                                    val issuedCredential = secondSubmittedRequest.response.credentials[0]
+                                    require(issuedCredential is IssuedCredential.Deferred)
+                                    issuedCredential
                                 }
 
                                 else -> fail("Success response expected but was not")
                             }
 
-                            val requestDeferredIssuance =
-                                authorizedRequest.requestDeferredIssuance(transactionId)
-                                    .getOrThrow()
-
-                            assertTrue("Expected response type Issued but was not") {
-                                requestDeferredIssuance is DeferredCredentialIssuanceResponse.Issued
-                            }
+                            val requestDeferredIssuance = authorizedRequest.queryForDeferredCredential(deferred)
+                                .getOrThrow()
+                            assertIs<DeferredCredentialQueryOutcome.Issued>(requestDeferredIssuance)
                         }
 
                         is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")

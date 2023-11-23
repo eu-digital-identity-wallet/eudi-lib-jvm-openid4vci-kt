@@ -110,59 +110,56 @@ sealed interface RequestedCredentialResponseEncryption : java.io.Serializable {
 }
 
 /**
+ * The result of a request for issuance
+ */
+sealed interface IssuedCredential {
+
+    /**
+     * Credential was issued from server and the result is returned inline.
+     *
+     * @param format The format of the issued credential
+     * @param credential The issued credential
+     */
+    data class Issued(
+        val format: String,
+        val credential: String,
+    ) : IssuedCredential
+
+    /**
+     * Credential could not be issued immediately. An identifier is returned from server to be used later on
+     * to request the credential from issuer's Deferred Credential Endpoint.
+     *
+     * @param transactionId  A string identifying a Deferred Issuance transaction.
+     */
+    data class Deferred(
+        val transactionId: TransactionId,
+    ) : IssuedCredential
+}
+
+/**
  * Models a response of the issuer to a successful issuance request.
  *
- * @param credentialResponses The outcome of the issuance request. If issuance request was a batch request it will contain
+ * @param credentials The outcome of the issuance request. If issuance request was a batch request it will contain
  *      the results of each individual issuance request. If it was a single issuance request list will contain only one result.
  * @param cNonce Nonce information sent back from issuance server.
  */
 data class CredentialIssuanceResponse(
-    val credentialResponses: List<Result>,
+    val credentials: List<IssuedCredential>,
     val cNonce: CNonce?,
-) {
-    /**
-     * The result of a request for issuance
-     */
-    sealed interface Result {
+)
 
-        /**
-         * Credential was issued from server and the result is returned inline.
-         *
-         * @param format The format of the issued credential
-         * @param credential The issued credential
-         */
-        data class Issued(
-            val format: String,
-            val credential: String,
-        ) : Result
+sealed interface DeferredCredentialQueryOutcome {
 
-        /**
-         * Credential could not be issued immediately. An identifier is returned from server to be used later on
-         * to request the credential from issuer's Deferred Credential Endpoint.
-         *
-         * @param transactionId  A string identifying a Deferred Issuance transaction.
-         */
-        data class Deferred(
-            val transactionId: TransactionId,
-        ) : Result
-    }
-}
-
-sealed interface DeferredCredentialIssuanceResponse {
-
-    data class Issued(
-        val format: String,
-        val credential: String,
-    ) : DeferredCredentialIssuanceResponse
+    data class Issued(val credential: IssuedCredential.Issued) : DeferredCredentialQueryOutcome
 
     data class IssuancePending(
-        val transactionId: TransactionId,
-    ) : DeferredCredentialIssuanceResponse
+        val interval: Long? = null,
+    ) : DeferredCredentialQueryOutcome
 
     data class Errored(
         val error: String,
         val errorDescription: String? = null,
-    ) : DeferredCredentialIssuanceResponse
+    ) : DeferredCredentialQueryOutcome
 }
 
 /**
@@ -206,7 +203,7 @@ interface IssuanceRequester {
     suspend fun placeDeferredCredentialRequest(
         accessToken: AccessToken,
         transactionId: TransactionId,
-    ): Result<DeferredCredentialIssuanceResponse>
+    ): Result<DeferredCredentialQueryOutcome>
 
     companion object {
 

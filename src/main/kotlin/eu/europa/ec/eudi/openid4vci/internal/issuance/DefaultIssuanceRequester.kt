@@ -149,7 +149,7 @@ internal class DefaultIssuanceRequester(
     override suspend fun placeDeferredCredentialRequest(
         accessToken: AccessToken,
         transactionId: TransactionId,
-    ): Result<DeferredCredentialIssuanceResponse> = runCatching {
+    ): Result<DeferredCredentialQueryOutcome> = runCatching {
         if (issuerMetadata.deferredCredentialEndpoint == null) {
             throw IssuerDoesNotSupportDeferredIssuance
         }
@@ -159,33 +159,30 @@ internal class DefaultIssuanceRequester(
                     issuerMetadata.deferredCredentialEndpoint.value.value.toURL(),
                     mapOf(accessToken.toAuthorizationHeader()),
                     transactionId.toDeferredRequestTO(),
-                ) {
-                    handleResponseDeferred(it, transactionId)
-                }
+                ) { handleResponseDeferred(it) }
             }
         }
     }
 
-    fun TransactionId.toDeferredRequestTO(): DeferredIssuanceRequestTO = DeferredIssuanceRequestTO(value)
+    private fun TransactionId.toDeferredRequestTO(): DeferredIssuanceRequestTO = DeferredIssuanceRequestTO(value)
 
     private suspend inline fun handleResponseDeferred(
         response: HttpResponse,
-        transactionId: TransactionId,
-    ): DeferredCredentialIssuanceResponse =
+
+    ): DeferredCredentialQueryOutcome =
         if (response.status.isSuccess()) {
             val success = response.body<DeferredIssuanceSuccessResponse>()
-            DeferredCredentialIssuanceResponse.Issued(
-                format = success.format,
-                credential = success.credential,
+            DeferredCredentialQueryOutcome.Issued(
+                IssuedCredential.Issued(
+                    format = success.format,
+                    credential = success.credential,
+                ),
             )
         } else {
             val responsePayload = response.body<GenericErrorResponse>()
             when (responsePayload.error) {
-                "issuance_pending" -> DeferredCredentialIssuanceResponse.IssuancePending(
-                    TransactionId(transactionId.value, responsePayload.interval),
-                )
-
-                else -> DeferredCredentialIssuanceResponse.Errored(
+                "issuance_pending" -> DeferredCredentialQueryOutcome.IssuancePending(responsePayload.interval)
+                else -> DeferredCredentialQueryOutcome.Errored(
                     responsePayload.error,
                     responsePayload.errorDescription,
                 )
@@ -196,12 +193,12 @@ internal class DefaultIssuanceRequester(
         transactionId?.let {
             CredentialIssuanceResponse(
                 cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
-                credentialResponses = listOf(CredentialIssuanceResponse.Result.Deferred(TransactionId(transactionId))),
+                credentials = listOf(IssuedCredential.Deferred(TransactionId(transactionId))),
             )
         } ?: credential?.let {
             CredentialIssuanceResponse(
                 cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
-                credentialResponses = listOf(CredentialIssuanceResponse.Result.Issued(format, credential)),
+                credentials = listOf(IssuedCredential.Issued(format, credential)),
             )
         } ?: throw ResponseUnparsable(
             "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
@@ -210,11 +207,11 @@ internal class DefaultIssuanceRequester(
     private fun BatchIssuanceSuccessResponse.toDomain(): CredentialIssuanceResponse =
         CredentialIssuanceResponse(
             cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
-            credentialResponses = credentialResponses.map {
+            credentials = credentialResponses.map {
                 it.transactionId?.let {
-                    CredentialIssuanceResponse.Result.Deferred(TransactionId(it))
+                    IssuedCredential.Deferred(TransactionId(it))
                 } ?: it.credential?.let { credential ->
-                    CredentialIssuanceResponse.Result.Issued(it.format, credential)
+                    IssuedCredential.Issued(it.format, credential)
                 } ?: throw ResponseUnparsable(
                     "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
                 )
@@ -284,7 +281,7 @@ internal class DefaultIssuanceRequester(
             }
 
         private fun postDeferredIssuanceRequest(httpClient: HttpClient):
-            HttpPost<DeferredIssuanceRequestTO, DeferredCredentialIssuanceResponse, DeferredCredentialIssuanceResponse> =
+            HttpPost<DeferredIssuanceRequestTO, DeferredCredentialQueryOutcome, DeferredCredentialQueryOutcome> =
             HttpPost { url, headers, payload, responseHandler ->
                 val response = httpClient.post(url) {
                     headers {

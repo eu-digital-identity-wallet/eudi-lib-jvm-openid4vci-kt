@@ -255,12 +255,12 @@ internal class DefaultIssuer(
             cNonce = cNonce,
         )
 
-    override suspend fun AuthorizedRequest.requestDeferredIssuance(
-        transactionId: TransactionId,
-    ): Result<DeferredCredentialIssuanceResponse> =
+    override suspend fun AuthorizedRequest.queryForDeferredCredential(
+        deferredCredential: IssuedCredential.Deferred,
+    ): Result<DeferredCredentialQueryOutcome> =
         issuanceRequester.placeDeferredCredentialRequest(
             accessToken = accessToken,
-            transactionId = transactionId,
+            transactionId = deferredCredential.transactionId,
         )
 
     private suspend fun requestIssuance(
