@@ -158,9 +158,7 @@ internal class IssuanceRequester(
         runCatching {
             ktorHttpClientFactory().use { client ->
 
-
                 val url = issuerMetadata.credentialEndpoint.value.value.toURL()
-
 
                 val response = client.post(url) {
                     bearerAuth(accessToken.accessToken)
@@ -295,7 +293,7 @@ internal class IssuanceRequester(
     private suspend inline fun handleResponseDeferred(
         response: HttpResponse,
 
-        ): DeferredCredentialQueryOutcome =
+    ): DeferredCredentialQueryOutcome =
         if (response.status.isSuccess()) {
             val success = response.body<DeferredIssuanceSuccessResponse>()
             DeferredCredentialQueryOutcome.Issued(

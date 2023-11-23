@@ -23,6 +23,7 @@ import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.ClaimTO
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.CredentialSupportedDisplayTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential
+import eu.europa.ec.eudi.openid4vci.internal.issuance.Proof
 import eu.europa.ec.eudi.openid4vci.internal.issuance.RequestedCredentialResponseEncryption
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*

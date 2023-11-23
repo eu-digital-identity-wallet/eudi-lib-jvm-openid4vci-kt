@@ -23,8 +23,8 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.Proof
 import eu.europa.ec.eudi.openid4vci.ProofType
+import eu.europa.ec.eudi.openid4vci.internal.issuance.Proof
 import java.time.Instant
 import java.util.*
 import kotlin.contracts.ExperimentalContracts

@@ -16,10 +16,18 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.formats.*
+import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
+import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
+import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdDataIntegrity
+import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdSignedJwt
+import eu.europa.ec.eudi.openid4vci.internal.formats.W3CSignedJwt
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.apache.*
@@ -72,13 +80,19 @@ val config = OpenId4VCIConfig(
 )
 
 fun main(): Unit = runTest {
-    val bindingKey = BindingKey.Jwk(
-        algorithm = JWSAlgorithm.RS256,
-        jwk = KeyGenerator.randomRSASigningKey(2048),
+    val bindingKeys = mapOf(
+        PID_SdJwtVC_SCOPE to BindingKey.Jwk(
+            algorithm = JWSAlgorithm.RS256,
+            jwk = KeyGenerator.randomRSASigningKey(2048),
+        ),
+        PID_MsoMdoc_SCOPE to BindingKey.Jwk(
+            algorithm = JWSAlgorithm.ES256,
+            jwk = KeyGenerator.randomECSigningKey(Curve.P_256),
+        ),
     )
 
     val user = ActingUser("tneal", "password")
-    val wallet = Wallet.ofUser(user, bindingKey)
+    val wallet = Wallet.ofUser(user, bindingKeys)
 
     walletInitiatedIssuanceWithOffer(wallet)
     walletInitiatedIssuanceNoOffer(wallet)
@@ -95,11 +109,12 @@ private suspend fun walletInitiatedIssuanceWithOffer(wallet: Wallet) {
 }
 
 private suspend fun walletInitiatedIssuanceNoOffer(wallet: Wallet) {
-    println("[[Scenario: No offer passed, wallet initiates issuance by credential scopes]]")
+    println("[[Scenario: No offer passed, wallet initiates issuance by credential scopes: $PID_SdJwtVC_SCOPE, $PID_MsoMdoc_SCOPE]]")
+    val pidSdjwtVc = wallet.issueByScope(PID_SdJwtVC_SCOPE)
+    println("--> Issued PID in format $PID_SdJwtVC_SCOPE: $pidSdjwtVc \n")
 
-    val credential = wallet.issueByScope(PID_SdJwtVC_SCOPE)
-
-    println("--> Issued credential : $credential \n")
+    val pidMsoMdoc = wallet.issueByScope(PID_MsoMdoc_SCOPE)
+    println("--> Issued PID in format $PID_MsoMdoc_SCOPE: $pidMsoMdoc \n")
 }
 
 data class ActingUser(
@@ -109,7 +124,7 @@ data class ActingUser(
 
 private class Wallet(
     val actingUser: ActingUser,
-    val bindingKey: BindingKey,
+    val bindingKeys: Map<String, BindingKey>,
 ) {
 
     suspend fun issueByScope(scope: String): String {
@@ -240,6 +255,8 @@ private class Wallet(
         credentialMetadata: CredentialMetadata,
     ): String {
         with(issuer) {
+            val scope = credentialMetadata.scope()
+            val bindingKey = bindingKeys[scope] ?: error("No binding key found for scope $scope")
             val requestOutcome =
                 authorized.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
 
@@ -364,10 +381,20 @@ private class Wallet(
     }
 
     companion object {
-        fun ofUser(actingUser: ActingUser, bindingKey: BindingKey.Jwk) =
-            Wallet(actingUser, bindingKey)
+        fun ofUser(actingUser: ActingUser, bindingKeys: Map<String, BindingKey.Jwk>) =
+            Wallet(actingUser, bindingKeys)
     }
 }
+
+private fun CredentialMetadata.scope(): String? =
+    when (this) {
+        is MsoMdoc.Model.CredentialMetadata -> scope
+        is SdJwtVc.Model.CredentialMetadata -> scope
+        is W3CJsonLdDataIntegrity.Model.CredentialMetadata -> scope
+        is W3CJsonLdSignedJwt.Model.CredentialMetadata -> scope
+        is W3CSignedJwt.Model.CredentialMetadata -> scope
+        is CredentialMetadata.ByScope -> scope.value
+    }
 
 object KeyGenerator {
 
@@ -377,8 +404,8 @@ object KeyGenerator {
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
 
-    fun randomRSAEncryptionKey(size: Int): RSAKey = RSAKeyGenerator(size)
-        .keyUse(KeyUse.ENCRYPTION)
+    fun randomECSigningKey(curve: Curve): ECKey = ECKeyGenerator(curve)
+        .keyUse(KeyUse.SIGNATURE)
         .keyID(UUID.randomUUID().toString())
         .issueTime(Date(System.currentTimeMillis()))
         .generate()

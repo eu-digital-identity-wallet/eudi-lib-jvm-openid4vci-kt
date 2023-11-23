@@ -15,11 +15,39 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.issuance
 
+import com.nimbusds.jwt.JWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.ProofBuilder
+import eu.europa.ec.eudi.openid4vci.internal.ProofSerializer
 import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.serialization.Serializable
 import java.util.*
+
+/**
+ * Sealed hierarchy of the proofs of possession that can be included in a credential issuance request. Proofs are used
+ * to bind the issued credential to the credential requester. They contain proof of possession of a bind key that can be
+ * used to cryptographically verify that the presenter of the credential is also the holder of the credential.
+ */
+@Serializable(ProofSerializer::class)
+sealed interface Proof {
+
+    /**
+     * Proof of possession is structured as signed JWT
+     *
+     * @param jwt The proof JWT
+     */
+    @JvmInline
+    value class Jwt(val jwt: JWT) : Proof
+
+    /**
+     * Proof of possession is structured as a CWT
+     *
+     * @param cwt The proof CWT
+     */
+    @JvmInline
+    value class Cwt(val cwt: String) : Proof
+}
 
 /**
  * Default implementation of [Issuer] interface
@@ -44,31 +72,20 @@ internal class DefaultIssuer(
         IssuanceRequester(coroutineDispatcher, issuerMetadata, ktorHttpClientFactory)
 
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec? by lazy {
-        val responseEncryptionSpec = when (val encryption = issuerMetadata.credentialResponseEncryption) {
-            CredentialResponseEncryption.NotRequired -> null
-            is CredentialResponseEncryption.Required -> responseEncryptionSpecFactory(encryption)
-        }
-
-        val issuerEncryption = issuerMetadata.credentialResponseEncryption
-        responseEncryptionSpec?.let {
-            when (issuerEncryption) {
-                is CredentialResponseEncryption.NotRequired ->
-                    throw CredentialIssuanceError.ResponseEncryptionError.IssuerDoesNotSupportEncryptedResponses
-
-                is CredentialResponseEncryption.Required -> {
-                    if (!issuerEncryption.algorithmsSupported.contains(it.algorithm)) {
-                        throw CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
-                    }
-                    if (!issuerEncryption.encryptionMethodsSupported.contains(it.encryptionMethod)) {
-                        throw CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer
-                    }
-                }
+        fun IssuanceResponseEncryptionSpec.validate(meta: CredentialResponseEncryption.Required) {
+            if (!meta.algorithmsSupported.contains(algorithm)) {
+                throw CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
+            }
+            if (!meta.encryptionMethodsSupported.contains(encryptionMethod)) {
+                throw CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer
             }
         }
-        if (issuerEncryption is CredentialResponseEncryption.Required && responseEncryptionSpec == null) {
-            throw CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+        when (val encryption = issuerMetadata.credentialResponseEncryption) {
+            is CredentialResponseEncryption.NotRequired -> null
+            is CredentialResponseEncryption.Required -> responseEncryptionSpecFactory(encryption).also {
+                it.validate(encryption)
+            }
         }
-        responseEncryptionSpec
     }
 
     override suspend fun pushAuthorizationCodeRequest(
