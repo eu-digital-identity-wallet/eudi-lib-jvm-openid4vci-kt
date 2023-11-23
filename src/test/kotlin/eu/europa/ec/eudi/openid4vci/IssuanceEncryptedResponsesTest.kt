@@ -93,9 +93,7 @@ class IssuanceEncryptedResponsesTest {
             assertFailsWith<ResponseEncryptionAlgorithmNotSupportedByIssuer>(
                 block = {
                     with(issuer) {
-                        noProofRequired.requestSingle(offer.credentials[0], null) {
-                            issuanceResponseEncryptionSpec
-                        }.getOrThrow()
+                        noProofRequired.requestSingle(offer.credentials[0], null).getOrThrow()
                     }
                 },
             )
@@ -133,9 +131,7 @@ class IssuanceEncryptedResponsesTest {
             assertFailsWith<ResponseEncryptionMethodNotSupportedByIssuer>(
                 block = {
                     with(issuer) {
-                        noProofRequired.requestSingle(offer.credentials[0], null) {
-                            issuanceResponseEncryptionSpec
-                        }.getOrThrow()
+                        noProofRequired.requestSingle(offer.credentials[0], null).getOrThrow()
                     }
                 },
             )
@@ -172,9 +168,7 @@ class IssuanceEncryptedResponsesTest {
             assertFailsWith<IssuerDoesNotSupportEncryptedResponses> {
                 with(issuer) {
                     noProofRequired
-                        .requestSingle(offer.credentials[0], null) {
-                            issuanceResponseEncryptionSpec
-                        }.getOrThrow()
+                        .requestSingle(offer.credentials[0], null).getOrThrow()
                 }
             }
         }
@@ -208,9 +202,7 @@ class IssuanceEncryptedResponsesTest {
                 block = {
                     with(issuer) {
                         noProofRequired
-                            .requestSingle(offer.credentials[0], null) {
-                                null
-                            }.getOrThrow()
+                            .requestSingle(offer.credentials[0], null).getOrThrow()
                     }
                 },
             )
@@ -283,15 +275,15 @@ class IssuanceEncryptedResponsesTest {
                         }
                         assertTrue("Missing response encryption JWK") {
                             issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
-                                issuanceRequestTO.credentialEncryptionJwk != null
+                                    issuanceRequestTO.credentialEncryptionJwk != null
                         }
                         assertTrue("Missing response encryption algorithm") {
                             issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
-                                issuanceRequestTO.credentialResponseEncryptionAlg != null
+                                    issuanceRequestTO.credentialResponseEncryptionAlg != null
                         }
                         assertTrue("Missing response encryption method") {
                             issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
-                                issuanceRequestTO.credentialResponseEncryptionMethod != null
+                                    issuanceRequestTO.credentialResponseEncryptionMethod != null
                         }
                     },
                 ),
@@ -363,15 +355,11 @@ class IssuanceEncryptedResponsesTest {
             .getOrThrow()
 
         val issuer = Issuer.make(
-            IssuanceAuthorizer.make(
-                authorizationServerMetadata = offer.authorizationServerMetadata,
-                config = vciWalletConfiguration,
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            ),
-            IssuanceRequester.make(
-                issuerMetadata = offer.credentialIssuerMetadata,
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            ),
+
+            authorizationServerMetadata = offer.authorizationServerMetadata,
+            config = vciWalletConfiguration,
+            ktorHttpClientFactory = ktorHttpClientFactory,
+            issuerMetadata = offer.credentialIssuerMetadata,
         )
 
         val flowState = with(issuer) {

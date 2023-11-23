@@ -42,11 +42,11 @@ import java.net.URI
 import java.net.URL
 import java.util.*
 
-val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
+const val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
 
-val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
-val OPENID_SCOPE = "openid"
+const val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
+const val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
+const val OPENID_SCOPE = "openid"
 
 val SdJwtVC_CredentialOffer = """
     {
@@ -82,11 +82,11 @@ fun main(): Unit = runTest {
     val user = ActingUser("tneal", "password")
     val wallet = Wallet.ofUser(user, bindingKey)
 
-    WalletInitiatedIssuanceWithOffer(wallet)
-    WalletInitiatedIssuanceNoOffer(wallet)
+    walletInitiatedIssuanceWithOffer(wallet)
+    walletInitiatedIssuanceNoOffer(wallet)
 }
 
-private suspend fun WalletInitiatedIssuanceWithOffer(wallet: Wallet) {
+private suspend fun walletInitiatedIssuanceWithOffer(wallet: Wallet) {
     println("[[Scenario: Offer passed to wallet via url]] ")
 
     val coUrl = "https://localhost/pid-issuer/credentialoffer?credential_offer=$SdJwtVC_CredentialOffer"
@@ -96,7 +96,7 @@ private suspend fun WalletInitiatedIssuanceWithOffer(wallet: Wallet) {
     println("--> Issued credential : $credential \n")
 }
 
-private suspend fun WalletInitiatedIssuanceNoOffer(wallet: Wallet) {
+private suspend fun walletInitiatedIssuanceNoOffer(wallet: Wallet) {
     println("[[Scenario: No offer passed, wallet initiates issuance by credential scopes]]")
 
     val credential = wallet.issueByScope(PID_SdJwtVC_SCOPE)
@@ -125,23 +125,19 @@ private class Wallet(
                 .resolve(issuerMetadata.authorizationServer).getOrThrow()
 
         val issuer = Issuer.make(
-            IssuanceAuthorizer.make(
-                authorizationServerMetadata = authServerMetadata,
-                config = config,
-                ktorHttpClientFactory = ::httpClientFactory,
-            ),
-            IssuanceRequester.make(
-                issuerMetadata = issuerMetadata,
-                ktorHttpClientFactory = ::httpClientFactory,
-            ),
+            authorizationServerMetadata = authServerMetadata,
+            config = config,
+            ktorHttpClientFactory = ::httpClientFactory,
+            issuerMetadata = issuerMetadata,
         )
 
+
         val credentialMetadata = CredentialMetadata.ByScope(Scope(scope))
-        val openId_scope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
+        val openIdScope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
 
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
-            listOf(credentialMetadata, openId_scope),
+            listOf(credentialMetadata, openIdScope),
             authServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
@@ -176,23 +172,18 @@ private class Wallet(
 
     suspend fun issueByCredentialOffer(offer: CredentialOffer): String {
         val issuer = Issuer.make(
-            IssuanceAuthorizer.make(
-                authorizationServerMetadata = offer.authorizationServerMetadata,
-                config = config,
-                ktorHttpClientFactory = ::httpClientFactory,
-            ),
-            IssuanceRequester.make(
-                issuerMetadata = offer.credentialIssuerMetadata,
-                ktorHttpClientFactory = ::httpClientFactory,
-            ),
+            authorizationServerMetadata = offer.authorizationServerMetadata,
+            config = config,
+            issuerMetadata = offer.credentialIssuerMetadata,
+            ktorHttpClientFactory = ::httpClientFactory,
         )
 
-        val openId_scope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
+        val openIdScope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
 
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
-            offer.credentials + openId_scope,
+            offer.credentials + openIdScope,
             offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 

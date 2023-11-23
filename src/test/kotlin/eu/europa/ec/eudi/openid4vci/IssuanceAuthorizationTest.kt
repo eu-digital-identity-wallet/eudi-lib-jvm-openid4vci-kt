@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.issuance.AccessTokenRequestResponse
+import eu.europa.ec.eudi.openid4vci.internal.issuance.PushedAuthorizationRequestResponse
 import eu.europa.ec.eudi.openid4vci.internal.issuance.TokenEndpointForm
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.forms.*
@@ -548,15 +550,10 @@ class IssuanceAuthorizationTest {
             ).resolve(issuerMetadata.authorizationServer).getOrThrow()
 
         val issuer = Issuer.make(
-            IssuanceAuthorizer.make(
-                authorizationServerMetadata = authServerMetadata,
-                config = vciWalletConfiguration,
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            ),
-            IssuanceRequester.make(
-                issuerMetadata = issuerMetadata,
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            ),
+            authorizationServerMetadata = authServerMetadata,
+            config = vciWalletConfiguration,
+            ktorHttpClientFactory = ktorHttpClientFactory,
+            issuerMetadata = issuerMetadata,
         )
         return issuer
     }

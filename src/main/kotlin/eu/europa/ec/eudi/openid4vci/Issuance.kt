@@ -19,9 +19,40 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
-import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuanceAuthorizer
 import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuer
+import eu.europa.ec.eudi.openid4vci.internal.issuance.IssuanceAuthorizer
+import eu.europa.ec.eudi.openid4vci.internal.issuance.IssuanceRequester
 import eu.europa.ec.eudi.openid4vci.internal.issuance.KeyGenerator
+import io.ktor.client.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.Json
+
+/**
+ * Holds a https [java.net.URL] to be used at the second step of PAR flow for retrieving the authorization code.
+ * Contains the 'request_uri' retrieved from the post to PAR endpoint of authorization server and the client_id.
+ */
+class AuthorizationUrl private constructor(val url: HttpsUrl) {
+
+
+    override fun toString(): String = url.toString()
+
+
+    companion object {
+        const val PARAM_CLIENT_ID = "client_id"
+        const val PARAM_REQUEST_URI = "request_uri"
+        const val PARAM_STATE = "state"
+        operator fun invoke(url: String): AuthorizationUrl {
+            val httpsUrl = HttpsUrl(url).getOrThrow()
+            val query = requireNotNull(httpsUrl.value.query) { "URL must contain query parameter" }
+            require(query.contains("$PARAM_CLIENT_ID=")) { "URL must contain client_id query parameter" }
+            require(query.contains("$PARAM_REQUEST_URI=")) { "URL must contain request_uri query parameter" }
+            return AuthorizationUrl(httpsUrl)
+        }
+    }
+}
 
 /**
  * Sealed hierarchy of states that denote the individual steps that need to be taken in order to authorize a request for issuance
@@ -81,6 +112,33 @@ sealed interface AuthorizedRequest {
         override val accessToken: AccessToken,
         val cNonce: CNonce,
     ) : AuthorizedRequest
+}
+
+/**
+ * The result of a request for issuance
+ */
+sealed interface IssuedCredential {
+
+    /**
+     * Credential was issued from server and the result is returned inline.
+     *
+     * @param format The format of the issued credential
+     * @param credential The issued credential
+     */
+    data class Issued(
+        val format: String,
+        val credential: String,
+    ) : IssuedCredential
+
+    /**
+     * Credential could not be issued immediately. An identifier is returned from server to be used later on
+     * to request the credential from issuer's Deferred Credential Endpoint.
+     *
+     * @param transactionId  A string identifying a Deferred Issuance transaction.
+     */
+    data class Deferred(
+        val transactionId: TransactionId,
+    ) : IssuedCredential
 }
 
 /**
@@ -179,6 +237,8 @@ interface AuthorizeIssuance {
     ): Result<AuthorizedRequest>
 }
 
+typealias ResponseEncryptionSpecFactory = (CredentialResponseEncryption.Required) -> IssuanceResponseEncryptionSpec
+
 /**
  * An interface for submitting a credential issuance request. Contains all the operation available to transition an [AuthorizedRequest]
  * to a [SubmittedRequest]
@@ -191,17 +251,13 @@ interface RequestIssuance {
      *  @param credentialMetadata   The metadata specifying the credential that will be requested.
      *  @param claimSet Optional parameter to specify the specific set of claims that are requested to be included in the
      *          credential to be issued.
-     *  @param responseEncryptionSpecProvider   Provider method to generate the expected issuer's encrypted response,
+     *  @param responseEncryptionSpecFactory   Provider method to generate the expected issuer's encrypted response,
      *          if issuer enforces encrypted responses. A default implementation is provided to callers that internally
      *  @return The new state of the request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
-        responseEncryptionSpecProvider:
-            (
-                issuerResponseEncryptionMetadata: CredentialResponseEncryption,
-            ) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
@@ -212,7 +268,7 @@ interface RequestIssuance {
      *  @param claimSet     Optional parameter to specify the specific set of claims that are requested to be included in the
      *          credential to be issued.
      *  @param bindingKey   Cryptographic material to be used from issuer to bind the issued credential to a holder.
-     *  @param responseEncryptionSpecProvider   Provider method to generate the expected issuer's encrypted response,
+     *  @param responseEncryptionSpecFactory   Provider method to generate the expected issuer's encrypted response,
      *          if issuer enforces encrypted responses. A default implementation is provided to callers that internally
      *  @return The new state of request or error.
      */
@@ -220,42 +276,30 @@ interface RequestIssuance {
         credentialMetadata: CredentialMetadata,
         claimSet: ClaimSet?,
         bindingKey: BindingKey,
-        responseEncryptionSpecProvider:
-            (
-                issuerResponseEncryptionMetadata: CredentialResponseEncryption,
-            ) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
-    ): Result<SubmittedRequest>
+
+        ): Result<SubmittedRequest>
 
     /**
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.NoProofRequired] authorization.
      *
      *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-     *  @param responseEncryptionSpecProvider   Provider method to generate the expected issuer's encrypted response,
-     *          if issuer enforces encrypted responses. A default implementation is provided to callers that internally
+
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
-        responseEncryptionSpecProvider:
-            (
-                issuerResponseEncryptionMetadata: CredentialResponseEncryption,
-            ) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
      *
      *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-     *  @param responseEncryptionSpecProvider   Provider method to generate the expected issuer's encrypted response,
+     *  @param responseEncryptionSpecFactory   Provider method to generate the expected issuer's encrypted response,
      *          if issuer enforces encrypted responses. A default implementation is provided to callers that internally
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
-        responseEncryptionSpecProvider:
-            (
-                issuerResponseEncryptionMetadata: CredentialResponseEncryption,
-            ) -> IssuanceResponseEncryptionSpec? = ::createResponseEncryptionSpec,
     ): Result<SubmittedRequest>
 
     /**
@@ -269,38 +313,21 @@ interface RequestIssuance {
         cNonce: CNonce,
     ): AuthorizedRequest.ProofRequired
 
-    companion object {
-        fun createResponseEncryptionSpec(issuerResponseEncryptionMetadata: CredentialResponseEncryption): IssuanceResponseEncryptionSpec? {
-            return when (issuerResponseEncryptionMetadata) {
-                is CredentialResponseEncryption.NotRequired -> null
-                is CredentialResponseEncryption.Required -> {
-                    val firstAsymmetricAlgorithm =
-                        issuerResponseEncryptionMetadata.algorithmsSupported.firstOrNull {
-                            JWEAlgorithm.Family.ASYMMETRIC.contains(it)
-                        }
 
-                    val encryptionKey = when {
-                        JWEAlgorithm.Family.ECDH_ES.contains(firstAsymmetricAlgorithm) ->
-                            KeyGenerator.randomECEncryptionKey(Curve.P_256)
+}
 
-                        JWEAlgorithm.Family.RSA.contains(firstAsymmetricAlgorithm) ->
-                            KeyGenerator.randomRSAEncryptionKey(2048)
+sealed interface DeferredCredentialQueryOutcome {
 
-                        else -> null
-                    }
+    data class Issued(val credential: IssuedCredential.Issued) : DeferredCredentialQueryOutcome
 
-                    if (firstAsymmetricAlgorithm == null || encryptionKey == null)
-                        null
-                    else
-                        IssuanceResponseEncryptionSpec(
-                            jwk = encryptionKey,
-                            algorithm = firstAsymmetricAlgorithm,
-                            encryptionMethod = issuerResponseEncryptionMetadata.encryptionMethodsSupported[0],
-                        )
-                }
-            }
-        }
-    }
+    data class IssuancePending(
+        val interval: Long? = null,
+    ) : DeferredCredentialQueryOutcome
+
+    data class Errored(
+        val error: String,
+        val errorDescription: String? = null,
+    ) : DeferredCredentialQueryOutcome
 }
 
 /**
@@ -327,20 +354,6 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
 
     companion object {
 
-        /**
-         * Factory method for creating an issuer component.
-         *
-         * @param authorizer    An [IssuanceAuthorizer] component responsible for all interactions with authorization server to authorize
-         *      a request for credential(s) issuance.
-         * @param requester     An [IssuanceRequester] component responsible for all interactions with credential issuer for submitting
-         *      credential issuance requests.
-         * @return An instance of Issuer
-         */
-        fun make(
-            authorizer: IssuanceAuthorizer,
-            requester: IssuanceRequester,
-        ): Issuer =
-            DefaultIssuer(authorizer, requester)
 
         /**
          * Factory method to create an [Issuer] using the passed http client factory
@@ -354,19 +367,56 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             authorizationServerMetadata: CIAuthorizationServerMetadata,
             issuerMetadata: CredentialIssuerMetadata,
             config: OpenId4VCIConfig,
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultIssuanceAuthorizer.HttpClientFactory,
-        ): Issuer =
-            DefaultIssuer(
-                IssuanceAuthorizer.make(
-                    authorizationServerMetadata = authorizationServerMetadata,
-                    config = config,
-                    ktorHttpClientFactory = ktorHttpClientFactory,
-                ),
-                IssuanceRequester.make(
-                    issuerMetadata = issuerMetadata,
-                    ktorHttpClientFactory = ktorHttpClientFactory,
-                ),
-            )
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultKtorHttpClientFactory,
+            coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory
+        ): Issuer = DefaultIssuer(
+            authorizationServerMetadata,
+            issuerMetadata,
+            config,
+            ktorHttpClientFactory,
+            coroutineDispatcher,
+            responseEncryptionSpecFactory
+        )
+
+        /**
+         * Factory which produces a [Ktor Http client][HttpClient]
+         * The actual engine will be peeked up by whatever
+         * it is available in classpath
+         *
+         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
+         */
+        val DefaultKtorHttpClientFactory: KtorHttpClientFactory = {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json(
+                        json = Json { ignoreUnknownKeys = true },
+                    )
+                }
+            }
+        }
+
+        val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory = { requiredEncryption ->
+            requiredEncryption.algorithmsSupported.mapNotNull { alg ->
+                val encryptionKey = when {
+                    JWEAlgorithm.Family.ECDH_ES.contains(alg) ->
+                        KeyGenerator.randomECEncryptionKey(Curve.P_256)
+
+                    JWEAlgorithm.Family.RSA.contains(alg) ->
+                        KeyGenerator.randomRSAEncryptionKey(2048)
+
+                    else -> null
+                }
+
+                encryptionKey?.let { it ->
+                    IssuanceResponseEncryptionSpec(
+                        jwk = it,
+                        algorithm = alg,
+                        encryptionMethod = requiredEncryption.encryptionMethodsSupported[0],
+                    )
+                }
+            }.firstOrNull() ?: error("Could not create encryption spec")
+        }
     }
 }
 

@@ -102,7 +102,10 @@ class IssuanceSingleRequestTest {
             ),
         )
         val (offer, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
+            authorizeRequestForCredentialOffer(
+                mockedKtorHttpClientFactory,
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc
+            )
 
         val claimSet = MsoMdoc.Model.ClaimSet(
             claims = mapOf(
@@ -132,64 +135,68 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
-    fun `when issuer responds with 'invalid_proof' and no c_nonce then ResponseUnparsable error is returned `() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker(),
-            tokenPostMocker(),
-            singleIssuanceRequestMocker(
-                responseBuilder = {
-                    respond(
-                        content = """
+    fun `when issuer responds with 'invalid_proof' and no c_nonce then ResponseUnparsable error is returned `() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                oidcWellKnownMocker(),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                singleIssuanceRequestMocker(
+                    responseBuilder = {
+                        respond(
+                            content = """
                             {
                                 "error": "invalid_proof"                               
                             } 
                         """.trimIndent(),
-                        status = HttpStatusCode.BadRequest,
-                        headers = headersOf(
-                            HttpHeaders.ContentType to listOf("application/json"),
-                        ),
-                    )
-                },
-            ),
-        )
-        val (offer, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
-
-        val claimSet = MsoMdoc.Model.ClaimSet(
-            claims = mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "given_name" to Claim(),
-                    "family_name" to Claim(),
-                    "birth_date" to Claim(),
-                ),
-            ),
-        )
-        with(issuer) {
-            when (authorizedRequest) {
-                is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = offer.credentials[0]
-                    authorizedRequest.requestSingle(credentialMetadata, claimSet)
-                        .fold(
-                            onSuccess = {
-                                assertThat(
-                                    "Expected CredentialIssuanceException to be thrown but was not",
-                                    it is SubmittedRequest.Failed &&
-                                        it.error is CredentialIssuanceError.ResponseUnparsable,
-                                )
-                            },
-                            onFailure = {
-                                fail("No exception expected to be thrown")
-                            },
+                            status = HttpStatusCode.BadRequest,
+                            headers = headersOf(
+                                HttpHeaders.ContentType to listOf("application/json"),
+                            ),
                         )
-                }
+                    },
+                ),
+            )
+            val (offer, authorizedRequest, issuer) =
+                authorizeRequestForCredentialOffer(
+                    mockedKtorHttpClientFactory,
+                    AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc
+                )
 
-                is AuthorizedRequest.ProofRequired ->
-                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+            val claimSet = MsoMdoc.Model.ClaimSet(
+                claims = mapOf(
+                    "org.iso.18013.5.1" to mapOf(
+                        "given_name" to Claim(),
+                        "family_name" to Claim(),
+                        "birth_date" to Claim(),
+                    ),
+                ),
+            )
+            with(issuer) {
+                when (authorizedRequest) {
+                    is AuthorizedRequest.NoProofRequired -> {
+                        val credentialMetadata = offer.credentials[0]
+                        authorizedRequest.requestSingle(credentialMetadata, claimSet)
+                            .fold(
+                                onSuccess = {
+                                    assertThat(
+                                        "Expected CredentialIssuanceException to be thrown but was not",
+                                        it is SubmittedRequest.Failed &&
+                                                it.error is CredentialIssuanceError.ResponseUnparsable,
+                                    )
+                                },
+                                onFailure = {
+                                    fail("No exception expected to be thrown")
+                                },
+                            )
+                    }
+
+                    is AuthorizedRequest.ProofRequired ->
+                        fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+                }
             }
         }
-    }
 
     @Test
     fun `when issuer request contains unsupported claims exception CredentialIssuanceException is thrown`() = runTest {
@@ -200,7 +207,10 @@ class IssuanceSingleRequestTest {
             tokenPostMocker(),
         )
         val (_, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
+            authorizeRequestForCredentialOffer(
+                mockedKtorHttpClientFactory,
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc
+            )
 
         with(issuer) {
             when (authorizedRequest) {
@@ -297,7 +307,10 @@ class IssuanceSingleRequestTest {
         )
 
         val (offer, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc)
+            authorizeRequestForCredentialOffer(
+                mockedKtorHttpClientFactory,
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc
+            )
 
         val claimSet = MsoMdoc.Model.ClaimSet(
             claims = mapOf(
@@ -396,7 +409,10 @@ class IssuanceSingleRequestTest {
         )
 
         val (offer, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt)
+            authorizeRequestForCredentialOffer(
+                mockedKtorHttpClientFactory,
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt
+            )
 
         val claimSet = SdJwtVc.Model.ClaimSet(
             claims = mapOf(
@@ -450,15 +466,10 @@ class IssuanceSingleRequestTest {
             .getOrThrow()
 
         val issuer = Issuer.make(
-            IssuanceAuthorizer.make(
-                authorizationServerMetadata = offer.authorizationServerMetadata,
-                config = vciWalletConfiguration,
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            ),
-            IssuanceRequester.make(
-                issuerMetadata = offer.credentialIssuerMetadata,
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            ),
+            authorizationServerMetadata = offer.authorizationServerMetadata,
+            config = vciWalletConfiguration,
+            ktorHttpClientFactory = ktorHttpClientFactory,
+            issuerMetadata = offer.credentialIssuerMetadata,
         )
 
         val authorizedRequest = with(issuer) {

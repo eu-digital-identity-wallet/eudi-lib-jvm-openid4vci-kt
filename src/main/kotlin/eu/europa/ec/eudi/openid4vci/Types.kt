@@ -93,6 +93,8 @@ data class PreAuthorizationCode(
     }
 }
 
+
+
 /**
  * A c_nonce related information as provided from issuance server.
  *

@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.internal.issuance.AccessTokenRequestResponse
+import eu.europa.ec.eudi.openid4vci.internal.issuance.PushedAuthorizationRequestResponse
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
 import io.ktor.http.*

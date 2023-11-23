@@ -19,6 +19,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
+import eu.europa.ec.eudi.openid4vci.internal.issuance.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -232,7 +233,7 @@ class IssuanceDeferredRequestTest {
                     val deferredIssuanceRequest = asDeferredIssuanceRequest(textContent.text)
                     deferredIssuanceRequest?.let {
                         assertTrue("No transaction id passed") {
-                            !deferredIssuanceRequest.transactionId.isBlank()
+                            deferredIssuanceRequest.transactionId.isNotBlank()
                         }
                     }
                 },
@@ -399,15 +400,10 @@ class IssuanceDeferredRequestTest {
             .getOrThrow()
 
         val issuer = Issuer.make(
-            IssuanceAuthorizer.make(
                 authorizationServerMetadata = offer.authorizationServerMetadata,
                 config = vciWalletConfiguration,
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            ),
-            IssuanceRequester.make(
                 issuerMetadata = offer.credentialIssuerMetadata,
                 ktorHttpClientFactory = ktorHttpClientFactory,
-            ),
         )
 
         val authorizedRequest = with(issuer) {
