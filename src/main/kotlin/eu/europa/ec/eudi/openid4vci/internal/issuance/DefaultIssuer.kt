@@ -17,37 +17,11 @@ package eu.europa.ec.eudi.openid4vci.internal.issuance
 
 import com.nimbusds.jwt.JWT
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.ProofBuilder
-import eu.europa.ec.eudi.openid4vci.internal.ProofSerializer
 import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.serialization.Serializable
 import java.util.*
-
-/**
- * Sealed hierarchy of the proofs of possession that can be included in a credential issuance request. Proofs are used
- * to bind the issued credential to the credential requester. They contain proof of possession of a bind key that can be
- * used to cryptographically verify that the presenter of the credential is also the holder of the credential.
- */
-@Serializable(ProofSerializer::class)
-sealed interface Proof {
-
-    /**
-     * Proof of possession is structured as signed JWT
-     *
-     * @param jwt The proof JWT
-     */
-    @JvmInline
-    value class Jwt(val jwt: JWT) : Proof
-
-    /**
-     * Proof of possession is structured as a CWT
-     *
-     * @param cwt The proof CWT
-     */
-    @JvmInline
-    value class Cwt(val cwt: String) : Proof
-}
 
 /**
  * Default implementation of [Issuer] interface

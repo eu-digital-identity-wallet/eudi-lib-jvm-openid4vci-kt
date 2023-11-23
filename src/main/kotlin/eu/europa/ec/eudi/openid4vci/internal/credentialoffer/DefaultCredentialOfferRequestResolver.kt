@@ -25,7 +25,6 @@ import io.ktor.client.request.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
@@ -74,8 +73,8 @@ private data class PreAuthorizedCodeTO(
  * A default implementation for [CredentialOfferRequestResolver].
  */
 internal class DefaultCredentialOfferRequestResolver(
-    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
+    private val ioCoroutineDispatcher: CoroutineDispatcher,
+    private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) : CredentialOfferRequestResolver {
 
     private val credentialIssuerMetadataResolver =
@@ -134,23 +133,6 @@ internal class DefaultCredentialOfferRequestResolver(
         }
 
     companion object {
-
-        /**
-         * Factory which produces a [Ktor Http client][HttpClient]
-         * The actual engine will be peeked up by whatever
-         * it is available in classpath
-         *
-         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
-         */
-        val HttpClientFactory: KtorHttpClientFactory = {
-            HttpClient {
-                install(ContentNegotiation) {
-                    json(
-                        json = Json { ignoreUnknownKeys = true },
-                    )
-                }
-            }
-        }
 
         /**
          * Tries to parse a [GrantsTO] to a [Grants] instance.

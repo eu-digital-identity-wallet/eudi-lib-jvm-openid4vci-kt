@@ -19,9 +19,9 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.CredentialSupportedDisplayTO
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.LogoObject
-import eu.europa.ec.eudi.openid4vci.internal.issuance.Proof
 import eu.europa.ec.eudi.openid4vci.internal.issuance.RequestedCredentialResponseEncryption
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -154,7 +154,7 @@ internal object Formats {
 @kotlinx.serialization.Serializable
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("format")
-sealed interface CredentialIssuanceRequestTO {
+internal sealed interface CredentialIssuanceRequestTO {
 
     @kotlinx.serialization.Serializable
     @SerialName("batch-credential-request")
@@ -202,7 +202,7 @@ sealed interface ClaimSet
 /**
  * Credential(s) issuance request
  */
-sealed interface CredentialIssuanceRequest {
+internal sealed interface CredentialIssuanceRequest {
 
     /**
      * Models an issuance request for a batch of credentials
@@ -311,7 +311,7 @@ internal fun CredentialSupportedDisplayTO.toDomain(): Display {
 /**
  * Utility method to convert a list of string to a list of [CryptographicBindingMethod].
  */
-fun List<String>.toCryptographicBindingMethods(): List<CryptographicBindingMethod> =
+internal fun List<String>.toCryptographicBindingMethods(): List<CryptographicBindingMethod> =
     map {
         when (it) {
             "jwk" -> CryptographicBindingMethod.JWK
@@ -329,7 +329,7 @@ fun List<String>.toCryptographicBindingMethods(): List<CryptographicBindingMetho
 /**
  * Utility method to convert a list of string to a list of [ProofType].
  */
-fun List<String>?.toProofTypes(): List<ProofType> =
+internal fun List<String>?.toProofTypes(): List<ProofType> =
     this?.map {
         when (it) {
             "jwt" -> ProofType.JWT

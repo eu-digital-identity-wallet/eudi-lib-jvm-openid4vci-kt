@@ -272,7 +272,7 @@ fun interface CredentialIssuerMetadataResolver {
          */
         operator fun invoke(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultCredentialIssuerMetadataResolver.HttpClientFactory,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): CredentialIssuerMetadataResolver =
             DefaultCredentialIssuerMetadataResolver(
                 coroutineDispatcher = ioCoroutineDispatcher,

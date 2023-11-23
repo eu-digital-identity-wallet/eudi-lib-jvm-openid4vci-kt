@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialOfferRequestResolver
 import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import kotlinx.coroutines.test.runTest
 import org.apache.http.client.utils.URIBuilder
@@ -62,7 +61,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
+        CredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
             .resolve(credentialEndpointUrl.toString())
             .fold(
                 {
@@ -114,7 +113,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
+        CredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
             .resolve(credentialEndpointUrl.toString())
             .fold(
                 {
@@ -170,7 +169,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
+        CredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
             .resolve(credentialEndpointUrl.toString())
             .fold(
                 {
@@ -227,7 +226,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
+        CredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
             .resolve(credentialEndpointUrl.toString())
             .fold(
                 {
@@ -285,7 +284,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
+        CredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
             .resolve(credentialEndpointUrl.toString())
             .fold(
                 {
@@ -322,7 +321,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
+        CredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
             .resolve(credentialEndpointUrl.toString())
             .fold(
                 { fail("Credential Offer resolution should have failed") },
@@ -352,7 +351,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
+        CredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
             .resolve(credentialEndpointUrl.toString())
             .fold(
                 { fail("Credential Offer resolution should have failed") },
@@ -384,7 +383,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer", credentialOffer)
             .build()
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
+        CredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
             .resolve(credentialEndpointUrl.toString())
             .fold(
                 { fail("Credential Offer resolution should have failed") },
@@ -434,7 +433,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             ),
         )
 
-        DefaultCredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
+        CredentialOfferRequestResolver(ktorHttpClientFactory = mockedKtorHttpClientFactory)
             .resolve(credentialEndpointUrl.toString())
             .fold(
                 {

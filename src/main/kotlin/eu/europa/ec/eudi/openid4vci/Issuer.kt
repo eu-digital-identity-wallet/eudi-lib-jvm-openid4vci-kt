@@ -21,12 +21,8 @@ import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuer
 import eu.europa.ec.eudi.openid4vci.internal.issuance.IssuanceAuthorizer
 import eu.europa.ec.eudi.openid4vci.internal.issuance.IssuanceRequester
 import eu.europa.ec.eudi.openid4vci.internal.issuance.KeyGenerator
-import io.ktor.client.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.serialization.json.Json
 
 /**
  * Aggregation interface providing all functionality required for performing a credential issuance request (batch or single)
@@ -48,7 +44,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             authorizationServerMetadata: CIAuthorizationServerMetadata,
             issuerMetadata: CredentialIssuerMetadata,
             config: OpenId4VCIConfig,
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultKtorHttpClientFactory,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
             coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Issuer = DefaultIssuer(
@@ -59,23 +55,6 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             coroutineDispatcher,
             responseEncryptionSpecFactory,
         )
-
-        /**
-         * Factory which produces a [Ktor Http client][HttpClient]
-         * The actual engine will be peeked up by whatever
-         * it is available in classpath
-         *
-         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
-         */
-        val DefaultKtorHttpClientFactory: KtorHttpClientFactory = {
-            HttpClient {
-                install(ContentNegotiation) {
-                    json(
-                        json = Json { ignoreUnknownKeys = true },
-                    )
-                }
-            }
-        }
 
         val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory = { requiredEncryption ->
             requiredEncryption.algorithmsSupported.mapNotNull { alg ->

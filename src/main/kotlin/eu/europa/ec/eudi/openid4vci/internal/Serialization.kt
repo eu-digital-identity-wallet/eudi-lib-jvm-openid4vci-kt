@@ -21,7 +21,6 @@ import eu.europa.ec.eudi.openid4vci.ClaimName
 import eu.europa.ec.eudi.openid4vci.Namespace
 import eu.europa.ec.eudi.openid4vci.ProofType
 import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
-import eu.europa.ec.eudi.openid4vci.internal.issuance.Proof
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor

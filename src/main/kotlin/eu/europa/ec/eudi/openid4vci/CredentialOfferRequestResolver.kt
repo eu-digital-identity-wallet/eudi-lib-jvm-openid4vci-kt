@@ -231,7 +231,7 @@ sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestE
 }
 
 /**
- * A exception indicating a [CredentialOfferRequestError] occurred while trying to validate or resolve a [CredentialOfferRequest].
+ * An exception indicating a [CredentialOfferRequestError] occurred while trying to validate or resolve a [CredentialOfferRequest].
  */
 data class CredentialOfferRequestException(val error: CredentialOfferRequestError) : Exception()
 
@@ -262,7 +262,7 @@ fun interface CredentialOfferRequestResolver {
          */
         operator fun invoke(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultCredentialOfferRequestResolver.HttpClientFactory,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): CredentialOfferRequestResolver =
             DefaultCredentialOfferRequestResolver(
                 ioCoroutineDispatcher = ioCoroutineDispatcher,

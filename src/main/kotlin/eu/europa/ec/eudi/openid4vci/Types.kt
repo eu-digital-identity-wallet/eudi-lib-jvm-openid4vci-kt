@@ -165,6 +165,4 @@ value class Scope(val value: String) {
     }
 }
 
-typealias KtorHttpClientFactory = () -> HttpClient
-
 typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata
