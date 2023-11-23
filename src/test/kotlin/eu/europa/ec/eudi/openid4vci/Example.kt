@@ -255,7 +255,7 @@ private class Wallet(
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
-                    val issuedCredential = requestOutcome.response.credentials.get(0)
+                    val issuedCredential = requestOutcome.credentials.get(0)
                     when (issuedCredential) {
                         is IssuedCredential.Issued -> issuedCredential.credential
                         is IssuedCredential.Deferred -> {
@@ -304,7 +304,7 @@ private class Wallet(
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
-                    val issuedCredential = requestOutcome.response.credentials[0]
+                    val issuedCredential = requestOutcome.credentials[0]
                     when (issuedCredential) {
                         is IssuedCredential.Issued -> issuedCredential.credential
                         is IssuedCredential.Deferred -> {

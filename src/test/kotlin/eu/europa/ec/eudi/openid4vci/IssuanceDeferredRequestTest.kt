@@ -93,7 +93,7 @@ class IssuanceDeferredRequestTest {
 
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
-                                    val issuedCredential = secondSubmittedRequest.response.credentials[0]
+                                    val issuedCredential = secondSubmittedRequest.credentials[0]
                                     require(issuedCredential is IssuedCredential.Deferred)
                                     issuedCredential
                                 }
@@ -173,7 +173,7 @@ class IssuanceDeferredRequestTest {
 
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
-                                    val issuedCredential = secondSubmittedRequest.response.credentials[0]
+                                    val issuedCredential = secondSubmittedRequest.credentials[0]
                                     require(issuedCredential is IssuedCredential.Deferred)
                                     issuedCredential
                                 }
@@ -265,7 +265,7 @@ class IssuanceDeferredRequestTest {
 
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
-                                    val issuedCredential = secondSubmittedRequest.response.credentials[0]
+                                    val issuedCredential = secondSubmittedRequest.credentials[0]
                                     require(issuedCredential is IssuedCredential.Deferred)
                                     issuedCredential
                                 }

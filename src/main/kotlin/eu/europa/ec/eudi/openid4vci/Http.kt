@@ -22,7 +22,7 @@ import java.net.URL
  * An abstraction of an HTTP Get operation
  * to obtain [R]
  */
-fun interface HttpGet<out R> {
+internal fun interface HttpGet<out R> {
     suspend fun get(url: URL): R
 }
 
@@ -30,14 +30,14 @@ fun interface HttpGet<out R> {
  * An abstraction of an HTTP Post operation with application/x-www-form-urlencoded media type
  * parsing response as [R].
  */
-fun interface HttpFormPost<out R> {
+internal fun interface HttpFormPost<out R> {
     suspend fun post(url: URL, formParameters: Map<String, String>): R
 }
 
 /**
  * An abstraction of an HTP Post operation of payload [T] parsing response as [R].
  */
-fun interface HttpPost<in T, in R, out RESPONSE> {
+internal fun interface HttpPost<in T, in R, out RESPONSE> {
     suspend fun post(
         url: URL,
         headers: Map<String, String>,

@@ -94,7 +94,8 @@ sealed interface SubmittedRequest {
      * @param response The response from credential issuer
      */
     data class Success(
-        val response: CredentialIssuanceResponse,
+        val credentials: List<IssuedCredential>,
+        val cNonce: CNonce?,
     ) : SubmittedRequest
 
     /**

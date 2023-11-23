@@ -269,27 +269,17 @@ internal class DefaultIssuer(
     ): SubmittedRequest =
         when (val credentialRequest = issuanceRequestSupplier()) {
             is CredentialIssuanceRequest.SingleCredential -> {
-                issuanceRequester.placeIssuanceRequest(token, credentialRequest)
-                    .fold(
-                        onSuccess = {
-                            SubmittedRequest.Success(it)
-                        },
-                        onFailure = {
-                            handleIssuanceFailure(it)
-                        },
-                    )
+                issuanceRequester.placeIssuanceRequest(token, credentialRequest).fold(
+                    onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
+                    onFailure = { handleIssuanceFailure(it) },
+                )
             }
 
             is CredentialIssuanceRequest.BatchCredentials -> {
-                issuanceRequester.placeBatchIssuanceRequest(token, credentialRequest)
-                    .fold(
-                        onSuccess = {
-                            SubmittedRequest.Success(it)
-                        },
-                        onFailure = {
-                            handleIssuanceFailure(it)
-                        },
-                    )
+                issuanceRequester.placeBatchIssuanceRequest(token, credentialRequest).fold(
+                    onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
+                    onFailure = { handleIssuanceFailure(it) },
+                )
             }
         }
 

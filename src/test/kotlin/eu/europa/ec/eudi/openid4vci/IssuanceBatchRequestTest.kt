@@ -161,7 +161,7 @@ class IssuanceBatchRequestTest {
                             }
 
                             assertTrue("Second attempt should be successful") {
-                                (response as SubmittedRequest.Success).response.credentials.all {
+                                (response as SubmittedRequest.Success).credentials.all {
                                     it is IssuedCredential.Issued &&
                                         it.format in listOf(MsoMdoc.FORMAT, SdJwtVc.FORMAT)
                                 }
