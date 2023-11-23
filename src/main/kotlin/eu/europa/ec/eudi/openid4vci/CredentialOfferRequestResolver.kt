@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialOfferRequestResolver
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +32,7 @@ data class CredentialOffer(
     val authorizationServerMetadata: CIAuthorizationServerMetadata,
     val credentials: List<CredentialMetadata>,
     val grants: Grants? = null,
-) : java.io.Serializable {
+) : Serializable {
     init {
         require(credentials.isNotEmpty()) { "credentials must not be empty" }
     }
@@ -62,19 +63,9 @@ value class CredentialIssuerId private constructor(val value: HttpsUrl) {
 }
 
 /**
- * A Credential being offered in a Credential Offer.
- */
-sealed interface CredentialMetadata : Serializable {
-
-    data class ByScope(val scope: Scope) : CredentialMetadata
-
-    sealed interface ByFormat : CredentialMetadata
-}
-
-/**
  * The Grant Types a Credential Issuer can process for a Credential Offer.
  */
-sealed interface Grants : java.io.Serializable {
+sealed interface Grants : Serializable {
 
     /**
      * Data for an Authorization Code Grant. [issuerState], if provided, must not be blank.
@@ -271,7 +262,11 @@ fun interface CredentialOfferRequestResolver {
          */
         operator fun invoke(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            httpGet: HttpGet<String>,
-        ): CredentialOfferRequestResolver = DefaultCredentialOfferRequestResolver(ioCoroutineDispatcher, httpGet)
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultCredentialOfferRequestResolver.HttpClientFactory,
+        ): CredentialOfferRequestResolver =
+            DefaultCredentialOfferRequestResolver(
+                ioCoroutineDispatcher = ioCoroutineDispatcher,
+                ktorHttpClientFactory = ktorHttpClientFactory,
+            )
     }
 }

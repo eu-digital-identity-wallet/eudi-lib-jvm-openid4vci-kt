@@ -23,30 +23,108 @@ import com.nimbusds.oauth2.sdk.id.State
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import com.nimbusds.oauth2.sdk.pkce.CodeVerifier
 import eu.europa.ec.eudi.openid4vci.*
+import io.ktor.client.call.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import java.net.URI
 import java.net.URLEncoder
-import com.nimbusds.oauth2.sdk.Scope as NimbusOauth2Scope
+
+/**
+ * Sealed hierarchy of possible responses to a Pushed Authorization Request.
+ */
+internal sealed interface PushedAuthorizationRequestResponse {
+
+    /**
+     * Successful request submission.
+     *
+     * @param requestURI A unique identifier of the authorization request.
+     * @param expiresIn Time to live of the authorization request.
+     */
+    @Serializable
+    data class Success(
+        @SerialName("request_uri") val requestURI: String,
+        @SerialName("expires_in") val expiresIn: Long = 5,
+    ) : PushedAuthorizationRequestResponse
+
+    /**
+     * Request failed
+     *
+     * @param error The error reported from authorization server.
+     * @param errorDescription A description of the error.
+     */
+    @Serializable
+    data class Failure(
+        @SerialName("error") val error: String,
+        @SerialName("error_description") val errorDescription: String? = null,
+    ) : PushedAuthorizationRequestResponse
+}
+
+/**
+ * Sealed hierarchy of possible responses to an Access Token request.
+ */
+internal sealed interface AccessTokenRequestResponse {
+
+    /**
+     * Successful request submission.
+     *
+     * @param accessToken The access token.
+     * @param expiresIn Token time to live.
+     * @param cNonce    c_nonce returned from token endpoint.
+     * @param cNonceExpiresIn c_nonce time to live.
+     */
+    @Serializable
+    data class Success(
+        @SerialName("access_token") val accessToken: String,
+        @SerialName("expires_in") val expiresIn: Long,
+        @SerialName("c_nonce") val cNonce: String? = null,
+        @SerialName("c_nonce_expires_in") val cNonceExpiresIn: Long? = null,
+    ) : AccessTokenRequestResponse
+
+    /**
+     * Request failed
+     *
+     * @param error The error reported from authorization server.
+     * @param errorDescription A description of the error.
+     */
+    @Serializable
+    data class Failure(
+        @SerialName("error") val error: String,
+        @SerialName("error_description") val errorDescription: String? = null,
+    ) : AccessTokenRequestResponse
+}
 
 /**
  * Default implementation of [IssuanceAuthorizer] interface.
  */
-internal class DefaultIssuanceAuthorizer(
-    val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    val authorizationServerMetadata: CIAuthorizationServerMetadata,
-    val config: OpenId4VCIConfig,
-    val postPar: HttpFormPost<PushedAuthorizationRequestResponse>,
-    val getAccessToken: HttpFormPost<AccessTokenRequestResponse>,
-) : IssuanceAuthorizer {
+internal class IssuanceAuthorizer(
+    private val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val authorizationServerMetadata: CIAuthorizationServerMetadata,
+    private val config: OpenId4VCIConfig,
+    private val ktorHttpClientFactory: KtorHttpClientFactory,
+) {
 
-    override suspend fun submitPushedAuthorizationRequest(
+    /**
+     * Submit Pushed Authorization Request for authorizing an issuance request.
+     *
+     * @param scopes    The scopes of the authorization request.
+     * @param state     The oauth2 specific 'state' request parameter.
+     * @param issuerState   The state passed from credential issuer during the negotiation phase of the issuance.
+     * @return The result of the request as a pair of the PKCE verifier used during request and the authorization code
+     *      url that caller will need to follow in order to retrieve the authorization code.
+     *
+     * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
+     * @see <a href="https://www.rfc-editor.org/rfc/rfc9126.html">RFC9126</a>
+     */
+    suspend fun submitPushedAuthorizationRequest(
         scopes: List<Scope>,
         state: String,
         issuerState: String?,
-    ): Result<Pair<PKCEVerifier, GetAuthorizationCodeURL>> = runCatching {
+    ): Result<Pair<PKCEVerifier, AuthorizationUrl>> = runCatching {
         require(scopes.isNotEmpty()) { "No scopes provided. Cannot submit par with no scopes." }
 
         val parEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
@@ -61,7 +139,7 @@ internal class DefaultIssuanceAuthorizer(
         ) {
             redirectionURI(config.authFlowRedirectionURI)
             codeChallenge(codeVerifier, CodeChallengeMethod.S256)
-            scope(NimbusOauth2Scope(*scopes.map { it.value }.toTypedArray()))
+            scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray()))
             state(State(state))
             issuerState?.let {
                 customParameter("issuer_state", issuerState)
@@ -71,10 +149,7 @@ internal class DefaultIssuanceAuthorizer(
 
         val pushedAuthorizationRequest = PushedAuthorizationRequest(parEndpoint, authzRequest)
 
-        val response =
-            withContext(coroutineDispatcher) {
-                postPar.post(parEndpoint.toURL(), pushedAuthorizationRequest.asFormPostParams())
-            }
+        val response = pushAuthorizationRequest(parEndpoint, pushedAuthorizationRequest)
 
         response.toPair(clientID, codeVerifier, state)
     }
@@ -89,16 +164,16 @@ internal class DefaultIssuanceAuthorizer(
                 with(
                     URLBuilder(Url(authorizationServerMetadata.authorizationEndpointURI.toString())),
                 ) {
-                    parameters.append(GetAuthorizationCodeURL.PARAM_CLIENT_ID, clientID.value)
-                    parameters.append(GetAuthorizationCodeURL.PARAM_STATE, state)
+                    parameters.append(AuthorizationUrl.PARAM_CLIENT_ID, clientID.value)
+                    parameters.append(AuthorizationUrl.PARAM_STATE, state)
                     parameters.append(
-                        GetAuthorizationCodeURL.PARAM_REQUEST_URI,
+                        AuthorizationUrl.PARAM_REQUEST_URI,
                         requestURI,
                     )
                     build()
                 }
 
-            val getAuthorizationCodeURL = GetAuthorizationCodeURL(httpsUrl.toString())
+            val getAuthorizationCodeURL = AuthorizationUrl(httpsUrl.toString())
 
             Pair(
                 PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString()),
@@ -113,7 +188,16 @@ internal class DefaultIssuanceAuthorizer(
             )
     }
 
-    override suspend fun requestAccessTokenAuthFlow(
+    /**
+     * Submits a request for access token in authorization server's token endpoint passing parameters specific to the
+     * authorization code flow
+     *
+     * @param authorizationCode The authorization code generated from authorization server.
+     * @param codeVerifier  The code verifier that was used when submitting the Pushed Authorization Request.
+     * @return The result of the request as a pair of the access token and the optional c_nonce information returned
+     *      from token endpoint.
+     */
+    suspend fun requestAccessTokenAuthFlow(
         authorizationCode: String,
         codeVerifier: String,
     ): Result<Pair<String, CNonce?>> = runCatching {
@@ -124,13 +208,7 @@ internal class DefaultIssuanceAuthorizer(
             codeVerifier,
         )
 
-        val response =
-            withContext(coroutineDispatcher) {
-                getAccessToken.post(
-                    authorizationServerMetadata.tokenEndpointURI.toURL(),
-                    params,
-                )
-            }
+        val response = requestAccessToken(params)
 
         when (response) {
             is AccessTokenRequestResponse.Success -> {
@@ -146,17 +224,21 @@ internal class DefaultIssuanceAuthorizer(
         }
     }
 
-    override suspend fun requestAccessTokenPreAuthFlow(
+    /**
+     * Submits a request for access token in authorization server's token endpoint passing parameters specific to the
+     * pre-authorization code flow
+     *
+     * @param preAuthorizedCode The pre-authorization code.
+     * @param pin  Extra pin code to be passed if specified as required in the credential offer.
+     * @return The result of the request as a pair of the access token and the optional c_nonce information returned
+     *      from token endpoint.
+     */
+    suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: String,
         pin: String?,
     ): Result<Pair<String, CNonce?>> = runCatching {
         val params = TokenEndpointForm.PreAuthCodeFlow.of(preAuthorizedCode, pin)
-        val response = withContext(coroutineDispatcher) {
-            getAccessToken.post(
-                authorizationServerMetadata.tokenEndpointURI.toURL(),
-                params,
-            )
-        }
+        val response = requestAccessToken(params)
 
         when (response) {
             is AccessTokenRequestResponse.Success -> {
@@ -172,13 +254,47 @@ internal class DefaultIssuanceAuthorizer(
         }
     }
 
+    private suspend fun requestAccessToken(params: Map<String, String>): AccessTokenRequestResponse =
+        withContext(coroutineDispatcher) {
+            ktorHttpClientFactory().use { client ->
+                val url = authorizationServerMetadata.tokenEndpointURI.toURL()
+                val response = client.submitForm(
+                    url = url.toString(),
+                    formParameters = Parameters.build {
+                        params.entries.forEach { (k, v) -> append(k, v) }
+                    },
+                )
+                if (response.status.isSuccess()) response.body<AccessTokenRequestResponse.Success>()
+                else response.body<AccessTokenRequestResponse.Failure>()
+            }
+        }
+
+    private suspend fun pushAuthorizationRequest(
+        parEndpoint: URI,
+        pushedAuthorizationRequest: PushedAuthorizationRequest,
+    ): PushedAuthorizationRequestResponse =
+        withContext(coroutineDispatcher) {
+            ktorHttpClientFactory().use { client ->
+                val url = parEndpoint.toURL()
+                val formParameters = pushedAuthorizationRequest.asFormPostParams()
+                val response = client.submitForm(
+                    url = url.toString(),
+                    formParameters = Parameters.build {
+                        formParameters.entries.forEach { (k, v) -> append(k, v) }
+                    },
+                )
+                if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
+                else response.body<PushedAuthorizationRequestResponse.Failure>()
+            }
+        }
+
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =
         this.authorizationRequest.toParameters()
             .mapValues { (_, value) -> value[0] }
             .toMap()
 }
 
-sealed interface TokenEndpointForm {
+internal sealed interface TokenEndpointForm {
 
     class AuthCodeFlow : TokenEndpointForm {
         companion object {

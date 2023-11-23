@@ -16,20 +16,23 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
-import io.ktor.client.*
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
+import eu.europa.ec.eudi.openid4vci.internal.issuance.*
+import io.ktor.client.engine.mock.*
+import io.ktor.client.request.*
 import io.ktor.http.*
-import io.ktor.server.application.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
+import io.ktor.http.content.*
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import org.hamcrest.MatcherAssert
 import java.net.URI
 import java.util.*
-import kotlin.test.Test
-import kotlin.test.assertTrue
-import kotlin.test.fail
+import kotlin.test.*
 
 class IssuanceDeferredRequestTest {
+
+    val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
 
     val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
 
@@ -46,287 +49,265 @@ class IssuanceDeferredRequestTest {
     )
 
     @Test
-    fun `when issuer responds with invalid_transaction_id, response should be of type Errored`() {
-        issuanceTestBed(
-            { client ->
-                val (_, authorizedRequest, issuer) =
-                    authorizeRequestForCredentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt)
+    fun `when issuer responds with invalid_transaction_id, response should be of type Errored`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            singleIssuanceRequestMocker(
+                responseBuilder = {
+                    val textContent = it?.body as TextContent
+                    val issuanceRequest = asIssuanceRequest(textContent.text)
+                    respondToCredentialIssuanceRequest(this, issuanceRequest)
+                },
+            ),
+            deferredIssuanceRequestMocker(
+                responseBuilder = {
+                    respondToDeferredIssuanceRequest(this, credentialIsReady = true, transactionIdIsValid = false)
+                },
+            ),
+        )
+        val (_, authorizedRequest, issuer) =
+            authorizeRequestForCredentialOffer(
+                mockedKtorHttpClientFactory,
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
+            )
 
-                val bindingKey = BindingKey.Jwk(
-                    algorithm = JWSAlgorithm.RS256,
-                    jwk = KeyGenerator.randomRSASigningKey(2048),
-                )
+        val bindingKey = BindingKey.Jwk(
+            algorithm = JWSAlgorithm.RS256,
+            jwk = KeyGenerator.randomRSASigningKey(2048),
+        )
 
-                with(issuer) {
-                    when (authorizedRequest) {
-                        is AuthorizedRequest.NoProofRequired -> {
-                            val credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE))
-                            val submittedRequest =
-                                authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
-                            when (submittedRequest) {
-                                is SubmittedRequest.InvalidProof -> {
-                                    val proofRequired =
-                                        authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                                    val secondSubmittedRequest =
-                                        proofRequired.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
+        with(issuer) {
+            when (authorizedRequest) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    val credentialMetadata = CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE))
+                    val submittedRequest =
+                        authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
+                    when (submittedRequest) {
+                        is SubmittedRequest.InvalidProof -> {
+                            val proofRequired =
+                                authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                            val secondSubmittedRequest =
+                                proofRequired.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
 
-                                    val transactionId = when (secondSubmittedRequest) {
-                                        is SubmittedRequest.Success -> {
-                                            val result = secondSubmittedRequest.response.credentialResponses[0]
-                                            (result as CredentialIssuanceResponse.Result.Deferred).transactionId
-                                        }
-
-                                        else -> fail("Success response expected but was not")
-                                    }
-
-                                    val requestDeferredIssuance =
-                                        authorizedRequest.requestDeferredIssuance(transactionId)
-                                            .getOrThrow()
-
-                                    assertTrue("Expected response type Errored but was not") {
-                                        requestDeferredIssuance is DeferredCredentialIssuanceResponse.Errored
-                                    }
-
-                                    assertTrue("Expected interval but was not present") {
-                                        (requestDeferredIssuance as DeferredCredentialIssuanceResponse.Errored)
-                                            .error != "invalid_transaction_id"
-                                    }
+                            val deferred = when (secondSubmittedRequest) {
+                                is SubmittedRequest.Success -> {
+                                    val issuedCredential = secondSubmittedRequest.credentials[0]
+                                    require(issuedCredential is IssuedCredential.Deferred)
+                                    issuedCredential
                                 }
 
-                                is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
-                                is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
+                                else -> fail("Success response expected but was not")
+                            }
+
+                            val requestDeferredIssuance =
+                                authorizedRequest.queryForDeferredCredential(deferred)
+                                    .getOrThrow()
+
+                            assertTrue("Expected response type Errored but was not") {
+                                requestDeferredIssuance is DeferredCredentialQueryOutcome.Errored
+                            }
+
+                            assertTrue("Expected interval but was not present") {
+                                (requestDeferredIssuance as DeferredCredentialQueryOutcome.Errored)
+                                    .error != "invalid_transaction_id"
                             }
                         }
 
-                        is AuthorizedRequest.ProofRequired ->
-                            fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+                        is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
+                        is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
                     }
                 }
-            },
-            { call ->
-                val bodyStr = call.receive<String>()
 
-                val issuanceRequest = asIssuanceRequest(bodyStr)
-                val deferredIssuanceRequest = asDeferredIssuanceRequest(bodyStr)
-                if (issuanceRequest != null) {
-                    println(issuanceRequest)
-                    respondToCredentialIssuanceRequest(issuanceRequest, call)
-                } else if (deferredIssuanceRequest != null) {
-                    println(deferredIssuanceRequest)
-                    respondToDeferredIssuanceRequest(call, true, false)
-                } else {
-                    call.respondText(
-                        """
-                            {
-                              "error": "invalid_request"                              
-                            }
-                        """.trimIndent(),
-                        ContentType.parse("application/json"),
-                        HttpStatusCode.BadRequest,
-                    )
-                }
-            },
-        )
+                is AuthorizedRequest.ProofRequired ->
+                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+            }
+        }
     }
 
     @Test
-    fun `when issuer responds with issuance_pending, response should be of type IssuancePending`() {
-        issuanceTestBed(
-            { client ->
-                val (_, authorizedRequest, issuer) =
-                    authorizeRequestForCredentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt)
+    fun `when issuer responds with issuance_pending, response should be of type IssuancePending`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            singleIssuanceRequestMocker(
+                responseBuilder = {
+                    val textContent = it?.body as TextContent
+                    val issuanceRequest = asIssuanceRequest(textContent.text)
+                    respondToCredentialIssuanceRequest(this, issuanceRequest)
+                },
+            ),
+            deferredIssuanceRequestMocker(
+                responseBuilder = {
+                    respondToDeferredIssuanceRequest(this, false)
+                },
+            ),
+        )
 
-                val bindingKey = BindingKey.Jwk(
-                    algorithm = JWSAlgorithm.RS256,
-                    jwk = KeyGenerator.randomRSASigningKey(2048),
-                )
+        val (_, authorizedRequest, issuer) =
+            authorizeRequestForCredentialOffer(
+                mockedKtorHttpClientFactory,
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
+            )
 
-                with(issuer) {
-                    when (authorizedRequest) {
-                        is AuthorizedRequest.NoProofRequired -> {
-                            val credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE))
-                            val submittedRequest =
-                                authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
-                            when (submittedRequest) {
-                                is SubmittedRequest.InvalidProof -> {
-                                    val proofRequired =
-                                        authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                                    val secondSubmittedRequest =
-                                        proofRequired.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
+        val bindingKey = BindingKey.Jwk(
+            algorithm = JWSAlgorithm.RS256,
+            jwk = KeyGenerator.randomRSASigningKey(2048),
+        )
 
-                                    val transactionId = when (secondSubmittedRequest) {
-                                        is SubmittedRequest.Success -> {
-                                            val result = secondSubmittedRequest.response.credentialResponses[0]
-                                            (result as CredentialIssuanceResponse.Result.Deferred).transactionId
-                                        }
+        with(issuer) {
+            when (authorizedRequest) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    val credentialMetadata = CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE))
+                    val submittedRequest =
+                        authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
+                    when (submittedRequest) {
+                        is SubmittedRequest.InvalidProof -> {
+                            val proofRequired =
+                                authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                            val secondSubmittedRequest =
+                                proofRequired.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
 
-                                        else -> fail("Success response expected but was not")
-                                    }
-
-                                    val requestDeferredIssuance =
-                                        authorizedRequest.requestDeferredIssuance(transactionId)
-                                            .getOrThrow()
-
-                                    assertTrue("Expected response type IssuancePending but was not") {
-                                        requestDeferredIssuance is DeferredCredentialIssuanceResponse.IssuancePending
-                                    }
-
-                                    assertTrue("Expected interval but was not present") {
-                                        (requestDeferredIssuance as DeferredCredentialIssuanceResponse.IssuancePending)
-                                            .transactionId.interval != null
-                                    }
+                            val deferred = when (secondSubmittedRequest) {
+                                is SubmittedRequest.Success -> {
+                                    val issuedCredential = secondSubmittedRequest.credentials[0]
+                                    require(issuedCredential is IssuedCredential.Deferred)
+                                    issuedCredential
                                 }
 
-                                is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
-                                is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
+                                else -> fail("Success response expected but was not")
                             }
+
+                            val requestDeferredIssuance =
+                                authorizedRequest.queryForDeferredCredential(deferred)
+                                    .getOrThrow()
+
+                            assertIs<DeferredCredentialQueryOutcome.IssuancePending>(requestDeferredIssuance)
+                            assertNotNull(requestDeferredIssuance.interval) { "Expected interval but was not present" }
                         }
 
-                        is AuthorizedRequest.ProofRequired ->
-                            fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+                        is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
+                        is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
                     }
                 }
-            },
-            { call ->
-                val bodyStr = call.receive<String>()
 
-                val issuanceRequest = asIssuanceRequest(bodyStr)
-                val deferredIssuanceRequest = asDeferredIssuanceRequest(bodyStr)
-                if (issuanceRequest != null) {
-                    println(issuanceRequest)
-                    respondToCredentialIssuanceRequest(issuanceRequest, call)
-                } else if (deferredIssuanceRequest != null) {
-                    println(deferredIssuanceRequest)
-                    respondToDeferredIssuanceRequest(call, false)
-                } else {
-                    call.respondText(
-                        """
-                            {
-                              "error": "invalid_request"                              
-                            }
-                        """.trimIndent(),
-                        ContentType.parse("application/json"),
-                        HttpStatusCode.BadRequest,
-                    )
-                }
-            },
-        )
+                is AuthorizedRequest.ProofRequired ->
+                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+            }
+        }
     }
 
     @Test
-    fun `when deferred request is valid, credential must be issued`() {
-        issuanceTestBed(
-            { client ->
+    fun `when deferred request is valid, credential must be issued`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            singleIssuanceRequestMocker(
+                responseBuilder = {
+                    val textContent = it?.body as TextContent
+                    val issuanceRequest = asIssuanceRequest(textContent.text)
+                    respondToCredentialIssuanceRequest(this, issuanceRequest)
+                },
+            ),
+            deferredIssuanceRequestMocker(
+                responseBuilder = {
+                    respondToDeferredIssuanceRequest(this, true)
+                },
+                requestValidator = {
+                    assertTrue("No Authorization header passed.") {
+                        it.headers.contains("Authorization")
+                    }
 
-                val (_, authorizedRequest, issuer) =
-                    authorizeRequestForCredentialOffer(client, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt)
+                    assertTrue("Authorization header malformed.") {
+                        it.headers.get("Authorization")?.contains("Bearer") ?: false
+                    }
+                    assertTrue("Content Type must be application/json") {
+                        it.body.contentType == ContentType.parse("application/json")
+                    }
+                    val textContent = it.body as TextContent
+                    val deferredIssuanceRequest = asDeferredIssuanceRequest(textContent.text)
+                    deferredIssuanceRequest?.let {
+                        assertTrue("No transaction id passed") {
+                            deferredIssuanceRequest.transactionId.isNotBlank()
+                        }
+                    }
+                },
+            ),
+        )
 
-                val bindingKey = BindingKey.Jwk(
-                    algorithm = JWSAlgorithm.RS256,
-                    jwk = KeyGenerator.randomRSASigningKey(2048),
-                )
+        val (_, authorizedRequest, issuer) =
+            authorizeRequestForCredentialOffer(
+                mockedKtorHttpClientFactory,
+                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
+            )
 
-                with(issuer) {
-                    when (authorizedRequest) {
-                        is AuthorizedRequest.NoProofRequired -> {
-                            val credentialMetadata = CredentialMetadata.ByScope(Scope.of(PID_SdJwtVC_SCOPE))
-                            val submittedRequest =
-                                authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
-                            when (submittedRequest) {
-                                is SubmittedRequest.InvalidProof -> {
-                                    val proofRequired =
-                                        authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                                    val secondSubmittedRequest =
-                                        proofRequired.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
+        val bindingKey = BindingKey.Jwk(
+            algorithm = JWSAlgorithm.RS256,
+            jwk = KeyGenerator.randomRSASigningKey(2048),
+        )
 
-                                    val transactionId = when (secondSubmittedRequest) {
-                                        is SubmittedRequest.Success -> {
-                                            val result = secondSubmittedRequest.response.credentialResponses[0]
-                                            (result as CredentialIssuanceResponse.Result.Deferred).transactionId
-                                        }
+        with(issuer) {
+            when (authorizedRequest) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    val credentialMetadata = CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE))
+                    val submittedRequest =
+                        authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
+                    when (submittedRequest) {
+                        is SubmittedRequest.InvalidProof -> {
+                            val proofRequired =
+                                authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                            val secondSubmittedRequest =
+                                proofRequired.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
 
-                                        else -> fail("Success response expected but was not")
-                                    }
-
-                                    val requestDeferredIssuance =
-                                        authorizedRequest.requestDeferredIssuance(transactionId)
-                                            .getOrThrow()
-
-                                    assertTrue("Expected response type Issued but was not") {
-                                        requestDeferredIssuance is DeferredCredentialIssuanceResponse.Issued
-                                    }
+                            val deferred = when (secondSubmittedRequest) {
+                                is SubmittedRequest.Success -> {
+                                    val issuedCredential = secondSubmittedRequest.credentials[0]
+                                    require(issuedCredential is IssuedCredential.Deferred)
+                                    issuedCredential
                                 }
 
-                                is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
-                                is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
+                                else -> fail("Success response expected but was not")
                             }
+
+                            val requestDeferredIssuance = authorizedRequest.queryForDeferredCredential(deferred)
+                                .getOrThrow()
+                            assertIs<DeferredCredentialQueryOutcome.Issued>(requestDeferredIssuance)
                         }
 
-                        is AuthorizedRequest.ProofRequired ->
-                            fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+                        is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
+                        is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
                     }
                 }
-            },
-            { call ->
-                MatcherAssert.assertThat(
-                    "No Authorization header passed .",
-                    call.request.headers["Authorization"] != null,
-                )
-                call.request.headers["Authorization"]?.let {
-                    MatcherAssert.assertThat(
-                        "No Authorization header passed .",
-                        it.contains("BEARER"),
-                    )
-                }
-                MatcherAssert.assertThat(
-                    "Content Type must be application/json",
-                    call.request.headers["Content-Type"] == "application/json",
-                )
 
-                val bodyStr = call.receive<String>()
-
-                val issuanceRequest = asIssuanceRequest(bodyStr)
-                val deferredIssuanceRequest = asDeferredIssuanceRequest(bodyStr)
-                if (issuanceRequest != null) {
-                    println(issuanceRequest)
-                    respondToCredentialIssuanceRequest(issuanceRequest, call)
-                } else if (deferredIssuanceRequest != null) {
-                    println(deferredIssuanceRequest)
-                    respondToDeferredIssuanceRequest(call, true)
-                    MatcherAssert.assertThat(
-                        "No transaction id passed",
-                        !deferredIssuanceRequest.transactionId.isBlank(),
-                    )
-                } else {
-                    call.respondText(
-                        """
-                            {
-                              "error": "invalid_request"                              
-                            }
-                        """.trimIndent(),
-                        ContentType.parse("application/json"),
-                        HttpStatusCode.BadRequest,
-                    )
-                }
-            },
-        )
+                is AuthorizedRequest.ProofRequired ->
+                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+            }
+        }
     }
 
-    private suspend fun respondToDeferredIssuanceRequest(
-        call: ApplicationCall,
+    private fun respondToDeferredIssuanceRequest(
+        call: MockRequestHandleScope,
         credentialIsReady: Boolean,
         transactionIdIsValid: Boolean = true,
-    ) {
+    ): HttpResponseData =
         if (credentialIsReady && transactionIdIsValid) {
-            call.respondText(
-                """
+            call.respond(
+                content = """
                     {
                       "format": "vc+sd-jwt",
                       "credential": "credential_content"
                     }
                 """.trimIndent(),
-                ContentType.parse("application/json"),
-                HttpStatusCode.OK,
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("application/json"),
+                ),
             )
         } else {
             val error =
@@ -336,26 +317,39 @@ class IssuanceDeferredRequestTest {
                     "issuance_pending"
                 }
 
-            call.respondText(
-                """
-                {
-                  "error": "$error",
-                  "interval": 5
-                }
+            call.respond(
+                content = """
+                    {
+                      "error": "$error",
+                      "interval": 5
+                    }
                 """.trimIndent(),
-                ContentType.parse("application/json"),
-                HttpStatusCode.BadRequest,
+                status = HttpStatusCode.BadRequest,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("application/json"),
+                ),
             )
         }
-    }
 
-    private suspend fun respondToCredentialIssuanceRequest(
-        issuanceRequest: SdJwtVcFormat.CredentialIssuanceRequestTO,
-        call: ApplicationCall,
-    ) {
-        if (issuanceRequest.proof != null) {
-            call.respondText(
-                """
+    private fun respondToCredentialIssuanceRequest(
+        call: MockRequestHandleScope,
+        issuanceRequest: SdJwtVc.Model.CredentialIssuanceRequestTO?,
+    ): HttpResponseData =
+        if (issuanceRequest == null) {
+            call.respond(
+                content = """
+                                {
+                                  "error": "invalid_request"                              
+                                }
+                """.trimIndent(),
+                status = HttpStatusCode.BadRequest,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("application/json"),
+                ),
+            )
+        } else if (issuanceRequest.proof != null) {
+            call.respond(
+                content = """
                     {
                       "format": "vc+sd-jwt",
                       "transaction_id": "1234565768122",
@@ -363,23 +357,26 @@ class IssuanceDeferredRequestTest {
                       "c_nonce_expires_in": 86400
                     }
                 """.trimIndent(),
-                ContentType.parse("application/json"),
-                HttpStatusCode.OK,
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("application/json"),
+                ),
             )
         } else {
-            call.respondText(
-                """
+            call.respond(
+                content = """
                     {
                         "error": "invalid_proof",
                         "c_nonce": "ERE%@^TGWYEYWEY",
                         "c_nonce_expires_in": 34
                     } 
                 """.trimIndent(),
-                ContentType.parse("application/json"),
-                HttpStatusCode.BadRequest,
+                status = HttpStatusCode.BadRequest,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("application/json"),
+                ),
             )
         }
-    }
 
     private fun asDeferredIssuanceRequest(bodyStr: String): DeferredIssuanceRequestTO? =
         try {
@@ -388,41 +385,33 @@ class IssuanceDeferredRequestTest {
             null
         }
 
-    private fun asIssuanceRequest(bodyStr: String): SdJwtVcFormat.CredentialIssuanceRequestTO? =
+    private fun asIssuanceRequest(bodyStr: String): SdJwtVc.Model.CredentialIssuanceRequestTO? =
         try {
-            Json.decodeFromString<CredentialIssuanceRequestTO>(bodyStr) as SdJwtVcFormat.CredentialIssuanceRequestTO
+            Json.decodeFromString<CredentialIssuanceRequestTO>(bodyStr) as SdJwtVc.Model.CredentialIssuanceRequestTO
         } catch (ex: Exception) {
             null
         }
 
     private suspend fun authorizeRequestForCredentialOffer(
-        client: HttpClient,
+        ktorHttpClientFactory: KtorHttpClientFactory,
         credentialOfferStr: String,
     ): Triple<CredentialOffer, AuthorizedRequest, Issuer> {
-        val offer = CredentialOfferRequestResolver(
-            httpGet = createGetASMetadata(client),
-        ).resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
+        val offer = CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
+            .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
             .getOrThrow()
 
         val issuer = Issuer.make(
-            IssuanceAuthorizer.make(
-                offer.authorizationServerMetadata,
-                vciWalletConfiguration,
-                createPostPar(client),
-                createGetAccessToken(client),
-            ),
-            IssuanceRequester.make(
-                issuerMetadata = offer.credentialIssuerMetadata,
-                postIssueRequest = createPostIssuance(client),
-                postDeferredIssueRequest = createPostDeferredIssuance(client),
-            ),
+            authorizationServerMetadata = offer.authorizationServerMetadata,
+            config = vciWalletConfiguration,
+            issuerMetadata = offer.credentialIssuerMetadata,
+            ktorHttpClientFactory = ktorHttpClientFactory,
         )
 
         val authorizedRequest = with(issuer) {
             val parRequested = issuer.pushAuthorizationCodeRequest(offer.credentials, null).getOrThrow()
             val authorizationCode = UUID.randomUUID().toString()
             parRequested
-                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                 .requestAccessToken().getOrThrow()
         }
         return Triple(offer, authorizedRequest, issuer)

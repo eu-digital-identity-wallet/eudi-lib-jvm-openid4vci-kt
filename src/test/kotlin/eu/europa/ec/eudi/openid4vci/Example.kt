@@ -16,9 +16,18 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import eu.europa.ec.eudi.openid4vci.internal.formats.*
+import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
+import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
+import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdDataIntegrity
+import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdSignedJwt
+import eu.europa.ec.eudi.openid4vci.internal.formats.W3CSignedJwt
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.apache.*
@@ -39,10 +48,11 @@ import java.net.URI
 import java.net.URL
 import java.util.*
 
-val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
-val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
-val OPENID_SCOPE = "openid"
+const val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
+
+const val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
+const val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
+const val OPENID_SCOPE = "openid"
 
 val SdJwtVC_CredentialOffer = """
     {
@@ -70,19 +80,25 @@ val config = OpenId4VCIConfig(
 )
 
 fun main(): Unit = runTest {
-    val bindingKey = BindingKey.Jwk(
-        algorithm = JWSAlgorithm.RS256,
-        jwk = KeyGenerator.randomRSASigningKey(2048),
+    val bindingKeys = mapOf(
+        PID_SdJwtVC_SCOPE to BindingKey.Jwk(
+            algorithm = JWSAlgorithm.RS256,
+            jwk = KeyGenerator.randomRSASigningKey(2048),
+        ),
+        PID_MsoMdoc_SCOPE to BindingKey.Jwk(
+            algorithm = JWSAlgorithm.ES256,
+            jwk = KeyGenerator.randomECSigningKey(Curve.P_256),
+        ),
     )
 
     val user = ActingUser("tneal", "password")
-    val wallet = Wallet.ofUser(user, bindingKey)
+    val wallet = Wallet.ofUser(user, bindingKeys)
 
-    WalletInitiatedIssuanceWithOffer(wallet)
-    WalletInitiatedIssuanceNoOffer(wallet)
+    walletInitiatedIssuanceWithOffer(wallet)
+    walletInitiatedIssuanceNoOffer(wallet)
 }
 
-private suspend fun WalletInitiatedIssuanceWithOffer(wallet: Wallet) {
+private suspend fun walletInitiatedIssuanceWithOffer(wallet: Wallet) {
     println("[[Scenario: Offer passed to wallet via url]] ")
 
     val coUrl = "https://localhost/pid-issuer/credentialoffer?credential_offer=$SdJwtVC_CredentialOffer"
@@ -92,12 +108,13 @@ private suspend fun WalletInitiatedIssuanceWithOffer(wallet: Wallet) {
     println("--> Issued credential : $credential \n")
 }
 
-private suspend fun WalletInitiatedIssuanceNoOffer(wallet: Wallet) {
-    println("[[Scenario: No offer passed, wallet initiates issuance by credential scopes]]")
+private suspend fun walletInitiatedIssuanceNoOffer(wallet: Wallet) {
+    println("[[Scenario: No offer passed, wallet initiates issuance by credential scopes: $PID_SdJwtVC_SCOPE, $PID_MsoMdoc_SCOPE]]")
+    val pidSdjwtVc = wallet.issueByScope(PID_SdJwtVC_SCOPE)
+    println("--> Issued PID in format $PID_SdJwtVC_SCOPE: $pidSdjwtVc \n")
 
-    val credential = wallet.issueByScope(PID_SdJwtVC_SCOPE)
-
-    println("--> Issued credential : $credential \n")
+    val pidMsoMdoc = wallet.issueByScope(PID_MsoMdoc_SCOPE)
+    println("--> Issued PID in format $PID_MsoMdoc_SCOPE: $pidMsoMdoc \n")
 }
 
 data class ActingUser(
@@ -107,37 +124,32 @@ data class ActingUser(
 
 private class Wallet(
     val actingUser: ActingUser,
-    val bindingKey: BindingKey,
+    val bindingKeys: Map<String, BindingKey>,
 ) {
 
     suspend fun issueByScope(scope: String): String {
         val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
         val issuerMetadata =
-            CredentialIssuerMetadataResolver.ktor(ktorHttpClientFactory = { httpClientFactory() })
+            CredentialIssuerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
                 .resolve(credentialIssuerIdentifier).getOrThrow()
 
         val authServerMetadata =
-            AuthorizationServerMetadataResolver.ktor(ktorHttpClientFactory = { httpClientFactory() })
+            AuthorizationServerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
                 .resolve(issuerMetadata.authorizationServer).getOrThrow()
 
         val issuer = Issuer.make(
-            IssuanceAuthorizer.ktor(
-                authorizationServerMetadata = authServerMetadata,
-                config = config,
-                ktorHttpClientFactory = { httpClientFactory() },
-            ),
-            IssuanceRequester.ktor(
-                issuerMetadata = issuerMetadata,
-                ktorHttpClientFactory = { httpClientFactory() },
-            ),
+            authorizationServerMetadata = authServerMetadata,
+            config = config,
+            ktorHttpClientFactory = ::httpClientFactory,
+            issuerMetadata = issuerMetadata,
         )
 
-        val credentialMetadata = CredentialMetadata.ByScope(Scope.of(scope))
-        val openId_scope = CredentialMetadata.ByScope(Scope.of(OPENID_SCOPE))
+        val credentialMetadata = CredentialMetadata.ByScope(Scope(scope))
+        val openIdScope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
 
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
-            listOf(credentialMetadata, openId_scope),
+            listOf(credentialMetadata, openIdScope),
             authServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
@@ -165,35 +177,25 @@ private class Wallet(
     }
 
     suspend fun issueByCredentialOfferUrl(coUrl: String): String {
-        val offer = httpClientFactory().use { client ->
-            val credentialOfferRequestResolver = CredentialOfferRequestResolver(
-                httpGet = { url -> client.get(url).body<String>() },
-            )
-            credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
-        }
-
+        val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory = ::httpClientFactory)
+        val offer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
         return issueByCredentialOffer(offer)
     }
 
     suspend fun issueByCredentialOffer(offer: CredentialOffer): String {
         val issuer = Issuer.make(
-            IssuanceAuthorizer.ktor(
-                authorizationServerMetadata = offer.authorizationServerMetadata,
-                config = config,
-                ktorHttpClientFactory = ::httpClientFactory,
-            ),
-            IssuanceRequester.ktor(
-                issuerMetadata = offer.credentialIssuerMetadata,
-                ktorHttpClientFactory = ::httpClientFactory,
-            ),
+            authorizationServerMetadata = offer.authorizationServerMetadata,
+            config = config,
+            issuerMetadata = offer.credentialIssuerMetadata,
+            ktorHttpClientFactory = ::httpClientFactory,
         )
 
-        val openId_scope = CredentialMetadata.ByScope(Scope.of(OPENID_SCOPE))
+        val openIdScope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
 
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
-            offer.credentials + openId_scope,
+            offer.credentials + openIdScope,
             offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
@@ -239,10 +241,10 @@ private class Wallet(
             println("--> Authorization code retrieved: $authorizationCode")
 
             val authorizedRequest = parPlaced
-                .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
+                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                 .requestAccessToken().getOrThrow()
 
-            println("--> Authorization code exchanged with access token : ${authorizedRequest.token.accessToken}")
+            println("--> Authorization code exchanged with access token : ${authorizedRequest.accessToken.accessToken}")
 
             authorizedRequest
         }
@@ -253,16 +255,18 @@ private class Wallet(
         credentialMetadata: CredentialMetadata,
     ): String {
         with(issuer) {
+            val scope = credentialMetadata.scope()
+            val bindingKey = bindingKeys[scope] ?: error("No binding key found for scope $scope")
             val requestOutcome =
                 authorized.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
-                    val result = requestOutcome.response.credentialResponses.get(0)
-                    when (result) {
-                        is CredentialIssuanceResponse.Result.Issued -> result.credential
-                        is CredentialIssuanceResponse.Result.Deferred -> {
-                            deferredCredentialUseCase(issuer, authorized, result.transactionId)
+                    val issuedCredential = requestOutcome.credentials.get(0)
+                    when (issuedCredential) {
+                        is IssuedCredential.Issued -> issuedCredential.credential
+                        is IssuedCredential.Deferred -> {
+                            deferredCredentialUseCase(issuer, authorized, issuedCredential)
                         }
                     }
                 }
@@ -278,18 +282,20 @@ private class Wallet(
     private suspend fun deferredCredentialUseCase(
         issuer: Issuer,
         authorized: AuthorizedRequest,
-        transactionId: TransactionId,
+        deferred: IssuedCredential.Deferred,
     ): String {
-        println("--> Got a deferred issuance response from server with transaction_id ${transactionId.value}. Retrying issuance...")
+        println(
+            "--> Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
+        )
         with(issuer) {
-            val deferredRequestResponse = authorized.requestDeferredIssuance(transactionId).getOrThrow()
-            return when (deferredRequestResponse) {
-                is DeferredCredentialIssuanceResponse.Issued -> deferredRequestResponse.credential
-                is DeferredCredentialIssuanceResponse.IssuancePending -> throw RuntimeException(
-                    "Credential not ready yet. Try after ${deferredRequestResponse.transactionId.interval}",
+            val outcome = authorized.queryForDeferredCredential(deferred).getOrThrow()
+            return when (outcome) {
+                is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
+                is DeferredCredentialQueryOutcome.IssuancePending -> throw RuntimeException(
+                    "Credential not ready yet. Try after ${outcome.interval}",
                 )
 
-                is DeferredCredentialIssuanceResponse.Errored -> throw RuntimeException(deferredRequestResponse.error)
+                is DeferredCredentialQueryOutcome.Errored -> throw RuntimeException(outcome.error)
             }
         }
     }
@@ -305,11 +311,11 @@ private class Wallet(
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
-                    val result = requestOutcome.response.credentialResponses[0]
-                    when (result) {
-                        is CredentialIssuanceResponse.Result.Issued -> result.credential
-                        is CredentialIssuanceResponse.Result.Deferred -> {
-                            deferredCredentialUseCase(issuer, noProofRequiredState, result.transactionId)
+                    val issuedCredential = requestOutcome.credentials[0]
+                    when (issuedCredential) {
+                        is IssuedCredential.Issued -> issuedCredential.credential
+                        is IssuedCredential.Deferred -> {
+                            deferredCredentialUseCase(issuer, noProofRequiredState, issuedCredential)
                         }
                     }
                 }
@@ -348,30 +354,23 @@ private class Wallet(
         }
 
     private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
-        httpClientFactory().use { client ->
+        return httpClientFactory().use { client ->
 
-            val loginUrl = HttpGet { url ->
-                runCatching {
-                    client.get(url).body<String>()
-                }
-            }.get(getAuthorizationCodeUrl).getOrThrow().extractASLoginUrl()
+            val loginUrl =
+                client.get(getAuthorizationCodeUrl).body<String>().extractASLoginUrl()
 
-            return HttpFormPost { url, formParameters ->
-                val response = client.submitForm(
-                    url = url.toString(),
-                    formParameters = Parameters.build {
-                        formParameters.entries.forEach { append(it.key, it.value) }
-                    },
-                )
-                val redirectLocation = response.headers.get("Location").toString()
-                URLBuilder(redirectLocation).parameters.get("code")
-            }.post(
-                loginUrl,
-                mapOf(
-                    "username" to actingUser.username,
-                    "password" to actingUser.password,
-                ),
+            val formParameters = mapOf(
+                "username" to actingUser.username,
+                "password" to actingUser.password,
             )
+            val response = client.submitForm(
+                url = loginUrl.toString(),
+                formParameters = Parameters.build {
+                    formParameters.entries.forEach { append(it.key, it.value) }
+                },
+            )
+            val redirectLocation = response.headers.get("Location").toString()
+            URLBuilder(redirectLocation).parameters.get("code")
         }
     }
 
@@ -382,10 +381,20 @@ private class Wallet(
     }
 
     companion object {
-        fun ofUser(actingUser: ActingUser, bindingKey: BindingKey.Jwk) =
-            Wallet(actingUser, bindingKey)
+        fun ofUser(actingUser: ActingUser, bindingKeys: Map<String, BindingKey.Jwk>) =
+            Wallet(actingUser, bindingKeys)
     }
 }
+
+private fun CredentialMetadata.scope(): String? =
+    when (this) {
+        is MsoMdoc.Model.CredentialMetadata -> scope
+        is SdJwtVc.Model.CredentialMetadata -> scope
+        is W3CJsonLdDataIntegrity.Model.CredentialMetadata -> scope
+        is W3CJsonLdSignedJwt.Model.CredentialMetadata -> scope
+        is W3CSignedJwt.Model.CredentialMetadata -> scope
+        is CredentialMetadata.ByScope -> scope.value
+    }
 
 object KeyGenerator {
 
@@ -395,8 +404,8 @@ object KeyGenerator {
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
 
-    fun randomRSAEncryptionKey(size: Int): RSAKey = RSAKeyGenerator(size)
-        .keyUse(KeyUse.ENCRYPTION)
+    fun randomECSigningKey(curve: Curve): ECKey = ECKeyGenerator(curve)
+        .keyUse(KeyUse.SIGNATURE)
         .keyID(UUID.randomUUID().toString())
         .issueTime(Date(System.currentTimeMillis()))
         .generate()

@@ -16,23 +16,72 @@
 package eu.europa.ec.eudi.openid4vci.internal.credentialoffer
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
+import eu.europa.ec.eudi.openid4vci.internal.formats.Formats
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.seconds
+
+/**
+ * The unvalidated data of a Credential Offer.
+ */
+@Serializable
+private data class CredentialOfferRequestTO(
+    @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
+    @SerialName("credentials") @Required val credentials: List<JsonElement>,
+    @SerialName("grants") val grants: GrantsTO? = null,
+)
+
+/**
+ * Data of the Grant Types the Credential Issuer is prepared to process for a Credential Offer.
+ */
+@Serializable
+private data class GrantsTO(
+    @SerialName("authorization_code") val authorizationCode: AuthorizationCodeTO? = null,
+    @SerialName("urn:ietf:params:oauth:grant-type:pre-authorized_code") val preAuthorizedCode: PreAuthorizedCodeTO? = null,
+)
+
+/**
+ * Data for an Authorization Code Grant Type.
+ */
+@Serializable
+private data class AuthorizationCodeTO(
+    @SerialName("issuer_state") val issuerState: String? = null,
+)
+
+/**
+ * Data for a Pre-Authorized Code Grant Type.
+ */
+@Serializable
+private data class PreAuthorizedCodeTO(
+    @SerialName("pre-authorized_code") @Required val preAuthorizedCode: String,
+    @SerialName("user_pin_required") val pinRequired: Boolean? = null,
+    @SerialName("interval") val interval: Long? = null,
+)
 
 /**
  * A default implementation for [CredentialOfferRequestResolver].
  */
 internal class DefaultCredentialOfferRequestResolver(
-    private val ioCoroutineDispatcher: CoroutineDispatcher,
-    private val httpGet: HttpGet<String>,
+    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ktorHttpClientFactory: KtorHttpClientFactory = HttpClientFactory,
 ) : CredentialOfferRequestResolver {
 
-    private val credentialIssuerMetadataResolver = CredentialIssuerMetadataResolver(ioCoroutineDispatcher, httpGet)
+    private val credentialIssuerMetadataResolver =
+        CredentialIssuerMetadataResolver(ioCoroutineDispatcher, ktorHttpClientFactory)
     private val authorizationServerMetadataResolver =
-        AuthorizationServerMetadataResolver(ioCoroutineDispatcher, httpGet)
+        AuthorizationServerMetadataResolver(ioCoroutineDispatcher, ktorHttpClientFactory)
 
     override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> =
         runCatching {
@@ -41,7 +90,9 @@ internal class DefaultCredentialOfferRequestResolver(
                 is CredentialOfferRequest.PassByReference ->
                     withContext(ioCoroutineDispatcher + CoroutineName("credential-offer-request-object")) {
                         try {
-                            httpGet.get(request.value.value.toURL())
+                            ktorHttpClientFactory().use { client ->
+                                client.get(request.value.value.toURL()).body()
+                            }
                         } catch (t: Throwable) {
                             throw CredentialOfferRequestError.UnableToFetchCredentialOffer(t).toException()
                         }
@@ -83,6 +134,23 @@ internal class DefaultCredentialOfferRequestResolver(
         }
 
     companion object {
+
+        /**
+         * Factory which produces a [Ktor Http client][HttpClient]
+         * The actual engine will be peeked up by whatever
+         * it is available in classpath
+         *
+         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
+         */
+        val HttpClientFactory: KtorHttpClientFactory = {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json(
+                        json = Json { ignoreUnknownKeys = true },
+                    )
+                }
+            }
+        }
 
         /**
          * Tries to parse a [GrantsTO] to a [Grants] instance.
@@ -130,14 +198,14 @@ internal class DefaultCredentialOfferRequestResolver(
             credentialsSupported
                 .firstOrNull { it.scope == scope }
                 ?.let {
-                    CredentialMetadata.ByScope(Scope.of(scope))
+                    CredentialMetadata.ByScope(Scope(scope))
                 }
                 ?: throw IllegalArgumentException("Unknown scope '$scope")
 
         /**
-         * Converts this [JsonObject] to a [CredentialMetadata.ProfileSpecific] object.
+         * Converts this [JsonObject] to a [CredentialMetadata.ByFormat] object.
          *
-         * The resulting [CredentialMetadata.ProfileSpecific] must be supported by the Credential Issuer and be present in its [CredentialIssuerMetadata].
+         * The resulting [CredentialMetadata.ByFormat] must be supported by the Credential Issuer and be present in its [CredentialIssuerMetadata].
          */
         private fun JsonObject.toOfferedCredentialByProfile(metadata: CredentialIssuerMetadata): CredentialMetadata {
             val format =
@@ -150,19 +218,7 @@ internal class DefaultCredentialOfferRequestResolver(
                         }
                     }
 
-            return when (format) {
-                MsoMdocFormat.FORMAT -> MsoMdocFormat.matchSupportedAndToDomain(this, metadata)
-                W3CSignedJwtFormat.FORMAT -> W3CSignedJwtFormat.matchSupportedAndToDomain(this, metadata)
-                W3CJsonLdSignedJwtFormat.FORMAT -> W3CJsonLdSignedJwtFormat.matchSupportedAndToDomain(this, metadata)
-                W3CJsonLdDataIntegrityFormat.FORMAT -> W3CJsonLdDataIntegrityFormat.matchSupportedAndToDomain(
-                    this,
-                    metadata,
-                )
-
-                SdJwtVcFormat.FORMAT -> SdJwtVcFormat.matchSupportedAndToDomain(this, metadata)
-
-                else -> throw IllegalArgumentException("Unknown Credential format '$format'")
-            }
+            return Formats.matchSupportedCredentialByTypeAndMapToDomain(format, this, metadata)
         }
     }
 }

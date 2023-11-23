@@ -18,17 +18,12 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
+import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
 import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialIssuerMetadataResolver
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.ktor.KtorCredentialIssuerMetadataResolver
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 import java.io.Serializable
 import java.util.*
 
@@ -116,29 +111,6 @@ data class Claim(
         @kotlinx.serialization.Serializable(LocaleSerializer::class)
         @SerialName("locale") val locale: Locale? = null,
     ) : Serializable
-}
-
-internal object LocaleSerializer : KSerializer<Locale> {
-
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Locale", PrimitiveKind.STRING)
-
-    override fun deserialize(decoder: Decoder): Locale =
-        Locale.forLanguageTag(decoder.decodeString())
-
-    override fun serialize(encoder: Encoder, value: Locale) =
-        encoder.encodeString(value.toString())
-}
-
-/**
- * Credentials supported by an Issuer.
- */
-sealed interface CredentialSupported : Serializable {
-
-    val scope: String?
-    val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod>
-    val cryptographicSuitesSupported: List<String>
-    val proofTypesSupported: List<ProofType>
-    val display: List<Display>
 }
 
 /**
@@ -297,20 +269,13 @@ fun interface CredentialIssuerMetadataResolver {
 
         /**
          * Creates a new [CredentialIssuerMetadataResolver] instance.
-         *
-         * [httpGet] execution are dispatched on [ioCoroutineDispatcher].
          */
         operator fun invoke(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            httpGet: HttpGet<String>,
-        ): CredentialIssuerMetadataResolver = DefaultCredentialIssuerMetadataResolver(ioCoroutineDispatcher, httpGet)
-
-        fun ktor(
-            coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            ktorHttpClientFactory: KtorHttpClientFactory = KtorCredentialIssuerMetadataResolver.HttpClientFactory,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultCredentialIssuerMetadataResolver.HttpClientFactory,
         ): CredentialIssuerMetadataResolver =
-            KtorCredentialIssuerMetadataResolver(
-                coroutineDispatcher = coroutineDispatcher,
+            DefaultCredentialIssuerMetadataResolver(
+                coroutineDispatcher = ioCoroutineDispatcher,
                 ktorHttpClientFactory = ktorHttpClientFactory,
             )
     }

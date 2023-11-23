@@ -19,7 +19,6 @@ import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
@@ -35,7 +34,7 @@ internal fun match(url: URI, method: HttpMethod = HttpMethod.Get): HttpRequestDa
     { request -> request.url.toURI() == url && request.method == method }
 
 internal fun endsWith(endsWith: String, method: HttpMethod = HttpMethod.Get): HttpRequestDataMatcher =
-    { request -> request.url.encodedPath == endsWith && request.method == method }
+    { request -> request.url.encodedPath.endsWith(endsWith) && request.method == method }
 
 /**
  * Gets a [HttpResponseDataBuilder] that returns the provided [resource]
@@ -58,45 +57,16 @@ internal fun jsonResponse(resource: String, status: HttpStatusCode = HttpStatusC
 internal data class RequestMocker(
     val requestMatcher: HttpRequestDataMatcher,
     val responseBuilder: HttpResponseDataBuilder,
-)
-
-internal data class RequestMockerValidator(
-    val requestMatcher: HttpRequestDataMatcher,
-    val responseBuilder: HttpResponseDataBuilder,
-    val requestValidator: (request: HttpRequestData) -> Unit,
+    val requestValidator: (request: HttpRequestData) -> Unit = {},
 )
 
 /**
- * Sets up a [MockEngine] using the provided [mocks] and invokes the provided [action].
- * The [HttpGet] implementation provided to [action] is based on the [MockEngine] that was set up.
- * [verifier] can be used to verify the requests that have been performed using the [MockEngine].
+ * Factory method to create mocked http clients. Http clients behavior is based on the passed [requestMockers].
  */
-internal suspend fun mockEngine(
-    vararg mocks: RequestMocker,
-    verifier: (List<HttpRequestData>) -> Unit = {},
-    action: suspend (HttpGet<String>) -> Unit,
-) {
-    MockEngine { request ->
-        mocks
-            .firstOrNull { it.requestMatcher(request) }
-            ?.responseBuilder
-            ?.invoke(this, null)
-            ?: respondError(HttpStatusCode.NotFound)
-    }.use { mockEngine ->
-        HttpClient(mockEngine) {
-            install(ContentNegotiation) {
-                json()
-            }
-            expectSuccess = true
-        }.use { httpClient ->
-            val httpGet = HttpGet { httpClient.get(it).bodyAsText() }
-            action(httpGet)
-            verifier(mockEngine.requestHistory)
-        }
-    }
-}
-
-internal fun mockedKtorHttpClientFactory(requestMockers: List<RequestMockerValidator>): KtorHttpClientFactory = {
+internal fun mockedKtorHttpClientFactory(
+    vararg requestMockers: RequestMocker,
+    expectSuccessOnly: Boolean = false,
+): KtorHttpClientFactory = {
     HttpClient(MockEngine) {
         engine {
             addHandler { request ->
@@ -114,5 +84,6 @@ internal fun mockedKtorHttpClientFactory(requestMockers: List<RequestMockerValid
                 json = Json { ignoreUnknownKeys = true },
             )
         }
+        expectSuccess = expectSuccessOnly
     }
 }
