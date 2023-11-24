@@ -15,7 +15,7 @@
 ## Overview
 
 This is a Kotlin library, targeting JVM, that supports 
-the [OpenId4VCI (draft 14)](https://openid.bitbucket.io/connect/openid-4-verifiable-credential-issuance-1_0.html) protocol.
+the [OpenId4VCI (draft 12)](https://openid.bitbucket.io/connect/openid-4-verifiable-credential-issuance-1_0.html) protocol.
 In particular, the library focuses on the wallet's role in the protocol to:
 - Resolve credential issuer metadata 
 - Resolve metadata of the authorization server protecting issuance services
@@ -52,12 +52,9 @@ To obtain the credential issuers metadata use [CredentialIssuerMetadataResolver]
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
-val credentialIssuerIdentifier = 
-    CredentialIssuerId("https://....").getOrThrow() // credential issuer id is an https url with no query or fragment components
-val resolver = 
-    CredentialIssuerMetadataResolver.ktor() // get a ktor based implementation of the CredentialIssuerMetadataResolver interface 
-val metadata: CredentialIssuerMetadata = 
-    resolver.resolve(credentialIssuerIdentifier).getOrThrow()  // fetch and parse credential issuer metadata
+val credentialIssuerIdentifier = CredentialIssuerId("https://....").getOrThrow() // credential issuer id is a https url with no query or fragment components
+val resolver = CredentialIssuerMetadataResolver() // get a default implementation of the CredentialIssuerMetadataResolver interface 
+val metadata: CredentialIssuerMetadata = resolver.resolve(credentialIssuerIdentifier).getOrThrow()  // fetch and parse credential issuer metadata
 ```
 In case of metadata parsing failure a `Result.failure()` will be returned to caller wrapping the exception thrown while parsing metadata.
 
@@ -67,9 +64,8 @@ To obtain the authorization server's  metadata use [AuthorizationServerMetadataR
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
-val resolver = AuthorizationServerMetadataResolver.ktor() // get a ktor based implementation of the AuthorizationServerMetadataResolver interface
-val metadata: CIAuthorizationServerMetadata = 
-    resolver.resolve(HttpsUrl("https://...")).getOrThrow() // fetch and parse authorization server metadata
+val resolver = AuthorizationServerMetadataResolver() // get a default implementation of the AuthorizationServerMetadataResolver interface
+val metadata: CIAuthorizationServerMetadata = resolver.resolve(HttpsUrl("https://...")).getOrThrow() // fetch and parse authorization server metadata
 ```
 
 ### Resolve a credential offer presented by issuer
@@ -81,15 +77,8 @@ Given a credential offer url use [CredentialOfferRequestResolver](src/main/kotli
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
-val credentialOfferRequestResolver = CredentialOfferRequestResolver(
-    httpGet = { url ->
-        runCatching {
-            client.get(url).body<String>()
-        }
-    },
-)
-val credentialOffer: CredentialOffer =
-    credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
+val credentialOfferRequestResolver = CredentialOfferRequestResolver()
+val credentialOffer: CredentialOffer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
 ```
 
 ### Credential Issuance
@@ -146,45 +135,30 @@ stateDiagram-v2
 ```
 
 
-[Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuance.kt) the following way to validate and resolve it to [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) component is the component that facilitates the authorization and submission of a credential issuance request (batch or single)
+[Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) the following way to validate and resolve it to [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) component is the component that facilitates the authorization and submission of a credential issuance request (batch or single)
 As depicted from the below diagram it is consisted of two sub-components:
 - **IssuanceAuthorizer**: A component responsible for all interactions with an authorization server to authorize a request for credential(s) issuance.
 - **IssuerRequester**: A component responsible for all interactions with credential issuer for submitting credential issuance requests.
 
 #### Initialize an Issuer
 
-The Issuer interface provides two factory methods to construct an issuer component
+The Issuer interface provides a factory method to construct an issuer component. 
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
-// an Issuer component providing implementation of http calls 
-val issuer = 
+val issuer =  
     Issuer.make(
-        IssuanceAuthorizer.make(
-            authorizationServerMetadata, // read-only authorization server metadata.
-            openId4VCIConfig, // configuration attributes
-            postPar, // implementation of the http POST that submits the Pushed Authorization Request
-            getAccessToken // implementation of the http POST that submits the request to get the access token
-        ),
-        IssuanceRequester.make(
-            issuerMetadata, // credential issuer's metadata
-            postIssueRequest // implementation of the http POST that submits issuance requests
-        )
+        authorizationServerMetadata, // authorization server metadata.
+        issuerMetadata, // credential issuer's metadata
+        openId4VCIConfig, // configuration attributes    
+        responseEncryptionSpecFactory // OPTIONAL, factory method to generate the expected issuer's encrypted response, if issuer enforces encrypted responses
     )
-    
-// an Issuer based on ktor 
-val issuerKtor =  
-    Issuer.ktor(
-        authorizationServerMetadata, // authorization server metadata
-        issuerMetadata,  // credential issuer metadata
-        openId4VCIConfig // configuration attributes 
-    )  
 ```
 
 #### Authorize request via Authorization Code Flow
 
-Given an `issuer` use authorization code flow to authorize an issuance request     
+Given an `issuer` use [Authorization Code Flow](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-3.4) to authorize an issuance request.     
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
@@ -200,6 +174,8 @@ with(issuer) {
 ```
 
 #### Authorize request via Pre-Authorization Code Flow
+
+Given an `issuer` use [Pre-Authorization Code Flow](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-3.5) to authorize an issuance request.
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
@@ -219,7 +195,7 @@ import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {
     val submittedRequest =
-        authorizedRequest.requestSingle(credentialMetadata, claimSet, bindingKey, issuanceResponseEncryption).getOrThrow()
+        authorizedRequest.requestSingle(credentialMetadata, claimSet, bindingKey).getOrThrow()
 
     when (submittedRequest) {
         is SubmittedRequest.Success -> {
@@ -243,7 +219,7 @@ Given an `authorizedRequest` and in the context of an `issuer` a batch credentia
 import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {    
-    val submittedRequest = authorizedRequest.requestBatch(credentialMetadata, issuanceResponseEncryption).getOrThrow()
+    val submittedRequest = authorizedRequest.requestBatch(credentialMetadata).getOrThrow()
 
     when (requestOutcome) {
         is SubmittedRequest.Success -> {
