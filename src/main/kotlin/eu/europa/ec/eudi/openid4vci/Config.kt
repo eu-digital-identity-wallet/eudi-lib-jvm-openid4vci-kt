@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.jwk.Curve
 import java.net.URI
 
 typealias ClientId = String
@@ -28,4 +29,10 @@ typealias ClientId = String
 data class OpenId4VCIConfig(
     val clientId: ClientId,
     val authFlowRedirectionURI: URI,
+    val keyGenerationConfig: KeyGenerationConfig,
+)
+
+data class KeyGenerationConfig(
+    val ecKeyCurve: Curve,
+    val rcaKeySize: Int,
 )

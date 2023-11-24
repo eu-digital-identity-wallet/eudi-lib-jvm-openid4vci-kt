@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialOfferRequestResolver
+import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialOfferRequestResolver
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher

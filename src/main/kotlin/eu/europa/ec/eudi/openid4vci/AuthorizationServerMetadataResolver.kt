@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultAuthorizationServerMetadataResolver
+import eu.europa.ec.eudi.openid4vci.internal.DefaultAuthorizationServerMetadataResolver
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 

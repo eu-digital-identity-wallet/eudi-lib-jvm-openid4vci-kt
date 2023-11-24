@@ -17,11 +17,6 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.KeyUse
-import com.nimbusds.jose.jwk.RSAKey
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator
-import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
 import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
@@ -46,38 +41,23 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.FormElement
 import java.net.URI
 import java.net.URL
-import java.util.*
 
 const val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
+val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
 
 const val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
 const val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
 const val OPENID_SCOPE = "openid"
 
-val SdJwtVC_CredentialOffer = """
+val credentialOffer = """
     {
       "credential_issuer": "$CredentialIssuer_URL",
-      "credentials": [ "$PID_SdJwtVC_SCOPE" ],
+      "credentials": [ "$PID_SdJwtVC_SCOPE", "$PID_MsoMdoc_SCOPE" ],
       "grants": {
         "authorization_code": {}
       }
     }
 """.trimIndent()
-
-val MsoMdoc_CredentialOffer = """
-    {
-      "credential_issuer": "$CredentialIssuer_URL",
-      "grants": {
-        "authorization_code": {}
-      },
-      "credentials": [ "$PID_MsoMdoc_SCOPE" ]
-    }
-""".trimIndent()
-
-val config = OpenId4VCIConfig(
-    clientId = "wallet-dev",
-    authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
-)
 
 fun main(): Unit = runTest {
     val bindingKeys = mapOf(
@@ -91,8 +71,14 @@ fun main(): Unit = runTest {
         ),
     )
 
+    val config = OpenId4VCIConfig(
+        clientId = "wallet-dev",
+        authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
+        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
+    )
+
     val user = ActingUser("tneal", "password")
-    val wallet = Wallet.ofUser(user, bindingKeys)
+    val wallet = Wallet.ofUser(user, bindingKeys, config)
 
     walletInitiatedIssuanceWithOffer(wallet)
     walletInitiatedIssuanceNoOffer(wallet)
@@ -101,11 +87,14 @@ fun main(): Unit = runTest {
 private suspend fun walletInitiatedIssuanceWithOffer(wallet: Wallet) {
     println("[[Scenario: Offer passed to wallet via url]] ")
 
-    val coUrl = "https://localhost/pid-issuer/credentialoffer?credential_offer=$SdJwtVC_CredentialOffer"
+    val offerUrl = "https://localhost/pid-issuer/credentialoffer?credential_offer=$credentialOffer"
+    val credentials = wallet.issueByCredentialOfferUrl(offerUrl)
 
-    val credential = wallet.issueByCredentialOfferUrl(coUrl)
-
-    println("--> Issued credential : $credential \n")
+    println("--> Issued credentials :")
+    credentials.onEach { (scope, crednetial) ->
+        println("\t [$scope] : $crednetial")
+    }
+    println()
 }
 
 private suspend fun walletInitiatedIssuanceNoOffer(wallet: Wallet) {
@@ -125,25 +114,11 @@ data class ActingUser(
 private class Wallet(
     val actingUser: ActingUser,
     val bindingKeys: Map<String, BindingKey>,
+    val config: OpenId4VCIConfig,
 ) {
 
     suspend fun issueByScope(scope: String): String {
-        val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
-        val issuerMetadata =
-            CredentialIssuerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
-                .resolve(credentialIssuerIdentifier).getOrThrow()
-
-        val authServerMetadata =
-            AuthorizationServerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
-                .resolve(issuerMetadata.authorizationServer).getOrThrow()
-
-        val issuer = Issuer.make(
-            authorizationServerMetadata = authServerMetadata,
-            config = config,
-            ktorHttpClientFactory = ::httpClientFactory,
-            issuerMetadata = issuerMetadata,
-        )
-
+        val (authServerMetadata, issuer) = buildIssuer(credentialIssuerIdentifier, config)
         val credentialMetadata = CredentialMetadata.ByScope(Scope(scope))
         val openIdScope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
 
@@ -156,33 +131,23 @@ private class Wallet(
         // Authorize with auth code flow
         val outcome =
             when (authorizedRequest) {
-                is AuthorizedRequest.NoProofRequired -> {
-                    noProofRequiredSubmissionUseCase(
-                        issuer,
-                        authorizedRequest,
-                        credentialMetadata,
-                    )
-                }
+                is AuthorizedRequest.NoProofRequired ->
+                    noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialMetadata)
 
-                is AuthorizedRequest.ProofRequired -> {
-                    proofRequiredSubmissionUseCase(
-                        issuer,
-                        authorizedRequest,
-                        credentialMetadata,
-                    )
-                }
+                is AuthorizedRequest.ProofRequired ->
+                    proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialMetadata)
             }
 
         return outcome
     }
 
-    suspend fun issueByCredentialOfferUrl(coUrl: String): String {
+    suspend fun issueByCredentialOfferUrl(coUrl: String): List<Pair<String?, String>> {
         val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory = ::httpClientFactory)
         val offer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
         return issueByCredentialOffer(offer)
     }
 
-    suspend fun issueByCredentialOffer(offer: CredentialOffer): String {
+    suspend fun issueByCredentialOffer(offer: CredentialOffer): List<Pair<String?, String>> {
         val issuer = Issuer.make(
             authorizationServerMetadata = offer.authorizationServerMetadata,
             config = config,
@@ -199,26 +164,23 @@ private class Wallet(
             offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
-        val outcome =
-            when (authorizedRequest) {
-                is AuthorizedRequest.NoProofRequired -> {
-                    noProofRequiredSubmissionUseCase(
-                        issuer,
-                        authorizedRequest,
-                        offer.credentials[0],
-                    )
+        return when (authorizedRequest) {
+            is AuthorizedRequest.NoProofRequired ->
+                offer.credentials.map { metadata ->
+                    val scope = metadata.scope()
+                    issuanceLog("Requesting issuance of '$scope'")
+                    val credential = noProofRequiredSubmissionUseCase(issuer, authorizedRequest, metadata)
+                    scope to credential
                 }
 
-                is AuthorizedRequest.ProofRequired -> {
-                    proofRequiredSubmissionUseCase(
-                        issuer,
-                        authorizedRequest,
-                        offer.credentials[0],
-                    )
+            is AuthorizedRequest.ProofRequired ->
+                offer.credentials.map { metadata ->
+                    val scope = metadata.scope()
+                    issuanceLog("Requesting issuance of '$scope'")
+                    val credential = proofRequiredSubmissionUseCase(issuer, authorizedRequest, metadata)
+                    scope to credential
                 }
-            }
-
-        return outcome
+        }
     }
 
     private suspend fun authorizeRequestWithAuthCodeUseCase(
@@ -227,24 +189,24 @@ private class Wallet(
         parEndpoint: String,
     ): AuthorizedRequest =
         with(issuer) {
-            println("--> Placing PAR to AS server's endpoint $parEndpoint")
+            authorizationLog("Placing PAR to AS server's endpoint $parEndpoint")
 
             val parPlaced = pushAuthorizationCodeRequest(credentialMetadata, null).getOrThrow()
 
-            println("--> Placed PAR. Get authorization code URL is: ${parPlaced.getAuthorizationCodeURL.url.value}")
+            authorizationLog("Placed PAR. Get authorization code URL is: ${parPlaced.getAuthorizationCodeURL.url.value}")
 
             val authorizationCode = loginUserAndGetAuthCode(
                 parPlaced.getAuthorizationCodeURL.url.value.toURL(),
                 actingUser,
             ) ?: error("Could not retrieve authorization code")
 
-            println("--> Authorization code retrieved: $authorizationCode")
+            authorizationLog("Authorization code retrieved: $authorizationCode")
 
             val authorizedRequest = parPlaced
                 .handleAuthorizationCode(AuthorizationCode(authorizationCode))
                 .requestAccessToken().getOrThrow()
 
-            println("--> Authorization code exchanged with access token : ${authorizedRequest.accessToken.accessToken}")
+            authorizationLog("Authorization code exchanged with access token : ${authorizedRequest.accessToken.accessToken}")
 
             authorizedRequest
         }
@@ -284,8 +246,8 @@ private class Wallet(
         authorized: AuthorizedRequest,
         deferred: IssuedCredential.Deferred,
     ): String {
-        println(
-            "--> Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
+        issuanceLog(
+            "Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
         )
         with(issuer) {
             val outcome = authorized.queryForDeferredCredential(deferred).getOrThrow()
@@ -333,26 +295,6 @@ private class Wallet(
         }
     }
 
-    private fun httpClientFactory(): HttpClient =
-        HttpClient(Apache) {
-            install(ContentNegotiation) {
-                json(
-                    json = Json { ignoreUnknownKeys = true },
-                )
-            }
-            install(HttpCookies)
-            engine {
-                customizeClient {
-                    setSSLContext(
-                        SSLContextBuilder.create()
-                            .loadTrustMaterial(TrustSelfSignedStrategy())
-                            .build(),
-                    )
-                    setSSLHostnameVerifier(NoopHostnameVerifier())
-                }
-            }
-        }
-
     private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
         return httpClientFactory().use { client ->
 
@@ -374,16 +316,64 @@ private class Wallet(
         }
     }
 
-    private fun String.extractASLoginUrl(): URL {
-        val form = Jsoup.parse(this).body().getElementById("kc-form-login") as FormElement
-        val action = form.attr("action")
-        return URL(action)
+    companion object {
+        fun ofUser(actingUser: ActingUser, bindingKeys: Map<String, BindingKey.Jwk>, config: OpenId4VCIConfig) =
+            Wallet(actingUser, bindingKeys, config)
+    }
+}
+
+private fun authorizationLog(message: String) {
+    println("--> [AUTHORIZATION] $message")
+}
+private fun issuanceLog(message: String) {
+    println("--> [ISSUANCE] $message")
+}
+
+private suspend fun buildIssuer(
+    credentialIssuerIdentifier: CredentialIssuerId,
+    config: OpenId4VCIConfig,
+): Pair<CIAuthorizationServerMetadata, Issuer> {
+    val issuerMetadata =
+        CredentialIssuerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
+            .resolve(credentialIssuerIdentifier).getOrThrow()
+
+    val authServerMetadata =
+        AuthorizationServerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
+            .resolve(issuerMetadata.authorizationServer).getOrThrow()
+
+    val issuer = Issuer.make(
+        authorizationServerMetadata = authServerMetadata,
+        config = config,
+        ktorHttpClientFactory = ::httpClientFactory,
+        issuerMetadata = issuerMetadata,
+    )
+    return Pair(authServerMetadata, issuer)
+}
+
+private fun httpClientFactory(): HttpClient =
+    HttpClient(Apache) {
+        install(ContentNegotiation) {
+            json(
+                json = Json { ignoreUnknownKeys = true },
+            )
+        }
+        install(HttpCookies)
+        engine {
+            customizeClient {
+                setSSLContext(
+                    SSLContextBuilder.create()
+                        .loadTrustMaterial(TrustSelfSignedStrategy())
+                        .build(),
+                )
+                setSSLHostnameVerifier(NoopHostnameVerifier())
+            }
+        }
     }
 
-    companion object {
-        fun ofUser(actingUser: ActingUser, bindingKeys: Map<String, BindingKey.Jwk>) =
-            Wallet(actingUser, bindingKeys)
-    }
+private fun String.extractASLoginUrl(): URL {
+    val form = Jsoup.parse(this).body().getElementById("kc-form-login") as FormElement
+    val action = form.attr("action")
+    return URL(action)
 }
 
 private fun CredentialMetadata.scope(): String? =
@@ -395,18 +385,3 @@ private fun CredentialMetadata.scope(): String? =
         is W3CSignedJwt.Model.CredentialMetadata -> scope
         is CredentialMetadata.ByScope -> scope.value
     }
-
-object KeyGenerator {
-
-    fun randomRSASigningKey(size: Int): RSAKey = RSAKeyGenerator(size)
-        .keyUse(KeyUse.SIGNATURE)
-        .keyID(UUID.randomUUID().toString())
-        .issueTime(Date(System.currentTimeMillis()))
-        .generate()
-
-    fun randomECSigningKey(curve: Curve): ECKey = ECKeyGenerator(curve)
-        .keyUse(KeyUse.SIGNATURE)
-        .keyID(UUID.randomUUID().toString())
-        .issueTime(Date(System.currentTimeMillis()))
-        .generate()
-}

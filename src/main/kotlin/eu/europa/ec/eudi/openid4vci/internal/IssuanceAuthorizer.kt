@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal.issuance
+package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.oauth2.sdk.AuthorizationRequest
 import com.nimbusds.oauth2.sdk.PushedAuthorizationRequest

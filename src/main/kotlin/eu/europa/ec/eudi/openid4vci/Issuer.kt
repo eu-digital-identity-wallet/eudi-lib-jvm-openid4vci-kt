@@ -16,13 +16,14 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.internal.issuance.DefaultIssuer
-import eu.europa.ec.eudi.openid4vci.internal.issuance.IssuanceAuthorizer
-import eu.europa.ec.eudi.openid4vci.internal.issuance.IssuanceRequester
-import eu.europa.ec.eudi.openid4vci.internal.issuance.KeyGenerator
+import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer
+import eu.europa.ec.eudi.openid4vci.internal.IssuanceAuthorizer
+import eu.europa.ec.eudi.openid4vci.internal.IssuanceRequester
+import eu.europa.ec.eudi.openid4vci.internal.KeyGenerator
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+
+typealias ResponseEncryptionSpecFactory = (CredentialResponseEncryption.Required, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec
 
 /**
  * Aggregation interface providing all functionality required for performing a credential issuance request (batch or single)
@@ -56,14 +57,14 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             responseEncryptionSpecFactory,
         )
 
-        val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory = { requiredEncryption ->
+        val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory = { requiredEncryption, keyGenerationConfig ->
             requiredEncryption.algorithmsSupported.mapNotNull { alg ->
                 val encryptionKey = when {
                     JWEAlgorithm.Family.ECDH_ES.contains(alg) ->
-                        KeyGenerator.randomECEncryptionKey(Curve.P_256)
+                        KeyGenerator.randomECEncryptionKey(keyGenerationConfig.ecKeyCurve)
 
                     JWEAlgorithm.Family.RSA.contains(alg) ->
-                        KeyGenerator.randomRSAEncryptionKey(2048)
+                        KeyGenerator.randomRSAEncryptionKey(keyGenerationConfig.rcaKeySize)
 
                     else -> null
                 }

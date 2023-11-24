@@ -18,8 +18,8 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
+import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.DefaultCredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers

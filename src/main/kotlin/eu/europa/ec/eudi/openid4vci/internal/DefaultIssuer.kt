@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal.issuance
+package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.createProof
 import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import kotlinx.coroutines.CoroutineDispatcher
 import java.util.*
@@ -44,7 +42,7 @@ internal class DefaultIssuer(
         IssuanceRequester(coroutineDispatcher, issuerMetadata, ktorHttpClientFactory)
 
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec? by lazy {
-        fun IssuanceResponseEncryptionSpec.validate(meta: CredentialResponseEncryption.Required) {
+        fun IssuanceResponseEncryptionSpec.isValid(meta: CredentialResponseEncryption.Required) {
             if (!meta.algorithmsSupported.contains(algorithm)) {
                 throw CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
             }
@@ -54,8 +52,8 @@ internal class DefaultIssuer(
         }
         when (val encryption = issuerMetadata.credentialResponseEncryption) {
             is CredentialResponseEncryption.NotRequired -> null
-            is CredentialResponseEncryption.Required -> responseEncryptionSpecFactory(encryption).also {
-                it.validate(encryption)
+            is CredentialResponseEncryption.Required -> responseEncryptionSpecFactory(encryption, config.keyGenerationConfig).also {
+                it.isValid(encryption)
             }
         }
     }

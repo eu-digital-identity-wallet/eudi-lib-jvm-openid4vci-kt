@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal.issuance
+package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
@@ -162,7 +162,7 @@ internal class IssuanceRequester(
 
                 val response = client.post(url) {
                     bearerAuth(accessToken.accessToken)
-                    contentType(ContentType.parse("application/json"))
+                    contentType(ContentType.Application.Json)
                     setBody(request.toTransferObject())
                 }
                 handleResponseSingle(response, request)
@@ -190,7 +190,7 @@ internal class IssuanceRequester(
                 val payload = request.toTransferObject()
                 val response = client.post(url) {
                     bearerAuth(accessToken.accessToken)
-                    contentType(ContentType.parse("application/json"))
+                    contentType(ContentType.Application.Json)
                     setBody(payload)
                 }
                 handleResponseBatch(response)
@@ -279,7 +279,7 @@ internal class IssuanceRequester(
                 val url = issuerMetadata.deferredCredentialEndpoint.value.value.toURL()
                 val response = client.post(url) {
                     bearerAuth(accessToken.accessToken)
-                    contentType(ContentType.parse("application/json"))
+                    contentType(ContentType.Application.Json)
                     setBody(transactionId.toDeferredRequestTO())
                 }
                 handleResponseDeferred(response)
