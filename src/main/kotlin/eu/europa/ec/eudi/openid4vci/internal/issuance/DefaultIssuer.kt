@@ -26,9 +26,8 @@ import java.util.*
  * Default implementation of [Issuer] interface
  *  @param issuerMetadata  The credential issuer's metadata.
  *  @param ktorHttpClientFactory Factory method to generate ktor http clients
- *  @param responseEncryptionSpecFactory   Provider method to generate the expected issuer's encrypted response,
- *  if issuer enforces encrypted responses. A default implementation is provided to callers that internally
- *
+ *  @param responseEncryptionSpecFactory   Factory method to generate the expected issuer's encrypted response, if issuer enforces encrypted responses.
+ *     A default implementation is provided to callers.
  */
 internal class DefaultIssuer(
     authorizationServerMetadata: CIAuthorizationServerMetadata,
