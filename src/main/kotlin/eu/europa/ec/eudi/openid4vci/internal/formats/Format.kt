@@ -19,10 +19,10 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.CredentialSupportedDisplayTO
+import eu.europa.ec.eudi.openid4vci.internal.LogoObject
 import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.CredentialSupportedDisplayTO
-import eu.europa.ec.eudi.openid4vci.internal.credentialoffer.LogoObject
-import eu.europa.ec.eudi.openid4vci.internal.issuance.RequestedCredentialResponseEncryption
+import eu.europa.ec.eudi.openid4vci.internal.RequestedCredentialResponseEncryption
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.JsonClassDiscriminator

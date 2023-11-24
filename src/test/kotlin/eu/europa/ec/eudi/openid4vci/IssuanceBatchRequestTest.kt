@@ -16,11 +16,12 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.internal.BatchIssuanceSuccessResponse
+import eu.europa.ec.eudi.openid4vci.internal.CertificateIssuanceResponse
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
 import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
-import eu.europa.ec.eudi.openid4vci.internal.issuance.BatchIssuanceSuccessResponse
-import eu.europa.ec.eudi.openid4vci.internal.issuance.CertificateIssuanceResponse
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -50,6 +51,7 @@ class IssuanceBatchRequestTest {
     val vciWalletConfiguration = OpenId4VCIConfig(
         clientId = "MyWallet_ClientId",
         authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
     )
 
     @Test

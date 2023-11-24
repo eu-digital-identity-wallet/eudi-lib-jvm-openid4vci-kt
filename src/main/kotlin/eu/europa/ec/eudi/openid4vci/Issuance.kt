@@ -17,9 +17,6 @@ package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
-import io.ktor.client.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.serialization.kotlinx.json.*
 
 /**
  * Holds a https [java.net.URL] to be used at the second step of PAR flow for retrieving the authorization code.
@@ -231,8 +228,6 @@ interface AuthorizeIssuance {
         preAuthorizationCode: PreAuthorizationCode,
     ): Result<AuthorizedRequest>
 }
-
-typealias ResponseEncryptionSpecFactory = (CredentialResponseEncryption.Required) -> IssuanceResponseEncryptionSpec
 
 /**
  * An interface for submitting a credential issuance request. Contains all the operation available to transition an [AuthorizedRequest]

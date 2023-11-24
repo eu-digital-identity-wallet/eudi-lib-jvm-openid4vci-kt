@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
@@ -57,6 +58,7 @@ class IssuanceSingleRequestTest {
     val vciWalletConfiguration = OpenId4VCIConfig(
         clientId = "MyWallet_ClientId",
         authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
     )
 
     @Test

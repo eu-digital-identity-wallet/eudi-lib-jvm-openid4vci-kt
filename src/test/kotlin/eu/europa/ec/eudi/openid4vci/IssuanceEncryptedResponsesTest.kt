@@ -18,10 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.RSAEncrypter
-import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.jwk.KeyUse
-import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
@@ -58,6 +55,7 @@ class IssuanceEncryptedResponsesTest {
     val vciWalletConfiguration = OpenId4VCIConfig(
         clientId = "MyWallet_ClientId",
         authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
     )
 
     @Test
@@ -373,7 +371,7 @@ class IssuanceEncryptedResponsesTest {
             config = vciWalletConfiguration,
             ktorHttpClientFactory = ktorHttpClientFactory,
             issuerMetadata = offer.credentialIssuerMetadata,
-            responseEncryptionSpecFactory = { issuanceResponseEncryptionSpec },
+            responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
         )
 
         val flowState = with(issuer) {

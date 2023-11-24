@@ -16,10 +16,11 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.internal.DeferredIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
-import eu.europa.ec.eudi.openid4vci.internal.issuance.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -46,6 +47,7 @@ class IssuanceDeferredRequestTest {
     val vciWalletConfiguration = OpenId4VCIConfig(
         clientId = "MyWallet_ClientId",
         authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
     )
 
     @Test
