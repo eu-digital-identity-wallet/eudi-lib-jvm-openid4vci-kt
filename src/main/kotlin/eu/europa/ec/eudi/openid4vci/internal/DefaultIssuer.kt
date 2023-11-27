@@ -59,10 +59,13 @@ internal class DefaultIssuer(
     }
 
     override suspend fun pushAuthorizationCodeRequest(
-        credentials: List<CredentialMetadata>,
+        credentials: List<CredentialIdentifier>,
         issuerState: String?,
     ): Result<UnauthorizedRequest.ParRequested> = runCatching {
-        val scopes = credentials.filterIsInstance<CredentialMetadata.ByScope>().map { it.scope }.toMutableList()
+        val scopes = credentials.map {
+            it.matchIssuerSupportedCredential().scope?.let { Scope(it) }
+        }.filterNotNull()
+
         val state = UUID.randomUUID().toString()
         val (codeVerifier, getAuthorizationCodeUrl) =
             authorizer.submitPushedAuthorizationRequest(scopes, state, issuerState).getOrThrow()
@@ -80,7 +83,7 @@ internal class DefaultIssuer(
             .map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
 
     override suspend fun authorizeWithPreAuthorizationCode(
-        credentials: List<CredentialMetadata>,
+        credentials: List<CredentialIdentifier>,
         preAuthorizationCode: PreAuthorizationCode,
     ): Result<AuthorizedRequest> =
         authorizer.requestAccessTokenPreAuthFlow(
@@ -89,23 +92,23 @@ internal class DefaultIssuer(
         ).map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
-        credentialMetadata: CredentialMetadata,
+        credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(accessToken) {
-            credentialMetadata
+            credentialId
                 .matchIssuerSupportedCredential()
                 .constructIssuanceRequest(claimSet, null)
         }
     }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-        credentialMetadata: CredentialMetadata,
+        credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
         bindingKey: BindingKey,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(accessToken) {
-            with(credentialMetadata.matchIssuerSupportedCredential()) {
+            with(credentialId.matchIssuerSupportedCredential()) {
                 constructIssuanceRequest(
                     claimSet,
                     createProof(issuerMetadata, bindingKey, this, cNonce.value),
@@ -115,23 +118,23 @@ internal class DefaultIssuer(
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
+        credentialsMetadata: List<Pair<CredentialIdentifier, ClaimSet?>>,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(accessToken) {
             CredentialIssuanceRequest.BatchCredentials(
-                credentialRequests = credentialsMetadata.map { (meta, claimSet) ->
-                    meta.matchIssuerSupportedCredential().constructIssuanceRequest(claimSet, null)
+                credentialRequests = credentialsMetadata.map { (id, claimSet) ->
+                    id.matchIssuerSupportedCredential().constructIssuanceRequest(claimSet, null)
                 },
             )
         }
     }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
+        credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, BindingKey>>,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(accessToken) {
-            val credentialRequests = credentialsMetadata.map { (meta, claimSet, bindingKey) ->
-                with(meta.matchIssuerSupportedCredential()) {
+            val credentialRequests = credentialsMetadata.map { (id, claimSet, bindingKey) ->
+                with(id.matchIssuerSupportedCredential()) {
                     constructIssuanceRequest(
                         claimSet,
                         createProof(issuerMetadata, bindingKey, this, cNonce.value),
@@ -142,20 +145,11 @@ internal class DefaultIssuer(
         }
     }
 
-    private fun CredentialMetadata.matchIssuerSupportedCredential(): CredentialSupported = when (this) {
-        is CredentialMetadata.ByScope ->
-            supportedCredentialByScope(this)
-
-        is CredentialMetadata.ByFormat ->
-            Formats.matchSupportedCredentialByType(this, issuerMetadata)
+    private fun CredentialIdentifier.matchIssuerSupportedCredential(): CredentialSupported {
+        val credentialSupported = issuerMetadata.credentialsSupported[this]
+        requireNotNull(credentialSupported)
+        return credentialSupported
     }
-
-    private fun supportedCredentialByScope(
-        scoped: CredentialMetadata.ByScope,
-    ): CredentialSupported =
-        issuerMetadata.credentialsSupported
-            .firstOrNull { it.scope == scoped.scope.value }
-            ?: error("Issuer does not support issuance of credential scope: ${scoped.scope}")
 
     private fun CredentialSupported.constructIssuanceRequest(
         claimSet: ClaimSet?,

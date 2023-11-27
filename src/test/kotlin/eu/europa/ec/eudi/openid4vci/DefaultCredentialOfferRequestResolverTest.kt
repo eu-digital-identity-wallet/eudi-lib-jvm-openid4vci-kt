@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import kotlinx.coroutines.test.runTest
 import org.apache.http.client.utils.URIBuilder
 import kotlin.test.*
@@ -27,11 +26,11 @@ internal class DefaultCredentialOfferRequestResolverTest {
     internal fun `resolve success`() = runTest {
         val resolver = resolver(
             RequestMocker(
-                match(credentialIssuerMetadataUrl().value),
+                match(credentialIssuerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
             RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value),
+                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
             ),
         )
@@ -39,14 +38,13 @@ internal class DefaultCredentialOfferRequestResolverTest {
         val credentialOffer =
             getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer.json")
 
-        val mobileDrivingLicense = mobileDrivingLicense()
         val expected = CredentialOffer(
             credentialIssuerId(),
             credentialIssuerMetadata(),
             oidcAuthorizationServerMetadata(),
             listOf(
-                CredentialMetadata.ByScope(Scope("UniversityDegree_JWT")),
-                MsoMdoc.Model.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
+                CredentialIdentifier("UniversityDegree_JWT"),
+                CredentialIdentifier("MobileDrivingLicense_msoMdoc"),
             ),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
@@ -66,11 +64,11 @@ internal class DefaultCredentialOfferRequestResolverTest {
     fun `resolve success with mos_mdoc`() = runTest {
         val resolver = resolver(
             RequestMocker(
-                match(credentialIssuerMetadataUrl().value),
+                match(credentialIssuerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
             RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value),
+                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
             ),
         )
@@ -78,14 +76,11 @@ internal class DefaultCredentialOfferRequestResolverTest {
         val credentialOffer =
             getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/mso_mdoc_credential_offer.json")
 
-        val mobileDrivingLicense = mobileDrivingLicense()
         val expected = CredentialOffer(
             credentialIssuerId(),
             credentialIssuerMetadata(),
             oidcAuthorizationServerMetadata(),
-            listOf(
-                MsoMdoc.Model.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
-            ),
+            listOf(CredentialIdentifier("MobileDrivingLicense_msoMdoc")),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
                 Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
@@ -104,30 +99,22 @@ internal class DefaultCredentialOfferRequestResolverTest {
     internal fun `resolve success with jwt_vc_json`() = runTest {
         val resolver = resolver(
             RequestMocker(
-                match(credentialIssuerMetadataUrl().value),
+                match(credentialIssuerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
             RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value),
+                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
             ),
         )
         val credentialOffer =
             getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/jwt_vc_json_credential_offer.json")
 
-        val universityDegreeJwt = universityDegreeJwt()
         val expected = CredentialOffer(
             credentialIssuerId(),
             credentialIssuerMetadata(),
             oidcAuthorizationServerMetadata(),
-            listOf(
-                W3CSignedJwt.Model.CredentialMetadata(
-                    W3CSignedJwt.Model.CredentialMetadata.CredentialDefinitionMetadata(
-                        universityDegreeJwt.credentialDefinition.type,
-                    ),
-                    universityDegreeJwt.scope,
-                ),
-            ),
+            listOf(CredentialIdentifier("UniversityDegree_JWT")),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
                 Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
@@ -146,31 +133,22 @@ internal class DefaultCredentialOfferRequestResolverTest {
     internal fun `resolve success with ldp_vc`() = runTest {
         val resolver = resolver(
             RequestMocker(
-                match(credentialIssuerMetadataUrl().value),
+                match(credentialIssuerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
             RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value),
+                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
             ),
         )
         val credentialOffer =
             getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/ldp_vc_credential_offer.json")
 
-        val universityDegreeLdpVc = universityDegreeLdpVc()
         val expected = CredentialOffer(
             credentialIssuerId(),
             credentialIssuerMetadata(),
             oidcAuthorizationServerMetadata(),
-            listOf(
-                W3CJsonLdDataIntegrity.Model.CredentialMetadata(
-                    W3CJsonLdDataIntegrity.Model.CredentialMetadata.CredentialDefinitionMetadata(
-                        universityDegreeLdpVc.credentialDefinition.context,
-                        universityDegreeLdpVc.credentialDefinition.type,
-                    ),
-                    universityDegreeLdpVc.scope,
-                ),
-            ),
+            listOf(CredentialIdentifier("UniversityDegree_LDP_VC")),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
                 Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
@@ -190,11 +168,11 @@ internal class DefaultCredentialOfferRequestResolverTest {
     internal fun `resolve success with jwt_vc_json-ld`() = runTest {
         val resolver = resolver(
             RequestMocker(
-                match(credentialIssuerMetadataUrl().value),
+                match(credentialIssuerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
             RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value),
+                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
             ),
         )
@@ -202,20 +180,11 @@ internal class DefaultCredentialOfferRequestResolverTest {
         val credentialOffer =
             getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/jwt_vc_json-ld_credential_offer.json")
 
-        val universityDegreeJwtVcJsonLD = universityDegreeJwtVcJsonLD()
         val expected = CredentialOffer(
             credentialIssuerId(),
             credentialIssuerMetadata(),
             oidcAuthorizationServerMetadata(),
-            listOf(
-                W3CJsonLdSignedJwt.Model.CredentialMetadata(
-                    W3CJsonLdSignedJwt.Model.CredentialMetadata.CredentialDefinitionMetadata(
-                        universityDegreeJwtVcJsonLD.credentialDefinition.context,
-                        universityDegreeJwtVcJsonLD.credentialDefinition.type,
-                    ),
-                    universityDegreeJwtVcJsonLD.scope,
-                ),
-            ),
+            listOf(CredentialIdentifier("UniversityDegree_JWT_VC_JSON-LD")),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
                 Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
@@ -235,11 +204,11 @@ internal class DefaultCredentialOfferRequestResolverTest {
     internal fun `resolve failure with unknown credential format`() = runTest {
         val resolver = resolver(
             RequestMocker(
-                match(credentialIssuerMetadataUrl().value),
+                match(credentialIssuerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
             RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value),
+                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
             ),
         )
@@ -260,11 +229,11 @@ internal class DefaultCredentialOfferRequestResolverTest {
     internal fun `resolve failure with blank issuer_state in grant`() = runTest {
         val resolver = resolver(
             RequestMocker(
-                match(credentialIssuerMetadataUrl().value),
+                match(credentialIssuerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
             RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value),
+                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
             ),
         )
@@ -285,11 +254,11 @@ internal class DefaultCredentialOfferRequestResolverTest {
     internal fun `resolve failure with blank pre-authorized_code in grant`() = runTest {
         val resolver = resolver(
             RequestMocker(
-                match(credentialIssuerMetadataUrl().value),
+                match(credentialIssuerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
             RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value),
+                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
             ),
         )
@@ -312,15 +281,15 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
         val resolver = resolver(
             RequestMocker(
-                match(credentialIssuerMetadataUrl().value),
+                match(credentialIssuerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
             RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value),
+                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
             ),
             RequestMocker(
-                match(credentialOfferUri.value),
+                match(credentialOfferUri.value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer.json"),
             ),
         )
@@ -328,15 +297,11 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .addParameter("credential_offer_uri", credentialOfferUri.value.toString())
             .build()
 
-        val mobileDrivingLicense = mobileDrivingLicense()
         val expected = CredentialOffer(
             credentialIssuerId(),
             credentialIssuerMetadata(),
             oidcAuthorizationServerMetadata(),
-            listOf(
-                CredentialMetadata.ByScope(Scope("UniversityDegree_JWT")),
-                MsoMdoc.Model.CredentialMetadata(mobileDrivingLicense.docType, mobileDrivingLicense.scope),
-            ),
+            listOf(CredentialIdentifier("MobileDrivingLicense_msoMdoc")),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
                 Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),

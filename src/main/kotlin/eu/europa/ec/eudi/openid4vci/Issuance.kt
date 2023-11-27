@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 
 /**
  * Holds a https [java.net.URL] to be used at the second step of PAR flow for retrieving the authorization code.
@@ -187,12 +186,14 @@ interface AuthorizeIssuance {
      * Pushes the authorization request to authorization server's 'par endpoint'. Result of this transition is the
      * [UnauthorizedRequest.ParRequested] state
      *
+     * @param credentials   List of credentials whose issuance needs to be authorized.
+     * @param issuerState   Credential issuer state passed via a credential offer grant of type [Grants.AuthorizationCode].
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
      * @see <a href="https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-authorization-code-flow">OpenId4VCI</a>
      * @return The new state of the request or error.
      */
     suspend fun pushAuthorizationCodeRequest(
-        credentials: List<CredentialMetadata>,
+        credentials: List<CredentialIdentifier>,
         issuerState: String?,
     ): Result<UnauthorizedRequest.ParRequested>
 
@@ -224,7 +225,7 @@ interface AuthorizeIssuance {
      * @return The new state of the request or error.
      */
     suspend fun authorizeWithPreAuthorizationCode(
-        credentials: List<CredentialMetadata>,
+        credentials: List<CredentialIdentifier>,
         preAuthorizationCode: PreAuthorizationCode,
     ): Result<AuthorizedRequest>
 }
@@ -238,13 +239,13 @@ interface RequestIssuance {
     /**
      *  Requests the issuance of a single credential having an [AuthorizedRequest.NoProofRequired] authorization.
      *
-     *  @param credentialMetadata   The metadata specifying the credential that will be requested.
+     *  @param credentialId   The identifier of the credential that will be requested.
      *  @param claimSet Optional parameter to specify the specific set of claims that are requested to be included in the
      *          credential to be issued.
      *  @return The new state of the request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
-        credentialMetadata: CredentialMetadata,
+        credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
     ): Result<SubmittedRequest>
 
@@ -252,14 +253,14 @@ interface RequestIssuance {
      *  Requests the issuance of a single credential having an [AuthorizedRequest.ProofRequired] authorization. In this
      *  case caller must provide a binding key that will be used for generating a Proof of Possession that issuer expects.
      *
-     *  @param credentialMetadata   The metadata specifying the credentials that will be requested.
+     *  @param credentialId   The identifier of the credential that will be requested.
      *  @param claimSet     Optional parameter to specify the specific set of claims that are requested to be included in the
      *          credential to be issued.
      *  @param bindingKey   Cryptographic material to be used from issuer to bind the issued credential to a holder.
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-        credentialMetadata: CredentialMetadata,
+        credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
         bindingKey: BindingKey,
 
@@ -273,7 +274,7 @@ interface RequestIssuance {
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<CredentialMetadata, ClaimSet?>>,
+        credentialsMetadata: List<Pair<CredentialIdentifier, ClaimSet?>>,
     ): Result<SubmittedRequest>
 
     /**
@@ -283,7 +284,7 @@ interface RequestIssuance {
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<CredentialMetadata, ClaimSet?, BindingKey>>,
+        credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, BindingKey>>,
     ): Result<SubmittedRequest>
 
     /**

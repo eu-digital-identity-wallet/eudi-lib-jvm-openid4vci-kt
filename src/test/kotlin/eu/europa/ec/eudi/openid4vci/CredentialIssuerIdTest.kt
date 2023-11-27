@@ -45,6 +45,6 @@ internal class CredentialIssuerIdTest {
         val value = URI("https://issuer")
         val maybeId = CredentialIssuerId(value.toString())
         assertTrue(maybeId.isSuccess, "Parsing CredentialIssuerId should have succeeded")
-        assertEquals(value, maybeId.getOrThrow().value.value)
+        assertEquals(value.toURL(), maybeId.getOrThrow().value.value)
     }
 }

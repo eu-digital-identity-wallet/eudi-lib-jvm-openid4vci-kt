@@ -17,12 +17,6 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.internal.formats.*
-import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
-import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
-import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdDataIntegrity
-import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdSignedJwt
-import eu.europa.ec.eudi.openid4vci.internal.formats.W3CSignedJwt
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.apache.*
@@ -118,13 +112,13 @@ private class Wallet(
 ) {
 
     suspend fun issueByScope(scope: String): String {
-        val (authServerMetadata, issuer) = buildIssuer(credentialIssuerIdentifier, config)
-        val credentialMetadata = CredentialMetadata.ByScope(Scope(scope))
-        val openIdScope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
+        val (authServerMetadata, issuerMetadata, issuer) = buildIssuer(credentialIssuerIdentifier, config)
+        val credentialIdentifier = CredentialIdentifier(scope)
+//        val openIdScope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
 
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
-            listOf(credentialMetadata, openIdScope),
+            listOf(credentialIdentifier), //  openIdScope
             authServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
@@ -132,10 +126,10 @@ private class Wallet(
         val outcome =
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired ->
-                    noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialMetadata)
+                    noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialIdentifier, issuerMetadata)
 
                 is AuthorizedRequest.ProofRequired ->
-                    proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialMetadata)
+                    proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialIdentifier, issuerMetadata)
             }
 
         return outcome
@@ -148,36 +142,37 @@ private class Wallet(
     }
 
     suspend fun issueByCredentialOffer(offer: CredentialOffer): List<Pair<String?, String>> {
+        val issuerMetadata = offer.credentialIssuerMetadata
         val issuer = Issuer.make(
             authorizationServerMetadata = offer.authorizationServerMetadata,
             config = config,
-            issuerMetadata = offer.credentialIssuerMetadata,
+            issuerMetadata = issuerMetadata,
             ktorHttpClientFactory = ::httpClientFactory,
         )
 
-        val openIdScope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
+//        val openIdScope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
 
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
-            offer.credentials + openIdScope,
+            offer.credentials, // + openIdScope,
             offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
         return when (authorizedRequest) {
             is AuthorizedRequest.NoProofRequired ->
-                offer.credentials.map { metadata ->
-                    val scope = metadata.scope()
+                offer.credentials.map { credentialId ->
+                    val scope = issuerMetadata.credentialsSupported[credentialId]?.scope
                     issuanceLog("Requesting issuance of '$scope'")
-                    val credential = noProofRequiredSubmissionUseCase(issuer, authorizedRequest, metadata)
+                    val credential = noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId, issuerMetadata)
                     scope to credential
                 }
 
             is AuthorizedRequest.ProofRequired ->
-                offer.credentials.map { metadata ->
-                    val scope = metadata.scope()
+                offer.credentials.map { credentialId ->
+                    val scope = issuerMetadata.credentialsSupported[credentialId]?.scope
                     issuanceLog("Requesting issuance of '$scope'")
-                    val credential = proofRequiredSubmissionUseCase(issuer, authorizedRequest, metadata)
+                    val credential = proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId, issuerMetadata)
                     scope to credential
                 }
         }
@@ -185,7 +180,7 @@ private class Wallet(
 
     private suspend fun authorizeRequestWithAuthCodeUseCase(
         issuer: Issuer,
-        credentialMetadata: List<CredentialMetadata>,
+        credentialMetadata: List<CredentialIdentifier>,
         parEndpoint: String,
     ): AuthorizedRequest =
         with(issuer) {
@@ -196,7 +191,7 @@ private class Wallet(
             authorizationLog("Placed PAR. Get authorization code URL is: ${parPlaced.getAuthorizationCodeURL.url.value}")
 
             val authorizationCode = loginUserAndGetAuthCode(
-                parPlaced.getAuthorizationCodeURL.url.value.toURL(),
+                parPlaced.getAuthorizationCodeURL.url.value,
                 actingUser,
             ) ?: error("Could not retrieve authorization code")
 
@@ -214,13 +209,14 @@ private class Wallet(
     private suspend fun proofRequiredSubmissionUseCase(
         issuer: Issuer,
         authorized: AuthorizedRequest.ProofRequired,
-        credentialMetadata: CredentialMetadata,
+        credentialIdentifier: CredentialIdentifier,
+        issuerMetadata: CredentialIssuerMetadata,
     ): String {
         with(issuer) {
-            val scope = credentialMetadata.scope()
+            val scope = issuerMetadata.credentialsSupported[credentialIdentifier]?.scope
             val bindingKey = bindingKeys[scope] ?: error("No binding key found for scope $scope")
             val requestOutcome =
-                authorized.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
+                authorized.requestSingle(credentialIdentifier, null, bindingKey).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
@@ -265,11 +261,12 @@ private class Wallet(
     private suspend fun noProofRequiredSubmissionUseCase(
         issuer: Issuer,
         noProofRequiredState: AuthorizedRequest.NoProofRequired,
-        credentialMetadata: CredentialMetadata,
+        credentialIdentifier: CredentialIdentifier,
+        issuerMetadata: CredentialIssuerMetadata,
     ): String {
         with(issuer) {
             val requestOutcome =
-                noProofRequiredState.requestSingle(credentialMetadata, null).getOrThrow()
+                noProofRequiredState.requestSingle(credentialIdentifier, null).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
@@ -286,7 +283,8 @@ private class Wallet(
                     proofRequiredSubmissionUseCase(
                         issuer,
                         noProofRequiredState.handleInvalidProof(requestOutcome.cNonce),
-                        credentialMetadata,
+                        credentialIdentifier,
+                        issuerMetadata,
                     )
                 }
 
@@ -332,14 +330,14 @@ private fun issuanceLog(message: String) {
 private suspend fun buildIssuer(
     credentialIssuerIdentifier: CredentialIssuerId,
     config: OpenId4VCIConfig,
-): Pair<CIAuthorizationServerMetadata, Issuer> {
+): Triple<CIAuthorizationServerMetadata, CredentialIssuerMetadata, Issuer> {
     val issuerMetadata =
         CredentialIssuerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
             .resolve(credentialIssuerIdentifier).getOrThrow()
 
     val authServerMetadata =
         AuthorizationServerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
-            .resolve(issuerMetadata.authorizationServer).getOrThrow()
+            .resolve(issuerMetadata.authorizationServers[0]).getOrThrow()
 
     val issuer = Issuer.make(
         authorizationServerMetadata = authServerMetadata,
@@ -347,7 +345,7 @@ private suspend fun buildIssuer(
         ktorHttpClientFactory = ::httpClientFactory,
         issuerMetadata = issuerMetadata,
     )
-    return Pair(authServerMetadata, issuer)
+    return Triple(authServerMetadata, issuerMetadata, issuer)
 }
 
 private fun httpClientFactory(): HttpClient =
@@ -376,12 +374,5 @@ private fun String.extractASLoginUrl(): URL {
     return URL(action)
 }
 
-private fun CredentialMetadata.scope(): String? =
-    when (this) {
-        is MsoMdoc.Model.CredentialMetadata -> scope
-        is SdJwtVc.Model.CredentialMetadata -> scope
-        is W3CJsonLdDataIntegrity.Model.CredentialMetadata -> scope
-        is W3CJsonLdSignedJwt.Model.CredentialMetadata -> scope
-        is W3CSignedJwt.Model.CredentialMetadata -> scope
-        is CredentialMetadata.ByScope -> scope.value
-    }
+private fun CredentialIdentifier.scope(issuerMetadata: CredentialIssuerMetadata): String? =
+    issuerMetadata.credentialsSupported[this]?.scope

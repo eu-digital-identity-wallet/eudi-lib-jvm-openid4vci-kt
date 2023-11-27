@@ -30,42 +30,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.util.*
 
-internal data object SdJwtVc : Format<
-    SdJwtVc.Model.CredentialMetadata,
-    SdJwtVc.Model.CredentialSupported,
-    SdJwtVc.Model.CredentialIssuanceRequest,
-    > {
+internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "vc+sd-jwt"
-
-    override fun matchSupportedCredentialByTypeAndMapToDomain(
-        jsonObject: JsonObject,
-        issuerMetadata: CredentialIssuerMetadata,
-    ): Model.CredentialMetadata {
-        val credentialDefinition = Json.decodeFromJsonElement<Model.CredentialMetadataObject>(
-            jsonObject,
-        ).credentialDefinition
-
-        return issuerMetadata.credentialsSupported
-            .filterIsInstance<Model.CredentialSupported>()
-            .firstOrNull { it.credentialDefinition.type == credentialDefinition.type }
-            ?.let {
-                Model.CredentialMetadata(
-                    Model.CredentialMetadata.CredentialDefinitionMetadata(credentialDefinition.type),
-                    it.scope,
-                )
-            }
-            ?: error("Unsupported metadata with format $FORMAT' and type '${credentialDefinition.type}'")
-    }
-
-    override fun matchSupportedCredentialByType(
-        metadata: Model.CredentialMetadata,
-        issuerMetadata: CredentialIssuerMetadata,
-    ): CredentialSupported =
-        issuerMetadata.credentialsSupported
-            .filterIsInstance<Model.CredentialSupported>()
-            .firstOrNull { it.credentialDefinition.type == metadata.credentialDefinition.type }
-            ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
 
     override fun constructIssuanceRequest(
         supportedCredential: Model.CredentialSupported,
@@ -193,15 +160,6 @@ internal data object SdJwtVc : Format<
             @Serializable
             data class CredentialDefinition(
                 @SerialName("type") val type: String,
-            )
-        }
-
-        data class CredentialMetadata(
-            val credentialDefinition: CredentialDefinitionMetadata,
-            val scope: String? = null,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata.ByFormat {
-            data class CredentialDefinitionMetadata(
-                val type: String,
             )
         }
 

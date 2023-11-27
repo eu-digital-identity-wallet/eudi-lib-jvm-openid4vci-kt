@@ -23,61 +23,18 @@ import eu.europa.ec.eudi.openid4vci.internal.RequestedCredentialResponseEncrypti
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.decodeFromJsonElement
 import java.util.*
 
-internal data object W3CSignedJwt : Format<
-    W3CSignedJwt.Model.CredentialMetadata,
-    W3CSignedJwt.Model.CredentialSupported,
-    W3CSignedJwt.Model.CredentialIssuanceRequest,
-    > {
+internal data object W3CSignedJwt : Format<W3CSignedJwt.Model.CredentialSupported, W3CSignedJwt.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "jwt_vc_json"
-
-    override fun matchSupportedCredentialByTypeAndMapToDomain(
-        jsonObject: JsonObject,
-        issuerMetadata: CredentialIssuerMetadata,
-    ): Model.CredentialMetadata {
-        val credentialDefinition = Json.decodeFromJsonElement<Model.CredentialMetadataTO>(
-            jsonObject,
-        ).credentialDefinition
-
-        fun fail(): Nothing =
-            throw IllegalArgumentException(
-                "Unsupported W3CVerifiableCredential with format '$FORMAT' and credentialDefinition '$credentialDefinition'",
-            )
-
-        return issuerMetadata.credentialsSupported
-            .filterIsInstance<Model.CredentialSupported>()
-            .firstOrNull { it.credentialDefinition.type == credentialDefinition.type }
-            ?.let {
-                Model.CredentialMetadata(
-                    Model.CredentialMetadata.CredentialDefinitionMetadata(
-                        type = credentialDefinition.type,
-                    ),
-                    it.scope,
-                )
-            }
-            ?: fail()
-    }
-
-    override fun matchSupportedCredentialByType(
-        metadata: Model.CredentialMetadata,
-        issuerMetadata: CredentialIssuerMetadata,
-    ): CredentialSupported =
-        issuerMetadata.credentialsSupported.firstOrNull {
-            it is Model.CredentialSupported &&
-                it.credentialDefinition.type == metadata.credentialDefinition.type
-        } ?: error("Issuer does not support issuance of credential : $metadata")
 
     override fun constructIssuanceRequest(
         supportedCredential: Model.CredentialSupported,
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<CredentialIssuanceRequest.SingleCredential> {
+    ): Result<Model.CredentialIssuanceRequest> {
         TODO("Not yet implemented")
     }
 
@@ -176,18 +133,6 @@ internal data object W3CSignedJwt : Format<
             @Serializable
             data class CredentialDefinition(
                 @SerialName("type") val type: List<String>,
-            )
-        }
-
-        /**
-         * A signed JWT (not using JSON-LD) credential metadata object.
-         */
-        data class CredentialMetadata(
-            val credentialDefinition: CredentialDefinitionMetadata,
-            val scope: String? = null,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata.ByFormat {
-            data class CredentialDefinitionMetadata(
-                val type: List<String>,
             )
         }
 

@@ -48,12 +48,13 @@ sealed interface CredentialResponseEncryption : Serializable {
  */
 data class CredentialIssuerMetadata(
     val credentialIssuerIdentifier: CredentialIssuerId,
-    val authorizationServer: HttpsUrl = credentialIssuerIdentifier.value,
+    val authorizationServers: List<HttpsUrl> = listOf(credentialIssuerIdentifier.value),
     val credentialEndpoint: CredentialIssuerEndpoint,
     val batchCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val credentialResponseEncryption: CredentialResponseEncryption = NotRequired,
-    val credentialsSupported: List<CredentialSupported>,
+    val credentialIdentifiersSupported: Boolean = false,
+    val credentialsSupported: Map<CredentialIdentifier, CredentialSupported>,
     val display: List<Display> = emptyList(),
 ) : Serializable {
 
@@ -86,7 +87,7 @@ value class CredentialIssuerEndpoint private constructor(val value: HttpsUrl) {
         operator fun invoke(value: String): Result<CredentialIssuerEndpoint> =
             HttpsUrl(value)
                 .mapCatching {
-                    require(it.value.fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
+                    require(it.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
                     CredentialIssuerEndpoint(it)
                 }
     }

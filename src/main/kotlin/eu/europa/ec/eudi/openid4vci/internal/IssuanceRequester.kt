@@ -158,7 +158,7 @@ internal class IssuanceRequester(
         runCatching {
             ktorHttpClientFactory().use { client ->
 
-                val url = issuerMetadata.credentialEndpoint.value.value.toURL()
+                val url = issuerMetadata.credentialEndpoint.value.value
 
                 val response = client.post(url) {
                     bearerAuth(accessToken.accessToken)
@@ -186,7 +186,7 @@ internal class IssuanceRequester(
         }
         withContext(coroutineDispatcher) {
             ktorHttpClientFactory().use { client ->
-                val url = issuerMetadata.batchCredentialEndpoint.value.value.toURL()
+                val url = issuerMetadata.batchCredentialEndpoint.value.value
                 val payload = request.toTransferObject()
                 val response = client.post(url) {
                     bearerAuth(accessToken.accessToken)
@@ -276,7 +276,7 @@ internal class IssuanceRequester(
         }
         withContext(coroutineDispatcher) {
             ktorHttpClientFactory().use { client ->
-                val url = issuerMetadata.deferredCredentialEndpoint.value.value.toURL()
+                val url = issuerMetadata.deferredCredentialEndpoint.value.value
                 val response = client.post(url) {
                     bearerAuth(accessToken.accessToken)
                     contentType(ContentType.Application.Json)

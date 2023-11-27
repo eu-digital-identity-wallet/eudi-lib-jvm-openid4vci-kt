@@ -30,82 +30,25 @@ import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
 import java.util.*
 
-internal interface Format<
-    in M : CredentialMetadata.ByFormat,
-    in S : CredentialSupported,
-    in I : CredentialIssuanceRequest.SingleCredential,
-    > {
-
-    fun matchSupportedCredentialByTypeAndMapToDomain(
-        jsonObject: JsonObject,
-        issuerMetadata: CredentialIssuerMetadata,
-    ): CredentialMetadata
-
-    fun matchSupportedCredentialByType(
-        metadata: M,
-        issuerMetadata: CredentialIssuerMetadata,
-    ): CredentialSupported
+internal interface Format<in S : CredentialSupported, out I : CredentialIssuanceRequest.SingleCredential> {
 
     fun constructIssuanceRequest(
         supportedCredential: S,
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<CredentialIssuanceRequest.SingleCredential>
+    ): Result<I>
 }
 
 internal object Formats {
 
-    private val supported: Map<String, Format<*, *, *>> = mapOf(
+    private val supported: Map<String, Format<*, *>> = mapOf(
         MsoMdoc.FORMAT to MsoMdoc,
         SdJwtVc.FORMAT to SdJwtVc,
         W3CSignedJwt.FORMAT to W3CSignedJwt,
         W3CJsonLdSignedJwt.FORMAT to W3CJsonLdSignedJwt,
         W3CJsonLdDataIntegrity.FORMAT to W3CJsonLdDataIntegrity,
     )
-
-    private fun formatByName(format: String): Format<*, *, *> =
-        supported[format] ?: throw IllegalArgumentException("Unsupported Credential format '$format'")
-
-    fun matchSupportedCredentialByTypeAndMapToDomain(
-        format: String,
-        jsonObject: JsonObject,
-        issuerMetadata: CredentialIssuerMetadata,
-    ): CredentialMetadata =
-        formatByName(format).matchSupportedCredentialByTypeAndMapToDomain(jsonObject, issuerMetadata)
-
-    fun matchSupportedCredentialByType(
-        credentialMetadata: CredentialMetadata,
-        issuerMetadata: CredentialIssuerMetadata,
-    ): CredentialSupported =
-        when (credentialMetadata) {
-            is MsoMdoc.Model.CredentialMetadata -> MsoMdoc.matchSupportedCredentialByType(
-                credentialMetadata,
-                issuerMetadata,
-            )
-
-            is SdJwtVc.Model.CredentialMetadata -> SdJwtVc.matchSupportedCredentialByType(
-                credentialMetadata,
-                issuerMetadata,
-            )
-
-            is W3CSignedJwt.Model.CredentialMetadata -> W3CSignedJwt.matchSupportedCredentialByType(
-                credentialMetadata,
-                issuerMetadata,
-            )
-
-            is W3CJsonLdSignedJwt.Model.CredentialMetadata -> W3CJsonLdSignedJwt.matchSupportedCredentialByType(
-                credentialMetadata,
-                issuerMetadata,
-            )
-
-            is W3CJsonLdDataIntegrity.Model.CredentialMetadata -> W3CJsonLdDataIntegrity.matchSupportedCredentialByType(
-                credentialMetadata,
-                issuerMetadata,
-            )
-
-            else -> throw IllegalArgumentException("Unsupported Credential Metadata")
-        }
 
     fun constructIssuanceRequest(
         supportedCredential: CredentialSupported,
@@ -181,16 +124,6 @@ sealed interface CredentialSupported : Serializable {
     val cryptographicSuitesSupported: List<String>
     val proofTypesSupported: List<ProofType>
     val display: List<Display>
-}
-
-/**
- * A Credential being offered in a Credential Offer.
- */
-sealed interface CredentialMetadata : Serializable {
-
-    data class ByScope(val scope: Scope) : CredentialMetadata
-
-    sealed interface ByFormat : CredentialMetadata
 }
 
 /**

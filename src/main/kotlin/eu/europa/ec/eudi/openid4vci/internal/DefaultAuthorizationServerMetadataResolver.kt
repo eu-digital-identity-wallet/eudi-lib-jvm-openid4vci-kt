@@ -91,4 +91,4 @@ internal class DefaultAuthorizationServerMetadataResolver(
  * Verifies the issuer of this [CIAuthorizationServerMetadata] equals the [expected] one.
  */
 private fun CIAuthorizationServerMetadata.expectIssuer(expected: HttpsUrl) =
-    require(issuer == Issuer(expected.value)) { "issuer does not match the expected value" }
+    require(issuer == Issuer(expected.value.toURI())) { "issuer does not match the expected value" }

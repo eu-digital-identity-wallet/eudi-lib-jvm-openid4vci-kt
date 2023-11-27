@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialOfferRequestResolver
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +29,7 @@ data class CredentialOffer(
     val credentialIssuerIdentifier: CredentialIssuerId,
     val credentialIssuerMetadata: CredentialIssuerMetadata,
     val authorizationServerMetadata: CIAuthorizationServerMetadata,
-    val credentials: List<CredentialMetadata>,
+    val credentials: List<CredentialIdentifier>,
     val grants: Grants? = null,
 ) : Serializable {
     init {
@@ -55,7 +54,7 @@ value class CredentialIssuerId private constructor(val value: HttpsUrl) {
         operator fun invoke(value: String): Result<CredentialIssuerId> =
             HttpsUrl(value)
                 .mapCatching {
-                    require(it.value.fragment.isNullOrBlank()) { "CredentialIssuerId must not have a fragment" }
+                    require(it.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerId must not have a fragment" }
                     require(it.value.query.isNullOrBlank()) { "CredentialIssuerId must not have query parameters " }
                     CredentialIssuerId(it)
                 }
@@ -72,6 +71,7 @@ sealed interface Grants : Serializable {
      */
     data class AuthorizationCode(
         val issuerState: String? = null,
+        val authorizationServer: HttpsUrl? = null,
     ) : Grants {
         init {
             issuerState?.let {
@@ -87,6 +87,7 @@ sealed interface Grants : Serializable {
         val preAuthorizedCode: String,
         val pinRequired: Boolean = false,
         val interval: Duration,
+        val authorizationServer: HttpsUrl? = null,
     ) : Grants {
         init {
             require(preAuthorizedCode.isNotBlank()) { "preAuthorizedCode cannot be blank" }

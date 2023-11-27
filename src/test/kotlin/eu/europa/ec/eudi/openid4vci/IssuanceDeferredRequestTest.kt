@@ -19,7 +19,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.DeferredIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
@@ -84,7 +83,7 @@ class IssuanceDeferredRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE))
+                    val credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
                     val submittedRequest =
                         authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
                     when (submittedRequest) {
@@ -164,7 +163,7 @@ class IssuanceDeferredRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE))
+                    val credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
                     val submittedRequest =
                         authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
                     when (submittedRequest) {
@@ -257,7 +256,7 @@ class IssuanceDeferredRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE))
+                    val credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
                     val submittedRequest =
                         authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
                     when (submittedRequest) {
