@@ -45,6 +45,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
             listOf(
                 CredentialIdentifier("UniversityDegree_JWT"),
                 CredentialIdentifier("MobileDrivingLicense_msoMdoc"),
+                CredentialIdentifier("UniversityDegree_LDP_VC"),
+                CredentialIdentifier("UniversityDegree_JWT_VC_JSON-LD"),
             ),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
@@ -57,146 +59,6 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .build()
 
         val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
-        assertEquals(expected, offer)
-    }
-
-    @Test
-    fun `resolve success with mos_mdoc`() = runTest {
-        val resolver = resolver(
-            RequestMocker(
-                match(credentialIssuerMetadataUrl().value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
-            ),
-            RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-            ),
-        )
-
-        val credentialOffer =
-            getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/mso_mdoc_credential_offer.json")
-
-        val expected = CredentialOffer(
-            credentialIssuerId(),
-            credentialIssuerMetadata(),
-            oidcAuthorizationServerMetadata(),
-            listOf(CredentialIdentifier("MobileDrivingLicense_msoMdoc")),
-            Grants.Both(
-                Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
-            ),
-        )
-
-        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
-            .addParameter("credential_offer", credentialOffer)
-            .build()
-
-        val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
-        assertEquals(expected, offer)
-    }
-
-    @Test
-    internal fun `resolve success with jwt_vc_json`() = runTest {
-        val resolver = resolver(
-            RequestMocker(
-                match(credentialIssuerMetadataUrl().value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
-            ),
-            RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-            ),
-        )
-        val credentialOffer =
-            getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/jwt_vc_json_credential_offer.json")
-
-        val expected = CredentialOffer(
-            credentialIssuerId(),
-            credentialIssuerMetadata(),
-            oidcAuthorizationServerMetadata(),
-            listOf(CredentialIdentifier("UniversityDegree_JWT")),
-            Grants.Both(
-                Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
-            ),
-        )
-
-        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
-            .addParameter("credential_offer", credentialOffer)
-            .build()
-
-        val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
-        assertEquals(expected, offer)
-    }
-
-    @Test
-    internal fun `resolve success with ldp_vc`() = runTest {
-        val resolver = resolver(
-            RequestMocker(
-                match(credentialIssuerMetadataUrl().value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
-            ),
-            RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-            ),
-        )
-        val credentialOffer =
-            getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/ldp_vc_credential_offer.json")
-
-        val expected = CredentialOffer(
-            credentialIssuerId(),
-            credentialIssuerMetadata(),
-            oidcAuthorizationServerMetadata(),
-            listOf(CredentialIdentifier("UniversityDegree_LDP_VC")),
-            Grants.Both(
-                Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
-            ),
-        )
-
-        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
-            .addParameter("credential_offer", credentialOffer)
-            .build()
-
-        val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
-
-        assertEquals(expected, offer)
-    }
-
-    @Test
-    internal fun `resolve success with jwt_vc_json-ld`() = runTest {
-        val resolver = resolver(
-            RequestMocker(
-                match(credentialIssuerMetadataUrl().value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
-            ),
-            RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-            ),
-        )
-
-        val credentialOffer =
-            getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/jwt_vc_json-ld_credential_offer.json")
-
-        val expected = CredentialOffer(
-            credentialIssuerId(),
-            credentialIssuerMetadata(),
-            oidcAuthorizationServerMetadata(),
-            listOf(CredentialIdentifier("UniversityDegree_JWT_VC_JSON-LD")),
-            Grants.Both(
-                Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
-            ),
-        )
-
-        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
-            .addParameter("credential_offer", credentialOffer)
-            .build()
-
-        val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
-
         assertEquals(expected, offer)
     }
 
@@ -301,7 +163,12 @@ internal class DefaultCredentialOfferRequestResolverTest {
             credentialIssuerId(),
             credentialIssuerMetadata(),
             oidcAuthorizationServerMetadata(),
-            listOf(CredentialIdentifier("MobileDrivingLicense_msoMdoc")),
+            listOf(
+                CredentialIdentifier("UniversityDegree_JWT"),
+                CredentialIdentifier("MobileDrivingLicense_msoMdoc"),
+                CredentialIdentifier("UniversityDegree_LDP_VC"),
+                CredentialIdentifier("UniversityDegree_JWT_VC_JSON-LD"),
+            ),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
                 Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
