@@ -17,8 +17,6 @@ package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialOfferRequestResolver
 import io.ktor.http.*
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import java.io.Serializable
 import kotlin.time.Duration
 
@@ -262,11 +260,9 @@ fun interface CredentialOfferRequestResolver {
          * Creates a new [CredentialOfferRequestResolver].
          */
         operator fun invoke(
-            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): CredentialOfferRequestResolver =
             DefaultCredentialOfferRequestResolver(
-                ioCoroutineDispatcher = ioCoroutineDispatcher,
                 ktorHttpClientFactory = ktorHttpClientFactory,
             )
     }

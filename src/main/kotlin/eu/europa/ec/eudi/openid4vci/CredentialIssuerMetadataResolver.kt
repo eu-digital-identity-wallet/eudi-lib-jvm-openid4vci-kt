@@ -21,8 +21,6 @@ import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.SerialName
 import java.io.Serializable
 import java.util.*
@@ -272,11 +270,9 @@ fun interface CredentialIssuerMetadataResolver {
          * Creates a new [CredentialIssuerMetadataResolver] instance.
          */
         operator fun invoke(
-            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): CredentialIssuerMetadataResolver =
             DefaultCredentialIssuerMetadataResolver(
-                coroutineDispatcher = ioCoroutineDispatcher,
                 ktorHttpClientFactory = ktorHttpClientFactory,
             )
     }

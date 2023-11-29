@@ -26,6 +26,7 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.apache.http.conn.ssl.NoopHostnameVerifier
@@ -36,12 +37,12 @@ import org.jsoup.nodes.FormElement
 import java.net.URI
 import java.net.URL
 
-const val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
+// const val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
+const val CredentialIssuer_URL = "http://localhost:8080"
 val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
 
 const val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
 const val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
-const val OPENID_SCOPE = "openid"
 
 val credentialOffer = """
     {
@@ -114,7 +115,6 @@ private class Wallet(
     suspend fun issueByScope(scope: String): String {
         val (authServerMetadata, issuerMetadata, issuer) = buildIssuer(credentialIssuerIdentifier, config)
         val credentialIdentifier = CredentialIdentifier(scope)
-//        val openIdScope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
 
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
@@ -149,8 +149,6 @@ private class Wallet(
             issuerMetadata = issuerMetadata,
             ktorHttpClientFactory = ::httpClientFactory,
         )
-
-//        val openIdScope = CredentialMetadata.ByScope(Scope(OPENID_SCOPE))
 
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
@@ -293,9 +291,9 @@ private class Wallet(
         }
     }
 
+    @OptIn(InternalAPI::class)
     private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
         return httpClientFactory().use { client ->
-
             val loginUrl =
                 client.get(getAuthorizationCodeUrl).body<String>().extractASLoginUrl()
 
@@ -348,6 +346,7 @@ private suspend fun buildIssuer(
     return Triple(authServerMetadata, issuerMetadata, issuer)
 }
 
+@OptIn(InternalAPI::class)
 private fun httpClientFactory(): HttpClient =
     HttpClient(Apache) {
         install(ContentNegotiation) {
@@ -373,6 +372,3 @@ private fun String.extractASLoginUrl(): URL {
     val action = form.attr("action")
     return URL(action)
 }
-
-private fun CredentialIdentifier.scope(issuerMetadata: CredentialIssuerMetadata): String? =
-    issuerMetadata.credentialsSupported[this]?.scope

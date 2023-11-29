@@ -23,10 +23,7 @@ import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupportedTO
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -99,7 +96,6 @@ internal data class DisplayTO(
  * Default implementation of [CredentialIssuerMetadataResolver].
  */
 internal class DefaultCredentialIssuerMetadataResolver(
-    private val coroutineDispatcher: CoroutineDispatcher,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) : CredentialIssuerMetadataResolver {
 
@@ -113,9 +109,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                         .toURI()
                         .toURL()
 
-                withContext(coroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
-                    ktorHttpClientFactory().use { client -> client.get(url).body<String>() }
-                }
+                ktorHttpClientFactory().use { client -> client.get(url).body<String>() }
             } catch (t: Throwable) {
                 throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
             }

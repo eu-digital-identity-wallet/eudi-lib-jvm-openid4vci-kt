@@ -16,8 +16,10 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.formats.*
-import kotlinx.coroutines.CoroutineDispatcher
+import eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
+import eu.europa.ec.eudi.openid4vci.internal.formats.Formats
 import java.util.*
 
 /**
@@ -32,14 +34,13 @@ internal class DefaultIssuer(
     private val issuerMetadata: CredentialIssuerMetadata,
     config: OpenId4VCIConfig,
     ktorHttpClientFactory: KtorHttpClientFactory,
-    coroutineDispatcher: CoroutineDispatcher,
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
 ) : Issuer {
 
     private val authorizer: IssuanceAuthorizer =
-        IssuanceAuthorizer(coroutineDispatcher, authorizationServerMetadata, config, ktorHttpClientFactory)
+        IssuanceAuthorizer(authorizationServerMetadata, config, ktorHttpClientFactory)
     private val issuanceRequester: IssuanceRequester =
-        IssuanceRequester(coroutineDispatcher, issuerMetadata, ktorHttpClientFactory)
+        IssuanceRequester(issuerMetadata, ktorHttpClientFactory)
 
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec? by lazy {
         fun IssuanceResponseEncryptionSpec.isValid(meta: CredentialResponseEncryption.Required) {

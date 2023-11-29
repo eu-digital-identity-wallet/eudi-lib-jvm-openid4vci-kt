@@ -18,9 +18,6 @@ package eu.europa.ec.eudi.openid4vci.internal
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -70,28 +67,25 @@ private data class PreAuthorizedCodeTO(
  * A default implementation for [CredentialOfferRequestResolver].
  */
 internal class DefaultCredentialOfferRequestResolver(
-    private val ioCoroutineDispatcher: CoroutineDispatcher,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) : CredentialOfferRequestResolver {
 
     private val credentialIssuerMetadataResolver =
-        CredentialIssuerMetadataResolver(ioCoroutineDispatcher, ktorHttpClientFactory)
+        CredentialIssuerMetadataResolver(ktorHttpClientFactory)
     private val authorizationServerMetadataResolver =
-        AuthorizationServerMetadataResolver(ioCoroutineDispatcher, ktorHttpClientFactory)
+        AuthorizationServerMetadataResolver(ktorHttpClientFactory)
 
     override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> =
         runCatching {
             val credentialOfferRequestObjectString: String = when (request) {
                 is CredentialOfferRequest.PassByValue -> request.value
                 is CredentialOfferRequest.PassByReference ->
-                    withContext(ioCoroutineDispatcher + CoroutineName("credential-offer-request-object")) {
-                        try {
-                            ktorHttpClientFactory().use { client ->
-                                client.get(request.value.value).body()
-                            }
-                        } catch (t: Throwable) {
-                            throw CredentialOfferRequestError.UnableToFetchCredentialOffer(t).toException()
+                    try {
+                        ktorHttpClientFactory().use { client ->
+                            client.get(request.value.value).body()
                         }
+                    } catch (t: Throwable) {
+                        throw CredentialOfferRequestError.UnableToFetchCredentialOffer(t).toException()
                     }
             }
             val credentialOfferRequestObject = runCatching {
@@ -123,12 +117,17 @@ internal class DefaultCredentialOfferRequestResolver(
             val authorizationServer = when (grants) {
                 is Grants.AuthorizationCode -> grants.authorizationServer
                 is Grants.PreAuthorizedCode -> grants.authorizationServer
-                is Grants.Both -> grants.authorizationCode.authorizationServer ?: grants.preAuthorizedCode.authorizationServer
+                is Grants.Both ->
+                    grants.authorizationCode.authorizationServer
+                        ?: grants.preAuthorizedCode.authorizationServer
+
                 null -> null
             }
 
             val authorizationServerMetadata =
-                authorizationServerMetadataResolver.resolve(authorizationServer ?: credentialIssuerMetadata.authorizationServers[0])
+                authorizationServerMetadataResolver.resolve(
+                    authorizationServer ?: credentialIssuerMetadata.authorizationServers[0],
+                )
                     .getOrElse { CredentialOfferRequestError.UnableToResolveAuthorizationServerMetadata(it).raise() }
 
             CredentialOffer(

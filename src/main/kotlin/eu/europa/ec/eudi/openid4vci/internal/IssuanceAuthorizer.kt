@@ -28,9 +28,6 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationR
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
@@ -104,7 +101,6 @@ internal sealed interface AccessTokenRequestResponse {
  * Default implementation of [IssuanceAuthorizer] interface.
  */
 internal class IssuanceAuthorizer(
-    private val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val authorizationServerMetadata: CIAuthorizationServerMetadata,
     private val config: OpenId4VCIConfig,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
@@ -138,7 +134,7 @@ internal class IssuanceAuthorizer(
         ) {
             redirectionURI(config.authFlowRedirectionURI)
             codeChallenge(codeVerifier, CodeChallengeMethod.S256)
-            scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray()))
+            scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray() + "openid"))
             state(State(state))
             issuerState?.let { customParameter("issuer_state", issuerState) }
             build()
@@ -223,43 +219,40 @@ internal class IssuanceAuthorizer(
                 val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
                 AccessToken(accessToken) to cNonce
             }
+
             is AccessTokenRequestResponse.Failure ->
                 throw AccessTokenRequestFailed(error, errorDescription)
         }
 
     private suspend fun requestAccessToken(params: Map<String, String>): AccessTokenRequestResponse =
-        withContext(coroutineDispatcher) {
-            ktorHttpClientFactory().use { client ->
-                val url = authorizationServerMetadata.tokenEndpointURI.toURL()
-                val response = client.submitForm(
-                    url = url.toString(),
-                    formParameters = Parameters.build {
-                        params.entries.forEach { (k, v) -> append(k, v) }
-                    },
-                )
-                if (response.status.isSuccess()) response.body<AccessTokenRequestResponse.Success>()
-                else response.body<AccessTokenRequestResponse.Failure>()
-            }
+        ktorHttpClientFactory().use { client ->
+            val url = authorizationServerMetadata.tokenEndpointURI.toURL()
+            val response = client.submitForm(
+                url = url.toString(),
+                formParameters = Parameters.build {
+                    params.entries.forEach { (k, v) -> append(k, v) }
+                },
+            )
+            if (response.status.isSuccess()) response.body<AccessTokenRequestResponse.Success>()
+            else response.body<AccessTokenRequestResponse.Failure>()
         }
 
     private suspend fun pushAuthorizationRequest(
         parEndpoint: URI,
         pushedAuthorizationRequest: PushedAuthorizationRequest,
     ): PushedAuthorizationRequestResponse =
-        withContext(coroutineDispatcher) {
-            ktorHttpClientFactory().use { client ->
-                val url = parEndpoint.toURL()
-                val formParameters = pushedAuthorizationRequest.asFormPostParams()
-                val response = client.submitForm(
-                    url = url.toString(),
-                    formParameters = Parameters.build {
-                        formParameters.entries.forEach { (k, v) -> append(k, v) }
-                    },
+        ktorHttpClientFactory().use { client ->
+            val url = parEndpoint.toURL()
+            val formParameters = pushedAuthorizationRequest.asFormPostParams()
+            val response = client.submitForm(
+                url = url.toString(),
+                formParameters = Parameters.build {
+                    formParameters.entries.forEach { (k, v) -> append(k, v) }
+                },
 
-                )
-                if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
-                else response.body<PushedAuthorizationRequestResponse.Failure>()
-            }
+            )
+            if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
+            else response.body<PushedAuthorizationRequestResponse.Failure>()
         }
 
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =

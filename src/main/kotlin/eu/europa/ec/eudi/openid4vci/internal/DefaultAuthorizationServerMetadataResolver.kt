@@ -22,9 +22,6 @@ import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.withContext
 import net.minidev.json.JSONObject
 import java.net.URL
 
@@ -32,7 +29,6 @@ import java.net.URL
  * Default implementation for [AuthorizationServerMetadataResolver].
  */
 internal class DefaultAuthorizationServerMetadataResolver(
-    private val coroutineDispatcher: CoroutineDispatcher,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) : AuthorizationServerMetadataResolver {
 
@@ -79,11 +75,9 @@ internal class DefaultAuthorizationServerMetadataResolver(
      * using the provided [parser].
      */
     private suspend fun <T> fetchAndParse(url: URL, parser: (String) -> T): T =
-        withContext(coroutineDispatcher + CoroutineName("$url")) {
-            ktorHttpClientFactory().use { client ->
-                val body = client.get(url).body<String>()
-                parser(body)
-            }
+        ktorHttpClientFactory().use { client ->
+            val body = client.get(url).body<String>()
+            parser(body)
         }
 }
 
