@@ -37,7 +37,7 @@ import org.jsoup.nodes.FormElement
 import java.net.URI
 import java.net.URL
 
- const val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
+const val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
 val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
 
 const val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
@@ -217,7 +217,7 @@ private class Wallet(
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
-                    val issuedCredential = requestOutcome.credentials[0]
+                    val issuedCredential = requestOutcome.credentials.get(0)
                     when (issuedCredential) {
                         is IssuedCredential.Issued -> issuedCredential.credential
                         is IssuedCredential.Deferred -> {
@@ -290,6 +290,7 @@ private class Wallet(
         }
     }
 
+    @OptIn(InternalAPI::class)
     private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
         return httpClientFactory().use { client ->
             val loginUrl =
@@ -305,8 +306,8 @@ private class Wallet(
                     formParameters.entries.forEach { append(it.key, it.value) }
                 },
             )
-            val redirectLocation = response.headers["Location"].toString()
-            URLBuilder(redirectLocation).parameters["code"]
+            val redirectLocation = response.headers.get("Location").toString()
+            URLBuilder(redirectLocation).parameters.get("code")
         }
     }
 
@@ -344,6 +345,7 @@ private suspend fun buildIssuer(
     return Triple(authServerMetadata, issuerMetadata, issuer)
 }
 
+@OptIn(InternalAPI::class)
 private fun httpClientFactory(): HttpClient =
     HttpClient(Apache) {
         install(ContentNegotiation) {
