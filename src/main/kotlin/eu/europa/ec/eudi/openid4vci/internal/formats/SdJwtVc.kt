@@ -153,17 +153,6 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
         }
 
         @Serializable
-        data class CredentialMetadataObject(
-            @SerialName("format") @Required val format: String,
-            @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinition,
-        ) {
-            @Serializable
-            data class CredentialDefinition(
-                @SerialName("type") val type: String,
-            )
-        }
-
-        @Serializable
         @SerialName(FORMAT)
         data class CredentialIssuanceRequestTO(
             @SerialName("proof") override val proof: Proof? = null,

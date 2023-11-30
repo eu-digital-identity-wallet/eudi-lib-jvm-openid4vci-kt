@@ -30,7 +30,7 @@ import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
 import java.util.*
 
-internal interface Format<in S : CredentialSupported, out I : CredentialIssuanceRequest.SingleCredential> {
+internal fun interface Format<in S : CredentialSupported, out I : CredentialIssuanceRequest.SingleCredential> {
 
     fun constructIssuanceRequest(
         supportedCredential: S,
@@ -41,14 +41,6 @@ internal interface Format<in S : CredentialSupported, out I : CredentialIssuance
 }
 
 internal object Formats {
-
-    private val supported: Map<String, Format<*, *>> = mapOf(
-        MsoMdoc.FORMAT to MsoMdoc,
-        SdJwtVc.FORMAT to SdJwtVc,
-        W3CSignedJwt.FORMAT to W3CSignedJwt,
-        W3CJsonLdSignedJwt.FORMAT to W3CJsonLdSignedJwt,
-        W3CJsonLdDataIntegrity.FORMAT to W3CJsonLdDataIntegrity,
-    )
 
     fun constructIssuanceRequest(
         supportedCredential: CredentialSupported,

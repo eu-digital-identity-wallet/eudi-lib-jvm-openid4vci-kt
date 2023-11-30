@@ -135,18 +135,6 @@ internal data object W3CJsonLdSignedJwt : Format<
             )
         }
 
-        @Serializable
-        data class CredentialMetadataTO(
-            @SerialName("format") @Required val format: String,
-            @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinition,
-        ) {
-            @Serializable
-            data class CredentialDefinition(
-                @SerialName("type") val type: List<String>,
-                @SerialName("@context") val context: List<String>? = null,
-            )
-        }
-
         data class ClaimSet(
             val claims: Map<ClaimName, Claim>,
         ) : eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet

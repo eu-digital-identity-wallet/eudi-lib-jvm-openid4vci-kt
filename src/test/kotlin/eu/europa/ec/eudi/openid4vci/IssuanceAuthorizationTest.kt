@@ -550,13 +550,12 @@ class IssuanceAuthorizationTest {
                 ktorHttpClientFactory = ktorHttpClientFactory,
             ).resolve(issuerMetadata.authorizationServers[0]).getOrThrow()
 
-        val issuer = Issuer.make(
+        return Issuer.make(
             authorizationServerMetadata = authServerMetadata,
             config = vciWalletConfiguration,
             ktorHttpClientFactory = ktorHttpClientFactory,
             issuerMetadata = issuerMetadata,
         )
-        return issuer
     }
 
     private suspend fun credentialOffer(

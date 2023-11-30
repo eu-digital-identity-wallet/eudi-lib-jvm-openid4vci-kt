@@ -146,8 +146,8 @@ internal class DefaultCredentialOfferRequestResolver(
 private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata): Grants? {
     val maybeAuthorizationCodeGrant =
         authorizationCode?.let {
-            val authorizationServer = it.authorizationServer?.let {
-                val authServer = HttpsUrl(it).getOrThrow()
+            val authorizationServer = it.authorizationServer?.let { url ->
+                val authServer = HttpsUrl(url).getOrThrow()
                 require(credentialIssuerMetadata.authorizationServers.contains(authServer))
                 authServer
             }
@@ -155,8 +155,8 @@ private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata
         }
     val maybePreAuthorizedCodeGrant =
         preAuthorizedCode?.let {
-            val authorizationServer = it.authorizationServer?.let {
-                val authServer = HttpsUrl(it).getOrThrow()
+            val authorizationServer = it.authorizationServer?.let { url ->
+                val authServer = HttpsUrl(url).getOrThrow()
                 require(credentialIssuerMetadata.authorizationServers.contains(authServer))
                 authServer
             }
