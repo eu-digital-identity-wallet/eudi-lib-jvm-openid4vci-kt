@@ -29,7 +29,7 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
     internal fun `resolution success`() = runTest {
         val resolver = mockResolver(
             RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value),
+                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
             ),
         )
@@ -45,7 +45,7 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
         val metadataUrl = oidcAuthorizationServerMetadataUrl(issuer)
         val resolver = mockResolver(
             RequestMocker(
-                match(metadataUrl.value),
+                match(metadataUrl.value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
             ),
         )
@@ -60,7 +60,7 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
     internal fun `falls back to oauth server metadata`() = runTest {
         val resolver = mockResolver(
             RequestMocker(
-                match(oauthAuthorizationServerMetadataUrl().value),
+                match(oauthAuthorizationServerMetadataUrl().value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oauth_authorization_server_metadata.json"),
             ),
         )

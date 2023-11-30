@@ -21,8 +21,6 @@ import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.SerialName
 import java.io.Serializable
 import java.util.*
@@ -48,12 +46,13 @@ sealed interface CredentialResponseEncryption : Serializable {
  */
 data class CredentialIssuerMetadata(
     val credentialIssuerIdentifier: CredentialIssuerId,
-    val authorizationServer: HttpsUrl = credentialIssuerIdentifier.value,
+    val authorizationServers: List<HttpsUrl> = listOf(credentialIssuerIdentifier.value),
     val credentialEndpoint: CredentialIssuerEndpoint,
     val batchCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val credentialResponseEncryption: CredentialResponseEncryption = NotRequired,
-    val credentialsSupported: List<CredentialSupported>,
+    val credentialIdentifiersSupported: Boolean = false,
+    val credentialsSupported: Map<CredentialIdentifier, CredentialSupported>,
     val display: List<Display> = emptyList(),
 ) : Serializable {
 
@@ -86,7 +85,7 @@ value class CredentialIssuerEndpoint private constructor(val value: HttpsUrl) {
         operator fun invoke(value: String): Result<CredentialIssuerEndpoint> =
             HttpsUrl(value)
                 .mapCatching {
-                    require(it.value.fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
+                    require(it.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
                     CredentialIssuerEndpoint(it)
                 }
     }
@@ -271,11 +270,9 @@ fun interface CredentialIssuerMetadataResolver {
          * Creates a new [CredentialIssuerMetadataResolver] instance.
          */
         operator fun invoke(
-            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): CredentialIssuerMetadataResolver =
             DefaultCredentialIssuerMetadataResolver(
-                coroutineDispatcher = ioCoroutineDispatcher,
                 ktorHttpClientFactory = ktorHttpClientFactory,
             )
     }

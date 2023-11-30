@@ -19,7 +19,6 @@ import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponse
 import eu.europa.ec.eudi.openid4vci.internal.PushedAuthorizationRequestResponse
 import eu.europa.ec.eudi.openid4vci.internal.TokenEndpointForm
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -235,8 +234,8 @@ class IssuanceAuthorizationTest {
                 val parRequested =
                     pushAuthorizationCodeRequest(
                         listOf(
-                            CredentialMetadata.ByScope(Scope("eu.europa.ec.eudiw.pid_mso_mdoc")),
-                            CredentialMetadata.ByScope(Scope("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
+                            CredentialIdentifier("eu.europa.ec.eudiw.pid_mso_mdoc"),
+                            CredentialIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
                         ),
                         null,
                     ).getOrThrow()
@@ -300,8 +299,8 @@ class IssuanceAuthorizationTest {
             with(issuer) {
                 authorizeWithPreAuthorizationCode(
                     listOf(
-                        CredentialMetadata.ByScope(Scope("eu.europa.ec.eudiw.pid_mso_mdoc")),
-                        CredentialMetadata.ByScope(Scope("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
+                        CredentialIdentifier("eu.europa.ec.eudiw.pid_mso_mdoc"),
+                        CredentialIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
                     ),
                     PreAuthorizationCode("eyJhbGciOiJSU0EtFYUaBy", "pin"),
                 )
@@ -549,7 +548,7 @@ class IssuanceAuthorizationTest {
         val authServerMetadata =
             AuthorizationServerMetadataResolver(
                 ktorHttpClientFactory = ktorHttpClientFactory,
-            ).resolve(issuerMetadata.authorizationServer).getOrThrow()
+            ).resolve(issuerMetadata.authorizationServers[0]).getOrThrow()
 
         val issuer = Issuer.make(
             authorizationServerMetadata = authServerMetadata,

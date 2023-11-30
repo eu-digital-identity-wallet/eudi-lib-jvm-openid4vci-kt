@@ -29,33 +29,9 @@ import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import java.util.*
 
-internal data object MsoMdoc : Format<
-    MsoMdoc.Model.CredentialMetadata,
-    MsoMdoc.Model.CredentialSupported,
-    MsoMdoc.Model.CredentialIssuanceRequest,
-    > {
+internal data object MsoMdoc : Format<MsoMdoc.Model.CredentialSupported, MsoMdoc.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "mso_mdoc"
-
-    override fun matchSupportedCredentialByTypeAndMapToDomain(
-        jsonObject: JsonObject,
-        issuerMetadata: CredentialIssuerMetadata,
-    ): Model.CredentialMetadata {
-        val docType = Json.decodeFromJsonElement<Model.CredentialMetadataTO>(jsonObject).docType
-        return issuerMetadata.credentialsSupported
-            .filterIsInstance<Model.CredentialSupported>()
-            .firstOrNull { it.docType == docType }
-            ?.let { Model.CredentialMetadata(docType, it.scope) }
-            ?: error("Unsupported MsoMdocCredential with format '$FORMAT' and docType '$docType'")
-    }
-
-    override fun matchSupportedCredentialByType(
-        metadata: Model.CredentialMetadata,
-        issuerMetadata: CredentialIssuerMetadata,
-    ): CredentialSupported =
-        issuerMetadata.credentialsSupported
-            .firstOrNull { it is Model.CredentialSupported && it.docType == metadata.docType }
-            ?: throw IllegalArgumentException("Issuer does not support issuance of credential : $metadata")
 
     override fun constructIssuanceRequest(
         supportedCredential: Model.CredentialSupported,
@@ -181,14 +157,6 @@ internal data object MsoMdoc : Format<
             @SerialName("format") @Required val format: String,
             @SerialName("doctype") @Required val docType: String,
         )
-
-        /**
-         * An MSO MDOC credential metadata object.
-         */
-        data class CredentialMetadata(
-            val docType: String,
-            val scope: String? = null,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata.ByFormat
 
         @Serializable
         @SerialName(FORMAT)

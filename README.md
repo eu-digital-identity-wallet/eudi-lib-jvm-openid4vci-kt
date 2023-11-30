@@ -167,7 +167,7 @@ Given an `issuer` use [Authorization Code Flow](https://openid.github.io/OpenID4
 import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {
-    val parPlaced = pushAuthorizationCodeRequest(credentialMetadata, null).getOrThrow()
+    val parPlaced = pushAuthorizationCodeRequest(credentialIdentifiers, null).getOrThrow()
     val authorizationCode = ... // using url parPlaced.getAuthorizationCodeURL authenticate via front-channel on authorization server and retrieve authorization code 
     val authorizedRequest = 
         parPlaced
@@ -185,7 +185,7 @@ import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {
     val preAuthorizationCode = ... // pre-authorization code as contained in a credential offer 
-    val authorizedRequest = authorizeWithPreAuthorizationCode(credentials, preAuthorizationCode).getOrThrow()    
+    val authorizedRequest = authorizeWithPreAuthorizationCode(credentialIdentifiers, preAuthorizationCode).getOrThrow()    
 }
 ```
 
@@ -198,7 +198,7 @@ import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {
     val submittedRequest =
-        authorizedRequest.requestSingle(credentialMetadata, claimSet, bindingKey).getOrThrow()
+        authorizedRequest.requestSingle(credentialIdentifiers, claimSet, bindingKey).getOrThrow()
 
     when (submittedRequest) {
         is SubmittedRequest.Success -> {
@@ -222,7 +222,7 @@ Given an `authorizedRequest` and in the context of an `issuer` a batch credentia
 import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {    
-    val submittedRequest = authorizedRequest.requestBatch(credentialMetadata).getOrThrow()
+    val submittedRequest = authorizedRequest.requestBatch(credentialsMetadata).getOrThrow()
 
     when (requestOutcome) {
         is SubmittedRequest.Success -> {
@@ -239,21 +239,23 @@ with(issuer) {
 }
 ```
 
-## OpenId4VCI features supported
+## Features supported
 
-### Credential Offer
+### Authorization Endpoint
+Specification defines ([section 5.1.1](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-5.1.1)) that a credential's issuance can be requested using authorization_details parameter when using authorization code flow.
+Current version of the library does not support that. It only supports requesting issuance using `scope` parameter in the authorization endpoint. 
 
-###  `credentials` 
-Specification defines that for this required parameter (of type JSON array) its elements can be JSON Strings or JSON Objects. In the current version of the library only JSON String values are supported.
-Section [5.1.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-5.1.2) defines the way to process them. They are used as `scope` values that are: 
--   Included as the "scope" parameter in the authorization grant type
--   Are validated against issuer's metadata for existance in 'credentials_supported' metadata attribute (see section [10.2.3](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-10.2.3))  
+### Token Endpoint
+Specification defines ([section 6.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-6.2)) that upon a successful token response `authorization_details` is included in response,
+if `authorization_details` parameter is used in authorization endpoint. Current version of library is not parsing/utilizing this response attribute.
 
 ### Credential Request
 Current version of the library only integrations with issuer's [Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-credential-endpoint),
 [Batch Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-batch-credential-endpoint) and
 [Deferred Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-deferred-credential-endpoin)
 are supported.
+
+**NOTE:** Attribute `credential_identifier` of a single (or batch) credential request(s) is not supported.
 
 #### Credential Format Profiles
 OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library focuses only on **mso_mdoc** format as specified in section [E.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-iso-mdl)  

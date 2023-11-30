@@ -42,7 +42,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                 },
                 requestValidator = {
                     assertEquals(
-                        credentialIssuerMetadataUrl().value,
+                        credentialIssuerMetadataUrl().value.toURI(),
                         it.url.toURI(),
                     )
                 },
@@ -58,11 +58,11 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
     internal fun `fails when metadata cannot be parsed`() = runTest {
         val resolver = resolver(
             RequestMocker(
-                requestMatcher = match(credentialIssuerMetadataUrl().value),
+                requestMatcher = match(credentialIssuerMetadataUrl().value.toURI()),
                 responseBuilder = jsonResponse("eu/europa/ec/eudi/openid4vci/internal/invalid_credential_issuer_metadata.json"),
                 requestValidator = {
                     assertEquals(
-                        credentialIssuerMetadataUrl().value,
+                        credentialIssuerMetadataUrl().value.toURI(),
                         it.url.toURI(),
                     )
                 },
@@ -79,11 +79,11 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl(credentialIssuerId)
         val resolver = resolver(
             RequestMocker(
-                requestMatcher = match(credentialIssuerMetadataUrl.value),
+                requestMatcher = match(credentialIssuerMetadataUrl.value.toURI()),
                 responseBuilder = jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
                 requestValidator = {
                     assertEquals(
-                        credentialIssuerMetadataUrl.value,
+                        credentialIssuerMetadataUrl.value.toURI(),
                         it.url.toURI(),
                     )
                 },
@@ -102,13 +102,13 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         val resolver = resolver(
             RequestMocker(
-                requestMatcher = match(credentialIssuerMetadataUrl.value),
+                requestMatcher = match(credentialIssuerMetadataUrl.value.toURI()),
                 responseBuilder = jsonResponse(
                     "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_no_asymmetric_algs.json",
                 ),
                 requestValidator = {
                     assertEquals(
-                        credentialIssuerMetadataUrl.value,
+                        credentialIssuerMetadataUrl.value.toURI(),
                         it.url.toURI(),
                     )
                 },
@@ -126,11 +126,11 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         val resolver = resolver(
             RequestMocker(
-                requestMatcher = match(credentialIssuerMetadataUrl.value),
+                requestMatcher = match(credentialIssuerMetadataUrl.value.toURI()),
                 responseBuilder = jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
                 requestValidator = {
                     assertEquals(
-                        credentialIssuerMetadataUrl.value,
+                        credentialIssuerMetadataUrl.value.toURI(),
                         it.url.toURI(),
                     )
                 },

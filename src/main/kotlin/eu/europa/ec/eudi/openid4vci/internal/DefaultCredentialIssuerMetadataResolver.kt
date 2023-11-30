@@ -23,10 +23,7 @@ import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupportedTO
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -38,7 +35,7 @@ import kotlinx.serialization.json.Json
 @Serializable
 private data class CredentialIssuerMetadataTO(
     @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
-    @SerialName("authorization_server") val authorizationServer: String? = null,
+    @SerialName("authorization_servers") val authorizationServers: List<String>? = null,
     @SerialName("credential_endpoint") @Required val credentialEndpoint: String,
     @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
     @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
@@ -48,7 +45,9 @@ private data class CredentialIssuerMetadataTO(
     val credentialResponseEncryptionMethodsSupported: List<String>? = null,
     @SerialName("require_credential_response_encryption")
     val requireCredentialResponseEncryption: Boolean? = null,
-    @SerialName("credentials_supported") val credentialsSupported: List<CredentialSupportedTO> = emptyList(),
+    @SerialName("credential_identifiers_supported")
+    val credentialIdentifiersSupported: Boolean? = null,
+    @SerialName("credentials_supported") val credentialsSupported: Map<String, CredentialSupportedTO> = emptyMap(),
     @SerialName("display") val display: List<DisplayTO>? = null,
 )
 
@@ -97,7 +96,6 @@ internal data class DisplayTO(
  * Default implementation of [CredentialIssuerMetadataResolver].
  */
 internal class DefaultCredentialIssuerMetadataResolver(
-    private val coroutineDispatcher: CoroutineDispatcher,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) : CredentialIssuerMetadataResolver {
 
@@ -111,9 +109,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                         .toURI()
                         .toURL()
 
-                withContext(coroutineDispatcher + CoroutineName("/.well-known/openid-credential-issuer")) {
-                    ktorHttpClientFactory().use { client -> client.get(url).body<String>() }
-                }
+                ktorHttpClientFactory().use { client -> client.get(url).body<String>() }
             } catch (t: Throwable) {
                 throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
             }
@@ -143,9 +139,9 @@ private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetada
     val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
         .getOrThrowAs { InvalidCredentialIssuerId(it) }
 
-    val authorizationServer = authorizationServer
-        ?.let { HttpsUrl(it).getOrThrowAs(::InvalidAuthorizationServer) }
-        ?: credentialIssuerIdentifier.value
+    val authorizationServers = authorizationServers
+        ?.let { servers -> servers.map { HttpsUrl(it).getOrThrowAs(::InvalidAuthorizationServer) } }
+        ?: listOf(credentialIssuerIdentifier.value)
 
     val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
         .getOrThrowAs(::InvalidCredentialEndpoint)
@@ -157,7 +153,9 @@ private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetada
         ?.let { CredentialIssuerEndpoint(it).getOrThrowAs(::InvalidDeferredCredentialEndpoint) }
 
     val credentialsSupported = try {
-        credentialsSupported.map { it.toDomain() }
+        credentialsSupported.map {
+            CredentialIdentifier(it.key) to it.value.toDomain()
+        }.toMap()
     } catch (it: Throwable) {
         throw InvalidCredentialsSupported(it)
     }.apply {
@@ -168,11 +166,12 @@ private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetada
 
     CredentialIssuerMetadata(
         credentialIssuerIdentifier,
-        authorizationServer,
+        authorizationServers,
         credentialEndpoint,
         batchCredentialEndpoint,
         deferredCredentialEndpoint,
         credentialResponseEncryption().getOrThrow(),
+        credentialIdentifiersSupported ?: false,
         credentialsSupported,
         display,
     )

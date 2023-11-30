@@ -20,8 +20,6 @@ import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer
 import eu.europa.ec.eudi.openid4vci.internal.IssuanceAuthorizer
 import eu.europa.ec.eudi.openid4vci.internal.IssuanceRequester
 import eu.europa.ec.eudi.openid4vci.internal.KeyGenerator
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 
 typealias ResponseEncryptionSpecFactory = (CredentialResponseEncryption.Required, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec
 
@@ -46,14 +44,12 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             issuerMetadata: CredentialIssuerMetadata,
             config: OpenId4VCIConfig,
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
-            coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Issuer = DefaultIssuer(
             authorizationServerMetadata,
             issuerMetadata,
             config,
             ktorHttpClientFactory,
-            coroutineDispatcher,
             responseEncryptionSpecFactory,
         )
 

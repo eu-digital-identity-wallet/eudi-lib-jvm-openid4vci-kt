@@ -19,7 +19,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.BatchIssuanceSuccessResponse
 import eu.europa.ec.eudi.openid4vci.internal.CertificateIssuanceResponse
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialMetadata
 import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
 import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
 import io.ktor.client.engine.mock.*
@@ -134,8 +133,8 @@ class IssuanceBatchRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialMetadata = listOf(
-                        CredentialMetadata.ByScope(Scope(PID_MsoMdoc_SCOPE)) to claimSet_mso_mdoc,
-                        CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE)) to claimSet_sd_jwt_vc,
+                        CredentialIdentifier(PID_MsoMdoc_SCOPE) to claimSet_mso_mdoc,
+                        CredentialIdentifier(PID_SdJwtVC_SCOPE) to claimSet_sd_jwt_vc,
                     )
 
                     val submittedRequest =
@@ -147,12 +146,12 @@ class IssuanceBatchRequestTest {
 
                             val credentialMetadataTriples = listOf(
                                 Triple(
-                                    CredentialMetadata.ByScope(Scope(PID_MsoMdoc_SCOPE)),
+                                    CredentialIdentifier(PID_MsoMdoc_SCOPE),
                                     claimSet_mso_mdoc,
                                     bindingKey,
                                 ),
                                 Triple(
-                                    CredentialMetadata.ByScope(Scope(PID_SdJwtVC_SCOPE)),
+                                    CredentialIdentifier(PID_SdJwtVC_SCOPE),
                                     claimSet_sd_jwt_vc,
                                     bindingKey,
                                 ),

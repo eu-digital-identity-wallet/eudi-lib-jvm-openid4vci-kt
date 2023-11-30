@@ -261,7 +261,7 @@ internal fun universityDegreeJwtVcJsonLD() =
  */
 internal fun mobileDrivingLicense() =
     MsoMdoc.Model.CredentialSupported(
-        "mDL",
+        "MobileDrivingLicense_msoMdoc",
         listOf(CryptographicBindingMethod.MSO),
         listOf("ES256", "ES384", "ES512"),
         listOf(ProofType.JWT),
@@ -311,7 +311,7 @@ internal fun mobileDrivingLicense() =
 internal fun credentialIssuerMetadata() =
     CredentialIssuerMetadata(
         credentialIssuerId(),
-        authorizationServerIssuer(),
+        listOf(authorizationServerIssuer()),
         CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials").getOrThrow(),
         CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/batch").getOrThrow(),
         CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/deferred").getOrThrow(),
@@ -322,7 +322,13 @@ internal fun credentialIssuerMetadata() =
             ),
             listOf(EncryptionMethod.XC20P),
         ),
-        listOf(universityDegreeJwt(), mobileDrivingLicense(), universityDegreeLdpVc(), universityDegreeJwtVcJsonLD()),
+        true,
+        mapOf(
+            CredentialIdentifier("UniversityDegree_JWT") to universityDegreeJwt(),
+            CredentialIdentifier("MobileDrivingLicense_msoMdoc") to mobileDrivingLicense(),
+            CredentialIdentifier("UniversityDegree_LDP_VC") to universityDegreeLdpVc(),
+            CredentialIdentifier("UniversityDegree_JWT_VC_JSON-LD") to universityDegreeJwtVcJsonLD(),
+        ),
         listOf(CredentialIssuerMetadata.Display("credential-issuer.example.com", "en-US")),
     )
 
@@ -331,7 +337,7 @@ internal fun credentialIssuerMetadata() =
  */
 internal fun oidcAuthorizationServerMetadata(): OIDCProviderMetadata =
     OIDCProviderMetadata(
-        Issuer(authorizationServerIssuer().value),
+        Issuer(authorizationServerIssuer().value.toURI()),
         listOf(
             "public",
             "pairwise",
@@ -637,7 +643,7 @@ internal fun oidcAuthorizationServerMetadata(): OIDCProviderMetadata =
  */
 internal fun oauthAuthorizationServerMetadata(): AuthorizationServerMetadata =
     AuthorizationServerMetadata(
-        Issuer(authorizationServerIssuer().value),
+        Issuer(authorizationServerIssuer().value.toURI()),
     ).apply {
         val realmBaseUrl = "https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm"
         val oidcProtocolBaseUrl = "$realmBaseUrl/protocol/openid-connect"

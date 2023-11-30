@@ -34,8 +34,6 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -139,7 +137,6 @@ internal data class CredentialIssuanceResponse(
  * Default implementation of [IssuanceRequester] interface.
  */
 internal class IssuanceRequester(
-    private val coroutineDispatcher: CoroutineDispatcher,
     private val issuerMetadata: CredentialIssuerMetadata,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
@@ -154,12 +151,10 @@ internal class IssuanceRequester(
     suspend fun placeIssuanceRequest(
         accessToken: AccessToken,
         request: CredentialIssuanceRequest.SingleCredential,
-    ): Result<CredentialIssuanceResponse> = withContext(coroutineDispatcher) {
+    ): Result<CredentialIssuanceResponse> =
         runCatching {
             ktorHttpClientFactory().use { client ->
-
-                val url = issuerMetadata.credentialEndpoint.value.value.toURL()
-
+                val url = issuerMetadata.credentialEndpoint.value.value
                 val response = client.post(url) {
                     bearerAuth(accessToken.accessToken)
                     contentType(ContentType.Application.Json)
@@ -168,7 +163,6 @@ internal class IssuanceRequester(
                 handleResponseSingle(response, request)
             }
         }
-    }
 
     /**
      * Method that submits a request to credential issuer for the batch issuance of credentials.
@@ -184,17 +178,15 @@ internal class IssuanceRequester(
         if (issuerMetadata.batchCredentialEndpoint == null) {
             throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance
         }
-        withContext(coroutineDispatcher) {
-            ktorHttpClientFactory().use { client ->
-                val url = issuerMetadata.batchCredentialEndpoint.value.value.toURL()
-                val payload = request.toTransferObject()
-                val response = client.post(url) {
-                    bearerAuth(accessToken.accessToken)
-                    contentType(ContentType.Application.Json)
-                    setBody(payload)
-                }
-                handleResponseBatch(response)
+        ktorHttpClientFactory().use { client ->
+            val url = issuerMetadata.batchCredentialEndpoint.value.value
+            val payload = request.toTransferObject()
+            val response = client.post(url) {
+                bearerAuth(accessToken.accessToken)
+                contentType(ContentType.Application.Json)
+                setBody(payload)
             }
+            handleResponseBatch(response)
         }
     }
 
@@ -274,16 +266,14 @@ internal class IssuanceRequester(
         if (issuerMetadata.deferredCredentialEndpoint == null) {
             throw CredentialIssuanceError.IssuerDoesNotSupportDeferredIssuance
         }
-        withContext(coroutineDispatcher) {
-            ktorHttpClientFactory().use { client ->
-                val url = issuerMetadata.deferredCredentialEndpoint.value.value.toURL()
-                val response = client.post(url) {
-                    bearerAuth(accessToken.accessToken)
-                    contentType(ContentType.Application.Json)
-                    setBody(transactionId.toDeferredRequestTO())
-                }
-                handleResponseDeferred(response)
+        ktorHttpClientFactory().use { client ->
+            val url = issuerMetadata.deferredCredentialEndpoint.value.value
+            val response = client.post(url) {
+                bearerAuth(accessToken.accessToken)
+                contentType(ContentType.Application.Json)
+                setBody(transactionId.toDeferredRequestTO())
             }
+            handleResponseDeferred(response)
         }
     }
 

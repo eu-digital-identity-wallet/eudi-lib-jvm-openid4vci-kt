@@ -20,15 +20,15 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
-import io.ktor.client.*
 import java.net.URI
+import java.net.URL
 import java.security.cert.X509Certificate
 
 /**
  * A [URI] that strictly uses the 'https' protocol.
  */
 @JvmInline
-value class HttpsUrl private constructor(val value: URI) {
+value class HttpsUrl private constructor(val value: URL) {
 
     override fun toString(): String = value.toString()
 
@@ -40,8 +40,15 @@ value class HttpsUrl private constructor(val value: URI) {
         operator fun invoke(value: String): Result<HttpsUrl> = runCatching {
             val uri = URI.create(value)
             require(uri.scheme.contentEquals("https", true)) { "URL must use https protocol" }
-            HttpsUrl(uri)
+            HttpsUrl(uri.toURL())
         }
+    }
+}
+
+@JvmInline
+value class CredentialIdentifier(val value: String) {
+    init {
+        require(value.isNotEmpty()) { "value cannot be empty" }
     }
 }
 

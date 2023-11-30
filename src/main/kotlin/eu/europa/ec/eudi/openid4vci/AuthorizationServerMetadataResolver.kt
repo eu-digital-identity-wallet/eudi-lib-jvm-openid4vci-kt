@@ -16,8 +16,6 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.DefaultAuthorizationServerMetadataResolver
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 
 /**
  * Indicates an error during the resolution of an Authorization Server's metadata.
@@ -40,11 +38,9 @@ fun interface AuthorizationServerMetadataResolver {
          * Creates a new [AuthorizationServerMetadataResolver] instance.
          */
         operator fun invoke(
-            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): AuthorizationServerMetadataResolver =
             DefaultAuthorizationServerMetadataResolver(
-                coroutineDispatcher = ioCoroutineDispatcher,
                 ktorHttpClientFactory = ktorHttpClientFactory,
             )
     }
