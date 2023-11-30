@@ -322,8 +322,8 @@ internal class IssuanceRequester(
         CredentialIssuanceResponse(
             cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
             credentials = credentialResponses.map {
-                it.transactionId?.let {
-                    IssuedCredential.Deferred(TransactionId(it))
+                it.transactionId?.let { transactionId ->
+                    IssuedCredential.Deferred(TransactionId(transactionId))
                 } ?: it.credential?.let { credential ->
                     IssuedCredential.Issued(it.format, credential)
                 } ?: throw CredentialIssuanceError.ResponseUnparsable(

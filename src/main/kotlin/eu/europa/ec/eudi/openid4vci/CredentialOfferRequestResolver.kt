@@ -201,11 +201,9 @@ sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestE
      * The Credential Offer Endpoint URL either contained neither the 'credential_offer' nor the 'credential_offer_uri'
      * parameter or contained both of them.
      */
-    object OneOfCredentialOfferOrCredentialOfferUri : CredentialOfferRequestValidationError {
+    data object OneOfCredentialOfferOrCredentialOfferUri : CredentialOfferRequestValidationError {
 
         private fun readResolve(): Any = OneOfCredentialOfferOrCredentialOfferUri
-
-        override fun toString(): String = "OneOfCredentialOfferOrCredentialOfferUri"
     }
 
     /**

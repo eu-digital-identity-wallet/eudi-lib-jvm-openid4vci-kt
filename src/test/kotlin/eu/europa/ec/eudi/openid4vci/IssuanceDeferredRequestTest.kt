@@ -226,7 +226,7 @@ class IssuanceDeferredRequestTest {
                     }
 
                     assertTrue("Authorization header malformed.") {
-                        it.headers.get("Authorization")?.contains("Bearer") ?: false
+                        it.headers["Authorization"]?.contains("Bearer") ?: false
                     }
                     assertTrue("Content Type must be application/json") {
                         it.body.contentType == ContentType.parse("application/json")

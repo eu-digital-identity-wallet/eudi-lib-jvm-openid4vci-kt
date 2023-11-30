@@ -153,12 +153,6 @@ internal data object MsoMdoc : Format<MsoMdoc.Model.CredentialSupported, MsoMdoc
         ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
 
         @Serializable
-        data class CredentialMetadataTO(
-            @SerialName("format") @Required val format: String,
-            @SerialName("doctype") @Required val docType: String,
-        )
-
-        @Serializable
         @SerialName(FORMAT)
         data class CredentialIssuanceRequestTO(
             @SerialName("doctype") val docType: String,
