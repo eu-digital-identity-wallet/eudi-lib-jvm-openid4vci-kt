@@ -167,7 +167,7 @@ Given an `issuer` use [Authorization Code Flow](https://openid.github.io/OpenID4
 import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {
-    val parPlaced = pushAuthorizationCodeRequest(credentialMetadata, null).getOrThrow()
+    val parPlaced = pushAuthorizationCodeRequest(credentialIdentifiers, null).getOrThrow()
     val authorizationCode = ... // using url parPlaced.getAuthorizationCodeURL authenticate via front-channel on authorization server and retrieve authorization code 
     val authorizedRequest = 
         parPlaced
@@ -185,7 +185,7 @@ import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {
     val preAuthorizationCode = ... // pre-authorization code as contained in a credential offer 
-    val authorizedRequest = authorizeWithPreAuthorizationCode(credentials, preAuthorizationCode).getOrThrow()    
+    val authorizedRequest = authorizeWithPreAuthorizationCode(credentialIdentifiers, preAuthorizationCode).getOrThrow()    
 }
 ```
 
@@ -198,7 +198,7 @@ import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {
     val submittedRequest =
-        authorizedRequest.requestSingle(credentialMetadata, claimSet, bindingKey).getOrThrow()
+        authorizedRequest.requestSingle(credentialIdentifiers, claimSet, bindingKey).getOrThrow()
 
     when (submittedRequest) {
         is SubmittedRequest.Success -> {
@@ -222,7 +222,7 @@ Given an `authorizedRequest` and in the context of an `issuer` a batch credentia
 import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {    
-    val submittedRequest = authorizedRequest.requestBatch(credentialMetadata).getOrThrow()
+    val submittedRequest = authorizedRequest.requestBatch(credentialsMetadata).getOrThrow()
 
     when (requestOutcome) {
         is SubmittedRequest.Success -> {
