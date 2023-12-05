@@ -29,6 +29,9 @@ import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import java.util.*
 
+fun CredentialIssuerMetadata.findScopeForMsoMdoc(docType: String): String? =
+    findByFormat<MsoMdoc.Model.CredentialSupported> { it.docType == docType }.values.firstOrNull()?.scope
+
 internal data object MsoMdoc : Format<MsoMdoc.Model.CredentialSupported, MsoMdoc.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "mso_mdoc"
