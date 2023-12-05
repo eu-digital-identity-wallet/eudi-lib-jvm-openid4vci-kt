@@ -60,6 +60,10 @@ data class CredentialIssuerMetadata(
         require(credentialsSupported.isNotEmpty()) { "credentialsSupported must not be empty" }
     }
 
+    inline fun <reified T : CredentialSupported> findByFormat(predicate: (T) -> Boolean): Map<CredentialIdentifier, T> {
+        return credentialsSupported.mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }.toMap()
+    }
+
     /**
      * The display properties of the Credential Issuer.
      */
