@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSSigner
 import eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
 
 /**
@@ -256,14 +258,13 @@ interface RequestIssuance {
      *  @param credentialId   The identifier of the credential that will be requested.
      *  @param claimSet     Optional parameter to specify the specific set of claims that are requested to be included in the
      *          credential to be issued.
-     *  @param bindingKey   Cryptographic material to be used from issuer to bind the issued credential to a holder.
+     *  @param proofSigner  Signer component of the proof to be sent.
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
-        bindingKey: BindingKey,
-
+        proofSigner: ProofSigner,
     ): Result<SubmittedRequest>
 
     /**
@@ -281,10 +282,11 @@ interface RequestIssuance {
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
      *
      *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
+     *  @param proofSigner  Signer component of the proof to be sent.
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, BindingKey>>,
+        credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, ProofSigner>>,
     ): Result<SubmittedRequest>
 
     /**
@@ -327,4 +329,11 @@ fun interface QueryForDeferredCredential {
     suspend fun AuthorizedRequest.queryForDeferredCredential(
         deferredCredential: IssuedCredential.Deferred,
     ): Result<DeferredCredentialQueryOutcome>
+}
+
+interface ProofSigner : JWSSigner {
+
+    fun getBindingKey(): BindingKey
+
+    fun getAlgorithm(): JWSAlgorithm
 }

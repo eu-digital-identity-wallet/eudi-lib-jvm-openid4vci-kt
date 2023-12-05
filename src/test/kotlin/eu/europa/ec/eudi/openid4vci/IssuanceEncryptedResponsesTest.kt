@@ -298,10 +298,6 @@ class IssuanceEncryptedResponsesTest {
                     ),
                 ),
             )
-            val bindingKey = BindingKey.Jwk(
-                algorithm = JWSAlgorithm.RS256,
-                jwk = randomRSASigningKey(2048),
-            )
 
             val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
@@ -327,7 +323,7 @@ class IssuanceEncryptedResponsesTest {
                                 val proofRequired =
                                     authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                                 val response =
-                                    proofRequired.requestSingle(credentialMetadata, claimSet, bindingKey)
+                                    proofRequired.requestSingle(credentialMetadata, claimSet, CryptoGenerator.rsaProofSigner())
                                 assertThat(
                                     "Second attempt should be successful",
                                     response.getOrThrow() is SubmittedRequest.Success,

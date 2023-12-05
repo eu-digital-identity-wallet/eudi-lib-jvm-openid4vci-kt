@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.DeferredIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
@@ -75,11 +74,6 @@ class IssuanceDeferredRequestTest {
                 AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
             )
 
-        val bindingKey = BindingKey.Jwk(
-            algorithm = JWSAlgorithm.RS256,
-            jwk = KeyGenerator.randomRSASigningKey(2048),
-        )
-
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
@@ -91,7 +85,7 @@ class IssuanceDeferredRequestTest {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val secondSubmittedRequest =
-                                proofRequired.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
+                                proofRequired.requestSingle(credentialMetadata, null, CryptoGenerator.rsaProofSigner()).getOrThrow()
 
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
@@ -155,11 +149,6 @@ class IssuanceDeferredRequestTest {
                 AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
             )
 
-        val bindingKey = BindingKey.Jwk(
-            algorithm = JWSAlgorithm.RS256,
-            jwk = KeyGenerator.randomRSASigningKey(2048),
-        )
-
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
@@ -171,7 +160,7 @@ class IssuanceDeferredRequestTest {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val secondSubmittedRequest =
-                                proofRequired.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
+                                proofRequired.requestSingle(credentialMetadata, null, CryptoGenerator.rsaProofSigner()).getOrThrow()
 
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
@@ -248,11 +237,6 @@ class IssuanceDeferredRequestTest {
                 AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
             )
 
-        val bindingKey = BindingKey.Jwk(
-            algorithm = JWSAlgorithm.RS256,
-            jwk = KeyGenerator.randomRSASigningKey(2048),
-        )
-
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
@@ -264,7 +248,7 @@ class IssuanceDeferredRequestTest {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val secondSubmittedRequest =
-                                proofRequired.requestSingle(credentialMetadata, null, bindingKey).getOrThrow()
+                                proofRequired.requestSingle(credentialMetadata, null, CryptoGenerator.rsaProofSigner()).getOrThrow()
 
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {

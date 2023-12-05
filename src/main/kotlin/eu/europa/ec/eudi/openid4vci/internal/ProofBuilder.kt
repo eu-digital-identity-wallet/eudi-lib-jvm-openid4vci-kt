@@ -16,13 +16,12 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
-import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vci.ProofSigner
 import eu.europa.ec.eudi.openid4vci.ProofType
 import java.time.Instant
 import java.util.*
@@ -31,24 +30,17 @@ import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
 internal sealed interface ProofBuilder {
-
-    fun alg(alg: JWSAlgorithm)
     fun jwk(jwk: JWK)
     fun iss(iss: String)
     fun aud(aud: String)
     fun nonce(nonce: String)
-    fun build(): Proof
+    fun build(proofSigner: ProofSigner): Proof
 
     private class JwtProofBuilder : ProofBuilder {
 
         val HEADER_TYPE = "openid4vci-proof+jwt"
         val claimsSet = JWTClaimsSet.Builder()
-        var alg: JWSAlgorithm? = null
         var jwk: JWK? = null
-
-        override fun alg(alg: JWSAlgorithm) {
-            this.alg = alg
-        }
 
         override fun jwk(jwk: JWK) {
             this.jwk = jwk
@@ -66,14 +58,12 @@ internal sealed interface ProofBuilder {
             claimsSet.claim("nonce", nonce)
         }
 
-        override fun build(): Proof.Jwt {
-            checkNotNull(alg) {
-                "No signing algorithm provided"
-            }
+        override fun build(proofSigner: ProofSigner): Proof.Jwt {
             checkNotNull(jwk) {
                 "Cryptographic key material must be provided"
             }
-            check(jwk?.keyType == KeyType.forAlgorithm(alg)) {
+            val algorithm = proofSigner.getAlgorithm()
+            check(jwk?.keyType == KeyType.forAlgorithm(algorithm)) {
                 "Provided key and signing algorithm do not match"
             }
             checkNotNull(claimsSet.claims["aud"]) {
@@ -83,15 +73,14 @@ internal sealed interface ProofBuilder {
                 "Claim 'nonce' is missing"
             }
 
-            val headerBuilder = JWSHeader.Builder(alg)
+            val headerBuilder = JWSHeader.Builder(algorithm)
             headerBuilder.type(JOSEObjectType(HEADER_TYPE))
             headerBuilder.jwk(jwk!!.toPublicJWK())
 
             claimsSet.issueTime(Date.from(Instant.now()))
 
             val signedJWT = SignedJWT(headerBuilder.build(), claimsSet.build())
-            val signer = DefaultJWSSignerFactory().createJWSSigner(jwk!!, alg)
-            signedJWT.sign(signer)
+            signedJWT.sign(proofSigner)
 
             return Proof.Jwt(signedJWT)
         }

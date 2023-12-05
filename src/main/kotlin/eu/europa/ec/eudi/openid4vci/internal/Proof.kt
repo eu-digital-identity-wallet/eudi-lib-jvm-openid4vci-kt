@@ -50,13 +50,14 @@ internal sealed interface Proof {
  */
 internal fun createProof(
     issuerMetadata: CredentialIssuerMetadata,
-    bindingKey: BindingKey,
     credentialSpec: CredentialSupported,
     cNonce: String,
-): Proof = when (bindingKey) {
-    is BindingKey.Jwk -> {
+    proofSigner: ProofSigner,
+    proofType: ProofType,
+): Proof = when (proofType) {
+    ProofType.JWT -> {
         fun isAlgorithmSupported(): Boolean =
-            credentialSpec.cryptographicSuitesSupported.contains(bindingKey.algorithm.name)
+            credentialSpec.cryptographicSuitesSupported.contains(proofSigner.getAlgorithm().toString())
 
         fun isBindingMethodSupported(): Boolean =
             credentialSpec.cryptographicBindingMethodsSupported.contains(CryptographicBindingMethod.JWK)
@@ -76,14 +77,18 @@ internal fun createProof(
 
         ProofBuilder.ofType(ProofType.JWT) {
             aud(issuerMetadata.credentialIssuerIdentifier.toString())
-            jwk(bindingKey.jwk)
-            alg(bindingKey.algorithm)
+
+            when (val bindingKey = proofSigner.getBindingKey()) {
+                is BindingKey.Jwk -> jwk(bindingKey.jwk)
+                is BindingKey.Did -> TODO("DID proof evidence not supported yet")
+                is BindingKey.X509 -> TODO("X509 proof evidence not supported yet")
+            }
+
             nonce(cNonce)
 
-            build()
+            build(proofSigner)
         }
     }
 
-    is BindingKey.Did -> TODO("DID proof evidence not supported yet")
-    is BindingKey.X509 -> TODO("X509 proof evidence not supported yet")
+    ProofType.CWT -> TODO("CWT Proofs are not yet supported")
 }
