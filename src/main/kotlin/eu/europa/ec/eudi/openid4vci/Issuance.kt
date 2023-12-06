@@ -331,6 +331,11 @@ fun interface QueryForDeferredCredential {
     ): Result<DeferredCredentialQueryOutcome>
 }
 
+/**
+ * Interface for implementing the signing process of a proof. It extends [JWSSigner] of nimbus.
+ * Implementations should be initialized with the specifics of the proof signing, that is the binding key to be included
+ * in the proof and the signing algorithm that will be used for signing.
+ */
 interface ProofSigner : JWSSigner {
 
     fun getBindingKey(): BindingKey

@@ -37,13 +37,13 @@ object CryptoGenerator {
         .keyID(UUID.randomUUID().toString())
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
+
     fun rsaProofSigner(): DelegatingProofSigner {
         val keyPair = randomRSASigningKey(2048)
         val bindingKey = BindingKey.Jwk(
             jwk = keyPair.toPublicJWK(),
         )
-        val proofSigner = DelegatingProofSigner(keyPair, JWSAlgorithm.RS256, bindingKey)
-        return proofSigner
+        return DelegatingProofSigner(keyPair, JWSAlgorithm.RS256, bindingKey)
     }
 
     fun ecProofSigner(): DelegatingProofSigner {
@@ -51,7 +51,6 @@ object CryptoGenerator {
         val bindingKey = BindingKey.Jwk(
             jwk = keyPair.toPublicJWK(),
         )
-        val proofSigner = DelegatingProofSigner(keyPair, JWSAlgorithm.ES256, bindingKey)
-        return proofSigner
+        return DelegatingProofSigner(keyPair, JWSAlgorithm.ES256, bindingKey)
     }
 }

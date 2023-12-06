@@ -19,6 +19,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
+import com.nimbusds.jose.crypto.impl.BaseJWSProvider
 import com.nimbusds.jose.jca.JCAContext
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.Base64URL
@@ -27,14 +28,11 @@ class DelegatingProofSigner private constructor(
     private val delegate: JWSSigner,
     private val bindingKey: BindingKey,
     private val algorithm: JWSAlgorithm,
-) : ProofSigner {
+) : ProofSigner, BaseJWSProvider(setOf(algorithm))  {
+
     override fun getBindingKey(): BindingKey = this.bindingKey
 
     override fun getAlgorithm(): JWSAlgorithm = this.algorithm
-
-    override fun getJCAContext(): JCAContext = this.delegate.jcaContext
-
-    override fun supportedJWSAlgorithms(): MutableSet<JWSAlgorithm> = mutableSetOf(algorithm)
 
     override fun sign(header: JWSHeader?, signingInput: ByteArray?): Base64URL = delegate.sign(header, signingInput)
 
