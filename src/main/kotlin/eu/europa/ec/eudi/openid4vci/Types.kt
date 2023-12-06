@@ -150,10 +150,10 @@ sealed interface BindingKey {
      * An X509 biding key
      */
     data class X509(
-        val certificateChain: List<X509Certificate>,
+        val chain: List<X509Certificate>,
     ) : BindingKey {
         init {
-            require(certificateChain.isNotEmpty()) { "Certificate chain cannot be empty" }
+            require(chain.isNotEmpty()) { "Certificate chain cannot be empty" }
         }
     }
 }

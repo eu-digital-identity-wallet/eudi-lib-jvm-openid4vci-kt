@@ -16,34 +16,28 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
-import com.nimbusds.jose.crypto.impl.BaseJWSProvider
-import com.nimbusds.jose.jca.JCAContext
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.util.Base64URL
 
 class DelegatingProofSigner private constructor(
     private val delegate: JWSSigner,
     private val bindingKey: BindingKey,
     private val algorithm: JWSAlgorithm,
-) : ProofSigner, BaseJWSProvider(setOf(algorithm))  {
+) : JWSSigner by delegate, ProofSigner {
 
     override fun getBindingKey(): BindingKey = this.bindingKey
 
     override fun getAlgorithm(): JWSAlgorithm = this.algorithm
 
-    override fun sign(header: JWSHeader?, signingInput: ByteArray?): Base64URL = delegate.sign(header, signingInput)
-
     companion object {
         operator fun invoke(
-            jwk: JWK,
+            privateKey: JWK,
             alg: JWSAlgorithm,
-            bindingKey: BindingKey,
+            publicKey: BindingKey,
         ): DelegatingProofSigner {
-            val signer = DefaultJWSSignerFactory().createJWSSigner(jwk, alg)
-            return DelegatingProofSigner(signer, bindingKey, alg)
+            val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, alg)
+            return DelegatingProofSigner(signer, publicKey, alg)
         }
     }
 }

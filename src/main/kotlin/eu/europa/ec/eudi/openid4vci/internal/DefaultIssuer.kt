@@ -112,7 +112,14 @@ internal class DefaultIssuer(
             with(credentialId.matchIssuerSupportedCredential()) {
                 constructIssuanceRequest(
                     claimSet,
-                    createProof(issuerMetadata, this, cNonce.value, proofSigner, ProofType.JWT),
+                    ProofBuilder.ofType(ProofType.JWT) {
+                        aud(issuerMetadata.credentialIssuerIdentifier.toString())
+                        publicKey(proofSigner.getBindingKey())
+                        credentialSpec(this@with)
+                        nonce(cNonce.value)
+
+                        build(proofSigner)
+                    },
                 )
             }
         }
@@ -138,7 +145,14 @@ internal class DefaultIssuer(
                 with(id.matchIssuerSupportedCredential()) {
                     constructIssuanceRequest(
                         claimSet,
-                        createProof(issuerMetadata, this, cNonce.value, proofSigner, ProofType.JWT),
+                        ProofBuilder.ofType(ProofType.JWT) {
+                            aud(issuerMetadata.credentialIssuerIdentifier.toString())
+                            publicKey(proofSigner.getBindingKey())
+                            credentialSpec(this@with)
+                            nonce(cNonce.value)
+
+                            build(proofSigner)
+                        },
                     )
                 }
             }
