@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
 import java.net.URI
@@ -133,9 +132,12 @@ sealed interface BindingKey {
      * A JWK biding key
      */
     data class Jwk(
-        val algorithm: JWSAlgorithm,
         val jwk: JWK,
-    ) : BindingKey
+    ) : BindingKey {
+        init {
+            require(!jwk.isPrivate) { "Binding key of type Jwk must contain a public key" }
+        }
+    }
 
     /**
      * A Did biding key
@@ -148,10 +150,10 @@ sealed interface BindingKey {
      * An X509 biding key
      */
     data class X509(
-        val certificateChain: List<X509Certificate>,
+        val chain: List<X509Certificate>,
     ) : BindingKey {
         init {
-            require(certificateChain.isNotEmpty()) { "Certificate chane cannot be empty" }
+            require(chain.isNotEmpty()) { "Certificate chain cannot be empty" }
         }
     }
 }

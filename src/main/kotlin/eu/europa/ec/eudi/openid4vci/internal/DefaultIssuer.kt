@@ -106,13 +106,20 @@ internal class DefaultIssuer(
     override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
-        bindingKey: BindingKey,
+        proofSigner: ProofSigner,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(accessToken) {
             with(credentialId.matchIssuerSupportedCredential()) {
                 constructIssuanceRequest(
                     claimSet,
-                    createProof(issuerMetadata, bindingKey, this, cNonce.value),
+                    ProofBuilder.ofType(ProofType.JWT) {
+                        aud(issuerMetadata.credentialIssuerIdentifier.toString())
+                        publicKey(proofSigner.getBindingKey())
+                        credentialSpec(this@with)
+                        nonce(cNonce.value)
+
+                        build(proofSigner)
+                    },
                 )
             }
         }
@@ -131,14 +138,21 @@ internal class DefaultIssuer(
     }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, BindingKey>>,
+        credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, ProofSigner>>,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(accessToken) {
-            val credentialRequests = credentialsMetadata.map { (id, claimSet, bindingKey) ->
+            val credentialRequests = credentialsMetadata.map { (id, claimSet, proofSigner) ->
                 with(id.matchIssuerSupportedCredential()) {
                     constructIssuanceRequest(
                         claimSet,
-                        createProof(issuerMetadata, bindingKey, this, cNonce.value),
+                        ProofBuilder.ofType(ProofType.JWT) {
+                            aud(issuerMetadata.credentialIssuerIdentifier.toString())
+                            publicKey(proofSigner.getBindingKey())
+                            credentialSpec(this@with)
+                            nonce(cNonce.value)
+
+                            build(proofSigner)
+                        },
                     )
                 }
             }

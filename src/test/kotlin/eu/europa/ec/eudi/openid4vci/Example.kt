@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -54,15 +53,9 @@ val credentialOffer = """
 """.trimIndent()
 
 fun main(): Unit = runTest {
-    val bindingKeys = mapOf(
-        PID_SdJwtVC_SCOPE to BindingKey.Jwk(
-            algorithm = JWSAlgorithm.RS256,
-            jwk = KeyGenerator.randomRSASigningKey(2048),
-        ),
-        PID_MsoMdoc_SCOPE to BindingKey.Jwk(
-            algorithm = JWSAlgorithm.ES256,
-            jwk = KeyGenerator.randomECSigningKey(Curve.P_256),
-        ),
+    val proofSigners = mapOf(
+        PID_SdJwtVC_SCOPE to CryptoGenerator.rsaProofSigner(),
+        PID_MsoMdoc_SCOPE to CryptoGenerator.ecProofSigner(),
     )
 
     val config = OpenId4VCIConfig(
@@ -72,7 +65,7 @@ fun main(): Unit = runTest {
     )
 
     val user = ActingUser("tneal", "password")
-    val wallet = Wallet.ofUser(user, bindingKeys, config)
+    val wallet = Wallet.ofUser(user, proofSigners, config)
 
     walletInitiatedIssuanceWithOffer(wallet)
     walletInitiatedIssuanceNoOffer(wallet)
@@ -107,7 +100,7 @@ data class ActingUser(
 
 private class Wallet(
     val actingUser: ActingUser,
-    val bindingKeys: Map<String, BindingKey>,
+    val proofSigners: Map<String, DelegatingProofSigner>,
     val config: OpenId4VCIConfig,
 ) {
 
@@ -211,9 +204,9 @@ private class Wallet(
     ): String {
         with(issuer) {
             val scope = issuerMetadata.credentialsSupported[credentialIdentifier]?.scope
-            val bindingKey = bindingKeys[scope] ?: error("No binding key found for scope $scope")
+            val proofSigner = proofSigners[scope] ?: error("No signer found for scope $scope")
             val requestOutcome =
-                authorized.requestSingle(credentialIdentifier, null, bindingKey).getOrThrow()
+                authorized.requestSingle(credentialIdentifier, null, proofSigner).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
@@ -312,8 +305,8 @@ private class Wallet(
     }
 
     companion object {
-        fun ofUser(actingUser: ActingUser, bindingKeys: Map<String, BindingKey.Jwk>, config: OpenId4VCIConfig) =
-            Wallet(actingUser, bindingKeys, config)
+        fun ofUser(actingUser: ActingUser, proofSigners: Map<String, DelegatingProofSigner>, config: OpenId4VCIConfig) =
+            Wallet(actingUser, proofSigners, config)
     }
 }
 

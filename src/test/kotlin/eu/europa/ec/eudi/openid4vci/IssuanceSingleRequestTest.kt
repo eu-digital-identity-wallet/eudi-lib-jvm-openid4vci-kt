@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
@@ -323,10 +322,6 @@ class IssuanceSingleRequestTest {
                 ),
             ),
         )
-        val bindingKey = BindingKey.Jwk(
-            algorithm = JWSAlgorithm.RS256,
-            jwk = KeyGenerator.randomRSASigningKey(2048),
-        )
 
         with(issuer) {
             when (authorizedRequest) {
@@ -341,7 +336,7 @@ class IssuanceSingleRequestTest {
                             val response = proofRequired.requestSingle(
                                 credentialMetadata,
                                 claimSet,
-                                bindingKey,
+                                CryptoGenerator.rsaProofSigner(),
                             )
                             assertThat(
                                 "Second attempt should be successful",
@@ -423,10 +418,6 @@ class IssuanceSingleRequestTest {
                 "birth_date" to Claim(),
             ),
         )
-        val bindingKey = BindingKey.Jwk(
-            algorithm = JWSAlgorithm.RS256,
-            jwk = KeyGenerator.randomRSASigningKey(2048),
-        )
 
         with(issuer) {
             when (authorizedRequest) {
@@ -438,7 +429,7 @@ class IssuanceSingleRequestTest {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                            val response = proofRequired.requestSingle(credentialMetadata, claimSet, bindingKey)
+                            val response = proofRequired.requestSingle(credentialMetadata, claimSet, CryptoGenerator.rsaProofSigner())
                             assertThat(
                                 "Second attempt should be successful",
                                 response.getOrThrow() is SubmittedRequest.Success,

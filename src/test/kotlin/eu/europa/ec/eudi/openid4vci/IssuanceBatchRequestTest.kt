@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.BatchIssuanceSuccessResponse
 import eu.europa.ec.eudi.openid4vci.internal.CertificateIssuanceResponse
@@ -124,11 +123,6 @@ class IssuanceBatchRequestTest {
             ),
         )
 
-        val bindingKey = BindingKey.Jwk(
-            algorithm = JWSAlgorithm.RS256,
-            jwk = KeyGenerator.randomRSASigningKey(2048),
-        )
-
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
@@ -144,16 +138,17 @@ class IssuanceBatchRequestTest {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
 
+                            val proofSigner = CryptoGenerator.rsaProofSigner()
                             val credentialMetadataTriples = listOf(
                                 Triple(
                                     CredentialIdentifier(PID_MsoMdoc_SCOPE),
                                     claimSet_mso_mdoc,
-                                    bindingKey,
+                                    proofSigner,
                                 ),
                                 Triple(
                                     CredentialIdentifier(PID_SdJwtVC_SCOPE),
                                     claimSet_sd_jwt_vc,
-                                    bindingKey,
+                                    proofSigner,
                                 ),
                             )
 
