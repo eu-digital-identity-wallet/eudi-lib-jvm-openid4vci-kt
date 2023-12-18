@@ -97,7 +97,7 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
             @Serializable
             data class CredentialDefinitionTO(
                 @SerialName("type") val type: String,
-                @SerialName("claims") val claims: Map<String, ClaimTO>?,
+                @SerialName("claims") val claims: Map<String, ClaimTO>? = null,
             )
 
             override fun toDomain(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
