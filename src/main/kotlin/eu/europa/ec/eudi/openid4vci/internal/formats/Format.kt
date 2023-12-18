@@ -246,7 +246,7 @@ internal fun List<String>.toCryptographicBindingMethods(): List<CryptographicBin
                 if (it.startsWith("did")) {
                     CryptographicBindingMethod.DID(it)
                 } else {
-                    throw IllegalArgumentException("Unknown Cryptographic Binding Method '$it'")
+                    error("Unknown Cryptographic Binding Method '$it'")
                 }
         }
     }
@@ -259,7 +259,7 @@ internal fun List<String>?.toProofTypes(): List<ProofType> =
         when (it) {
             "jwt" -> ProofType.JWT
             "cwt" -> ProofType.CWT
-            else -> throw IllegalArgumentException("Unknown Proof Type '$it'")
+            else -> error("Unknown Proof Type '$it'")
         }
     } ?: emptyList<ProofType>()
         .ifEmpty {
