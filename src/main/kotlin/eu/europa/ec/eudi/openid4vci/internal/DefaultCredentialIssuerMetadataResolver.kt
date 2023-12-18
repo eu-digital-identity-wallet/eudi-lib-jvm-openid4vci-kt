@@ -27,7 +27,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 /**
  * Unvalidated metadata of a Credential Issuer.
@@ -115,7 +114,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
             }
 
             val credentialIssuerMetadataObject = try {
-                Json.decodeFromString<CredentialIssuerMetadataTO>(credentialIssuerMetadataContent)
+                JsonSupport.decodeFromString<CredentialIssuerMetadataTO>(credentialIssuerMetadataContent)
             } catch (t: Throwable) {
                 throw CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(t)
             }

@@ -21,7 +21,6 @@ import io.ktor.client.request.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -89,7 +88,7 @@ internal class DefaultCredentialOfferRequestResolver(
                     }
             }
             val credentialOfferRequestObject = runCatching {
-                Json.decodeFromString<CredentialOfferRequestTO>(credentialOfferRequestObjectString)
+                JsonSupport.decodeFromString<CredentialOfferRequestTO>(credentialOfferRequestObjectString)
             }.getOrElse { CredentialOfferRequestError.NonParseableCredentialOffer(it).raise() }
 
             val credentialIssuerId = CredentialIssuerId(credentialOfferRequestObject.credentialIssuerIdentifier)
