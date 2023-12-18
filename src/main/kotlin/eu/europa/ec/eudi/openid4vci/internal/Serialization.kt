@@ -27,7 +27,13 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
 import java.util.*
+
+internal val JsonSupport: Json = Json {
+    ignoreUnknownKeys = true
+    prettyPrint = true
+}
 
 internal object LocaleSerializer : KSerializer<Locale> {
 
