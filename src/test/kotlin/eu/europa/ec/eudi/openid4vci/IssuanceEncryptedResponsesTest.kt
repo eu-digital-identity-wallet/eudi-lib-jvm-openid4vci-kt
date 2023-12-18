@@ -407,7 +407,7 @@ class IssuanceEncryptedResponsesTest {
                 when (jwk) {
                     is RSAKey -> RSAEncrypter(jwk)
                     is ECKey -> ECDHEncrypter(jwk)
-                    else -> throw IllegalArgumentException("unsupported 'kty': '${jwk.keyType.value}'")
+                    else -> error("unsupported 'kty': '${jwk.keyType.value}'")
                 }
 
             jwt.encrypt(encrypter)
