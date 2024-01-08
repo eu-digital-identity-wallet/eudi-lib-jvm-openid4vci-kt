@@ -30,12 +30,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.util.*
 
-internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc.Model.CredentialIssuanceRequest> {
+internal data object SdJwtVc : Format<SdJwtVc.Model.SdJwtVcCredential, SdJwtVc.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "vc+sd-jwt"
 
     override fun constructIssuanceRequest(
-        supportedCredential: Model.CredentialSupported,
+        supportedCredential: Model.SdJwtVcCredential,
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
@@ -100,7 +100,7 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
                 @SerialName("claims") val claims: Map<String, ClaimTO>? = null,
             )
 
-            override fun toDomain(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
+            override fun toDomain(): CredentialSupported {
                 val bindingMethods =
                     cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
                         ?: emptyList()
@@ -108,7 +108,7 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
                 val proofTypesSupported = proofTypesSupported.toProofTypes()
                 val cryptographicSuitesSupported = cryptographicSuitesSupported ?: emptyList()
 
-                return CredentialSupported(
+                return SdJwtVcCredential(
                     scope,
                     bindingMethods,
                     cryptographicSuitesSupported,
@@ -119,8 +119,8 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
             }
         }
 
-        private fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): CredentialSupported.CredentialDefinition =
-            CredentialSupported.CredentialDefinition(
+        private fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): SdJwtVcCredential.CredentialDefinition =
+            SdJwtVcCredential.CredentialDefinition(
                 type = type,
                 claims = claims?.mapValues { nameAndClaim ->
                     nameAndClaim.value.let {
@@ -138,14 +138,14 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
                 },
             )
 
-        data class CredentialSupported(
+        data class SdJwtVcCredential(
             override val scope: String? = null,
             override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
             override val cryptographicSuitesSupported: List<String> = emptyList(),
             override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
             override val display: List<Display> = emptyList(),
             val credentialDefinition: CredentialDefinition,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
+        ) : CredentialSupported {
             data class CredentialDefinition(
                 val type: String,
                 val claims: Map<ClaimName, Claim?>?,

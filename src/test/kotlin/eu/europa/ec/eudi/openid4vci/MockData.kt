@@ -87,7 +87,7 @@ internal fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: Http
  * Gets the 'UniversityDegree_JWT' scoped credential used throughout the tests.
  */
 internal fun universityDegreeJwt() =
-    W3CSignedJwt.Model.CredentialSupported(
+    W3CSignedJwt.Model.W3CSignedJwtCredential(
         "UniversityDegree_JWT",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("ES256K"),
@@ -105,7 +105,7 @@ internal fun universityDegreeJwt() =
                 "#FFFFFF",
             ),
         ),
-        W3CSignedJwt.Model.CredentialSupported.CredentialDefinition(
+        W3CSignedJwt.Model.W3CSignedJwtCredential.CredentialDefinition(
             listOf("VerifiableCredential", "UniversityDegreeCredential"),
             mapOf(
                 "given_name" to Claim(
@@ -139,7 +139,7 @@ internal fun universityDegreeJwt() =
  * Gets the 'UniversityDegree_LDP_VC' scoped credential used throughout the tests.
  */
 internal fun universityDegreeLdpVc() =
-    W3CJsonLdDataIntegrity.Model.CredentialSupported(
+    W3CJsonLdDataIntegrity.Model.W3CJsonLdDataIntegrityCredential(
         "UniversityDegree_LDP_VC",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("Ed25519Signature2018"),
@@ -165,7 +165,7 @@ internal fun universityDegreeLdpVc() =
             "VerifiableCredential_LDP_VC",
             "UniversityDegreeCredential_LDP_VC",
         ),
-        W3CJsonLdDataIntegrity.Model.CredentialSupported.CredentialDefinition(
+        W3CJsonLdDataIntegrity.Model.W3CJsonLdDataIntegrityCredential.CredentialDefinition(
             listOf(
                 URL("https://www.w3.org/2018/credentials/v1"),
                 URL("https://www.w3.org/2018/credentials/examples/v1"),
@@ -200,7 +200,7 @@ internal fun universityDegreeLdpVc() =
     )
 
 internal fun universityDegreeJwtVcJsonLD() =
-    W3CJsonLdSignedJwt.Model.CredentialSupported(
+    W3CJsonLdSignedJwt.Model.W3CJsonLdSignedJwtCredential(
         "UniversityDegree_JWT_VC_JSON-LD",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("Ed25519Signature2018"),
@@ -222,7 +222,7 @@ internal fun universityDegreeJwtVcJsonLD() =
             "https://www.w3.org/2018/credentials/v1",
             "https://www.w3.org/2018/credentials/examples/v1",
         ),
-        W3CJsonLdSignedJwt.Model.CredentialSupported.CredentialDefinition(
+        W3CJsonLdSignedJwt.Model.W3CJsonLdSignedJwtCredential.CredentialDefinition(
             listOf(
                 URL("https://www.w3.org/2018/credentials/v1"),
                 URL("https://www.w3.org/2018/credentials/examples/v1"),
@@ -260,7 +260,7 @@ internal fun universityDegreeJwtVcJsonLD() =
  * Gets the 'mDL' scoped credential used throughout the tests.
  */
 internal fun mobileDrivingLicense() =
-    MsoMdoc.Model.CredentialSupported(
+    MsoMdoc.Model.MsoMdocCredential(
         "MobileDrivingLicense_msoMdoc",
         listOf(CryptographicBindingMethod.MSO),
         listOf("ES256", "ES384", "ES512"),

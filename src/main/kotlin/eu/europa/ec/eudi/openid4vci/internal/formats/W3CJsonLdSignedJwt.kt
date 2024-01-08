@@ -27,14 +27,14 @@ import java.net.URL
 import java.util.*
 
 internal data object W3CJsonLdSignedJwt : Format<
-    W3CJsonLdSignedJwt.Model.CredentialSupported,
+    W3CJsonLdSignedJwt.Model.W3CJsonLdSignedJwtCredential,
     W3CJsonLdSignedJwt.Model.CredentialIssuanceRequest,
     > {
 
     const val FORMAT = "jwt_vc_json-ld"
 
     override fun constructIssuanceRequest(
-        supportedCredential: Model.CredentialSupported,
+        supportedCredential: Model.W3CJsonLdSignedJwtCredential,
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
@@ -74,7 +74,7 @@ internal data object W3CJsonLdSignedJwt : Format<
                 @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>? = null,
             )
 
-            override fun toDomain(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
+            override fun toDomain(): CredentialSupported {
                 val bindingMethods =
                     cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
                         ?: emptyList()
@@ -82,7 +82,7 @@ internal data object W3CJsonLdSignedJwt : Format<
                 val proofTypesSupported = proofTypesSupported.toProofTypes()
                 val cryptographicSuitesSupported = cryptographicSuitesSupported ?: emptyList()
 
-                return CredentialSupported(
+                return W3CJsonLdSignedJwtCredential(
                     scope,
                     bindingMethods,
                     cryptographicSuitesSupported,
@@ -95,8 +95,8 @@ internal data object W3CJsonLdSignedJwt : Format<
             }
         }
 
-        fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): CredentialSupported.CredentialDefinition =
-            CredentialSupported.CredentialDefinition(
+        fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): W3CJsonLdSignedJwtCredential.CredentialDefinition =
+            W3CJsonLdSignedJwtCredential.CredentialDefinition(
                 context = context.map { URL(it) },
                 type = types,
                 credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
@@ -118,7 +118,7 @@ internal data object W3CJsonLdSignedJwt : Format<
         /**
          * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
          */
-        data class CredentialSupported(
+        data class W3CJsonLdSignedJwtCredential(
             override val scope: String? = null,
             override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
             override val cryptographicSuitesSupported: List<String> = emptyList(),
@@ -127,7 +127,7 @@ internal data object W3CJsonLdSignedJwt : Format<
             val context: List<String> = emptyList(),
             val credentialDefinition: CredentialDefinition,
             val order: List<ClaimName> = emptyList(),
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
+        ) : CredentialSupported {
             data class CredentialDefinition(
                 val context: List<URL>,
                 val type: List<String>,

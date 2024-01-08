@@ -49,35 +49,35 @@ internal object Formats {
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<CredentialIssuanceRequest.SingleCredential> =
         when (supportedCredential) {
-            is MsoMdoc.Model.CredentialSupported -> MsoMdoc.constructIssuanceRequest(
+            is MsoMdoc.Model.MsoMdocCredential -> MsoMdoc.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
 
-            is SdJwtVc.Model.CredentialSupported -> SdJwtVc.constructIssuanceRequest(
+            is SdJwtVc.Model.SdJwtVcCredential -> SdJwtVc.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
 
-            is W3CSignedJwt.Model.CredentialSupported -> W3CSignedJwt.constructIssuanceRequest(
+            is W3CSignedJwt.Model.W3CSignedJwtCredential -> W3CSignedJwt.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
 
-            is W3CJsonLdSignedJwt.Model.CredentialSupported -> W3CJsonLdSignedJwt.constructIssuanceRequest(
+            is W3CJsonLdSignedJwt.Model.W3CJsonLdSignedJwtCredential -> W3CJsonLdSignedJwt.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
 
-            is W3CJsonLdDataIntegrity.Model.CredentialSupported -> W3CJsonLdDataIntegrity.constructIssuanceRequest(
+            is W3CJsonLdDataIntegrity.Model.W3CJsonLdDataIntegrityCredential -> W3CJsonLdDataIntegrity.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,

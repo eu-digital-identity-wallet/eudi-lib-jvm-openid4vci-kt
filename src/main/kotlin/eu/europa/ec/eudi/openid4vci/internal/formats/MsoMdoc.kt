@@ -30,14 +30,14 @@ import kotlinx.serialization.json.*
 import java.util.*
 
 fun CredentialIssuerMetadata.findScopeForMsoMdoc(docType: String): String? =
-    findByFormat<MsoMdoc.Model.CredentialSupported> { it.docType == docType }.values.firstOrNull()?.scope
+    findByFormat<MsoMdoc.Model.MsoMdocCredential> { it.docType == docType }.values.firstOrNull()?.scope
 
-internal data object MsoMdoc : Format<MsoMdoc.Model.CredentialSupported, MsoMdoc.Model.CredentialIssuanceRequest> {
+internal data object MsoMdoc : Format<MsoMdoc.Model.MsoMdocCredential, MsoMdoc.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "mso_mdoc"
 
     override fun constructIssuanceRequest(
-        supportedCredential: Model.CredentialSupported,
+        supportedCredential: Model.MsoMdocCredential,
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
@@ -102,7 +102,7 @@ internal data object MsoMdoc : Format<MsoMdoc.Model.CredentialSupported, MsoMdoc
                 require(format == FORMAT) { "invalid format '$format'" }
             }
 
-            override fun toDomain(): CredentialSupported {
+            override fun toDomain(): MsoMdocCredential {
                 val bindingMethods = cryptographicBindingMethodsSupported
                     ?.toCryptographicBindingMethods()
                     ?: emptyList()
@@ -128,7 +128,7 @@ internal data object MsoMdoc : Format<MsoMdoc.Model.CredentialSupported, MsoMdoc
                         }
                     } ?: emptyMap()
 
-                return CredentialSupported(
+                return MsoMdocCredential(
                     scope,
                     bindingMethods,
                     cryptographicSuitesSupported,
@@ -144,7 +144,7 @@ internal data object MsoMdoc : Format<MsoMdoc.Model.CredentialSupported, MsoMdoc
         /**
          * The data of a Verifiable Credentials issued as an ISO mDL.
          */
-        data class CredentialSupported(
+        data class MsoMdocCredential(
             override val scope: String? = null,
             override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
             override val cryptographicSuitesSupported: List<String> = emptyList(),
@@ -153,7 +153,7 @@ internal data object MsoMdoc : Format<MsoMdoc.Model.CredentialSupported, MsoMdoc
             val docType: String,
             val claims: MsoMdocClaims = emptyMap(),
             val order: List<ClaimName> = emptyList(),
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
+        ) : CredentialSupported
 
         @Serializable
         @SerialName(FORMAT)
