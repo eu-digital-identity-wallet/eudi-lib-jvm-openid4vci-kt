@@ -27,14 +27,14 @@ import java.net.URL
 import java.util.*
 
 internal data object W3CJsonLdSignedJwt : Format<
-    W3CJsonLdSignedJwt.Model.W3CJsonLdSignedJwtCredential,
+    W3CJsonLdSignedJwtCredential,
     W3CJsonLdSignedJwt.Model.CredentialIssuanceRequest,
     > {
 
     const val FORMAT = "jwt_vc_json-ld"
 
     override fun constructIssuanceRequest(
-        supportedCredential: Model.W3CJsonLdSignedJwtCredential,
+        supportedCredential: W3CJsonLdSignedJwtCredential,
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
@@ -114,26 +114,6 @@ internal data object W3CJsonLdSignedJwt : Format<
                     }
                 },
             )
-
-        /**
-         * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
-         */
-        data class W3CJsonLdSignedJwtCredential(
-            override val scope: String? = null,
-            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-            override val cryptographicSuitesSupported: List<String> = emptyList(),
-            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
-            override val display: List<Display> = emptyList(),
-            val context: List<String> = emptyList(),
-            val credentialDefinition: CredentialDefinition,
-            val order: List<ClaimName> = emptyList(),
-        ) : CredentialSupported {
-            data class CredentialDefinition(
-                val context: List<URL>,
-                val type: List<String>,
-                val credentialSubject: Map<ClaimName, Claim?>?,
-            )
-        }
 
         data class ClaimSet(
             val claims: Map<ClaimName, Claim>,

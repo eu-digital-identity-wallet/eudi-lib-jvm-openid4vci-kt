@@ -30,12 +30,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.util.*
 
-internal data object SdJwtVc : Format<SdJwtVc.Model.SdJwtVcCredential, SdJwtVc.Model.CredentialIssuanceRequest> {
+internal data object SdJwtVc : Format<SdJwtVcCredential, SdJwtVc.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "vc+sd-jwt"
 
     override fun constructIssuanceRequest(
-        supportedCredential: Model.SdJwtVcCredential,
+        supportedCredential: SdJwtVcCredential,
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
@@ -137,20 +137,6 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.SdJwtVcCredential, SdJwtVc.M
                     }
                 },
             )
-
-        data class SdJwtVcCredential(
-            override val scope: String? = null,
-            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-            override val cryptographicSuitesSupported: List<String> = emptyList(),
-            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
-            override val display: List<Display> = emptyList(),
-            val credentialDefinition: CredentialDefinition,
-        ) : CredentialSupported {
-            data class CredentialDefinition(
-                val type: String,
-                val claims: Map<ClaimName, Claim?>?,
-            )
-        }
 
         @Serializable
         @SerialName(FORMAT)

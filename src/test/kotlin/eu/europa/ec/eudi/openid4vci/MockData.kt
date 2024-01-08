@@ -33,10 +33,6 @@ import com.nimbusds.openid.connect.sdk.claims.ACR
 import com.nimbusds.openid.connect.sdk.claims.ClaimType
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderEndpointMetadata
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
-import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
-import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdDataIntegrity
-import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdSignedJwt
-import eu.europa.ec.eudi.openid4vci.internal.formats.W3CSignedJwt
 import io.ktor.http.*
 import java.net.URI
 import java.net.URL
@@ -87,7 +83,7 @@ internal fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: Http
  * Gets the 'UniversityDegree_JWT' scoped credential used throughout the tests.
  */
 internal fun universityDegreeJwt() =
-    W3CSignedJwt.Model.W3CSignedJwtCredential(
+    W3CSignedJwtCredential(
         "UniversityDegree_JWT",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("ES256K"),
@@ -105,7 +101,7 @@ internal fun universityDegreeJwt() =
                 "#FFFFFF",
             ),
         ),
-        W3CSignedJwt.Model.W3CSignedJwtCredential.CredentialDefinition(
+        W3CSignedJwtCredential.CredentialDefinition(
             listOf("VerifiableCredential", "UniversityDegreeCredential"),
             mapOf(
                 "given_name" to Claim(
@@ -139,7 +135,7 @@ internal fun universityDegreeJwt() =
  * Gets the 'UniversityDegree_LDP_VC' scoped credential used throughout the tests.
  */
 internal fun universityDegreeLdpVc() =
-    W3CJsonLdDataIntegrity.Model.W3CJsonLdDataIntegrityCredential(
+    W3CJsonLdDataIntegrityCredential(
         "UniversityDegree_LDP_VC",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("Ed25519Signature2018"),
@@ -165,7 +161,7 @@ internal fun universityDegreeLdpVc() =
             "VerifiableCredential_LDP_VC",
             "UniversityDegreeCredential_LDP_VC",
         ),
-        W3CJsonLdDataIntegrity.Model.W3CJsonLdDataIntegrityCredential.CredentialDefinition(
+        W3CJsonLdDataIntegrityCredential.CredentialDefinition(
             listOf(
                 URL("https://www.w3.org/2018/credentials/v1"),
                 URL("https://www.w3.org/2018/credentials/examples/v1"),
@@ -200,7 +196,7 @@ internal fun universityDegreeLdpVc() =
     )
 
 internal fun universityDegreeJwtVcJsonLD() =
-    W3CJsonLdSignedJwt.Model.W3CJsonLdSignedJwtCredential(
+    W3CJsonLdSignedJwtCredential(
         "UniversityDegree_JWT_VC_JSON-LD",
         listOf(CryptographicBindingMethod.DID("did:example")),
         listOf("Ed25519Signature2018"),
@@ -222,7 +218,7 @@ internal fun universityDegreeJwtVcJsonLD() =
             "https://www.w3.org/2018/credentials/v1",
             "https://www.w3.org/2018/credentials/examples/v1",
         ),
-        W3CJsonLdSignedJwt.Model.W3CJsonLdSignedJwtCredential.CredentialDefinition(
+        W3CJsonLdSignedJwtCredential.CredentialDefinition(
             listOf(
                 URL("https://www.w3.org/2018/credentials/v1"),
                 URL("https://www.w3.org/2018/credentials/examples/v1"),
@@ -260,7 +256,7 @@ internal fun universityDegreeJwtVcJsonLD() =
  * Gets the 'mDL' scoped credential used throughout the tests.
  */
 internal fun mobileDrivingLicense() =
-    MsoMdoc.Model.MsoMdocCredential(
+    MsoMdocCredential(
         "MobileDrivingLicense_msoMdoc",
         listOf(CryptographicBindingMethod.MSO),
         listOf("ES256", "ES384", "ES512"),
@@ -317,8 +313,15 @@ internal fun credentialIssuerMetadata() =
         CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/deferred").getOrThrow(),
         CredentialResponseEncryption.Required(
             listOf(
-                JWEAlgorithm.ECDH_ES, JWEAlgorithm.ECDH_ES_A128KW, JWEAlgorithm.ECDH_ES_A192KW, JWEAlgorithm.ECDH_ES_A256KW,
-                JWEAlgorithm.RSA1_5, JWEAlgorithm.RSA_OAEP, JWEAlgorithm.RSA_OAEP_256, JWEAlgorithm.RSA_OAEP_384, JWEAlgorithm.RSA_OAEP_512,
+                JWEAlgorithm.ECDH_ES,
+                JWEAlgorithm.ECDH_ES_A128KW,
+                JWEAlgorithm.ECDH_ES_A192KW,
+                JWEAlgorithm.ECDH_ES_A256KW,
+                JWEAlgorithm.RSA1_5,
+                JWEAlgorithm.RSA_OAEP,
+                JWEAlgorithm.RSA_OAEP_256,
+                JWEAlgorithm.RSA_OAEP_384,
+                JWEAlgorithm.RSA_OAEP_512,
             ),
             listOf(EncryptionMethod.XC20P),
         ),

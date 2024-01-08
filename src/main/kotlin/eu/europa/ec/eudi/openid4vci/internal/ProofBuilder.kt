@@ -22,7 +22,6 @@ import com.nimbusds.jose.util.Base64
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
 import java.time.Instant
 import java.util.*
 import kotlin.contracts.ExperimentalContracts

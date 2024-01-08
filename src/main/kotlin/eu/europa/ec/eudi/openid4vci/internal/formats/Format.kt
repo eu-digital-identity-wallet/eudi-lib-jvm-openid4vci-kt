@@ -27,7 +27,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonObject
-import java.io.Serializable
 import java.util.*
 
 internal fun interface Format<in S : CredentialSupported, out I : CredentialIssuanceRequest.SingleCredential> {
@@ -49,35 +48,35 @@ internal object Formats {
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<CredentialIssuanceRequest.SingleCredential> =
         when (supportedCredential) {
-            is MsoMdoc.Model.MsoMdocCredential -> MsoMdoc.constructIssuanceRequest(
+            is MsoMdocCredential -> MsoMdoc.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
 
-            is SdJwtVc.Model.SdJwtVcCredential -> SdJwtVc.constructIssuanceRequest(
+            is SdJwtVcCredential -> SdJwtVc.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
 
-            is W3CSignedJwt.Model.W3CSignedJwtCredential -> W3CSignedJwt.constructIssuanceRequest(
+            is W3CSignedJwtCredential -> W3CSignedJwt.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
 
-            is W3CJsonLdSignedJwt.Model.W3CJsonLdSignedJwtCredential -> W3CJsonLdSignedJwt.constructIssuanceRequest(
+            is W3CJsonLdSignedJwtCredential -> W3CJsonLdSignedJwt.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
                 responseEncryptionSpec,
             )
 
-            is W3CJsonLdDataIntegrity.Model.W3CJsonLdDataIntegrityCredential -> W3CJsonLdDataIntegrity.constructIssuanceRequest(
+            is W3CJsonLdDataIntegrityCredential -> W3CJsonLdDataIntegrity.constructIssuanceRequest(
                 supportedCredential,
                 claimSet,
                 proof,
@@ -104,18 +103,6 @@ internal sealed interface CredentialIssuanceRequestTO {
         val credentialResponseEncryptionAlg: String?
         val credentialResponseEncryptionMethod: String?
     }
-}
-
-/**
- * Credentials supported by an Issuer.
- */
-sealed interface CredentialSupported : Serializable {
-
-    val scope: String?
-    val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod>
-    val cryptographicSuitesSupported: List<String>
-    val proofTypesSupported: List<ProofType>
-    val display: List<Display>
 }
 
 /**

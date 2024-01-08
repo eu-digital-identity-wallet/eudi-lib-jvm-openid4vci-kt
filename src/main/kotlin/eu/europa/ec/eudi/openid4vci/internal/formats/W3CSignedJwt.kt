@@ -25,12 +25,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.*
 
-internal data object W3CSignedJwt : Format<W3CSignedJwt.Model.W3CSignedJwtCredential, W3CSignedJwt.Model.CredentialIssuanceRequest> {
+internal data object W3CSignedJwt : Format<W3CSignedJwtCredential, W3CSignedJwt.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "jwt_vc_json"
 
     override fun constructIssuanceRequest(
-        supportedCredential: Model.W3CSignedJwtCredential,
+        supportedCredential: W3CSignedJwtCredential,
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
@@ -105,25 +105,6 @@ internal data object W3CSignedJwt : Format<W3CSignedJwt.Model.W3CSignedJwtCreden
                     }
                 },
             )
-
-        /**
-         * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
-         */
-        data class W3CSignedJwtCredential(
-            override val scope: String? = null,
-            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-            override val cryptographicSuitesSupported: List<String> = emptyList(),
-            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
-            override val display: List<Display> = emptyList(),
-            val credentialDefinition: CredentialDefinition,
-            val order: List<ClaimName> = emptyList(),
-        ) : CredentialSupported {
-
-            data class CredentialDefinition(
-                val type: List<String>,
-                val credentialSubject: Map<ClaimName, Claim?>?,
-            )
-        }
 
         data class ClaimSet(
             val claims: Map<ClaimName, Claim>,

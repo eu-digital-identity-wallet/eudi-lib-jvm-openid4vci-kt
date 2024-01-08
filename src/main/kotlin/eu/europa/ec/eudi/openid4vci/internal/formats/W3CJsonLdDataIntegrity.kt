@@ -27,14 +27,14 @@ import java.net.URL
 import java.util.*
 
 internal data object W3CJsonLdDataIntegrity : Format<
-    W3CJsonLdDataIntegrity.Model.W3CJsonLdDataIntegrityCredential,
+    W3CJsonLdDataIntegrityCredential,
     W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest,
     > {
 
     const val FORMAT = "ldp_vc"
 
     override fun constructIssuanceRequest(
-        supportedCredential: Model.W3CJsonLdDataIntegrityCredential,
+        supportedCredential: W3CJsonLdDataIntegrityCredential,
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
@@ -115,28 +115,6 @@ internal data object W3CJsonLdDataIntegrity : Format<
                     }
                 },
             )
-
-        /**
-         * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
-         */
-        data class W3CJsonLdDataIntegrityCredential(
-            override val scope: String? = null,
-            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-            override val cryptographicSuitesSupported: List<String> = emptyList(),
-            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
-            override val display: List<Display> = emptyList(),
-            val context: List<String> = emptyList(),
-            val type: List<String> = emptyList(),
-            val credentialDefinition: CredentialDefinition,
-            val order: List<ClaimName> = emptyList(),
-        ) : CredentialSupported {
-
-            data class CredentialDefinition(
-                val context: List<URL>,
-                val type: List<String>,
-                val credentialSubject: Map<ClaimName, Claim?>?,
-            )
-        }
 
         data class ClaimSet(
             val claims: Map<ClaimName, Claim>,

@@ -30,14 +30,14 @@ import kotlinx.serialization.json.*
 import java.util.*
 
 fun CredentialIssuerMetadata.findScopeForMsoMdoc(docType: String): String? =
-    findByFormat<MsoMdoc.Model.MsoMdocCredential> { it.docType == docType }.values.firstOrNull()?.scope
+    findByFormat<MsoMdocCredential> { it.docType == docType }.values.firstOrNull()?.scope
 
-internal data object MsoMdoc : Format<MsoMdoc.Model.MsoMdocCredential, MsoMdoc.Model.CredentialIssuanceRequest> {
+internal data object MsoMdoc : Format<MsoMdocCredential, MsoMdoc.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "mso_mdoc"
 
     override fun constructIssuanceRequest(
-        supportedCredential: Model.MsoMdocCredential,
+        supportedCredential: MsoMdocCredential,
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
@@ -140,20 +140,6 @@ internal data object MsoMdoc : Format<MsoMdoc.Model.MsoMdocCredential, MsoMdoc.M
                 )
             }
         }
-
-        /**
-         * The data of a Verifiable Credentials issued as an ISO mDL.
-         */
-        data class MsoMdocCredential(
-            override val scope: String? = null,
-            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-            override val cryptographicSuitesSupported: List<String> = emptyList(),
-            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
-            override val display: List<Display> = emptyList(),
-            val docType: String,
-            val claims: MsoMdocClaims = emptyMap(),
-            val order: List<ClaimName> = emptyList(),
-        ) : CredentialSupported
 
         @Serializable
         @SerialName(FORMAT)
