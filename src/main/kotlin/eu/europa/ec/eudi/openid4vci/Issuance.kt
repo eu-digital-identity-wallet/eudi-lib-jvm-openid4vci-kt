@@ -17,7 +17,8 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
-import eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
+import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
+import kotlinx.serialization.Serializable
 
 /**
  * Holds a https [java.net.URL] to be used at the second step of PAR flow for retrieving the authorization code.
@@ -42,7 +43,7 @@ class AuthorizationUrl private constructor(val url: HttpsUrl) {
 }
 
 /**
- * Sealed hierarchy of states that denote the individual steps that need to be taken in order to authorize a request for issuance
+ * Sealed hierarchy of states that denote the individual steps that need to be taken to authorize a request for issuance
  * using the Authorized Code Flow, utilizing Pushed Authorization Request and PKCE.
  *
  * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
@@ -70,7 +71,7 @@ sealed interface UnauthorizedRequest {
 
 /**
  * Sealed hierarchy of states describing an authorized issuance request. These states hold an access token issued by the
- * authorization server that protects the credentials issuer.
+ * authorization server that protects the credential issuer.
  */
 sealed interface AuthorizedRequest {
 
@@ -89,7 +90,7 @@ sealed interface AuthorizedRequest {
     ) : AuthorizedRequest
 
     /**
-     * Issuer authorized issuance and requires the provision of proof of holder's binding to be provided
+     * Issuer authorized issuance and required the provision of proof of holder's binding to be provided
      * along with the request
      *
      * @param accessToken  Access token authorizing certificate issuance
@@ -141,9 +142,10 @@ sealed interface SubmittedRequest {
 
     /**
      * State that denotes the successful submission of an issuance request
-     * @param credentials The outcome of the issuance request. If issuance request was a batch request it will contain
-     *      the results of each individual issuance request. If it was a single issuance request list will contain only one result.
-     * @param cNonce Nonce information sent back from issuance server.
+     * @param credentials The outcome of the issuance request.
+     * If the issuance request was a batch request, it will contain the results of each issuance request.
+     * If it was a single issuance request list will contain only one result.
+     * @param cNonce Nonce information sent back from the issuance server.
      */
     data class Success(
         val credentials: List<IssuedCredential>,
@@ -213,7 +215,7 @@ interface AuthorizeIssuance {
 
     /**
      * Last step to authorize an issuance request using Authorized Code Flow (utilizing PAR).
-     * Using the access code retrieved from previous step, posts a request to authorization server's token endpoint to
+     * Using the access code retrieved from a previous step, posts a request to authorization server's token endpoint to
      * retrieve an access token. This step transitions state from [UnauthorizedRequest.AuthorizationCodeRetrieved] to an
      * [AuthorizedRequest] state
      */
@@ -231,6 +233,18 @@ interface AuthorizeIssuance {
         preAuthorizationCode: PreAuthorizationCode,
     ): Result<AuthorizedRequest>
 }
+
+/**
+ * Interface to model the set of specific claims that need to be included in the issued credential.
+ * This set of claims is modeled differently depending on the credential format.
+ */
+interface ClaimSet
+
+@Serializable(with = ClaimSetSerializer::class)
+class MsoMdocClaimSet(claims: Map<Namespace, Map<ClaimName, Claim>>) :
+    ClaimSet,
+    Map<Namespace, Map<ClaimName, Claim>> by claims
+data class SdJwtVcClaimSet(val claims: Map<ClaimName, Claim>) : ClaimSet
 
 /**
  * An interface for submitting a credential issuance request. Contains all the operation available to transition an [AuthorizedRequest]
@@ -282,7 +296,6 @@ interface RequestIssuance {
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
      *
      *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-     *  @param proofSigner  Signer component of the proof to be sent.
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(

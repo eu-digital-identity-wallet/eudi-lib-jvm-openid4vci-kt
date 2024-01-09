@@ -27,20 +27,24 @@ import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.S
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import java.util.*
 
-internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc.Model.CredentialIssuanceRequest> {
+internal data object SdJwtVc :
+    IssuanceRequestFactory<SdJwtVcCredential, SdJwtVcClaimSet, SdJwtVc.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "vc+sd-jwt"
 
-    override fun constructIssuanceRequest(
-        supportedCredential: Model.CredentialSupported,
-        claimSet: ClaimSet?,
+    override fun createIssuanceRequest(
+        supportedCredential: SdJwtVcCredential,
+        claimSet: SdJwtVcClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<Model.CredentialIssuanceRequest> = runCatching {
-        fun validateClaimSet(claimSet: Model.ClaimSet): Model.ClaimSet {
+        fun validateClaimSet(claimSet: SdJwtVcClaimSet): SdJwtVcClaimSet {
             if ((supportedCredential.credentialDefinition.claims.isNullOrEmpty()) && claimSet.claims.isNotEmpty()) {
                 throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential " +
@@ -59,7 +63,7 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
 
         val validClaimSet = claimSet?.let {
             when (claimSet) {
-                is Model.ClaimSet -> validateClaimSet(claimSet)
+                is SdJwtVcClaimSet -> validateClaimSet(claimSet)
                 else -> throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
             }
         }
@@ -100,7 +104,7 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
                 @SerialName("claims") val claims: Map<String, ClaimTO>? = null,
             )
 
-            override fun toDomain(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
+            override fun toDomain(): CredentialSupported {
                 val bindingMethods =
                     cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
                         ?: emptyList()
@@ -108,7 +112,7 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
                 val proofTypesSupported = proofTypesSupported.toProofTypes()
                 val cryptographicSuitesSupported = cryptographicSuitesSupported ?: emptyList()
 
-                return CredentialSupported(
+                return SdJwtVcCredential(
                     scope,
                     bindingMethods,
                     cryptographicSuitesSupported,
@@ -119,8 +123,8 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
             }
         }
 
-        private fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): CredentialSupported.CredentialDefinition =
-            CredentialSupported.CredentialDefinition(
+        private fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): SdJwtVcCredential.CredentialDefinition =
+            SdJwtVcCredential.CredentialDefinition(
                 type = type,
                 claims = claims?.mapValues { nameAndClaim ->
                     nameAndClaim.value.let {
@@ -138,20 +142,6 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
                 },
             )
 
-        data class CredentialSupported(
-            override val scope: String? = null,
-            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-            override val cryptographicSuitesSupported: List<String> = emptyList(),
-            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
-            override val display: List<Display> = emptyList(),
-            val credentialDefinition: CredentialDefinition,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
-            data class CredentialDefinition(
-                val type: String,
-                val claims: Map<ClaimName, Claim?>?,
-            )
-        }
-
         @Serializable
         @SerialName(FORMAT)
         data class CredentialIssuanceRequestTO(
@@ -168,10 +158,6 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
                 @SerialName("claims") val claims: JsonObject? = null,
             )
         }
-
-        data class ClaimSet(
-            val claims: Map<ClaimName, Claim>,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
 
         class CredentialIssuanceRequest private constructor(
             override val proof: Proof? = null,
@@ -210,10 +196,7 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
                 }
             }
 
-            data class CredentialDefinition(
-                val type: String,
-                val claims: ClaimSet?,
-            )
+            data class CredentialDefinition(val type: String, val claims: SdJwtVcClaimSet?)
 
             companion object {
                 operator fun invoke(
@@ -222,7 +205,7 @@ internal data object SdJwtVc : Format<SdJwtVc.Model.CredentialSupported, SdJwtVc
                     credentialEncryptionJwk: JWK? = null,
                     credentialResponseEncryptionAlg: JWEAlgorithm? = null,
                     credentialResponseEncryptionMethod: EncryptionMethod? = null,
-                    claimSet: ClaimSet? = null,
+                    claimSet: SdJwtVcClaimSet? = null,
                 ): Result<CredentialIssuanceRequest> = runCatching {
                     CredentialIssuanceRequest(
                         proof = proof,

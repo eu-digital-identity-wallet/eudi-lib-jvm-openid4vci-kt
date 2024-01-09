@@ -16,11 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.Claim
-import eu.europa.ec.eudi.openid4vci.ClaimName
-import eu.europa.ec.eudi.openid4vci.Namespace
-import eu.europa.ec.eudi.openid4vci.ProofType
-import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
+import eu.europa.ec.eudi.openid4vci.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -98,15 +94,16 @@ internal object ProofSerializer : KSerializer<Proof> {
     }
 }
 
-internal object ClaimSetSerializer : KSerializer<MsoMdoc.Model.ClaimSet> {
+internal object ClaimSetSerializer : KSerializer<MsoMdocClaimSet> {
+
     val internal = serializer<Map<Namespace, Map<ClaimName, Claim>>>()
     override val descriptor: SerialDescriptor =
         internal.descriptor
 
-    override fun deserialize(decoder: Decoder): MsoMdoc.Model.ClaimSet =
-        MsoMdoc.Model.ClaimSet(internal.deserialize(decoder))
+    override fun deserialize(decoder: Decoder): MsoMdocClaimSet =
+        MsoMdocClaimSet(internal.deserialize(decoder))
 
-    override fun serialize(encoder: Encoder, value: MsoMdoc.Model.ClaimSet) {
+    override fun serialize(encoder: Encoder, value: MsoMdocClaimSet) {
         internal.serialize(encoder, value as Map<Namespace, Map<ClaimName, Claim>>)
     }
 }

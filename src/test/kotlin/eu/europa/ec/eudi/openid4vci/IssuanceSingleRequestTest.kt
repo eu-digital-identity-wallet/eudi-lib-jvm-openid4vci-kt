@@ -34,10 +34,9 @@ import kotlin.test.fail
 
 class IssuanceSingleRequestTest {
 
-    val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
-
-    val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-    val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
+    private val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
+    private val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
+    private val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
 
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc = """
         {
@@ -108,7 +107,7 @@ class IssuanceSingleRequestTest {
                 AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
             )
 
-        val claimSet = MsoMdoc.Model.ClaimSet(
+        val claimSet = MsoMdocClaimSet(
             claims = mapOf(
                 "org.iso.18013.5.1" to mapOf(
                     "given_name" to Claim(),
@@ -165,7 +164,7 @@ class IssuanceSingleRequestTest {
                     AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
                 )
 
-            val claimSet = MsoMdoc.Model.ClaimSet(
+            val claimSet = MsoMdocClaimSet(
                 claims = mapOf(
                     "org.iso.18013.5.1" to mapOf(
                         "given_name" to Claim(),
@@ -217,7 +216,7 @@ class IssuanceSingleRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val claimSet_mso_mdoc =
-                        MsoMdoc.Model.ClaimSet(mapOf("org.iso.18013.5.1" to mapOf("degree" to Claim())))
+                        MsoMdocClaimSet(mapOf("org.iso.18013.5.1" to mapOf("degree" to Claim())))
                     var credentialMetadata = CredentialIdentifier(PID_MsoMdoc_SCOPE)
                     authorizedRequest.requestSingle(credentialMetadata, claimSet_mso_mdoc)
                         .fold(
@@ -230,7 +229,7 @@ class IssuanceSingleRequestTest {
                             },
                         )
 
-                    val claimSet_sd_jwt_vc = SdJwtVc.Model.ClaimSet(mapOf("degree" to Claim()))
+                    val claimSet_sd_jwt_vc = SdJwtVcClaimSet(mapOf("degree" to Claim()))
                     credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
                     authorizedRequest.requestSingle(credentialMetadata, claimSet_sd_jwt_vc)
                         .fold(
@@ -313,7 +312,7 @@ class IssuanceSingleRequestTest {
                 AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
             )
 
-        val claimSet = MsoMdoc.Model.ClaimSet(
+        val claimSet = MsoMdocClaimSet(
             claims = mapOf(
                 "org.iso.18013.5.1" to mapOf(
                     "given_name" to Claim(),
@@ -411,7 +410,7 @@ class IssuanceSingleRequestTest {
                 AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
             )
 
-        val claimSet = SdJwtVc.Model.ClaimSet(
+        val claimSet = SdJwtVcClaimSet(
             claims = mapOf(
                 "given_name" to Claim(),
                 "family_name" to Claim(),
