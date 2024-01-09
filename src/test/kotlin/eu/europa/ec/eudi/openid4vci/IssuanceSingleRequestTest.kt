@@ -229,7 +229,7 @@ class IssuanceSingleRequestTest {
                             },
                         )
 
-                    val claimSet_sd_jwt_vc = SdJwtVcClaimSet(mapOf("degree" to Claim()))
+                    val claimSet_sd_jwt_vc = GenericClaimSet(mapOf("degree" to Claim()))
                     credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
                     authorizedRequest.requestSingle(credentialMetadata, claimSet_sd_jwt_vc)
                         .fold(
@@ -410,7 +410,7 @@ class IssuanceSingleRequestTest {
                 AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
             )
 
-        val claimSet = SdJwtVcClaimSet(
+        val claimSet = GenericClaimSet(
             claims = mapOf(
                 "given_name" to Claim(),
                 "family_name" to Claim(),

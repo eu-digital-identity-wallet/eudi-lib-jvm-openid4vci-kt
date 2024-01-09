@@ -115,7 +115,7 @@ class IssuanceBatchRequestTest {
                 ),
             ),
         )
-        val claimSet_sd_jwt_vc = SdJwtVcClaimSet(
+        val claimSet_sd_jwt_vc = GenericClaimSet(
             claims = mapOf(
                 "given_name" to Claim(),
                 "family_name" to Claim(),

@@ -16,7 +16,10 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.ClaimName
+import eu.europa.ec.eudi.openid4vci.MsoMdocClaimSet
+import eu.europa.ec.eudi.openid4vci.Namespace
+import eu.europa.ec.eudi.openid4vci.ProofType
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -24,6 +27,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import java.util.*
 
 internal val JsonSupport: Json = Json {
@@ -96,14 +100,28 @@ internal object ProofSerializer : KSerializer<Proof> {
 
 internal object ClaimSetSerializer : KSerializer<MsoMdocClaimSet> {
 
-    val internal = serializer<Map<Namespace, Map<ClaimName, Claim>>>()
+
+    val internal = serializer<Map<Namespace, Map<ClaimName, JsonObject>>>()
     override val descriptor: SerialDescriptor =
         internal.descriptor
 
     override fun deserialize(decoder: Decoder): MsoMdocClaimSet =
-        MsoMdocClaimSet(internal.deserialize(decoder))
+        internal.deserialize(decoder).asMsoMdocClaimSet()
 
     override fun serialize(encoder: Encoder, value: MsoMdocClaimSet) {
-        internal.serialize(encoder, value as Map<Namespace, Map<ClaimName, Claim>>)
+        internal.serialize(encoder, value.toJson())
     }
+
+    private fun Map<Namespace, Map<ClaimName, JsonObject>>.asMsoMdocClaimSet() =
+        flatMap { (nameSpace, cs) -> cs.map { (claimName, _) -> nameSpace to claimName } }
+            .let(::MsoMdocClaimSet)
+
+    private fun MsoMdocClaimSet.toJson(): Map<Namespace, Map<ClaimName, JsonObject>> =
+        groupBy { (nameSpace, _) -> nameSpace }
+            .mapValues { (_, vs) -> vs.associate { (_, claimName) -> claimName to emptyJsonObject } }
+
+    private val emptyJsonObject = JsonObject(emptyMap())
 }
+
+
+

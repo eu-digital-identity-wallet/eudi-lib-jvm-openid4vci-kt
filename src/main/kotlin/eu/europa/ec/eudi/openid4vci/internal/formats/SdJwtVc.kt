@@ -34,17 +34,17 @@ import kotlinx.serialization.json.jsonObject
 import java.util.*
 
 internal data object SdJwtVc :
-    IssuanceRequestFactory<SdJwtVcCredential, SdJwtVcClaimSet, SdJwtVc.Model.CredentialIssuanceRequest> {
+    IssuanceRequestFactory<SdJwtVcCredential, GenericClaimSet, SdJwtVc.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "vc+sd-jwt"
 
     override fun createIssuanceRequest(
         supportedCredential: SdJwtVcCredential,
-        claimSet: SdJwtVcClaimSet?,
+        claimSet: GenericClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<Model.CredentialIssuanceRequest> = runCatching {
-        fun validateClaimSet(claimSet: SdJwtVcClaimSet): SdJwtVcClaimSet {
+        fun validateClaimSet(claimSet: GenericClaimSet): GenericClaimSet {
             if ((supportedCredential.credentialDefinition.claims.isNullOrEmpty()) && claimSet.claims.isNotEmpty()) {
                 throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential " +
@@ -63,7 +63,7 @@ internal data object SdJwtVc :
 
         val validClaimSet = claimSet?.let {
             when (claimSet) {
-                is SdJwtVcClaimSet -> validateClaimSet(claimSet)
+                is GenericClaimSet -> validateClaimSet(claimSet)
                 else -> throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
             }
         }
@@ -196,7 +196,7 @@ internal data object SdJwtVc :
                 }
             }
 
-            data class CredentialDefinition(val type: String, val claims: SdJwtVcClaimSet?)
+            data class CredentialDefinition(val type: String, val claims: GenericClaimSet?)
 
             companion object {
                 operator fun invoke(
@@ -205,7 +205,7 @@ internal data object SdJwtVc :
                     credentialEncryptionJwk: JWK? = null,
                     credentialResponseEncryptionAlg: JWEAlgorithm? = null,
                     credentialResponseEncryptionMethod: EncryptionMethod? = null,
-                    claimSet: SdJwtVcClaimSet? = null,
+                    claimSet: GenericClaimSet? = null,
                 ): Result<CredentialIssuanceRequest> = runCatching {
                     CredentialIssuanceRequest(
                         proof = proof,
