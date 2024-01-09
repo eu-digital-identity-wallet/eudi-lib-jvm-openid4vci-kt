@@ -26,14 +26,12 @@ import kotlinx.serialization.Serializable
 import java.net.URL
 import java.util.*
 
-internal data object W3CJsonLdDataIntegrity : Format<
-    W3CJsonLdDataIntegrityCredential,
-    W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest,
-    > {
+internal data object W3CJsonLdDataIntegrity :
+    IssuanceRequestFactory<W3CJsonLdDataIntegrityCredential, ClaimSet, W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "ldp_vc"
 
-    override fun constructIssuanceRequest(
+    override fun createIssuanceRequest(
         supportedCredential: W3CJsonLdDataIntegrityCredential,
         claimSet: ClaimSet?,
         proof: Proof?,
@@ -115,10 +113,6 @@ internal data object W3CJsonLdDataIntegrity : Format<
                     }
                 },
             )
-
-        data class ClaimSet(
-            val claims: Map<ClaimName, Claim>,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
 
         class CredentialIssuanceRequest(
             override val format: String,

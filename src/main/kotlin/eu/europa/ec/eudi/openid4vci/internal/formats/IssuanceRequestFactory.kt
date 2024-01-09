@@ -29,59 +29,58 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonObject
 import java.util.*
 
-internal fun interface Format<in S : CredentialSupported, out I : CredentialIssuanceRequest.SingleCredential> {
+internal fun interface IssuanceRequestFactory<
+    in CredSup : CredentialSupported,
+    in Claims : ClaimSet,
+    out Req : CredentialIssuanceRequest.SingleCredential,
+    > {
 
-    fun constructIssuanceRequest(
-        supportedCredential: S,
-        claimSet: ClaimSet?,
+    fun createIssuanceRequest(
+        supportedCredential: CredSup,
+        claimSet: Claims?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<I>
+    ): Result<Req>
 }
 
 internal object Formats {
 
-    fun constructIssuanceRequest(
+    fun createIssuanceRequest(
         supportedCredential: CredentialSupported,
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<CredentialIssuanceRequest.SingleCredential> =
-        when (supportedCredential) {
-            is MsoMdocCredential -> MsoMdoc.constructIssuanceRequest(
+    ): Result<CredentialIssuanceRequest.SingleCredential> = when (supportedCredential) {
+        is MsoMdocCredential ->
+            MsoMdoc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, responseEncryptionSpec)
+
+        is SdJwtVcCredential ->
+            SdJwtVc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, responseEncryptionSpec)
+
+        is W3CSignedJwtCredential ->
+            W3CSignedJwt.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, responseEncryptionSpec)
+
+        is W3CJsonLdSignedJwtCredential ->
+            W3CJsonLdSignedJwt.createIssuanceRequest(
                 supportedCredential,
-                claimSet,
+                claimSet.ensure(),
                 proof,
                 responseEncryptionSpec,
             )
 
-            is SdJwtVcCredential -> SdJwtVc.constructIssuanceRequest(
+        is W3CJsonLdDataIntegrityCredential ->
+            W3CJsonLdDataIntegrity.createIssuanceRequest(
                 supportedCredential,
-                claimSet,
+                claimSet.ensure(),
                 proof,
                 responseEncryptionSpec,
             )
+    }
 
-            is W3CSignedJwtCredential -> W3CSignedJwt.constructIssuanceRequest(
-                supportedCredential,
-                claimSet,
-                proof,
-                responseEncryptionSpec,
-            )
-
-            is W3CJsonLdSignedJwtCredential -> W3CJsonLdSignedJwt.constructIssuanceRequest(
-                supportedCredential,
-                claimSet,
-                proof,
-                responseEncryptionSpec,
-            )
-
-            is W3CJsonLdDataIntegrityCredential -> W3CJsonLdDataIntegrity.constructIssuanceRequest(
-                supportedCredential,
-                claimSet,
-                proof,
-                responseEncryptionSpec,
-            )
+    private inline fun <reified C : ClaimSet> ClaimSet?.ensure(): C? =
+        this?.let {
+            if (it is C) it
+            else throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
         }
 }
 
@@ -104,12 +103,6 @@ internal sealed interface CredentialIssuanceRequestTO {
         val credentialResponseEncryptionMethod: String?
     }
 }
-
-/**
- * Sealed interface to model the set of specific claims that need to be included in the issued credential.
- * This set of claims is modelled differently depending on the credential format.
- */
-sealed interface ClaimSet
 
 /**
  * Credential(s) issuance request
@@ -141,7 +134,7 @@ internal sealed interface CredentialIssuanceRequest {
 
             /**
              * Utility method to create the [RequestedCredentialResponseEncryption] attribute of the issuance request.
-             * Construction logic is independent of the credential's format.
+             * The Construction logic is independent of the credential format.
              *
              * @param credentialEncryptionJwk   Key pair in JWK format used for issuance response encryption/decryption
              * @param credentialResponseEncryptionAlg   Encryption algorithm to be used

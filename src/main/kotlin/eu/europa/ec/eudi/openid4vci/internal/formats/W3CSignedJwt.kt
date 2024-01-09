@@ -25,11 +25,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.*
 
-internal data object W3CSignedJwt : Format<W3CSignedJwtCredential, W3CSignedJwt.Model.CredentialIssuanceRequest> {
+internal data object W3CSignedJwt :
+    IssuanceRequestFactory<W3CSignedJwtCredential, ClaimSet, W3CSignedJwt.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "jwt_vc_json"
 
-    override fun constructIssuanceRequest(
+    override fun createIssuanceRequest(
         supportedCredential: W3CSignedJwtCredential,
         claimSet: ClaimSet?,
         proof: Proof?,
@@ -105,10 +106,6 @@ internal data object W3CSignedJwt : Format<W3CSignedJwtCredential, W3CSignedJwt.
                     }
                 },
             )
-
-        data class ClaimSet(
-            val claims: Map<ClaimName, Claim>,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
 
         class CredentialIssuanceRequest(
             override val format: String,

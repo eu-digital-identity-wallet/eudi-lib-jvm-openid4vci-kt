@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 import eu.europa.ec.eudi.openid4vci.internal.formats.Formats
 import java.util.*
@@ -179,7 +178,7 @@ internal class DefaultIssuer(
             }
         }
         proof?.let { assertSupported(it) }
-        return Formats.constructIssuanceRequest(this, claimSet, proof, responseEncryptionSpec).getOrThrow()
+        return Formats.createIssuanceRequest(this, claimSet, proof, responseEncryptionSpec).getOrThrow()
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
