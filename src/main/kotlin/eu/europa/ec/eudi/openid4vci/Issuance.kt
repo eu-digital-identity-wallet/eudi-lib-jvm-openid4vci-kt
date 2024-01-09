@@ -241,9 +241,9 @@ interface AuthorizeIssuance {
 sealed interface ClaimSet
 
 @Serializable(with = ClaimSetSerializer::class)
-class MsoMdocClaimSet(claims:List<Pair<Namespace, ClaimName>>) :
+class MsoMdocClaimSet(claims: List<Pair<Namespace, ClaimName>>) :
     ClaimSet,
-    List<Pair<Namespace,ClaimName>> by claims
+    List<Pair<Namespace, ClaimName>> by claims
 data class GenericClaimSet(val claims: List<ClaimName>) : ClaimSet
 
 /**

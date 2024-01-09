@@ -100,7 +100,6 @@ internal object ProofSerializer : KSerializer<Proof> {
 
 internal object ClaimSetSerializer : KSerializer<MsoMdocClaimSet> {
 
-
     val internal = serializer<Map<Namespace, Map<ClaimName, JsonObject>>>()
     override val descriptor: SerialDescriptor =
         internal.descriptor
@@ -122,6 +121,3 @@ internal object ClaimSetSerializer : KSerializer<MsoMdocClaimSet> {
 
     private val emptyJsonObject = JsonObject(emptyMap())
 }
-
-
-

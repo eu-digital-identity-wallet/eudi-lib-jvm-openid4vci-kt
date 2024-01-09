@@ -48,23 +48,22 @@ internal data object MsoMdoc :
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<MsoMdocRequest> = runCatching {
-        fun validateClaimSet(claims: MsoMdocClaimSet): MsoMdocClaimSet {
-            if (claims.isEmpty() && claims.isNotEmpty()) {
+        fun MsoMdocClaimSet.validate() {
+            if (supportedCredential.claims.isEmpty() && isNotEmpty()) {
                 throw InvalidIssuanceRequest(
                     "Issuer does not support claims for credential [MsoMdoc-${supportedCredential.docType}]",
                 )
             }
-            claims.forEach { (nameSpace, attributes) ->
-                supportedCredential.claims[nameSpace]?.let { supportedClaim ->
-                    if (!supportedClaim.keys.containsAll(attributes.keys)) {
-                        throw InvalidIssuanceRequest("Claim names requested are not supported by issuer")
+            forEach { (nameSpace, claimName) ->
+                supportedCredential.claims[nameSpace]?.let { supportedClaimNames ->
+                    if (claimName !in supportedClaimNames) {
+                        throw InvalidIssuanceRequest("Requested claim name $claimName is not supported by issuer")
                     }
                 } ?: throw InvalidIssuanceRequest("Namespace $nameSpace not supported by issuer")
             }
-            return claims
         }
 
-        val validClaimSet = claimSet?.let { validateClaimSet(it) }
+        val validClaimSet = claimSet?.apply { validate() }
 
         MsoMdocRequest(
             doctype = supportedCredential.docType,

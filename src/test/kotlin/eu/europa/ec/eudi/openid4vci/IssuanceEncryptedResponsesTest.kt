@@ -289,12 +289,10 @@ class IssuanceEncryptedResponsesTest {
                 ),
             )
             val claimSet = MsoMdocClaimSet(
-                claims = mapOf(
-                    "org.iso.18013.5.1" to mapOf(
-                        "given_name" to Claim(),
-                        "family_name" to Claim(),
-                        "birth_date" to Claim(),
-                    ),
+                claims = listOf(
+                    "org.iso.18013.5.1" to "given_name",
+                    "org.iso.18013.5.1" to "family_name",
+                    "org.iso.18013.5.1" to "birth_date",
                 ),
             )
 
