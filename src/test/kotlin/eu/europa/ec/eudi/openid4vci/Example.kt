@@ -42,7 +42,6 @@ val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrT
 const val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
 const val PID_MsoMdoc = "eu.europa.ec.eudiw.pid_mso_mdoc"
 
-
 val credentialOffer = """
     {
       "credential_issuer": "$CredentialIssuer_URL",
