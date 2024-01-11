@@ -27,46 +27,37 @@ import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.S
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 import java.util.*
 
 internal data object SdJwtVc :
-    IssuanceRequestFactory<SdJwtVcCredential, SdJwtVcClaimSet, SdJwtVc.Model.CredentialIssuanceRequest> {
+    IssuanceRequestFactory<SdJwtVcCredential, GenericClaimSet, SdJwtVc.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "vc+sd-jwt"
 
     override fun createIssuanceRequest(
         supportedCredential: SdJwtVcCredential,
-        claimSet: SdJwtVcClaimSet?,
+        claimSet: GenericClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<Model.CredentialIssuanceRequest> = runCatching {
-        fun validateClaimSet(claimSet: SdJwtVcClaimSet): SdJwtVcClaimSet {
-            if ((supportedCredential.credentialDefinition.claims.isNullOrEmpty()) && claimSet.claims.isNotEmpty()) {
+        fun GenericClaimSet.validate() {
+            if ((supportedCredential.credentialDefinition.claims.isNullOrEmpty()) && claims.isNotEmpty()) {
                 throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential " +
                         "[$FORMAT-${supportedCredential.credentialDefinition.type}]",
                 )
             }
             if (supportedCredential.credentialDefinition.claims != null &&
-                !supportedCredential.credentialDefinition.claims.keys.containsAll(claimSet.claims.keys)
+                !supportedCredential.credentialDefinition.claims.keys.containsAll(claims)
             ) {
                 throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Claim names requested are not supported by issuer",
                 )
             }
-            return claimSet
         }
 
-        val validClaimSet = claimSet?.let {
-            when (claimSet) {
-                is SdJwtVcClaimSet -> validateClaimSet(claimSet)
-                else -> throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
-            }
-        }
+        val validClaimSet = claimSet?.apply { validate() }
 
         Model.CredentialIssuanceRequest(
             type = supportedCredential.credentialDefinition.type,
@@ -174,7 +165,11 @@ internal data object SdJwtVc :
                         credentialDefinition = CredentialIssuanceRequestTO.CredentialDefinitionTO(
                             type = this.credentialDefinition.type,
                             claims = this.credentialDefinition.claims?.let {
-                                Json.encodeToJsonElement(it.claims).jsonObject
+                                buildJsonObject {
+                                    for (c in it.claims) {
+                                        put(c, JsonObject(emptyMap()))
+                                    }
+                                }
                             },
                         ),
                     )
@@ -196,7 +191,7 @@ internal data object SdJwtVc :
                 }
             }
 
-            data class CredentialDefinition(val type: String, val claims: SdJwtVcClaimSet?)
+            data class CredentialDefinition(val type: String, val claims: GenericClaimSet?)
 
             companion object {
                 operator fun invoke(
@@ -205,7 +200,7 @@ internal data object SdJwtVc :
                     credentialEncryptionJwk: JWK? = null,
                     credentialResponseEncryptionAlg: JWEAlgorithm? = null,
                     credentialResponseEncryptionMethod: EncryptionMethod? = null,
-                    claimSet: SdJwtVcClaimSet? = null,
+                    claimSet: GenericClaimSet? = null,
                 ): Result<CredentialIssuanceRequest> = runCatching {
                     CredentialIssuanceRequest(
                         proof = proof,

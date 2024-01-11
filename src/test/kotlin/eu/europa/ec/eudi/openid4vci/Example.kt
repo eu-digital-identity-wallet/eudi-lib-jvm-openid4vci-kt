@@ -39,13 +39,13 @@ import java.net.URL
 const val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
 val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
 
-const val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-const val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
+const val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
+const val PID_MsoMdoc = "eu.europa.ec.eudiw.pid_mso_mdoc"
 
 val credentialOffer = """
     {
       "credential_issuer": "$CredentialIssuer_URL",
-      "credentials": [ "$PID_SdJwtVC_SCOPE", "$PID_MsoMdoc_SCOPE" ],
+      "credentials": [ "$PID_SdJwtVC", "$PID_MsoMdoc" ],
       "grants": {
         "authorization_code": {}
       }
@@ -54,8 +54,8 @@ val credentialOffer = """
 
 fun main(): Unit = runTest {
     val proofSigners = mapOf(
-        PID_SdJwtVC_SCOPE to CryptoGenerator.rsaProofSigner(),
-        PID_MsoMdoc_SCOPE to CryptoGenerator.ecProofSigner(),
+        PID_SdJwtVC to CryptoGenerator.rsaProofSigner(),
+        PID_MsoMdoc to CryptoGenerator.ecProofSigner(),
     )
 
     val config = OpenId4VCIConfig(
@@ -78,19 +78,19 @@ private suspend fun walletInitiatedIssuanceWithOffer(wallet: Wallet) {
     val credentials = wallet.issueByCredentialOfferUrl(offerUrl)
 
     println("--> Issued credentials :")
-    credentials.onEach { (scope, crednetial) ->
-        println("\t [$scope] : $crednetial")
+    credentials.onEach { (credentialId, credential) ->
+        println("\t [$credentialId] : $credential")
     }
     println()
 }
 
 private suspend fun walletInitiatedIssuanceNoOffer(wallet: Wallet) {
-    println("[[Scenario: No offer passed, wallet initiates issuance by credential scopes: $PID_SdJwtVC_SCOPE, $PID_MsoMdoc_SCOPE]]")
-    val pidSdjwtVc = wallet.issueByScope(PID_SdJwtVC_SCOPE)
-    println("--> Issued PID in format $PID_SdJwtVC_SCOPE: $pidSdjwtVc \n")
+    println("[[Scenario: No offer passed, wallet initiates issuance by credential identifiers: $PID_SdJwtVC, $PID_MsoMdoc]]")
+    val pidSdjwtVc = wallet.issueByCredentialIdentifier(PID_SdJwtVC)
+    println("--> Issued PID $PID_SdJwtVC: $pidSdjwtVc \n")
 
-    val pidMsoMdoc = wallet.issueByScope(PID_MsoMdoc_SCOPE)
-    println("--> Issued PID in format $PID_MsoMdoc_SCOPE: $pidMsoMdoc \n")
+    val pidMsoMdoc = wallet.issueByCredentialIdentifier(PID_MsoMdoc)
+    println("--> Issued PID $PID_MsoMdoc: $pidMsoMdoc \n")
 }
 
 data class ActingUser(
@@ -104,13 +104,13 @@ private class Wallet(
     val config: OpenId4VCIConfig,
 ) {
 
-    suspend fun issueByScope(scope: String): String {
-        val (authServerMetadata, issuerMetadata, issuer) = buildIssuer(credentialIssuerIdentifier, config)
-        val credentialIdentifier = CredentialIdentifier(scope)
+    suspend fun issueByCredentialIdentifier(identifier: String): String {
+        val (authServerMetadata, issuer) = buildIssuer(credentialIssuerIdentifier, config)
+        val credentialIdentifier = CredentialIdentifier(identifier)
 
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
-            listOf(credentialIdentifier), //  openIdScope
+            listOf(credentialIdentifier),
             authServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
@@ -118,22 +118,22 @@ private class Wallet(
         val outcome =
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired ->
-                    noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialIdentifier, issuerMetadata)
+                    noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialIdentifier)
 
                 is AuthorizedRequest.ProofRequired ->
-                    proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialIdentifier, issuerMetadata)
+                    proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialIdentifier)
             }
 
         return outcome
     }
 
-    suspend fun issueByCredentialOfferUrl(coUrl: String): List<Pair<String?, String>> {
+    suspend fun issueByCredentialOfferUrl(coUrl: String): List<Pair<String, String>> {
         val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory = ::httpClientFactory)
         val offer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
         return issueByCredentialOffer(offer)
     }
 
-    suspend fun issueByCredentialOffer(offer: CredentialOffer): List<Pair<String?, String>> {
+    suspend fun issueByCredentialOffer(offer: CredentialOffer): List<Pair<String, String>> {
         val issuerMetadata = offer.credentialIssuerMetadata
         val issuer = Issuer.make(
             authorizationServerMetadata = offer.authorizationServerMetadata,
@@ -145,25 +145,23 @@ private class Wallet(
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
-            offer.credentials, // + openIdScope,
+            offer.credentials,
             offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
         return when (authorizedRequest) {
             is AuthorizedRequest.NoProofRequired ->
                 offer.credentials.map { credentialId ->
-                    val scope = issuerMetadata.credentialsSupported[credentialId]?.scope
-                    issuanceLog("Requesting issuance of '$scope'")
-                    val credential = noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId, issuerMetadata)
-                    scope to credential
+                    issuanceLog("Requesting issuance of '$credentialId'")
+                    val credential = noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId)
+                    credentialId.value to credential
                 }
 
             is AuthorizedRequest.ProofRequired ->
                 offer.credentials.map { credentialId ->
-                    val scope = issuerMetadata.credentialsSupported[credentialId]?.scope
-                    issuanceLog("Requesting issuance of '$scope'")
-                    val credential = proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId, issuerMetadata)
-                    scope to credential
+                    issuanceLog("Requesting issuance of '$credentialId'")
+                    val credential = proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId)
+                    credentialId.value to credential
                 }
         }
     }
@@ -200,11 +198,9 @@ private class Wallet(
         issuer: Issuer,
         authorized: AuthorizedRequest.ProofRequired,
         credentialIdentifier: CredentialIdentifier,
-        issuerMetadata: CredentialIssuerMetadata,
     ): String {
         with(issuer) {
-            val scope = issuerMetadata.credentialsSupported[credentialIdentifier]?.scope
-            val proofSigner = proofSigners[scope] ?: error("No signer found for scope $scope")
+            val proofSigner = proofSigners[credentialIdentifier.value] ?: error("No signer found for credential $credentialIdentifier")
             val requestOutcome =
                 authorized.requestSingle(credentialIdentifier, null, proofSigner).getOrThrow()
 
@@ -252,7 +248,6 @@ private class Wallet(
         issuer: Issuer,
         noProofRequiredState: AuthorizedRequest.NoProofRequired,
         credentialIdentifier: CredentialIdentifier,
-        issuerMetadata: CredentialIssuerMetadata,
     ): String {
         with(issuer) {
             val requestOutcome =
@@ -274,7 +269,6 @@ private class Wallet(
                         issuer,
                         noProofRequiredState.handleInvalidProof(requestOutcome.cNonce),
                         credentialIdentifier,
-                        issuerMetadata,
                     )
                 }
 
@@ -320,7 +314,7 @@ private fun issuanceLog(message: String) {
 private suspend fun buildIssuer(
     credentialIssuerIdentifier: CredentialIssuerId,
     config: OpenId4VCIConfig,
-): Triple<CIAuthorizationServerMetadata, CredentialIssuerMetadata, Issuer> {
+): Pair<CIAuthorizationServerMetadata, Issuer> {
     val issuerMetadata =
         CredentialIssuerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
             .resolve(credentialIssuerIdentifier).getOrThrow()
@@ -335,7 +329,7 @@ private suspend fun buildIssuer(
         ktorHttpClientFactory = ::httpClientFactory,
         issuerMetadata = issuerMetadata,
     )
-    return Triple(authServerMetadata, issuerMetadata, issuer)
+    return Pair(authServerMetadata, issuer)
 }
 
 @OptIn(InternalAPI::class)

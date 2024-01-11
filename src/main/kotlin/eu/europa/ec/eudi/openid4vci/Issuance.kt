@@ -238,13 +238,13 @@ interface AuthorizeIssuance {
  * Interface to model the set of specific claims that need to be included in the issued credential.
  * This set of claims is modeled differently depending on the credential format.
  */
-interface ClaimSet
+sealed interface ClaimSet
 
 @Serializable(with = ClaimSetSerializer::class)
-class MsoMdocClaimSet(claims: Map<Namespace, Map<ClaimName, Claim>>) :
+class MsoMdocClaimSet(claims: List<Pair<Namespace, ClaimName>>) :
     ClaimSet,
-    Map<Namespace, Map<ClaimName, Claim>> by claims
-data class SdJwtVcClaimSet(val claims: Map<ClaimName, Claim>) : ClaimSet
+    List<Pair<Namespace, ClaimName>> by claims
+data class GenericClaimSet(val claims: List<ClaimName>) : ClaimSet
 
 /**
  * An interface for submitting a credential issuance request. Contains all the operation available to transition an [AuthorizedRequest]

@@ -107,19 +107,19 @@ class IssuanceBatchRequestTest {
             initIssuerWithOfferAndAuthorize(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
 
         val claimSet_mso_mdoc = MsoMdocClaimSet(
-            claims = mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "given_name" to Claim(),
-                    "family_name" to Claim(),
-                    "birth_date" to Claim(),
-                ),
+            claims = listOf(
+                "org.iso.18013.5.1" to "given_name",
+                "org.iso.18013.5.1" to "family_name",
+                "org.iso.18013.5.1" to "given_name",
+                "org.iso.18013.5.1" to "birth_date",
+
             ),
         )
-        val claimSet_sd_jwt_vc = SdJwtVcClaimSet(
-            claims = mapOf(
-                "given_name" to Claim(),
-                "family_name" to Claim(),
-                "birth_date" to Claim(),
+        val claimSet_sd_jwt_vc = GenericClaimSet(
+            claims = listOf(
+                "given_name",
+                "family_name",
+                "birth_date",
             ),
         )
 
