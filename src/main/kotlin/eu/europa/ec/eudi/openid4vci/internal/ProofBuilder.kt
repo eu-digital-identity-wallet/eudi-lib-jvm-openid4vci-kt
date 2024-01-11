@@ -102,9 +102,6 @@ internal sealed interface ProofBuilder {
             if (!credentialSpec!!.cryptographicSuitesSupported.contains(algorithm.name)) {
                 throw CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported
             }
-            if (!credentialSpec!!.cryptographicBindingMethodsSupported.contains(CryptographicBindingMethod.JWK)) {
-                throw CredentialIssuanceError.ProofGenerationError.CryptographicBindingMethodNotSupported
-            }
             if (!credentialSpec!!.proofTypesSupported.contains(ProofType.JWT)) {
                 throw CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
             }
