@@ -18,12 +18,10 @@ package eu.europa.ec.eudi.openid4vci.internal
 import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
-import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
-import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.jwk.KeyType
+import com.nimbusds.jose.util.Base64
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.ProofType
+import eu.europa.ec.eudi.openid4vci.*
 import java.time.Instant
 import java.util.*
 import kotlin.contracts.ExperimentalContracts
@@ -31,28 +29,20 @@ import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
 internal sealed interface ProofBuilder {
-
-    fun alg(alg: JWSAlgorithm)
-    fun jwk(jwk: JWK)
     fun iss(iss: String)
     fun aud(aud: String)
     fun nonce(nonce: String)
-    fun build(): Proof
+    fun publicKey(publicKey: BindingKey)
+    fun credentialSpec(credentialSpec: CredentialSupported)
+
+    fun build(proofSigner: ProofSigner): Proof
 
     private class JwtProofBuilder : ProofBuilder {
 
         val HEADER_TYPE = "openid4vci-proof+jwt"
         val claimsSet = JWTClaimsSet.Builder()
-        var alg: JWSAlgorithm? = null
-        var jwk: JWK? = null
-
-        override fun alg(alg: JWSAlgorithm) {
-            this.alg = alg
-        }
-
-        override fun jwk(jwk: JWK) {
-            this.jwk = jwk
-        }
+        var publicKey: BindingKey? = null
+        var credentialSpec: CredentialSupported? = null
 
         override fun iss(iss: String) {
             claimsSet.issuer(iss)
@@ -66,15 +56,42 @@ internal sealed interface ProofBuilder {
             claimsSet.claim("nonce", nonce)
         }
 
-        override fun build(): Proof.Jwt {
-            checkNotNull(alg) {
-                "No signing algorithm provided"
+        override fun publicKey(publicKey: BindingKey) {
+            this.publicKey = publicKey
+        }
+
+        override fun credentialSpec(credentialSpec: CredentialSupported) {
+            this.credentialSpec = credentialSpec
+        }
+
+        override fun build(proofSigner: ProofSigner): Proof.Jwt {
+            val algorithm = proofSigner.getAlgorithm()
+
+            validate(algorithm)
+
+            val headerBuilder = JWSHeader.Builder(algorithm)
+            headerBuilder.type(JOSEObjectType(HEADER_TYPE))
+
+            when (val key = publicKey!!) {
+                is BindingKey.Jwk -> headerBuilder.jwk(key.jwk.toPublicJWK())
+                is BindingKey.Did -> headerBuilder.keyID(key.identity)
+                is BindingKey.X509 -> headerBuilder.x509CertChain(key.chain.map { Base64.encode(it.encoded) })
             }
-            checkNotNull(jwk) {
-                "Cryptographic key material must be provided"
+
+            claimsSet.issueTime(Date.from(Instant.now()))
+
+            val signedJWT = SignedJWT(headerBuilder.build(), claimsSet.build())
+            signedJWT.sign(proofSigner)
+
+            return Proof.Jwt(signedJWT)
+        }
+
+        private fun validate(algorithm: JWSAlgorithm) {
+            checkNotNull(credentialSpec) {
+                "No credential specification provided"
             }
-            check(jwk?.keyType == KeyType.forAlgorithm(alg)) {
-                "Provided key and signing algorithm do not match"
+            checkNotNull(publicKey) {
+                "No public key provided"
             }
             checkNotNull(claimsSet.claims["aud"]) {
                 "Claim 'aud' is missing"
@@ -82,18 +99,12 @@ internal sealed interface ProofBuilder {
             checkNotNull(claimsSet.claims["nonce"]) {
                 "Claim 'nonce' is missing"
             }
-
-            val headerBuilder = JWSHeader.Builder(alg)
-            headerBuilder.type(JOSEObjectType(HEADER_TYPE))
-            headerBuilder.jwk(jwk!!.toPublicJWK())
-
-            claimsSet.issueTime(Date.from(Instant.now()))
-
-            val signedJWT = SignedJWT(headerBuilder.build(), claimsSet.build())
-            val signer = DefaultJWSSignerFactory().createJWSSigner(jwk!!, alg)
-            signedJWT.sign(signer)
-
-            return Proof.Jwt(signedJWT)
+            if (!credentialSpec!!.cryptographicSuitesSupported.contains(algorithm.name)) {
+                throw CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported
+            }
+            if (!credentialSpec!!.proofTypesSupported.contains(ProofType.JWT)) {
+                throw CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
+            }
         }
     }
 

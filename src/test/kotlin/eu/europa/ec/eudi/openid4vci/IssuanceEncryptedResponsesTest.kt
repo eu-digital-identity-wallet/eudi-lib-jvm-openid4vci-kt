@@ -24,7 +24,6 @@ import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
-import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -289,18 +288,12 @@ class IssuanceEncryptedResponsesTest {
                     },
                 ),
             )
-            val claimSet = MsoMdoc.Model.ClaimSet(
-                claims = mapOf(
-                    "org.iso.18013.5.1" to mapOf(
-                        "given_name" to Claim(),
-                        "family_name" to Claim(),
-                        "birth_date" to Claim(),
-                    ),
+            val claimSet = MsoMdocClaimSet(
+                claims = listOf(
+                    "org.iso.18013.5.1" to "given_name",
+                    "org.iso.18013.5.1" to "family_name",
+                    "org.iso.18013.5.1" to "birth_date",
                 ),
-            )
-            val bindingKey = BindingKey.Jwk(
-                algorithm = JWSAlgorithm.RS256,
-                jwk = randomRSASigningKey(2048),
             )
 
             val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
@@ -327,7 +320,7 @@ class IssuanceEncryptedResponsesTest {
                                 val proofRequired =
                                     authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                                 val response =
-                                    proofRequired.requestSingle(credentialMetadata, claimSet, bindingKey)
+                                    proofRequired.requestSingle(credentialMetadata, claimSet, CryptoGenerator.rsaProofSigner())
                                 assertThat(
                                     "Second attempt should be successful",
                                     response.getOrThrow() is SubmittedRequest.Success,
@@ -411,7 +404,7 @@ class IssuanceEncryptedResponsesTest {
                 when (jwk) {
                     is RSAKey -> RSAEncrypter(jwk)
                     is ECKey -> ECDHEncrypter(jwk)
-                    else -> throw IllegalArgumentException("unsupported 'kty': '${jwk.keyType.value}'")
+                    else -> error("unsupported 'kty': '${jwk.keyType.value}'")
                 }
 
             jwt.encrypt(encrypter)

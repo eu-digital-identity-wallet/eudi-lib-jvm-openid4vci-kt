@@ -20,7 +20,6 @@ import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
 import kotlinx.serialization.SerialName
 import java.io.Serializable
 import java.util.*
@@ -58,6 +57,10 @@ data class CredentialIssuerMetadata(
 
     init {
         require(credentialsSupported.isNotEmpty()) { "credentialsSupported must not be empty" }
+    }
+
+    inline fun <reified T : CredentialSupported> findByFormat(predicate: (T) -> Boolean): Map<CredentialIdentifier, T> {
+        return credentialsSupported.mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }.toMap()
     }
 
     /**
@@ -109,69 +112,6 @@ data class Claim(
         @SerialName("name") val name: String? = null,
         @kotlinx.serialization.Serializable(LocaleSerializer::class)
         @SerialName("locale") val locale: Locale? = null,
-    ) : Serializable
-}
-
-/**
- * Cryptographic Binding Methods for issued Credentials.
- */
-sealed interface CryptographicBindingMethod : Serializable {
-
-    /**
-     * JWK format.
-     */
-    data object JWK : CryptographicBindingMethod {
-        private fun readResolve(): Any = JWK
-    }
-
-    /**
-     * COSE Key object.
-     */
-    data object COSE : CryptographicBindingMethod {
-        private fun readResolve(): Any = COSE
-    }
-
-    /**
-     * MSO.
-     */
-    data object MSO : CryptographicBindingMethod {
-        private fun readResolve(): Any = MSO
-    }
-
-    /**
-     * DID method.
-     */
-    data class DID(val method: String) : CryptographicBindingMethod
-}
-
-/**
- * Proof types supported by a Credential Issuer.
- */
-enum class ProofType : Serializable {
-    JWT,
-    CWT,
-}
-
-typealias CssColor = String
-
-/**
- * Display properties of a supported credential type for a certain language.
- */
-data class Display(
-    val name: String,
-    val locale: Locale? = null,
-    val logo: Logo? = null,
-    val description: String? = null,
-    val backgroundColor: CssColor? = null,
-    val textColor: CssColor? = null,
-) : Serializable {
-
-    /**
-     * Logo information.
-     */
-    data class Logo(
-        val url: HttpsUrl? = null,
-        val alternativeText: String? = null,
     ) : Serializable
 }
 
@@ -277,7 +217,3 @@ fun interface CredentialIssuerMetadataResolver {
             )
     }
 }
-
-typealias Namespace = String
-typealias ClaimName = String
-typealias MsoMdocClaims = Map<Namespace, Map<ClaimName, Claim>>

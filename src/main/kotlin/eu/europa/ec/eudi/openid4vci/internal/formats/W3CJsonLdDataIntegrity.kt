@@ -26,15 +26,13 @@ import kotlinx.serialization.Serializable
 import java.net.URL
 import java.util.*
 
-internal data object W3CJsonLdDataIntegrity : Format<
-    W3CJsonLdDataIntegrity.Model.CredentialSupported,
-    W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest,
-    > {
+internal data object W3CJsonLdDataIntegrity :
+    IssuanceRequestFactory<W3CJsonLdDataIntegrityCredential, ClaimSet, W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest> {
 
     const val FORMAT = "ldp_vc"
 
-    override fun constructIssuanceRequest(
-        supportedCredential: Model.CredentialSupported,
+    override fun createIssuanceRequest(
+        supportedCredential: W3CJsonLdDataIntegrityCredential,
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
@@ -74,7 +72,7 @@ internal data object W3CJsonLdDataIntegrity : Format<
                 @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>? = null,
             )
 
-            override fun toDomain(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
+            override fun toDomain(): CredentialSupported {
                 val bindingMethods =
                     cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
                         ?: emptyList()
@@ -82,7 +80,7 @@ internal data object W3CJsonLdDataIntegrity : Format<
                 val proofTypesSupported = proofTypesSupported.toProofTypes()
                 val cryptographicSuitesSupported = cryptographicSuitesSupported ?: emptyList()
 
-                return CredentialSupported(
+                return W3CJsonLdDataIntegrityCredential(
                     scope,
                     bindingMethods,
                     cryptographicSuitesSupported,
@@ -96,8 +94,8 @@ internal data object W3CJsonLdDataIntegrity : Format<
             }
         }
 
-        fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): CredentialSupported.CredentialDefinition =
-            CredentialSupported.CredentialDefinition(
+        fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): W3CJsonLdDataIntegrityCredential.CredentialDefinition =
+            W3CJsonLdDataIntegrityCredential.CredentialDefinition(
                 context = context.map { URL(it) },
                 type = types,
                 credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
@@ -115,32 +113,6 @@ internal data object W3CJsonLdDataIntegrity : Format<
                     }
                 },
             )
-
-        /**
-         * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
-         */
-        data class CredentialSupported(
-            override val scope: String? = null,
-            override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-            override val cryptographicSuitesSupported: List<String> = emptyList(),
-            override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
-            override val display: List<Display> = emptyList(),
-            val context: List<String> = emptyList(),
-            val type: List<String> = emptyList(),
-            val credentialDefinition: CredentialDefinition,
-            val order: List<ClaimName> = emptyList(),
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported {
-
-            data class CredentialDefinition(
-                val context: List<URL>,
-                val type: List<String>,
-                val credentialSubject: Map<ClaimName, Claim?>?,
-            )
-        }
-
-        data class ClaimSet(
-            val claims: Map<ClaimName, Claim>,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
 
         class CredentialIssuanceRequest(
             override val format: String,

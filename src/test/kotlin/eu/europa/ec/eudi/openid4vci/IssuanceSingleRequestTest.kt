@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
@@ -35,10 +34,9 @@ import kotlin.test.fail
 
 class IssuanceSingleRequestTest {
 
-    val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
-
-    val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-    val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
+    private val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
+    private val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
+    private val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
 
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc = """
         {
@@ -109,14 +107,13 @@ class IssuanceSingleRequestTest {
                 AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
             )
 
-        val claimSet = MsoMdoc.Model.ClaimSet(
-            claims = mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "given_name" to Claim(),
-                    "family_name" to Claim(),
-                    "birth_date" to Claim(),
-                ),
+        val claimSet = MsoMdocClaimSet(
+            claims = listOf(
+                "org.iso.18013.5.1" to "given_name",
+                "org.iso.18013.5.1" to "family_name",
+                "org.iso.18013.5.1" to "birth_date",
             ),
+
         )
         with(issuer) {
             when (authorizedRequest) {
@@ -166,13 +163,11 @@ class IssuanceSingleRequestTest {
                     AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
                 )
 
-            val claimSet = MsoMdoc.Model.ClaimSet(
-                claims = mapOf(
-                    "org.iso.18013.5.1" to mapOf(
-                        "given_name" to Claim(),
-                        "family_name" to Claim(),
-                        "birth_date" to Claim(),
-                    ),
+            val claimSet = MsoMdocClaimSet(
+                claims = listOf(
+                    "org.iso.18013.5.1" to "given_name",
+                    "org.iso.18013.5.1" to "family_name",
+                    "org.iso.18013.5.1" to "birth_date",
                 ),
             )
             with(issuer) {
@@ -218,7 +213,7 @@ class IssuanceSingleRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val claimSet_mso_mdoc =
-                        MsoMdoc.Model.ClaimSet(mapOf("org.iso.18013.5.1" to mapOf("degree" to Claim())))
+                        MsoMdocClaimSet(listOf("org.iso.18013.5.1" to "degree"))
                     var credentialMetadata = CredentialIdentifier(PID_MsoMdoc_SCOPE)
                     authorizedRequest.requestSingle(credentialMetadata, claimSet_mso_mdoc)
                         .fold(
@@ -231,7 +226,7 @@ class IssuanceSingleRequestTest {
                             },
                         )
 
-                    val claimSet_sd_jwt_vc = SdJwtVc.Model.ClaimSet(mapOf("degree" to Claim()))
+                    val claimSet_sd_jwt_vc = GenericClaimSet(listOf("degree"))
                     credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
                     authorizedRequest.requestSingle(credentialMetadata, claimSet_sd_jwt_vc)
                         .fold(
@@ -314,18 +309,12 @@ class IssuanceSingleRequestTest {
                 AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
             )
 
-        val claimSet = MsoMdoc.Model.ClaimSet(
-            claims = mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "given_name" to Claim(),
-                    "family_name" to Claim(),
-                    "birth_date" to Claim(),
-                ),
+        val claimSet = MsoMdocClaimSet(
+            claims = listOf(
+                "org.iso.18013.5.1" to "given_name",
+                "org.iso.18013.5.1" to "family_name",
+                "org.iso.18013.5.1" to "birth_date",
             ),
-        )
-        val bindingKey = BindingKey.Jwk(
-            algorithm = JWSAlgorithm.RS256,
-            jwk = KeyGenerator.randomRSASigningKey(2048),
         )
 
         with(issuer) {
@@ -341,7 +330,7 @@ class IssuanceSingleRequestTest {
                             val response = proofRequired.requestSingle(
                                 credentialMetadata,
                                 claimSet,
-                                bindingKey,
+                                CryptoGenerator.rsaProofSigner(),
                             )
                             assertThat(
                                 "Second attempt should be successful",
@@ -416,16 +405,12 @@ class IssuanceSingleRequestTest {
                 AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
             )
 
-        val claimSet = SdJwtVc.Model.ClaimSet(
-            claims = mapOf(
-                "given_name" to Claim(),
-                "family_name" to Claim(),
-                "birth_date" to Claim(),
+        val claimSet = GenericClaimSet(
+            claims = listOf(
+                "given_name",
+                "family_name",
+                "birth_date",
             ),
-        )
-        val bindingKey = BindingKey.Jwk(
-            algorithm = JWSAlgorithm.RS256,
-            jwk = KeyGenerator.randomRSASigningKey(2048),
         )
 
         with(issuer) {
@@ -438,7 +423,7 @@ class IssuanceSingleRequestTest {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                            val response = proofRequired.requestSingle(credentialMetadata, claimSet, bindingKey)
+                            val response = proofRequired.requestSingle(credentialMetadata, claimSet, CryptoGenerator.rsaProofSigner())
                             assertThat(
                                 "Second attempt should be successful",
                                 response.getOrThrow() is SubmittedRequest.Success,

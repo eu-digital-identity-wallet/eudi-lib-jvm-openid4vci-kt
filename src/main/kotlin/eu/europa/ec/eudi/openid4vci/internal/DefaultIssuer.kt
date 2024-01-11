@@ -16,9 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.formats.ClaimSet
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupported
 import eu.europa.ec.eudi.openid4vci.internal.formats.Formats
 import java.util.*
 
@@ -106,13 +104,20 @@ internal class DefaultIssuer(
     override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
-        bindingKey: BindingKey,
+        proofSigner: ProofSigner,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(accessToken) {
             with(credentialId.matchIssuerSupportedCredential()) {
                 constructIssuanceRequest(
                     claimSet,
-                    createProof(issuerMetadata, bindingKey, this, cNonce.value),
+                    ProofBuilder.ofType(ProofType.JWT) {
+                        aud(issuerMetadata.credentialIssuerIdentifier.toString())
+                        publicKey(proofSigner.getBindingKey())
+                        credentialSpec(this@with)
+                        nonce(cNonce.value)
+
+                        build(proofSigner)
+                    },
                 )
             }
         }
@@ -131,14 +136,21 @@ internal class DefaultIssuer(
     }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, BindingKey>>,
+        credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, ProofSigner>>,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(accessToken) {
-            val credentialRequests = credentialsMetadata.map { (id, claimSet, bindingKey) ->
+            val credentialRequests = credentialsMetadata.map { (id, claimSet, proofSigner) ->
                 with(id.matchIssuerSupportedCredential()) {
                     constructIssuanceRequest(
                         claimSet,
-                        createProof(issuerMetadata, bindingKey, this, cNonce.value),
+                        ProofBuilder.ofType(ProofType.JWT) {
+                            aud(issuerMetadata.credentialIssuerIdentifier.toString())
+                            publicKey(proofSigner.getBindingKey())
+                            credentialSpec(this@with)
+                            nonce(cNonce.value)
+
+                            build(proofSigner)
+                        },
                     )
                 }
             }
@@ -166,7 +178,7 @@ internal class DefaultIssuer(
             }
         }
         proof?.let { assertSupported(it) }
-        return Formats.constructIssuanceRequest(this, claimSet, proof, responseEncryptionSpec).getOrThrow()
+        return Formats.createIssuanceRequest(this, claimSet, proof, responseEncryptionSpec).getOrThrow()
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(

@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 #Shallow clones should be disabled for a better relevancy of SonarCloud analysis
-      - uses: actions/setup-java@v3
+      - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -40,7 +40,7 @@ jobs:
       - name: setup projectkey
         run: echo "PROJECTKEY=${{ github.repository_owner}}_$(echo ${{ github.repository }} | sed 's/.*\///')" >> $GITHUB_ENV
       - name: Build with Gradle Wrapper & Run Sonar
-        uses: gradle/gradle-build-action@v2.9.0
+        uses: gradle/gradle-build-action@v2.10.0
         with:
           gradle-version: wrapper
           arguments: test jacocoTestReport sonar --info --full-stacktrace -Dsonar.organization=${{ github.repository_owner }} -Dsonar.projectKey=${{ env.PROJECTKEY }}
@@ -59,7 +59,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 #Shallow clones should be disabled for a better relevancy of SonarCloud analysis
-      - uses: actions/setup-java@v3
+      - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -74,7 +74,7 @@ jobs:
       - name: setup projectkey
         run: echo "PROJECTKEY=${{ github.repository_owner}}_$(echo ${{ github.repository }} | sed 's/.*\///')" >> $GITHUB_ENV
       - name: Build with Gradle Wrapper & Run Sonar
-        uses: gradle/gradle-build-action@v2.9.0
+        uses: gradle/gradle-build-action@v2.10.0
         with:
           gradle-version: wrapper
           arguments: sonar --info --full-stacktrace -Dsonar.organization=${{ github.repository_owner }} -Dsonar.projectKey=${{ env.PROJECTKEY }} -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }} -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }}

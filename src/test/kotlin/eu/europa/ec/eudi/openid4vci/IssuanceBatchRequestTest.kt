@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.BatchIssuanceSuccessResponse
 import eu.europa.ec.eudi.openid4vci.internal.CertificateIssuanceResponse
@@ -107,26 +106,21 @@ class IssuanceBatchRequestTest {
         val (_, authorizedRequest, issuer) =
             initIssuerWithOfferAndAuthorize(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
 
-        val claimSet_mso_mdoc = MsoMdoc.Model.ClaimSet(
-            claims = mapOf(
-                "org.iso.18013.5.1" to mapOf(
-                    "given_name" to Claim(),
-                    "family_name" to Claim(),
-                    "birth_date" to Claim(),
-                ),
-            ),
-        )
-        val claimSet_sd_jwt_vc = SdJwtVc.Model.ClaimSet(
-            claims = mapOf(
-                "given_name" to Claim(),
-                "family_name" to Claim(),
-                "birth_date" to Claim(),
-            ),
-        )
+        val claimSet_mso_mdoc = MsoMdocClaimSet(
+            claims = listOf(
+                "org.iso.18013.5.1" to "given_name",
+                "org.iso.18013.5.1" to "family_name",
+                "org.iso.18013.5.1" to "given_name",
+                "org.iso.18013.5.1" to "birth_date",
 
-        val bindingKey = BindingKey.Jwk(
-            algorithm = JWSAlgorithm.RS256,
-            jwk = KeyGenerator.randomRSASigningKey(2048),
+            ),
+        )
+        val claimSet_sd_jwt_vc = GenericClaimSet(
+            claims = listOf(
+                "given_name",
+                "family_name",
+                "birth_date",
+            ),
         )
 
         with(issuer) {
@@ -144,16 +138,17 @@ class IssuanceBatchRequestTest {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
 
+                            val proofSigner = CryptoGenerator.rsaProofSigner()
                             val credentialMetadataTriples = listOf(
                                 Triple(
                                     CredentialIdentifier(PID_MsoMdoc_SCOPE),
                                     claimSet_mso_mdoc,
-                                    bindingKey,
+                                    proofSigner,
                                 ),
                                 Triple(
                                     CredentialIdentifier(PID_SdJwtVC_SCOPE),
                                     claimSet_sd_jwt_vc,
-                                    bindingKey,
+                                    proofSigner,
                                 ),
                             )
 

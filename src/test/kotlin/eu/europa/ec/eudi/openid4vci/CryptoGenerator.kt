@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.KeyUse
@@ -23,7 +24,7 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import java.util.*
 
-object KeyGenerator {
+object CryptoGenerator {
 
     fun randomRSASigningKey(size: Int): RSAKey = RSAKeyGenerator(size)
         .keyUse(KeyUse.SIGNATURE)
@@ -36,4 +37,20 @@ object KeyGenerator {
         .keyID(UUID.randomUUID().toString())
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
+
+    fun rsaProofSigner(): DelegatingProofSigner {
+        val keyPair = randomRSASigningKey(2048)
+        val bindingKey = BindingKey.Jwk(
+            jwk = keyPair.toPublicJWK(),
+        )
+        return DelegatingProofSigner(keyPair, JWSAlgorithm.RS256, bindingKey)
+    }
+
+    fun ecProofSigner(): DelegatingProofSigner {
+        val keyPair = randomECSigningKey(Curve.P_256)
+        val bindingKey = BindingKey.Jwk(
+            jwk = keyPair.toPublicJWK(),
+        )
+        return DelegatingProofSigner(keyPair, JWSAlgorithm.ES256, bindingKey)
+    }
 }
