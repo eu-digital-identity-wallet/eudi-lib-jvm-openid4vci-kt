@@ -16,25 +16,22 @@
 package eu.europa.ec.eudi.openid4vci.internal.formats
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.ClaimTO
-import eu.europa.ec.eudi.openid4vci.internal.CredentialSupportedDisplayTO
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.RequestedCredentialResponseEncryption
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential
 import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVcIssuanceRequest.CredentialDefinition
-import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.util.*
 
 internal data object SdJwtVc :
-    Format<SdJwtVcCredentialTO, SdJwtVcCredential, GenericClaimSet, SdJwtVcIssuanceRequest, SdJwtVcIssuanceRequestTO> {
+    Format<SdJwtVcCredential, GenericClaimSet, SdJwtVcIssuanceRequest, SdJwtVcIssuanceRequestTO> {
 
     const val FORMAT = "vc+sd-jwt"
 
     override val serializationSupport:
-        FormatSerializationSupport<SdJwtVcCredentialTO, SdJwtVcCredential, SdJwtVcIssuanceRequest, SdJwtVcIssuanceRequestTO>
+        FormatSerializationSupport<SdJwtVcIssuanceRequest, SdJwtVcIssuanceRequestTO>
         get() = SdJwtVcFormatSerializationSupport
 
     override fun createIssuanceRequest(
@@ -104,71 +101,8 @@ internal data class SdJwtVcIssuanceRequestTO(
     )
 }
 
-@Serializable
-@SerialName(SdJwtVc.FORMAT)
-internal data class SdJwtVcCredentialTO(
-    @SerialName("format") @Required override val format: String = SdJwtVc.FORMAT,
-    @SerialName("scope") override val scope: String? = null,
-    @SerialName("cryptographic_binding_methods_supported")
-    override val cryptographicBindingMethodsSupported: List<String>? = null,
-    @SerialName("cryptographic_suites_supported")
-    override val cryptographicSuitesSupported: List<String>? = null,
-    @SerialName("proof_types_supported")
-    override val proofTypesSupported: List<String>? = null,
-    @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
-    @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
-) : CredentialSupportedTO {
-    init {
-        require(format == SdJwtVc.FORMAT) { "invalid format '$format'" }
-    }
-
-    @Serializable
-    data class CredentialDefinitionTO(
-        @SerialName("type") val type: String,
-        @SerialName("claims") val claims: Map<String, ClaimTO>? = null,
-    )
-
-    override fun toDomain(): CredentialSupported = SdJwtVcFormatSerializationSupport.credentialSupportedFromJson(this)
-}
-
 private object SdJwtVcFormatSerializationSupport :
-    FormatSerializationSupport<SdJwtVcCredentialTO, SdJwtVcCredential, SdJwtVcIssuanceRequest, SdJwtVcIssuanceRequestTO> {
-    override fun credentialSupportedFromJson(csJson: SdJwtVcCredentialTO): SdJwtVcCredential {
-        val bindingMethods =
-            csJson.cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
-                ?: emptyList()
-        val display = csJson.display?.map { it.toDomain() } ?: emptyList()
-        val proofTypesSupported = csJson.proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = csJson.cryptographicSuitesSupported ?: emptyList()
-
-        return SdJwtVcCredential(
-            csJson.scope,
-            bindingMethods,
-            cryptographicSuitesSupported,
-            proofTypesSupported,
-            display,
-            csJson.credentialDefinition.toDomain(),
-        )
-    }
-
-    private fun SdJwtVcCredentialTO.CredentialDefinitionTO.toDomain(): SdJwtVcCredential.CredentialDefinition =
-        SdJwtVcCredential.CredentialDefinition(
-            type = type,
-            claims = claims?.mapValues { nameAndClaim ->
-                nameAndClaim.value.let {
-                    Claim(
-                        it.mandatory ?: false,
-                        it.valueType,
-                        it.display?.map { displayObject ->
-                            Claim.Display(
-                                displayObject.name,
-                                displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                            )
-                        } ?: emptyList(),
-                    )
-                }
-            },
-        )
+    FormatSerializationSupport<SdJwtVcIssuanceRequest, SdJwtVcIssuanceRequestTO> {
 
     override fun issuanceRequestToJson(request: SdJwtVcIssuanceRequest): SdJwtVcIssuanceRequestTO {
         return when (val it = request.requestedCredentialResponseEncryption) {

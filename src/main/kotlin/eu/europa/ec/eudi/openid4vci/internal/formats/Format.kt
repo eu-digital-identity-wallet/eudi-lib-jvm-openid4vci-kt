@@ -21,7 +21,6 @@ import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.RequestedCredentialResponseEncryption
 
 internal sealed interface Format<
-    in CS_JSON,
     CS : CredentialSupported,
     in CL_SET : ClaimSet,
     IR : CredentialIssuanceRequest.SingleCredential,
@@ -35,15 +34,13 @@ internal sealed interface Format<
         requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
     ): Result<IR>
 
-    val serializationSupport: FormatSerializationSupport<CS_JSON, CS, IR, IR_JSON>
+    val serializationSupport: FormatSerializationSupport<IR, IR_JSON>
 }
 
 internal interface FormatSerializationSupport<
-    in CS_JSON,
-    out CS : CredentialSupported,
     in IR : CredentialIssuanceRequest.SingleCredential,
     out IR_JSON,
     > {
-    fun credentialSupportedFromJson(csJson: CS_JSON): CS
+
     fun issuanceRequestToJson(request: IR): IR_JSON
 }
