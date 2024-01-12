@@ -29,64 +29,6 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonObject
 import java.util.*
 
-internal fun interface IssuanceRequestFactory<
-    in CredSup : CredentialSupported,
-    in Claims : ClaimSet,
-    out Req : CredentialIssuanceRequest.SingleCredential,
-    > {
-
-    fun createIssuanceRequest(
-        supportedCredential: CredSup,
-        claimSet: Claims?,
-        proof: Proof?,
-        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<Req>
-}
-
-internal fun createIssuanceRequest(
-    supportedCredential: CredentialSupported,
-    claimSet: ClaimSet?,
-    proof: Proof?,
-    responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-): Result<CredentialIssuanceRequest.SingleCredential> {
-    return when (supportedCredential) {
-        is MsoMdocCredential ->
-            MsoMdoc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, responseEncryptionSpec)
-
-        is SdJwtVcCredential ->
-            SdJwtVc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, responseEncryptionSpec)
-
-        is W3CSignedJwtCredential ->
-            W3CSignedJwt.createIssuanceRequest(
-                supportedCredential,
-                claimSet.ensure(),
-                proof,
-                responseEncryptionSpec,
-            )
-
-        is W3CJsonLdSignedJwtCredential ->
-            W3CJsonLdSignedJwt.createIssuanceRequest(
-                supportedCredential,
-                claimSet.ensure(),
-                proof,
-                responseEncryptionSpec,
-            )
-
-        is W3CJsonLdDataIntegrityCredential ->
-            W3CJsonLdDataIntegrity.createIssuanceRequest(
-                supportedCredential,
-                claimSet.ensure(),
-                proof,
-                responseEncryptionSpec,
-            )
-    }
-}
-
-private inline fun <reified C : ClaimSet> ClaimSet?.ensure(): C? =
-    this?.let {
-        if (it is C) it
-        else throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
-    }
 
 @kotlinx.serialization.Serializable
 @OptIn(ExperimentalSerializationApi::class)
@@ -127,11 +69,12 @@ internal sealed interface CredentialIssuanceRequest {
     /**
      * Sealed hierarchy of credential issuance requests based on the format of the requested credential.
      */
-    sealed interface SingleCredential : CredentialIssuanceRequest {
+    interface SingleCredential : CredentialIssuanceRequest {
         val format: String
         val proof: Proof?
         val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption
 
+        @Deprecated("Don't use it")
         fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO
 
         companion object {

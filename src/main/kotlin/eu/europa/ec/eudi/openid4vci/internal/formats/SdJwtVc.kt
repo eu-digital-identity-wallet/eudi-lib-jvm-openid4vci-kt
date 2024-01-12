@@ -31,9 +31,13 @@ import kotlinx.serialization.json.*
 import java.util.*
 
 internal data object SdJwtVc :
-    IssuanceRequestFactory<SdJwtVcCredential, GenericClaimSet, SdJwtVcIssuanceRequest> {
+    Format<SdJwtVcCredentialTO, SdJwtVcCredential, GenericClaimSet, SdJwtVcIssuanceRequest, SdJwtVcIssuanceRequestTO> {
 
     const val FORMAT = "vc+sd-jwt"
+
+    override val serializationSupport: FormatSerializationSupport<SdJwtVcCredentialTO, SdJwtVcCredential, SdJwtVcIssuanceRequest, SdJwtVcIssuanceRequestTO>
+        get() = SdJwtVcFormatSerializationSupport
+
 
     override fun createIssuanceRequest(
         supportedCredential: SdJwtVcCredential,
@@ -45,7 +49,7 @@ internal data object SdJwtVc :
             if ((supportedCredential.credentialDefinition.claims.isNullOrEmpty()) && claims.isNotEmpty()) {
                 throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential " +
-                        "[$FORMAT-${supportedCredential.credentialDefinition.type}]",
+                            "[$FORMAT-${supportedCredential.credentialDefinition.type}]",
                 )
             }
             if (supportedCredential.credentialDefinition.claims != null &&
@@ -68,6 +72,7 @@ internal data object SdJwtVc :
             claimSet = validClaimSet,
         ).getOrThrow()
     }
+
 }
 
 internal class SdJwtVcIssuanceRequest private constructor(
@@ -78,6 +83,7 @@ internal class SdJwtVcIssuanceRequest private constructor(
 
     override val format: String = SdJwtVc.FORMAT
 
+    @Deprecated("Don't use it")
     override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO =
         SdJwtVcFormatSerializationSupport.issuanceRequestToJson(this)
 
@@ -95,11 +101,11 @@ internal class SdJwtVcIssuanceRequest private constructor(
             SdJwtVcIssuanceRequest(
                 proof = proof,
                 requestedCredentialResponseEncryption =
-                    SingleCredential.requestedCredentialResponseEncryption(
-                        credentialEncryptionJwk = credentialEncryptionJwk,
-                        credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
-                        credentialResponseEncryptionMethod = credentialResponseEncryptionMethod,
-                    ),
+                SingleCredential.requestedCredentialResponseEncryption(
+                    credentialEncryptionJwk = credentialEncryptionJwk,
+                    credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
+                    credentialResponseEncryptionMethod = credentialResponseEncryptionMethod,
+                ),
                 credentialDefinition = CredentialDefinition(
                     type = type,
                     claims = claimSet,
@@ -153,7 +159,7 @@ internal data class SdJwtVcCredentialTO(
     override fun toDomain(): CredentialSupported = SdJwtVcFormatSerializationSupport.credentialSupportedFromJson(this)
 }
 
-internal object SdJwtVcFormatSerializationSupport :
+private object SdJwtVcFormatSerializationSupport :
     FormatSerializationSupport<SdJwtVcCredentialTO, SdJwtVcCredential, SdJwtVcIssuanceRequest, SdJwtVcIssuanceRequestTO> {
     override fun credentialSupportedFromJson(csJson: SdJwtVcCredentialTO): SdJwtVcCredential {
         val bindingMethods =

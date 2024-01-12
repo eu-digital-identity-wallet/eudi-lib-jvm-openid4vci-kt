@@ -26,7 +26,13 @@ import kotlinx.serialization.Serializable
 import java.util.*
 
 internal data object W3CSignedJwt :
-    IssuanceRequestFactory<W3CSignedJwtCredential, ClaimSet, W3CSignedJwtIssuanceRequest> {
+    Format<
+            W3CSignedJwtCredentialTO,
+            W3CSignedJwtCredential,
+            ClaimSet,
+            W3CSignedJwtIssuanceRequest,
+            CredentialIssuanceRequestTO.SingleCredentialTO
+            > {
 
     const val FORMAT = "jwt_vc_json"
 
@@ -35,9 +41,17 @@ internal data object W3CSignedJwt :
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<W3CSignedJwtIssuanceRequest> {
-        TODO("Not yet implemented")
-    }
+    ): Result<W3CSignedJwtIssuanceRequest> = TODO("Not yet implemented")
+
+    override val serializationSupport:
+            FormatSerializationSupport<
+                    W3CSignedJwtCredentialTO,
+                    W3CSignedJwtCredential,
+                    W3CSignedJwtIssuanceRequest,
+                    CredentialIssuanceRequestTO.SingleCredentialTO
+                    >
+        get() = W3CSignedJwtSerializationSupport
+
 }
 
 internal class W3CSignedJwtIssuanceRequest(
@@ -46,9 +60,65 @@ internal class W3CSignedJwtIssuanceRequest(
     override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
 ) : CredentialIssuanceRequest.SingleCredential {
 
-    override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO {
+    override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO  =
+        W3CSignedJwt.serializationSupport.issuanceRequestToJson(this)
+}
+
+//
+// Serialization
+//
+
+
+private object W3CSignedJwtSerializationSupport :
+    FormatSerializationSupport<
+        W3CSignedJwtCredentialTO,
+            W3CSignedJwtCredential,
+            W3CSignedJwtIssuanceRequest,
+            CredentialIssuanceRequestTO.SingleCredentialTO
+            > {
+    override fun credentialSupportedFromJson(csJson: W3CSignedJwtCredentialTO): W3CSignedJwtCredential {
+        val bindingMethods =
+            csJson.cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
+                ?: emptyList()
+        val display = csJson.display?.map { it.toDomain() } ?: emptyList()
+        val proofTypesSupported = csJson.proofTypesSupported.toProofTypes()
+        val cryptographicSuitesSupported = csJson.cryptographicSuitesSupported ?: emptyList()
+
+        return W3CSignedJwtCredential(
+            csJson.scope,
+            bindingMethods,
+            cryptographicSuitesSupported,
+            proofTypesSupported,
+            display,
+            csJson.credentialDefinition.toDomain(),
+            csJson.order ?: emptyList(),
+        )
+    }
+
+    private fun W3CSignedJwtCredentialTO.CredentialDefinitionTO.toDomain(): W3CSignedJwtCredential.CredentialDefinition =
+        W3CSignedJwtCredential.CredentialDefinition(
+            type = types,
+            credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
+                nameAndClaim.value.let {
+                    Claim(
+                        it.mandatory ?: false,
+                        it.valueType,
+                        it.display?.map { displayObject ->
+                            Claim.Display(
+                                displayObject.name,
+                                displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
+                            )
+                        } ?: emptyList(),
+                    )
+                }
+            },
+        )
+
+
+    override fun issuanceRequestToJson(request: W3CSignedJwtIssuanceRequest): CredentialIssuanceRequestTO.SingleCredentialTO {
         TODO("Not yet implemented")
     }
+
 }
 
 /**
@@ -79,41 +149,6 @@ internal data class W3CSignedJwtCredentialTO(
         @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>? = null,
     )
 
-    override fun toDomain(): CredentialSupported {
-        val bindingMethods =
-            cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
-                ?: emptyList()
-        val display = display?.map { it.toDomain() } ?: emptyList()
-        val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = cryptographicSuitesSupported ?: emptyList()
-
-        return W3CSignedJwtCredential(
-            scope,
-            bindingMethods,
-            cryptographicSuitesSupported,
-            proofTypesSupported,
-            display,
-            credentialDefinition.toDomain(),
-            order ?: emptyList(),
-        )
-    }
+    override fun toDomain(): CredentialSupported  =  W3CSignedJwt.serializationSupport.credentialSupportedFromJson(this)
 }
 
-private fun W3CSignedJwtCredentialTO.CredentialDefinitionTO.toDomain(): W3CSignedJwtCredential.CredentialDefinition =
-    W3CSignedJwtCredential.CredentialDefinition(
-        type = types,
-        credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
-            nameAndClaim.value.let {
-                Claim(
-                    it.mandatory ?: false,
-                    it.valueType,
-                    it.display?.map { displayObject ->
-                        Claim.Display(
-                            displayObject.name,
-                            displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                        )
-                    } ?: emptyList(),
-                )
-            }
-        },
-    )

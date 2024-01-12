@@ -38,9 +38,12 @@ fun CredentialIssuerMetadata.findMsoMdoc(docType: String): MsoMdocCredential? =
     findByFormat<MsoMdocCredential> { it.docType == docType }.values.firstOrNull()
 
 internal data object MsoMdoc :
-    IssuanceRequestFactory<MsoMdocCredential, MsoMdocClaimSet, MsoMdocIssuanceRequest> {
+    Format<MsdMdocCredentialTO, MsoMdocCredential, MsoMdocClaimSet, MsoMdocIssuanceRequest, MsoMdocIssuanceRequestTO> {
 
     const val FORMAT = "mso_mdoc"
+
+    override val serializationSupport: FormatSerializationSupport<MsdMdocCredentialTO, MsoMdocCredential, MsoMdocIssuanceRequest, MsoMdocIssuanceRequestTO>
+        get() = MsoMdocFormatSerializationSupport
 
     override fun createIssuanceRequest(
         supportedCredential: MsoMdocCredential,
@@ -113,11 +116,11 @@ internal class MsoMdocIssuanceRequest private constructor(
             MsoMdocIssuanceRequest(
                 proof = proof,
                 requestedCredentialResponseEncryption =
-                    SingleCredential.requestedCredentialResponseEncryption(
-                        credentialEncryptionJwk = credentialEncryptionJwk,
-                        credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
-                        credentialResponseEncryptionMethod = credentialResponseEncryptionMethod,
-                    ),
+                SingleCredential.requestedCredentialResponseEncryption(
+                    credentialEncryptionJwk = credentialEncryptionJwk,
+                    credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
+                    credentialResponseEncryptionMethod = credentialResponseEncryptionMethod,
+                ),
                 doctype = doctype,
                 claimSet = claimSet,
             )
@@ -152,7 +155,7 @@ internal data class MsdMdocCredentialTO(
         MsoMdocFormatSerializationSupport.credentialSupportedFromJson(this)
 }
 
-internal object MsoMdocFormatSerializationSupport :
+private object MsoMdocFormatSerializationSupport :
     FormatSerializationSupport<MsdMdocCredentialTO, MsoMdocCredential, MsoMdocIssuanceRequest, MsoMdocIssuanceRequestTO> {
     override fun credentialSupportedFromJson(csJson: MsdMdocCredentialTO): MsoMdocCredential {
         val bindingMethods = csJson.cryptographicBindingMethodsSupported

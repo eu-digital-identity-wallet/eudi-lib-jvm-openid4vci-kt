@@ -26,8 +26,12 @@ import kotlinx.serialization.Serializable
 import java.net.URL
 import java.util.*
 
+
 internal data object W3CJsonLdDataIntegrity :
-    IssuanceRequestFactory<W3CJsonLdDataIntegrityCredential, ClaimSet, W3CJsonLdDataIntegrityIssuanceRequest> {
+    Format<W3CJsonLdDataIntegrityCredentialTO,
+            W3CJsonLdDataIntegrityCredential,
+            ClaimSet, W3CJsonLdDataIntegrityIssuanceRequest,
+            CredentialIssuanceRequestTO.SingleCredentialTO> {
 
     const val FORMAT = "ldp_vc"
 
@@ -36,22 +40,86 @@ internal data object W3CJsonLdDataIntegrity :
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<W3CJsonLdDataIntegrityIssuanceRequest> {
-        TODO("Not yet implemented")
-    }
+    ): Result<W3CJsonLdDataIntegrityIssuanceRequest> = TODO("Not yet implemented")
 
-    object Model
+
+    override val serializationSupport:
+            FormatSerializationSupport<
+                    W3CJsonLdDataIntegrityCredentialTO,
+                    W3CJsonLdDataIntegrityCredential,
+                    W3CJsonLdDataIntegrityIssuanceRequest,
+                    CredentialIssuanceRequestTO.SingleCredentialTO
+                    >
+        get() = W3CJsonLdDataIntegritySerializationSupport
 }
-
 internal class W3CJsonLdDataIntegrityIssuanceRequest(
     override val format: String,
     override val proof: Proof?,
     override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
 ) : CredentialIssuanceRequest.SingleCredential {
-    override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO {
+    @Deprecated("Don't use it")
+    override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO =
+        W3CJsonLdDataIntegritySerializationSupport.issuanceRequestToJson(this)
+}
+
+//
+// Serialization
+//
+
+
+private object W3CJsonLdDataIntegritySerializationSupport :
+    FormatSerializationSupport<
+            W3CJsonLdDataIntegrityCredentialTO,
+            W3CJsonLdDataIntegrityCredential,
+            W3CJsonLdDataIntegrityIssuanceRequest,
+            CredentialIssuanceRequestTO.SingleCredentialTO
+            > {
+    override fun credentialSupportedFromJson(
+        csJson: W3CJsonLdDataIntegrityCredentialTO
+    ): W3CJsonLdDataIntegrityCredential {
+        val bindingMethods =
+            csJson.cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
+                ?: emptyList()
+        val display = csJson.display?.map { it.toDomain() } ?: emptyList()
+        val proofTypesSupported = csJson.proofTypesSupported.toProofTypes()
+        val cryptographicSuitesSupported = csJson.cryptographicSuitesSupported ?: emptyList()
+
+        return W3CJsonLdDataIntegrityCredential(
+            csJson.scope, bindingMethods, cryptographicSuitesSupported, proofTypesSupported,
+            display, csJson.context, csJson.type, csJson.credentialDefinition.toDomain(),
+            csJson.order ?: emptyList()
+        )
+    }
+
+    private fun W3CJsonLdDataIntegrityCredentialTO.CredentialDefinitionTO.toDomain():
+            W3CJsonLdDataIntegrityCredential.CredentialDefinition =
+        W3CJsonLdDataIntegrityCredential.CredentialDefinition(
+            context = context.map { URL(it) },
+            type = types,
+            credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
+                nameAndClaim.value.let {
+                    Claim(
+                        it.mandatory ?: false,
+                        it.valueType,
+                        it.display?.map { displayObject ->
+                            Claim.Display(
+                                displayObject.name,
+                                displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
+                            )
+                        } ?: emptyList(),
+                    )
+                }
+            },
+        )
+
+    override fun issuanceRequestToJson(
+        request: W3CJsonLdDataIntegrityIssuanceRequest
+    ): CredentialIssuanceRequestTO.SingleCredentialTO {
         TODO("Not yet implemented")
     }
+
 }
+
 
 /**
  * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
@@ -72,7 +140,7 @@ internal data class W3CJsonLdDataIntegrityCredentialTO(
     @SerialName("type") @Required val type: List<String> = emptyList(),
     @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
     @SerialName("order") val order: List<String>? = null,
-) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupportedTO {
+) : CredentialSupportedTO {
     init {
         require(format == W3CJsonLdDataIntegrity.FORMAT) { "invalid format '$format'" }
     }
@@ -84,44 +152,8 @@ internal data class W3CJsonLdDataIntegrityCredentialTO(
         @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>? = null,
     )
 
-    override fun toDomain(): CredentialSupported {
-        val bindingMethods =
-            cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
-                ?: emptyList()
-        val display = display?.map { it.toDomain() } ?: emptyList()
-        val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = cryptographicSuitesSupported ?: emptyList()
-
-        return W3CJsonLdDataIntegrityCredential(
-            scope,
-            bindingMethods,
-            cryptographicSuitesSupported,
-            proofTypesSupported,
-            display,
-            context,
-            type,
-            credentialDefinition.toDomain(),
-            order ?: emptyList(),
-        )
-    }
+    override fun toDomain(): CredentialSupported =
+        W3CJsonLdDataIntegritySerializationSupport.credentialSupportedFromJson(this)
 }
 
-private fun W3CJsonLdDataIntegrityCredentialTO.CredentialDefinitionTO.toDomain(): W3CJsonLdDataIntegrityCredential.CredentialDefinition =
-    W3CJsonLdDataIntegrityCredential.CredentialDefinition(
-        context = context.map { URL(it) },
-        type = types,
-        credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
-            nameAndClaim.value.let {
-                Claim(
-                    it.mandatory ?: false,
-                    it.valueType,
-                    it.display?.map { displayObject ->
-                        Claim.Display(
-                            displayObject.name,
-                            displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                        )
-                    } ?: emptyList(),
-                )
-            }
-        },
-    )
+
