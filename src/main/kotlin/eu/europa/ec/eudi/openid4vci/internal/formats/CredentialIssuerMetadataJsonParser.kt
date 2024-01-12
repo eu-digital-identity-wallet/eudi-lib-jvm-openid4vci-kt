@@ -58,9 +58,9 @@ private sealed interface CredentialSupportedTO {
  * The data of a Verifiable Credentials issued as an ISO mDL.
  */
 @Serializable
-@SerialName(MsoMdoc.FORMAT)
+@SerialName(FORMAT_MSO_MDOC)
 private data class MsdMdocCredentialTO(
-    @SerialName("format") @Required override val format: String = MsoMdoc.FORMAT,
+    @SerialName("format") @Required override val format: String = FORMAT_MSO_MDOC,
     @SerialName("scope") override val scope: String? = null,
     @SerialName("cryptographic_binding_methods_supported")
     override val cryptographicBindingMethodsSupported: List<String>? = null,
@@ -74,14 +74,14 @@ private data class MsdMdocCredentialTO(
     @SerialName("order") val order: List<String>? = null,
 ) : CredentialSupportedTO {
     init {
-        require(format == MsoMdoc.FORMAT) { "invalid format '$format'" }
+        require(format == FORMAT_MSO_MDOC) { "invalid format '$format'" }
     }
 }
 
 @Serializable
-@SerialName(SdJwtVc.FORMAT)
+@SerialName(FORMAT_SD_JWT_VC)
 private data class SdJwtVcCredentialTO(
-    @SerialName("format") @Required override val format: String = SdJwtVc.FORMAT,
+    @SerialName("format") @Required override val format: String = FORMAT_SD_JWT_VC,
     @SerialName("scope") override val scope: String? = null,
     @SerialName("cryptographic_binding_methods_supported")
     override val cryptographicBindingMethodsSupported: List<String>? = null,
@@ -93,7 +93,7 @@ private data class SdJwtVcCredentialTO(
     @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
 ) : CredentialSupportedTO {
     init {
-        require(format == SdJwtVc.FORMAT) { "invalid format '$format'" }
+        require(format == FORMAT_SD_JWT_VC) { "invalid format '$format'" }
     }
 
     @Serializable
@@ -107,9 +107,9 @@ private data class SdJwtVcCredentialTO(
  * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
  */
 @Serializable
-@SerialName(W3CJsonLdDataIntegrity.FORMAT)
+@SerialName(FORMAT_W3C_JSONLD_DATA_INTEGRITY)
 private data class W3CJsonLdDataIntegrityCredentialTO(
-    @SerialName("format") @Required override val format: String = W3CJsonLdDataIntegrity.FORMAT,
+    @SerialName("format") @Required override val format: String = FORMAT_W3C_JSONLD_DATA_INTEGRITY,
     @SerialName("scope") override val scope: String? = null,
     @SerialName("cryptographic_binding_methods_supported")
     override val cryptographicBindingMethodsSupported: List<String>? = null,
@@ -124,7 +124,7 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
     @SerialName("order") val order: List<String>? = null,
 ) : CredentialSupportedTO {
     init {
-        require(format == W3CJsonLdDataIntegrity.FORMAT) { "invalid format '$format'" }
+        require(format == FORMAT_W3C_JSONLD_DATA_INTEGRITY) { "invalid format '$format'" }
     }
 
     @Serializable
@@ -139,9 +139,9 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
  * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
  */
 @Serializable
-@SerialName(W3CJsonLdSignedJwt.FORMAT)
+@SerialName(FORMAT_W3C_JSONLD_SIGNED_JWT)
 private data class W3CJsonLdSignedJwtCredentialTO(
-    @SerialName("format") @Required override val format: String = W3CJsonLdSignedJwt.FORMAT,
+    @SerialName("format") @Required override val format: String = FORMAT_W3C_JSONLD_SIGNED_JWT,
     @SerialName("scope") override val scope: String? = null,
     @SerialName("cryptographic_binding_methods_supported")
     override val cryptographicBindingMethodsSupported: List<String>? = null,
@@ -155,7 +155,7 @@ private data class W3CJsonLdSignedJwtCredentialTO(
     @SerialName("order") val order: List<String>? = null,
 ) : CredentialSupportedTO {
     init {
-        require(format == W3CJsonLdSignedJwt.FORMAT) { "invalid format '$format'" }
+        require(format == FORMAT_W3C_JSONLD_SIGNED_JWT) { "invalid format '$format'" }
     }
 
     @Serializable
@@ -170,9 +170,9 @@ private data class W3CJsonLdSignedJwtCredentialTO(
  * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
  */
 @Serializable
-@SerialName(W3CSignedJwt.FORMAT)
+@SerialName(FORMAT_W3C_SIGNED_JWT)
 private data class W3CSignedJwtCredentialTO(
-    @SerialName("format") @Required override val format: String = W3CSignedJwt.FORMAT,
+    @SerialName("format") @Required override val format: String = FORMAT_W3C_SIGNED_JWT,
     @SerialName("scope") override val scope: String? = null,
     @SerialName("cryptographic_binding_methods_supported")
     override val cryptographicBindingMethodsSupported: List<String>? = null,
@@ -185,7 +185,7 @@ private data class W3CSignedJwtCredentialTO(
     @SerialName("order") val order: List<String>? = null,
 ) : CredentialSupportedTO {
     init {
-        require(format == W3CSignedJwt.FORMAT) { "invalid format '$format'" }
+        require(format == FORMAT_W3C_SIGNED_JWT) { "invalid format '$format'" }
     }
 
     @Serializable

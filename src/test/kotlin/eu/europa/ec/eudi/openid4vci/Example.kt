@@ -25,7 +25,6 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import io.ktor.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.apache.http.conn.ssl.NoopHostnameVerifier
@@ -200,14 +199,14 @@ private class Wallet(
         credentialIdentifier: CredentialIdentifier,
     ): String {
         with(issuer) {
-            val proofSigner = proofSigners[credentialIdentifier.value] ?: error("No signer found for credential $credentialIdentifier")
+            val proofSigner = proofSigners[credentialIdentifier.value]
+                ?: error("No signer found for credential $credentialIdentifier")
             val requestOutcome =
                 authorized.requestSingle(credentialIdentifier, null, proofSigner).getOrThrow()
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
-                    val issuedCredential = requestOutcome.credentials.get(0)
-                    when (issuedCredential) {
+                    when (val issuedCredential = requestOutcome.credentials[0]) {
                         is IssuedCredential.Issued -> issuedCredential.credential
                         is IssuedCredential.Deferred -> {
                             deferredCredentialUseCase(issuer, authorized, issuedCredential)
@@ -232,8 +231,7 @@ private class Wallet(
             "Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
         )
         with(issuer) {
-            val outcome = authorized.queryForDeferredCredential(deferred).getOrThrow()
-            return when (outcome) {
+            return when (val outcome = authorized.queryForDeferredCredential(deferred).getOrThrow()) {
                 is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
                 is DeferredCredentialQueryOutcome.IssuancePending -> throw RuntimeException(
                     "Credential not ready yet. Try after ${outcome.interval}",
@@ -255,8 +253,7 @@ private class Wallet(
 
             return when (requestOutcome) {
                 is SubmittedRequest.Success -> {
-                    val issuedCredential = requestOutcome.credentials[0]
-                    when (issuedCredential) {
+                    when (val issuedCredential = requestOutcome.credentials[0]) {
                         is IssuedCredential.Issued -> issuedCredential.credential
                         is IssuedCredential.Deferred -> {
                             deferredCredentialUseCase(issuer, noProofRequiredState, issuedCredential)
@@ -277,7 +274,6 @@ private class Wallet(
         }
     }
 
-    @OptIn(InternalAPI::class)
     private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
         return httpClientFactory().use { client ->
             val loginUrl =
@@ -293,8 +289,8 @@ private class Wallet(
                     formParameters.entries.forEach { append(it.key, it.value) }
                 },
             )
-            val redirectLocation = response.headers.get("Location").toString()
-            URLBuilder(redirectLocation).parameters.get("code")
+            val redirectLocation = response.headers["Location"].toString()
+            URLBuilder(redirectLocation).parameters["code"]
         }
     }
 
@@ -307,6 +303,7 @@ private class Wallet(
 private fun authorizationLog(message: String) {
     println("--> [AUTHORIZATION] $message")
 }
+
 private fun issuanceLog(message: String) {
     println("--> [ISSUANCE] $message")
 }
@@ -332,7 +329,6 @@ private suspend fun buildIssuer(
     return Pair(authServerMetadata, issuer)
 }
 
-@OptIn(InternalAPI::class)
 private fun httpClientFactory(): HttpClient =
     HttpClient(Apache) {
         install(ContentNegotiation) {

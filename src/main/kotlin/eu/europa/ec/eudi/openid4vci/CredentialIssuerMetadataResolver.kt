@@ -71,6 +71,8 @@ data class CredentialIssuerMetadata(
         val locale: String? = null,
     ) : Serializable
 }
+fun CredentialIssuerMetadata.findMsoMdoc(docType: String): MsoMdocCredential? =
+    findByFormat<MsoMdocCredential> { it.docType == docType }.values.firstOrNull()
 
 /**
  * An endpoint of a Credential Issuer. It's an [HttpsUrl] that must not have a fragment.

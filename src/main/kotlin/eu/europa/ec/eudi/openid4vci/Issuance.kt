@@ -244,6 +244,8 @@ sealed interface ClaimSet
 class MsoMdocClaimSet(claims: List<Pair<Namespace, ClaimName>>) :
     ClaimSet,
     List<Pair<Namespace, ClaimName>> by claims
+
+@Serializable
 data class GenericClaimSet(val claims: List<ClaimName>) : ClaimSet
 
 /**

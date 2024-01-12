@@ -29,7 +29,7 @@ import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.IssuanceRequestJsonMapper
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -205,7 +205,7 @@ internal class IssuanceRequester(
      */
     suspend fun placeIssuanceRequest(
         accessToken: AccessToken,
-        request: CredentialIssuanceRequest.SingleCredential,
+        request: CredentialIssuanceRequest.SingleRequest,
     ): Result<CredentialIssuanceResponse> =
         runCatching {
             ktorHttpClientFactory().use { client ->
@@ -213,7 +213,7 @@ internal class IssuanceRequester(
                 val response = client.post(url) {
                     bearerAuth(accessToken.accessToken)
                     contentType(ContentType.Application.Json)
-                    setBody(request.toTransferObject())
+                    setBody(IssuanceRequestJsonMapper.asJson(request))
                 }
                 handleResponseSingle(response, request)
             }
@@ -228,14 +228,14 @@ internal class IssuanceRequester(
      */
     suspend fun placeBatchIssuanceRequest(
         accessToken: AccessToken,
-        request: CredentialIssuanceRequest.BatchCredentials,
+        request: CredentialIssuanceRequest.BatchRequest,
     ): Result<CredentialIssuanceResponse> = runCatching {
         if (issuerMetadata.batchCredentialEndpoint == null) {
             throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance
         }
         ktorHttpClientFactory().use { client ->
             val url = issuerMetadata.batchCredentialEndpoint.value.value
-            val payload = request.toTransferObject()
+            val payload = IssuanceRequestJsonMapper.asJson(request)
             val response = client.post(url) {
                 bearerAuth(accessToken.accessToken)
                 contentType(ContentType.Application.Json)
@@ -247,7 +247,7 @@ internal class IssuanceRequester(
 
     private suspend inline fun handleResponseSingle(
         response: HttpResponse,
-        request: CredentialIssuanceRequest.SingleCredential,
+        request: CredentialIssuanceRequest.SingleRequest,
     ): CredentialIssuanceResponse =
         if (response.status.isSuccess()) {
             when (issuerMetadata.credentialResponseEncryption) {
@@ -259,7 +259,7 @@ internal class IssuanceRequester(
                 is CredentialResponseEncryption.Required -> {
                     val jwt = response.body<String>()
                     val encryptionSpec =
-                        when (val requestedEncryptionSpec = request.requestedCredentialResponseEncryption) {
+                        when (val requestedEncryptionSpec = request.encryption) {
                             is RequestedCredentialResponseEncryption.Requested -> requestedEncryptionSpec
                             is RequestedCredentialResponseEncryption.NotRequested ->
                                 throw IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
@@ -407,11 +407,5 @@ internal class IssuanceRequester(
         "invalid_encryption_parameters " -> CredentialIssuanceError.InvalidEncryptionParameters
 
         else -> CredentialIssuanceError.IssuanceRequestFailed(error, errorDescription)
-    }
-
-    private fun CredentialIssuanceRequest.BatchCredentials.toTransferObject(): CredentialIssuanceRequestTO {
-        return CredentialIssuanceRequestTO.BatchCredentialsTO(
-            credentialRequests = credentialRequests.map { it.toTransferObject() },
-        )
     }
 }

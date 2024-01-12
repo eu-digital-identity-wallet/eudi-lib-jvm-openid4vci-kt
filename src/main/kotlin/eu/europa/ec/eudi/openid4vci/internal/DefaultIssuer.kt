@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.formats.*
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 import java.util.*
 
 /**
@@ -63,8 +63,8 @@ internal class DefaultIssuer(
         credentials: List<CredentialIdentifier>,
         issuerState: String?,
     ): Result<UnauthorizedRequest.ParRequested> = runCatching {
-        val scopes = credentials.map {
-            it.matchIssuerSupportedCredential().scope?.let { Scope(it) }
+        val scopes = credentials.map { credentialId ->
+            credentialId.matchIssuerSupportedCredential().scope?.let { Scope(it) }
         }.filterNotNull()
 
         val state = UUID.randomUUID().toString()
@@ -129,7 +129,7 @@ internal class DefaultIssuer(
         credentialsMetadata: List<Pair<CredentialIdentifier, ClaimSet?>>,
     ): Result<SubmittedRequest> = runCatching {
         requestIssuance(accessToken) {
-            CredentialIssuanceRequest.BatchCredentials(
+            CredentialIssuanceRequest.BatchRequest(
                 credentialRequests = credentialsMetadata.map { (id, claimSet) ->
                     id.matchIssuerSupportedCredential().constructIssuanceRequest(claimSet, null)
                 },
@@ -156,7 +156,7 @@ internal class DefaultIssuer(
                     )
                 }
             }
-            CredentialIssuanceRequest.BatchCredentials(credentialRequests)
+            CredentialIssuanceRequest.BatchRequest(credentialRequests)
         }
     }
 
@@ -169,7 +169,7 @@ internal class DefaultIssuer(
     private fun CredentialSupported.constructIssuanceRequest(
         claimSet: ClaimSet?,
         proof: Proof?,
-    ): CredentialIssuanceRequest.SingleCredential {
+    ): CredentialIssuanceRequest.SingleRequest {
         fun assertSupported(p: Proof) {
             val proofType = when (p) {
                 is Proof.Jwt -> ProofType.JWT
@@ -180,7 +180,7 @@ internal class DefaultIssuer(
             }
         }
         proof?.let { assertSupported(it) }
-        return createIssuanceRequest(this, claimSet, proof, responseEncryptionSpec).getOrThrow()
+        return CredentialIssuanceRequest.singleRequest(this, claimSet, proof, responseEncryptionSpec)
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
@@ -196,14 +196,14 @@ internal class DefaultIssuer(
         token: AccessToken,
         issuanceRequestSupplier: () -> CredentialIssuanceRequest,
     ): SubmittedRequest = when (val credentialRequest = issuanceRequestSupplier()) {
-        is CredentialIssuanceRequest.SingleCredential -> {
+        is CredentialIssuanceRequest.SingleRequest -> {
             issuanceRequester.placeIssuanceRequest(token, credentialRequest).fold(
                 onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
                 onFailure = { handleIssuanceFailure(it) },
             )
         }
 
-        is CredentialIssuanceRequest.BatchCredentials -> {
+        is CredentialIssuanceRequest.BatchRequest -> {
             issuanceRequester.placeBatchIssuanceRequest(token, credentialRequest).fold(
                 onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
                 onFailure = { handleIssuanceFailure(it) },
@@ -221,49 +221,3 @@ internal class DefaultIssuer(
         else -> throw error
     }
 }
-
-private fun createIssuanceRequest(
-    supportedCredential: CredentialSupported,
-    claimSet: ClaimSet?,
-    proof: Proof?,
-    responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-): Result<CredentialIssuanceRequest.SingleCredential> {
-    val encryption = RequestedCredentialResponseEncryption.fromSpec(responseEncryptionSpec)
-    return when (supportedCredential) {
-        is MsoMdocCredential ->
-            MsoMdoc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, encryption)
-
-        is SdJwtVcCredential ->
-            SdJwtVc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, encryption)
-
-        is W3CSignedJwtCredential ->
-            W3CSignedJwt.createIssuanceRequest(
-                supportedCredential,
-                claimSet.ensure(),
-                proof,
-                encryption,
-            )
-
-        is W3CJsonLdSignedJwtCredential ->
-            W3CJsonLdSignedJwt.createIssuanceRequest(
-                supportedCredential,
-                claimSet.ensure(),
-                proof,
-                encryption,
-            )
-
-        is W3CJsonLdDataIntegrityCredential ->
-            W3CJsonLdDataIntegrity.createIssuanceRequest(
-                supportedCredential,
-                claimSet.ensure(),
-                proof,
-                encryption,
-            )
-    }
-}
-
-private inline fun <reified C : ClaimSet> ClaimSet?.ensure(): C? =
-    this?.let {
-        if (it is C) it
-        else throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
-    }

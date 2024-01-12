@@ -32,17 +32,12 @@ internal class DefaultCredentialIssuerMetadataResolver(
 
     override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> = coroutineScope {
         runCatching {
-            val credentialIssuerMetadataContent = try {
-                val url =
-                    URLBuilder(issuer.toString())
-                        .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
-                        .build()
-                        .toURI()
-                        .toURL()
-
-                ktorHttpClientFactory().use { client -> client.get(url).body<String>() }
-            } catch (t: Throwable) {
-                throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
+            val credentialIssuerMetadataContent = ktorHttpClientFactory().use { client ->
+                try {
+                    client.get(issuer.wellKnown()).body<String>()
+                } catch (t: Throwable) {
+                    throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
+                }
             }
             val metaData = CredentialIssuerMetadataJsonParser.parseMetaData(credentialIssuerMetadataContent)
             if (metaData.credentialIssuerIdentifier != issuer) {
@@ -54,3 +49,9 @@ internal class DefaultCredentialIssuerMetadataResolver(
         }
     }
 }
+
+private fun CredentialIssuerId.wellKnown() = URLBuilder(Url(value.value.toURI()))
+    .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
+    .build()
+    .toURI()
+    .toURL()

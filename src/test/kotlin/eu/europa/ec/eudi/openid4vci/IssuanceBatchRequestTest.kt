@@ -18,8 +18,8 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.BatchIssuanceSuccessResponse
 import eu.europa.ec.eudi.openid4vci.internal.CertificateIssuanceResponse
-import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
-import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
+import eu.europa.ec.eudi.openid4vci.internal.formats.FORMAT_MSO_MDOC
+import eu.europa.ec.eudi.openid4vci.internal.formats.FORMAT_SD_JWT_VC
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -68,11 +68,11 @@ class IssuanceBatchRequestTest {
                                 BatchIssuanceSuccessResponse(
                                     credentialResponses = listOf(
                                         CertificateIssuanceResponse(
-                                            format = MsoMdoc.FORMAT,
+                                            format = FORMAT_MSO_MDOC,
                                             credential = "issued_credential_content_mso_mdoc",
                                         ),
                                         CertificateIssuanceResponse(
-                                            format = SdJwtVc.FORMAT,
+                                            format = FORMAT_SD_JWT_VC,
                                             credential = "issued_credential_content_sd_jwt_vc",
                                         ),
                                     ),
@@ -161,7 +161,7 @@ class IssuanceBatchRequestTest {
                             assertTrue("Second attempt should be successful") {
                                 (response as SubmittedRequest.Success).credentials.all {
                                     it is IssuedCredential.Issued &&
-                                        it.format in listOf(MsoMdoc.FORMAT, SdJwtVc.FORMAT)
+                                        it.format in listOf(FORMAT_MSO_MDOC, FORMAT_SD_JWT_VC)
                                 }
                             }
                         }
