@@ -229,6 +229,7 @@ private fun createIssuanceRequest(
     proof: Proof?,
     responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ): Result<CredentialIssuanceRequest.SingleCredential> {
+
     return when (supportedCredential) {
         is MsoMdocCredential ->
             MsoMdoc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, responseEncryptionSpec)

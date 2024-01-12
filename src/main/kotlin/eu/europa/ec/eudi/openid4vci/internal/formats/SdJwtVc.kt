@@ -15,15 +15,13 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.formats
 
-import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.ClaimTO
 import eu.europa.ec.eudi.openid4vci.internal.CredentialSupportedDisplayTO
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.RequestedCredentialResponseEncryption
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential
+import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVcIssuanceRequest.CredentialDefinition
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -64,18 +62,20 @@ internal data object SdJwtVc :
         val validClaimSet = claimSet?.apply { validate() }
 
         SdJwtVcIssuanceRequest(
-            type = supportedCredential.credentialDefinition.type,
-            credentialEncryptionJwk = responseEncryptionSpec?.jwk,
-            credentialResponseEncryptionAlg = responseEncryptionSpec?.algorithm,
-            credentialResponseEncryptionMethod = responseEncryptionSpec?.encryptionMethod,
             proof = proof,
-            claimSet = validClaimSet,
-        ).getOrThrow()
+            requestedCredentialResponseEncryption =
+            RequestedCredentialResponseEncryption.fromSpec(responseEncryptionSpec),
+            credentialDefinition = CredentialDefinition(
+                type = supportedCredential.credentialDefinition.type,
+                claims = validClaimSet,
+            ),
+        )
+
     }
 
 }
 
-internal class SdJwtVcIssuanceRequest private constructor(
+internal class SdJwtVcIssuanceRequest(
     override val proof: Proof? = null,
     override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
     val credentialDefinition: CredentialDefinition,
@@ -89,30 +89,6 @@ internal class SdJwtVcIssuanceRequest private constructor(
 
     data class CredentialDefinition(val type: String, val claims: GenericClaimSet?)
 
-    companion object {
-        operator fun invoke(
-            type: String,
-            proof: Proof? = null,
-            credentialEncryptionJwk: JWK? = null,
-            credentialResponseEncryptionAlg: JWEAlgorithm? = null,
-            credentialResponseEncryptionMethod: EncryptionMethod? = null,
-            claimSet: GenericClaimSet? = null,
-        ): Result<SdJwtVcIssuanceRequest> = runCatching {
-            SdJwtVcIssuanceRequest(
-                proof = proof,
-                requestedCredentialResponseEncryption =
-                SingleCredential.requestedCredentialResponseEncryption(
-                    credentialEncryptionJwk = credentialEncryptionJwk,
-                    credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
-                    credentialResponseEncryptionMethod = credentialResponseEncryptionMethod,
-                ),
-                credentialDefinition = CredentialDefinition(
-                    type = type,
-                    claims = claimSet,
-                ),
-            )
-        }
-    }
 }
 
 @Serializable

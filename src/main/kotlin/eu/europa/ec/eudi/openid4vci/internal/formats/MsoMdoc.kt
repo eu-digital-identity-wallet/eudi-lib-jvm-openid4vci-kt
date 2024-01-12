@@ -15,9 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.formats
 
-import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidIssuanceRequest
 import eu.europa.ec.eudi.openid4vci.internal.ClaimTO
@@ -68,14 +65,15 @@ internal data object MsoMdoc :
 
         val validClaimSet = claimSet?.apply { validate() }
 
+
         MsoMdocIssuanceRequest(
-            doctype = supportedCredential.docType,
-            credentialEncryptionJwk = responseEncryptionSpec?.jwk,
-            credentialResponseEncryptionAlg = responseEncryptionSpec?.algorithm,
-            credentialResponseEncryptionMethod = responseEncryptionSpec?.encryptionMethod,
             proof = proof,
+            requestedCredentialResponseEncryption =
+            RequestedCredentialResponseEncryption.fromSpec(responseEncryptionSpec),
+            doctype = supportedCredential.docType,
             claimSet = validClaimSet,
-        ).getOrThrow()
+        )
+
     }
 }
 
@@ -93,10 +91,10 @@ internal data class MsoMdocIssuanceRequestTO(
 /**
  * Issuance request for a credential of mso_mdoc format
  */
-internal class MsoMdocIssuanceRequest private constructor(
-    val doctype: String,
+internal class MsoMdocIssuanceRequest(
     override val proof: Proof? = null,
     override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
+    val doctype: String,
     val claimSet: MsoMdocClaimSet?,
 ) : SingleCredential {
 
@@ -104,28 +102,6 @@ internal class MsoMdocIssuanceRequest private constructor(
     override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO =
         MsoMdocFormatSerializationSupport.issuanceRequestToJson(this)
 
-    companion object {
-        operator fun invoke(
-            proof: Proof? = null,
-            credentialEncryptionJwk: JWK? = null,
-            credentialResponseEncryptionAlg: JWEAlgorithm? = null,
-            credentialResponseEncryptionMethod: EncryptionMethod? = null,
-            doctype: String,
-            claimSet: MsoMdocClaimSet? = null,
-        ): Result<MsoMdocIssuanceRequest> = runCatching {
-            MsoMdocIssuanceRequest(
-                proof = proof,
-                requestedCredentialResponseEncryption =
-                SingleCredential.requestedCredentialResponseEncryption(
-                    credentialEncryptionJwk = credentialEncryptionJwk,
-                    credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
-                    credentialResponseEncryptionMethod = credentialResponseEncryptionMethod,
-                ),
-                doctype = doctype,
-                claimSet = claimSet,
-            )
-        }
-    }
 }
 
 /**

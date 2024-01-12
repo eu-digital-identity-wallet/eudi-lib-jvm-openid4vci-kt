@@ -15,9 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.formats
 
-import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.CredentialSupportedDisplayTO
 import eu.europa.ec.eudi.openid4vci.internal.LogoObject
@@ -30,97 +27,9 @@ import kotlinx.serialization.json.JsonObject
 import java.util.*
 
 
-@kotlinx.serialization.Serializable
-@OptIn(ExperimentalSerializationApi::class)
-@JsonClassDiscriminator("format")
-internal sealed interface CredentialIssuanceRequestTO {
 
-    @kotlinx.serialization.Serializable
-    @SerialName("batch-credential-request")
-    data class BatchCredentialsTO(
-        @SerialName("credential_requests") val credentialRequests: List<SingleCredentialTO>,
-    ) : CredentialIssuanceRequestTO
 
-    @kotlinx.serialization.Serializable
-    sealed interface SingleCredentialTO : CredentialIssuanceRequestTO {
-        val proof: Proof?
-        val credentialEncryptionJwk: JsonObject?
-        val credentialResponseEncryptionAlg: String?
-        val credentialResponseEncryptionMethod: String?
-    }
-}
 
-/**
- * Credential(s) issuance request
- */
-internal sealed interface CredentialIssuanceRequest {
-
-    /**
-     * Models an issuance request for a batch of credentials
-     *
-     * @param credentialRequests    List of individual credential issuance requests
-     * @return A [CredentialIssuanceRequest]
-     *
-     */
-    data class BatchCredentials(
-        val credentialRequests: List<SingleCredential>,
-    ) : CredentialIssuanceRequest
-
-    /**
-     * Sealed hierarchy of credential issuance requests based on the format of the requested credential.
-     */
-    interface SingleCredential : CredentialIssuanceRequest {
-        val format: String
-        val proof: Proof?
-        val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption
-
-        @Deprecated("Don't use it")
-        fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO
-
-        companion object {
-
-            /**
-             * Utility method to create the [RequestedCredentialResponseEncryption] attribute of the issuance request.
-             * The Construction logic is independent of the credential format.
-             *
-             * @param credentialEncryptionJwk   Key pair in JWK format used for issuance response encryption/decryption
-             * @param credentialResponseEncryptionAlg   Encryption algorithm to be used
-             * @param credentialResponseEncryptionMethod Encryption method to be used
-             */
-            fun requestedCredentialResponseEncryption(
-                credentialEncryptionJwk: JWK?,
-                credentialResponseEncryptionAlg: JWEAlgorithm?,
-                credentialResponseEncryptionMethod: EncryptionMethod?,
-            ): RequestedCredentialResponseEncryption =
-                if (credentialEncryptionJwk == null &&
-                    credentialResponseEncryptionAlg == null &&
-                    credentialResponseEncryptionMethod == null
-                ) {
-                    RequestedCredentialResponseEncryption.NotRequested
-                } else {
-                    var encryptionMethod = credentialResponseEncryptionMethod
-                    when {
-                        credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null ->
-                            encryptionMethod = EncryptionMethod.A256GCM
-
-                        credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null ->
-                            throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
-
-                        credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null ->
-                            throw CredentialIssuanceError.InvalidIssuanceRequest(
-                                "Credential response encryption algorithm must be specified if Credential " +
-                                    "response encryption method is provided",
-                            )
-                    }
-                    RequestedCredentialResponseEncryption.Requested(
-                        encryptionJwk = credentialEncryptionJwk!!,
-                        responseEncryptionAlg = credentialResponseEncryptionAlg!!,
-                        responseEncryptionMethod = encryptionMethod!!,
-                    )
-                }
-        }
-    }
-}
 
 /**
  * The metadata of a Credentials that can be issued by a Credential Issuer.

@@ -119,14 +119,70 @@ sealed interface RequestedCredentialResponseEncryption : java.io.Serializable {
             }
         }
     }
+
+    companion object {
+
+
+        fun fromSpec(responseEncryptionSpec: IssuanceResponseEncryptionSpec?): RequestedCredentialResponseEncryption {
+            return invoke(
+                credentialEncryptionJwk = responseEncryptionSpec?.jwk,
+                credentialResponseEncryptionAlg = responseEncryptionSpec?.algorithm,
+                credentialResponseEncryptionMethod = responseEncryptionSpec?.encryptionMethod,
+                )
+        }
+
+        /**
+         * Utility method to create the [RequestedCredentialResponseEncryption] attribute of the issuance request.
+         * The Construction logic is independent of the credential format.
+         *
+         * @param credentialEncryptionJwk   Key pair in JWK format used for issuance response encryption/decryption
+         * @param credentialResponseEncryptionAlg   Encryption algorithm to be used
+         * @param credentialResponseEncryptionMethod Encryption method to be used
+         */
+        private operator fun invoke(
+            credentialEncryptionJwk: JWK?,
+            credentialResponseEncryptionAlg: JWEAlgorithm?,
+            credentialResponseEncryptionMethod: EncryptionMethod?,
+        ): RequestedCredentialResponseEncryption {
+            return when {
+                credentialEncryptionJwk == null &&
+                        credentialResponseEncryptionAlg == null &&
+                        credentialResponseEncryptionMethod == null -> NotRequested
+
+                else -> {
+                    var encryptionMethod = credentialResponseEncryptionMethod
+                    when {
+                        credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null ->
+                            encryptionMethod = EncryptionMethod.A256GCM
+
+                        credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null ->
+                            throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
+
+                        credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null ->
+                            throw CredentialIssuanceError.InvalidIssuanceRequest(
+                                "Credential response encryption algorithm must be specified if Credential " +
+                                        "response encryption method is provided",
+                            )
+                    }
+                    Requested(
+                        encryptionJwk = credentialEncryptionJwk!!,
+                        responseEncryptionAlg = credentialResponseEncryptionAlg!!,
+                        responseEncryptionMethod = encryptionMethod!!,
+                    )
+                }
+            }
+        }
+    }
 }
 
 /**
  * Models a response of the issuer to a successful issuance request.
  *
- * @param credentials The outcome of the issuance request. If issuance request was a batch request it will contain
- *      the results of each individual issuance request. If it was a single issuance request list will contain only one result.
- * @param cNonce Nonce information sent back from issuance server.
+ * @param credentials The outcome of the issuance request.
+ * if the issuance request was a batch request, it will contain
+ * the results of each issuance request.
+ * If it was a single issuance request list will contain only one result.
+ * @param cNonce Nonce information sent back from the issuance server.
  */
 internal data class CredentialIssuanceResponse(
     val credentials: List<IssuedCredential>,
@@ -142,7 +198,7 @@ internal class IssuanceRequester(
 ) {
 
     /**
-     * Method that submits a request to credential issuer for the issuance of single credential.
+     * Method that submits a request to credential issuer for the issuance of a single credential.
      *
      * @param accessToken Access token authorizing the request
      * @param request The single credential issuance request
@@ -257,7 +313,7 @@ internal class IssuanceRequester(
      *
      * @param accessToken Access token authorizing the request
      * @param transactionId The identifier of the Deferred Issuance transaction
-     * @return response from issuer. Can be either positive if credential is issued or errored in case issuance is still pending
+     * @return response from issuer. Can be either positive if a credential is issued or error in case issuance is still pending
      */
     suspend fun placeDeferredCredentialRequest(
         accessToken: AccessToken,
@@ -283,7 +339,7 @@ internal class IssuanceRequester(
     private suspend inline fun handleResponseDeferred(
         response: HttpResponse,
 
-    ): DeferredCredentialQueryOutcome =
+        ): DeferredCredentialQueryOutcome =
         if (response.status.isSuccess()) {
             val success = response.body<DeferredIssuanceSuccessResponse>()
             DeferredCredentialQueryOutcome.Issued(

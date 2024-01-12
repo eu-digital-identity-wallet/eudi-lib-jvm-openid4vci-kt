@@ -9,7 +9,7 @@ ktor = "2.3.6"
 jsoup = "1.16.2"
 cbor = "0.9"
 java = "17"
-ktlint = "0.50.0"
+ktlint = "1.1.1"
 dokka = "1.9.10"
 maven-publish = "0.25.3"
 
