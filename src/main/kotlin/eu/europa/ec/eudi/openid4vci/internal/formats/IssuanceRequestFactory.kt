@@ -18,18 +18,9 @@ package eu.europa.ec.eudi.openid4vci.internal.formats
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.CredentialSupportedDisplayTO
 import eu.europa.ec.eudi.openid4vci.internal.LogoObject
-import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.RequestedCredentialResponseEncryption
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.JsonClassDiscriminator
-import kotlinx.serialization.json.JsonObject
 import java.util.*
-
-
-
-
-
 
 /**
  * The metadata of a Credentials that can be issued by a Credential Issuer.

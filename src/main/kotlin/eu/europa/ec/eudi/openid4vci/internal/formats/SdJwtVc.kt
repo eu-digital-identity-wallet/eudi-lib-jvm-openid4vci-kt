@@ -33,9 +33,9 @@ internal data object SdJwtVc :
 
     const val FORMAT = "vc+sd-jwt"
 
-    override val serializationSupport: FormatSerializationSupport<SdJwtVcCredentialTO, SdJwtVcCredential, SdJwtVcIssuanceRequest, SdJwtVcIssuanceRequestTO>
+    override val serializationSupport:
+        FormatSerializationSupport<SdJwtVcCredentialTO, SdJwtVcCredential, SdJwtVcIssuanceRequest, SdJwtVcIssuanceRequestTO>
         get() = SdJwtVcFormatSerializationSupport
-
 
     override fun createIssuanceRequest(
         supportedCredential: SdJwtVcCredential,
@@ -47,7 +47,7 @@ internal data object SdJwtVc :
             if ((supportedCredential.credentialDefinition.claims.isNullOrEmpty()) && claims.isNotEmpty()) {
                 throw CredentialIssuanceError.InvalidIssuanceRequest(
                     "Issuer does not support claims for credential " +
-                            "[$FORMAT-${supportedCredential.credentialDefinition.type}]",
+                        "[$FORMAT-${supportedCredential.credentialDefinition.type}]",
                 )
             }
             if (supportedCredential.credentialDefinition.claims != null &&
@@ -64,15 +64,13 @@ internal data object SdJwtVc :
         SdJwtVcIssuanceRequest(
             proof = proof,
             requestedCredentialResponseEncryption =
-            RequestedCredentialResponseEncryption.fromSpec(responseEncryptionSpec),
+                RequestedCredentialResponseEncryption.fromSpec(responseEncryptionSpec),
             credentialDefinition = CredentialDefinition(
                 type = supportedCredential.credentialDefinition.type,
                 claims = validClaimSet,
             ),
         )
-
     }
-
 }
 
 internal class SdJwtVcIssuanceRequest(
@@ -88,7 +86,6 @@ internal class SdJwtVcIssuanceRequest(
         SdJwtVcFormatSerializationSupport.issuanceRequestToJson(this)
 
     data class CredentialDefinition(val type: String, val claims: GenericClaimSet?)
-
 }
 
 @Serializable

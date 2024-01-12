@@ -40,9 +40,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
+private const val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
 class IssuanceEncryptedResponsesTest {
-
-    val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
 
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS = """
         {
@@ -51,7 +50,7 @@ class IssuanceEncryptedResponsesTest {
         }
     """.trimIndent()
 
-    val vciWalletConfiguration = OpenId4VCIConfig(
+    private val vciWalletConfiguration = OpenId4VCIConfig(
         clientId = "MyWallet_ClientId",
         authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
         keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),

@@ -20,18 +20,21 @@ import eu.europa.ec.eudi.openid4vci.internal.ClaimTO
 import eu.europa.ec.eudi.openid4vci.internal.CredentialSupportedDisplayTO
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.RequestedCredentialResponseEncryption
+import eu.europa.ec.eudi.openid4vci.internal.formats.W3CJsonLdDataIntegrityCredentialTO.CredentialDefinitionTO
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URL
 import java.util.*
 
-
 internal data object W3CJsonLdDataIntegrity :
-    Format<W3CJsonLdDataIntegrityCredentialTO,
-            W3CJsonLdDataIntegrityCredential,
-            ClaimSet, W3CJsonLdDataIntegrityIssuanceRequest,
-            CredentialIssuanceRequestTO.SingleCredentialTO> {
+    Format<
+        W3CJsonLdDataIntegrityCredentialTO,
+        W3CJsonLdDataIntegrityCredential,
+        ClaimSet,
+        W3CJsonLdDataIntegrityIssuanceRequest,
+        CredentialIssuanceRequestTO.SingleCredentialTO,
+        > {
 
     const val FORMAT = "ldp_vc"
 
@@ -42,16 +45,16 @@ internal data object W3CJsonLdDataIntegrity :
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<W3CJsonLdDataIntegrityIssuanceRequest> = TODO("Not yet implemented")
 
-
     override val serializationSupport:
-            FormatSerializationSupport<
-                    W3CJsonLdDataIntegrityCredentialTO,
-                    W3CJsonLdDataIntegrityCredential,
-                    W3CJsonLdDataIntegrityIssuanceRequest,
-                    CredentialIssuanceRequestTO.SingleCredentialTO
-                    >
+        FormatSerializationSupport<
+            W3CJsonLdDataIntegrityCredentialTO,
+            W3CJsonLdDataIntegrityCredential,
+            W3CJsonLdDataIntegrityIssuanceRequest,
+            CredentialIssuanceRequestTO.SingleCredentialTO,
+            >
         get() = W3CJsonLdDataIntegritySerializationSupport
 }
+
 internal class W3CJsonLdDataIntegrityIssuanceRequest(
     override val format: String,
     override val proof: Proof?,
@@ -66,16 +69,15 @@ internal class W3CJsonLdDataIntegrityIssuanceRequest(
 // Serialization
 //
 
-
 private object W3CJsonLdDataIntegritySerializationSupport :
     FormatSerializationSupport<
-            W3CJsonLdDataIntegrityCredentialTO,
-            W3CJsonLdDataIntegrityCredential,
-            W3CJsonLdDataIntegrityIssuanceRequest,
-            CredentialIssuanceRequestTO.SingleCredentialTO
-            > {
+        W3CJsonLdDataIntegrityCredentialTO,
+        W3CJsonLdDataIntegrityCredential,
+        W3CJsonLdDataIntegrityIssuanceRequest,
+        CredentialIssuanceRequestTO.SingleCredentialTO,
+        > {
     override fun credentialSupportedFromJson(
-        csJson: W3CJsonLdDataIntegrityCredentialTO
+        csJson: W3CJsonLdDataIntegrityCredentialTO,
     ): W3CJsonLdDataIntegrityCredential {
         val bindingMethods =
             csJson.cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
@@ -86,17 +88,16 @@ private object W3CJsonLdDataIntegritySerializationSupport :
 
         return W3CJsonLdDataIntegrityCredential(
             csJson.scope, bindingMethods, cryptographicSuitesSupported, proofTypesSupported,
-            display, csJson.context, csJson.type, csJson.credentialDefinition.toDomain(),
-            csJson.order ?: emptyList()
+            display, csJson.context, csJson.type, toDomain(csJson.credentialDefinition),
+            csJson.order ?: emptyList(),
         )
     }
 
-    private fun W3CJsonLdDataIntegrityCredentialTO.CredentialDefinitionTO.toDomain():
-            W3CJsonLdDataIntegrityCredential.CredentialDefinition =
+    private fun toDomain(credentialDefinitionTO: CredentialDefinitionTO): W3CJsonLdDataIntegrityCredential.CredentialDefinition =
         W3CJsonLdDataIntegrityCredential.CredentialDefinition(
-            context = context.map { URL(it) },
-            type = types,
-            credentialSubject = credentialSubject?.mapValues { nameAndClaim ->
+            context = credentialDefinitionTO.context.map { URL(it) },
+            type = credentialDefinitionTO.types,
+            credentialSubject = credentialDefinitionTO.credentialSubject?.mapValues { nameAndClaim ->
                 nameAndClaim.value.let {
                     Claim(
                         it.mandatory ?: false,
@@ -113,13 +114,11 @@ private object W3CJsonLdDataIntegritySerializationSupport :
         )
 
     override fun issuanceRequestToJson(
-        request: W3CJsonLdDataIntegrityIssuanceRequest
+        request: W3CJsonLdDataIntegrityIssuanceRequest,
     ): CredentialIssuanceRequestTO.SingleCredentialTO {
         TODO("Not yet implemented")
     }
-
 }
-
 
 /**
  * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
@@ -155,5 +154,3 @@ internal data class W3CJsonLdDataIntegrityCredentialTO(
     override fun toDomain(): CredentialSupported =
         W3CJsonLdDataIntegritySerializationSupport.credentialSupportedFromJson(this)
 }
-
-

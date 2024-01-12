@@ -52,7 +52,7 @@ internal class DefaultIssuer(
             is CredentialResponseEncryption.NotRequired -> null
             is CredentialResponseEncryption.Required -> responseEncryptionSpecFactory(
                 encryption,
-                config.keyGenerationConfig
+                config.keyGenerationConfig,
             ).also {
                 it.isValid(encryption)
             }
@@ -222,14 +222,12 @@ internal class DefaultIssuer(
     }
 }
 
-
 private fun createIssuanceRequest(
     supportedCredential: CredentialSupported,
     claimSet: ClaimSet?,
     proof: Proof?,
     responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ): Result<CredentialIssuanceRequest.SingleCredential> {
-
     return when (supportedCredential) {
         is MsoMdocCredential ->
             MsoMdoc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, responseEncryptionSpec)
@@ -268,4 +266,3 @@ private inline fun <reified C : ClaimSet> ClaimSet?.ensure(): C? =
         if (it is C) it
         else throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
     }
-

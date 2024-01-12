@@ -39,7 +39,8 @@ internal data object MsoMdoc :
 
     const val FORMAT = "mso_mdoc"
 
-    override val serializationSupport: FormatSerializationSupport<MsdMdocCredentialTO, MsoMdocCredential, MsoMdocIssuanceRequest, MsoMdocIssuanceRequestTO>
+    override val serializationSupport:
+        FormatSerializationSupport<MsdMdocCredentialTO, MsoMdocCredential, MsoMdocIssuanceRequest, MsoMdocIssuanceRequestTO>
         get() = MsoMdocFormatSerializationSupport
 
     override fun createIssuanceRequest(
@@ -65,15 +66,13 @@ internal data object MsoMdoc :
 
         val validClaimSet = claimSet?.apply { validate() }
 
-
         MsoMdocIssuanceRequest(
             proof = proof,
             requestedCredentialResponseEncryption =
-            RequestedCredentialResponseEncryption.fromSpec(responseEncryptionSpec),
+                RequestedCredentialResponseEncryption.fromSpec(responseEncryptionSpec),
             doctype = supportedCredential.docType,
             claimSet = validClaimSet,
         )
-
     }
 }
 
@@ -101,7 +100,6 @@ internal class MsoMdocIssuanceRequest(
     override val format: String = "mso_mdoc"
     override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO =
         MsoMdocFormatSerializationSupport.issuanceRequestToJson(this)
-
 }
 
 /**

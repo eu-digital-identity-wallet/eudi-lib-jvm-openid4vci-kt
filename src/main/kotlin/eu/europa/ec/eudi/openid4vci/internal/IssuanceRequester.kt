@@ -122,13 +122,12 @@ sealed interface RequestedCredentialResponseEncryption : java.io.Serializable {
 
     companion object {
 
-
         fun fromSpec(responseEncryptionSpec: IssuanceResponseEncryptionSpec?): RequestedCredentialResponseEncryption {
             return invoke(
                 credentialEncryptionJwk = responseEncryptionSpec?.jwk,
                 credentialResponseEncryptionAlg = responseEncryptionSpec?.algorithm,
                 credentialResponseEncryptionMethod = responseEncryptionSpec?.encryptionMethod,
-                )
+            )
         }
 
         /**
@@ -146,8 +145,8 @@ sealed interface RequestedCredentialResponseEncryption : java.io.Serializable {
         ): RequestedCredentialResponseEncryption {
             return when {
                 credentialEncryptionJwk == null &&
-                        credentialResponseEncryptionAlg == null &&
-                        credentialResponseEncryptionMethod == null -> NotRequested
+                    credentialResponseEncryptionAlg == null &&
+                    credentialResponseEncryptionMethod == null -> NotRequested
 
                 else -> {
                     var encryptionMethod = credentialResponseEncryptionMethod
@@ -161,7 +160,7 @@ sealed interface RequestedCredentialResponseEncryption : java.io.Serializable {
                         credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null ->
                             throw CredentialIssuanceError.InvalidIssuanceRequest(
                                 "Credential response encryption algorithm must be specified if Credential " +
-                                        "response encryption method is provided",
+                                    "response encryption method is provided",
                             )
                     }
                     Requested(
@@ -339,7 +338,7 @@ internal class IssuanceRequester(
     private suspend inline fun handleResponseDeferred(
         response: HttpResponse,
 
-        ): DeferredCredentialQueryOutcome =
+    ): DeferredCredentialQueryOutcome =
         if (response.status.isSuccess()) {
             val success = response.body<DeferredIssuanceSuccessResponse>()
             DeferredCredentialQueryOutcome.Issued(
