@@ -228,19 +228,20 @@ private fun createIssuanceRequest(
     proof: Proof?,
     responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ): Result<CredentialIssuanceRequest.SingleCredential> {
+    val encryption = RequestedCredentialResponseEncryption.fromSpec(responseEncryptionSpec)
     return when (supportedCredential) {
         is MsoMdocCredential ->
-            MsoMdoc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, responseEncryptionSpec)
+            MsoMdoc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, encryption)
 
         is SdJwtVcCredential ->
-            SdJwtVc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, responseEncryptionSpec)
+            SdJwtVc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, encryption)
 
         is W3CSignedJwtCredential ->
             W3CSignedJwt.createIssuanceRequest(
                 supportedCredential,
                 claimSet.ensure(),
                 proof,
-                responseEncryptionSpec,
+                encryption,
             )
 
         is W3CJsonLdSignedJwtCredential ->
@@ -248,7 +249,7 @@ private fun createIssuanceRequest(
                 supportedCredential,
                 claimSet.ensure(),
                 proof,
-                responseEncryptionSpec,
+                encryption,
             )
 
         is W3CJsonLdDataIntegrityCredential ->
@@ -256,7 +257,7 @@ private fun createIssuanceRequest(
                 supportedCredential,
                 claimSet.ensure(),
                 proof,
-                responseEncryptionSpec,
+                encryption,
             )
     }
 }

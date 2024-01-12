@@ -47,7 +47,7 @@ internal data object MsoMdoc :
         supportedCredential: MsoMdocCredential,
         claimSet: MsoMdocClaimSet?,
         proof: Proof?,
-        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+        requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
     ): Result<MsoMdocIssuanceRequest> = runCatching {
         fun MsoMdocClaimSet.validate() {
             if (supportedCredential.claims.isEmpty() && isNotEmpty()) {
@@ -68,8 +68,7 @@ internal data object MsoMdoc :
 
         MsoMdocIssuanceRequest(
             proof = proof,
-            requestedCredentialResponseEncryption =
-                RequestedCredentialResponseEncryption.fromSpec(responseEncryptionSpec),
+            requestedCredentialResponseEncryption = requestedCredentialResponseEncryption,
             doctype = supportedCredential.docType,
             claimSet = validClaimSet,
         )

@@ -15,7 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.formats
 
-import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.Claim
+import eu.europa.ec.eudi.openid4vci.ClaimSet
+import eu.europa.ec.eudi.openid4vci.CredentialSupported
+import eu.europa.ec.eudi.openid4vci.W3CSignedJwtCredential
 import eu.europa.ec.eudi.openid4vci.internal.ClaimTO
 import eu.europa.ec.eudi.openid4vci.internal.CredentialSupportedDisplayTO
 import eu.europa.ec.eudi.openid4vci.internal.Proof
@@ -40,7 +43,7 @@ internal data object W3CSignedJwt :
         supportedCredential: W3CSignedJwtCredential,
         claimSet: ClaimSet?,
         proof: Proof?,
-        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+        requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
     ): Result<W3CSignedJwtIssuanceRequest> = TODO("Not yet implemented")
 
     override val serializationSupport:

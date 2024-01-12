@@ -41,7 +41,7 @@ internal data object SdJwtVc :
         supportedCredential: SdJwtVcCredential,
         claimSet: GenericClaimSet?,
         proof: Proof?,
-        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+        requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
     ): Result<SdJwtVcIssuanceRequest> = runCatching {
         fun GenericClaimSet.validate() {
             if ((supportedCredential.credentialDefinition.claims.isNullOrEmpty()) && claims.isNotEmpty()) {
@@ -63,8 +63,7 @@ internal data object SdJwtVc :
 
         SdJwtVcIssuanceRequest(
             proof = proof,
-            requestedCredentialResponseEncryption =
-                RequestedCredentialResponseEncryption.fromSpec(responseEncryptionSpec),
+            requestedCredentialResponseEncryption = requestedCredentialResponseEncryption,
             credentialDefinition = CredentialDefinition(
                 type = supportedCredential.credentialDefinition.type,
                 claims = validClaimSet,

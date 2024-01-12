@@ -17,8 +17,8 @@ package eu.europa.ec.eudi.openid4vci.internal.formats
 
 import eu.europa.ec.eudi.openid4vci.ClaimSet
 import eu.europa.ec.eudi.openid4vci.CredentialSupported
-import eu.europa.ec.eudi.openid4vci.IssuanceResponseEncryptionSpec
 import eu.europa.ec.eudi.openid4vci.internal.Proof
+import eu.europa.ec.eudi.openid4vci.internal.RequestedCredentialResponseEncryption
 
 internal sealed interface Format<
     in CS_JSON,
@@ -32,7 +32,7 @@ internal sealed interface Format<
         supportedCredential: CS,
         claimSet: CL_SET?,
         proof: Proof?,
-        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+        requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
     ): Result<IR>
 
     val serializationSupport: FormatSerializationSupport<CS_JSON, CS, IR, IR_JSON>

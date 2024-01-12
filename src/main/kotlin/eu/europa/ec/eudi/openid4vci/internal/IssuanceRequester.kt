@@ -83,7 +83,7 @@ private data class DeferredIssuanceSuccessResponse(
 /**
  * Sealed hierarchy for the issuance response encryption specification as it is requested to the issuer server.
  */
-sealed interface RequestedCredentialResponseEncryption : java.io.Serializable {
+internal sealed interface RequestedCredentialResponseEncryption : java.io.Serializable {
 
     /**
      *  No encryption is requested
