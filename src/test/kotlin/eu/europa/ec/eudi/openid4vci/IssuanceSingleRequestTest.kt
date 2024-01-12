@@ -17,9 +17,9 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.Proof
+import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
-import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdoc
-import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVc
+import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdocIssuanceRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -258,7 +258,7 @@ class IssuanceSingleRequestTest {
                 responseBuilder = {
                     val textContent = it?.body as TextContent
                     val issuanceRequest =
-                        Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as MsoMdoc.Model.CredentialIssuanceRequestTO
+                        Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as MsoMdocIssuanceRequestTO
                     if (issuanceRequest.proof != null) {
                         respond(
                             content = """
@@ -293,7 +293,7 @@ class IssuanceSingleRequestTest {
                 requestValidator = {
                     val textContent = it.body as TextContent
                     val issuanceRequest =
-                        Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as MsoMdoc.Model.CredentialIssuanceRequestTO
+                        Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as MsoMdocIssuanceRequestTO
                     issuanceRequest.proof?.let {
                         assertTrue("Not a JWT proof sent.") {
                             issuanceRequest.proof is Proof.Jwt
@@ -364,7 +364,7 @@ class IssuanceSingleRequestTest {
                 responseBuilder = {
                     val textContent = it?.body as TextContent
                     val issuanceRequest =
-                        Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as SdJwtVc.Model.CredentialIssuanceRequestTO
+                        Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as SdJwtVcIssuanceRequestTO
                     if (issuanceRequest.proof != null) {
                         respond(
                             content = """

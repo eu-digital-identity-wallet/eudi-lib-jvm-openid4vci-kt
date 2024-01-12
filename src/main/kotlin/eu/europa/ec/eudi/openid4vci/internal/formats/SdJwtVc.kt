@@ -68,88 +68,6 @@ internal data object SdJwtVc :
             claimSet = validClaimSet,
         ).getOrThrow()
     }
-
-    object Model {
-
-        @Serializable
-        @SerialName(FORMAT)
-        data class CredentialSupportedTO(
-            @SerialName("format") @Required override val format: String = FORMAT,
-            @SerialName("scope") override val scope: String? = null,
-            @SerialName("cryptographic_binding_methods_supported")
-            override val cryptographicBindingMethodsSupported: List<String>? = null,
-            @SerialName("cryptographic_suites_supported")
-            override val cryptographicSuitesSupported: List<String>? = null,
-            @SerialName("proof_types_supported")
-            override val proofTypesSupported: List<String>? = null,
-            @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
-            @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupportedTO {
-            init {
-                require(format == FORMAT) { "invalid format '$format'" }
-            }
-
-            @Serializable
-            data class CredentialDefinitionTO(
-                @SerialName("type") val type: String,
-                @SerialName("claims") val claims: Map<String, ClaimTO>? = null,
-            )
-
-            override fun toDomain(): CredentialSupported {
-                val bindingMethods =
-                    cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
-                        ?: emptyList()
-                val display = display?.map { it.toDomain() } ?: emptyList()
-                val proofTypesSupported = proofTypesSupported.toProofTypes()
-                val cryptographicSuitesSupported = cryptographicSuitesSupported ?: emptyList()
-
-                return SdJwtVcCredential(
-                    scope,
-                    bindingMethods,
-                    cryptographicSuitesSupported,
-                    proofTypesSupported,
-                    display,
-                    credentialDefinition.toDomain(),
-                )
-            }
-        }
-
-        private fun CredentialSupportedTO.CredentialDefinitionTO.toDomain(): SdJwtVcCredential.CredentialDefinition =
-            SdJwtVcCredential.CredentialDefinition(
-                type = type,
-                claims = claims?.mapValues { nameAndClaim ->
-                    nameAndClaim.value.let {
-                        Claim(
-                            it.mandatory ?: false,
-                            it.valueType,
-                            it.display?.map { displayObject ->
-                                Claim.Display(
-                                    displayObject.name,
-                                    displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                                )
-                            } ?: emptyList(),
-                        )
-                    }
-                },
-            )
-
-        @Serializable
-        @SerialName(FORMAT)
-        data class CredentialIssuanceRequestTO(
-            @SerialName("proof") override val proof: Proof? = null,
-            @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
-            @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
-            @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String? = null,
-            @SerialName("credential_definition") val credentialDefinition: CredentialDefinitionTO,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
-
-            @Serializable
-            data class CredentialDefinitionTO(
-                @SerialName("type") val type: String,
-                @SerialName("claims") val claims: JsonObject? = null,
-            )
-        }
-    }
 }
 
 internal class SdJwtVcIssuanceRequest private constructor(
@@ -160,38 +78,8 @@ internal class SdJwtVcIssuanceRequest private constructor(
 
     override val format: String = SdJwtVc.FORMAT
 
-    override fun toTransferObject(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
-        return when (val it = this.requestedCredentialResponseEncryption) {
-            is RequestedCredentialResponseEncryption.NotRequested -> SdJwtVc.Model.CredentialIssuanceRequestTO(
-                proof = this.proof,
-                credentialDefinition = SdJwtVc.Model.CredentialIssuanceRequestTO.CredentialDefinitionTO(
-                    type = this.credentialDefinition.type,
-                    claims = this.credentialDefinition.claims?.let {
-                        buildJsonObject {
-                            for (c in it.claims) {
-                                put(c, JsonObject(emptyMap()))
-                            }
-                        }
-                    },
-                ),
-            )
-
-            is RequestedCredentialResponseEncryption.Requested -> SdJwtVc.Model.CredentialIssuanceRequestTO(
-                proof = this.proof,
-                credentialEncryptionJwk = Json.parseToJsonElement(
-                    it.encryptionJwk.toPublicJWK().toString(),
-                ).jsonObject,
-                credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
-                credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
-                credentialDefinition = SdJwtVc.Model.CredentialIssuanceRequestTO.CredentialDefinitionTO(
-                    type = this.credentialDefinition.type,
-                    claims = this.credentialDefinition.claims?.let {
-                        Json.encodeToJsonElement(it.claims).jsonObject
-                    },
-                ),
-            )
-        }
-    }
+    override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO =
+        SdJwtVcFormatSerializationSupport.issuanceRequestToJson(this)
 
     data class CredentialDefinition(val type: String, val claims: GenericClaimSet?)
 
@@ -215,6 +103,123 @@ internal class SdJwtVcIssuanceRequest private constructor(
                 credentialDefinition = CredentialDefinition(
                     type = type,
                     claims = claimSet,
+                ),
+            )
+        }
+    }
+}
+
+@Serializable
+@SerialName(SdJwtVc.FORMAT)
+internal data class SdJwtVcIssuanceRequestTO(
+    @SerialName("proof") override val proof: Proof? = null,
+    @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
+    @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
+    @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String? = null,
+    @SerialName("credential_definition") val credentialDefinition: CredentialDefinitionTO,
+) : CredentialIssuanceRequestTO.SingleCredentialTO {
+
+    @Serializable
+    data class CredentialDefinitionTO(
+        @SerialName("type") val type: String,
+        @SerialName("claims") val claims: JsonObject? = null,
+    )
+}
+
+@Serializable
+@SerialName(SdJwtVc.FORMAT)
+internal data class SdJwtVcCredentialTO(
+    @SerialName("format") @Required override val format: String = SdJwtVc.FORMAT,
+    @SerialName("scope") override val scope: String? = null,
+    @SerialName("cryptographic_binding_methods_supported")
+    override val cryptographicBindingMethodsSupported: List<String>? = null,
+    @SerialName("cryptographic_suites_supported")
+    override val cryptographicSuitesSupported: List<String>? = null,
+    @SerialName("proof_types_supported")
+    override val proofTypesSupported: List<String>? = null,
+    @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
+    @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
+) : CredentialSupportedTO {
+    init {
+        require(format == SdJwtVc.FORMAT) { "invalid format '$format'" }
+    }
+
+    @Serializable
+    data class CredentialDefinitionTO(
+        @SerialName("type") val type: String,
+        @SerialName("claims") val claims: Map<String, ClaimTO>? = null,
+    )
+
+    override fun toDomain(): CredentialSupported = SdJwtVcFormatSerializationSupport.credentialSupportedFromJson(this)
+}
+
+internal object SdJwtVcFormatSerializationSupport :
+    FormatSerializationSupport<SdJwtVcCredentialTO, SdJwtVcCredential, SdJwtVcIssuanceRequest, SdJwtVcIssuanceRequestTO> {
+    override fun credentialSupportedFromJson(csJson: SdJwtVcCredentialTO): SdJwtVcCredential {
+        val bindingMethods =
+            csJson.cryptographicBindingMethodsSupported?.toCryptographicBindingMethods()
+                ?: emptyList()
+        val display = csJson.display?.map { it.toDomain() } ?: emptyList()
+        val proofTypesSupported = csJson.proofTypesSupported.toProofTypes()
+        val cryptographicSuitesSupported = csJson.cryptographicSuitesSupported ?: emptyList()
+
+        return SdJwtVcCredential(
+            csJson.scope,
+            bindingMethods,
+            cryptographicSuitesSupported,
+            proofTypesSupported,
+            display,
+            csJson.credentialDefinition.toDomain(),
+        )
+    }
+
+    private fun SdJwtVcCredentialTO.CredentialDefinitionTO.toDomain(): SdJwtVcCredential.CredentialDefinition =
+        SdJwtVcCredential.CredentialDefinition(
+            type = type,
+            claims = claims?.mapValues { nameAndClaim ->
+                nameAndClaim.value.let {
+                    Claim(
+                        it.mandatory ?: false,
+                        it.valueType,
+                        it.display?.map { displayObject ->
+                            Claim.Display(
+                                displayObject.name,
+                                displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
+                            )
+                        } ?: emptyList(),
+                    )
+                }
+            },
+        )
+
+    override fun issuanceRequestToJson(request: SdJwtVcIssuanceRequest): SdJwtVcIssuanceRequestTO {
+        return when (val it = request.requestedCredentialResponseEncryption) {
+            is RequestedCredentialResponseEncryption.NotRequested -> SdJwtVcIssuanceRequestTO(
+                proof = request.proof,
+                credentialDefinition = SdJwtVcIssuanceRequestTO.CredentialDefinitionTO(
+                    type = request.credentialDefinition.type,
+                    claims = request.credentialDefinition.claims?.let {
+                        buildJsonObject {
+                            for (c in it.claims) {
+                                put(c, JsonObject(emptyMap()))
+                            }
+                        }
+                    },
+                ),
+            )
+
+            is RequestedCredentialResponseEncryption.Requested -> SdJwtVcIssuanceRequestTO(
+                proof = request.proof,
+                credentialEncryptionJwk = Json.parseToJsonElement(
+                    it.encryptionJwk.toPublicJWK().toString(),
+                ).jsonObject,
+                credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
+                credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
+                credentialDefinition = SdJwtVcIssuanceRequestTO.CredentialDefinitionTO(
+                    type = request.credentialDefinition.type,
+                    claims = request.credentialDefinition.claims?.let {
+                        Json.encodeToJsonElement(it.claims).jsonObject
+                    },
                 ),
             )
         }

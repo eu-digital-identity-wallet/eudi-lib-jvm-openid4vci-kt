@@ -74,113 +74,18 @@ internal data object MsoMdoc :
             claimSet = validClaimSet,
         ).getOrThrow()
     }
-
-    object Model {
-        /**
-         * The data of a Verifiable Credentials issued as an ISO mDL.
-         */
-        @Serializable
-        @SerialName(FORMAT)
-        data class CredentialSupportedTO(
-            @SerialName("format") @Required override val format: String = FORMAT,
-            @SerialName("scope") override val scope: String? = null,
-            @SerialName("cryptographic_binding_methods_supported")
-            override val cryptographicBindingMethodsSupported: List<String>? = null,
-            @SerialName("cryptographic_suites_supported")
-            override val cryptographicSuitesSupported: List<String>? = null,
-            @SerialName("proof_types_supported")
-            override val proofTypesSupported: List<String>? = null,
-            @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
-            @SerialName("doctype") @Required val docType: String,
-            @SerialName("claims") val claims: Map<String, Map<String, ClaimTO>>? = null,
-            @SerialName("order") val order: List<String>? = null,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupportedTO {
-            init {
-                require(format == FORMAT) { "invalid format '$format'" }
-            }
-
-            override fun toDomain(): MsoMdocCredential {
-                val bindingMethods = cryptographicBindingMethodsSupported
-                    ?.toCryptographicBindingMethods()
-                    ?: emptyList()
-                val display = display?.map { it.toDomain() } ?: emptyList()
-                val proofTypesSupported = proofTypesSupported.toProofTypes()
-                val cryptographicSuitesSupported = cryptographicSuitesSupported ?: emptyList()
-
-                fun claims(): MsoMdocClaims =
-                    claims?.mapValues { (_, claims) ->
-                        claims.mapValues { (_, claim) ->
-                            claim.let { claimObject ->
-                                Claim(
-                                    claimObject.mandatory ?: false,
-                                    claimObject.valueType,
-                                    claimObject.display?.map { displayObject ->
-                                        Claim.Display(
-                                            displayObject.name,
-                                            displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                                        )
-                                    } ?: emptyList(),
-                                )
-                            }
-                        }
-                    } ?: emptyMap()
-
-                return MsoMdocCredential(
-                    scope,
-                    bindingMethods,
-                    cryptographicSuitesSupported,
-                    proofTypesSupported,
-                    display,
-                    docType,
-                    claims(),
-                    order ?: emptyList(),
-                )
-            }
-        }
-
-        @Serializable
-        @SerialName(FORMAT)
-        data class CredentialIssuanceRequestTO(
-            @SerialName("doctype") val docType: String,
-            @SerialName("proof") override val proof: Proof? = null,
-            @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
-            @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
-            @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String? = null,
-            @SerialName("claims") val claims: JsonObject?,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO
-
-        fun transferObjectOf(
-            request: MsoMdocIssuanceRequest,
-        ): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
-            return when (val it = request.requestedCredentialResponseEncryption) {
-                is RequestedCredentialResponseEncryption.NotRequested -> {
-                    CredentialIssuanceRequestTO(
-                        docType = request.doctype,
-                        proof = request.proof,
-                        claims = request.claimSet?.let {
-                            Json.encodeToJsonElement(it).jsonObject
-                        },
-                    )
-                }
-
-                is RequestedCredentialResponseEncryption.Requested -> {
-                    CredentialIssuanceRequestTO(
-                        docType = request.doctype,
-                        proof = request.proof,
-                        credentialEncryptionJwk = Json.parseToJsonElement(
-                            it.encryptionJwk.toPublicJWK().toString(),
-                        ).jsonObject,
-                        credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
-                        credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
-                        claims = request.claimSet?.let {
-                            Json.encodeToJsonElement(it).jsonObject
-                        },
-                    )
-                }
-            }
-        }
-    }
 }
+
+@Serializable
+@SerialName(MsoMdoc.FORMAT)
+internal data class MsoMdocIssuanceRequestTO(
+    @SerialName("doctype") val docType: String,
+    @SerialName("proof") override val proof: Proof? = null,
+    @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
+    @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
+    @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String? = null,
+    @SerialName("claims") val claims: JsonObject?,
+) : CredentialIssuanceRequestTO.SingleCredentialTO
 
 /**
  * Issuance request for a credential of mso_mdoc format
@@ -194,7 +99,7 @@ internal class MsoMdocIssuanceRequest private constructor(
 
     override val format: String = "mso_mdoc"
     override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO =
-        MsoMdoc.Model.transferObjectOf(this)
+        MsoMdocFormatSerializationSupport.issuanceRequestToJson(this)
 
     companion object {
         operator fun invoke(
@@ -216,6 +121,103 @@ internal class MsoMdocIssuanceRequest private constructor(
                 doctype = doctype,
                 claimSet = claimSet,
             )
+        }
+    }
+}
+
+/**
+ * The data of a Verifiable Credentials issued as an ISO mDL.
+ */
+@Serializable
+@SerialName(MsoMdoc.FORMAT)
+internal data class MsdMdocCredentialTO(
+    @SerialName("format") @Required override val format: String = MsoMdoc.FORMAT,
+    @SerialName("scope") override val scope: String? = null,
+    @SerialName("cryptographic_binding_methods_supported")
+    override val cryptographicBindingMethodsSupported: List<String>? = null,
+    @SerialName("cryptographic_suites_supported")
+    override val cryptographicSuitesSupported: List<String>? = null,
+    @SerialName("proof_types_supported")
+    override val proofTypesSupported: List<String>? = null,
+    @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
+    @SerialName("doctype") @Required val docType: String,
+    @SerialName("claims") val claims: Map<String, Map<String, ClaimTO>>? = null,
+    @SerialName("order") val order: List<String>? = null,
+) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupportedTO {
+    init {
+        require(format == MsoMdoc.FORMAT) { "invalid format '$format'" }
+    }
+
+    override fun toDomain(): MsoMdocCredential =
+        MsoMdocFormatSerializationSupport.credentialSupportedFromJson(this)
+}
+
+internal object MsoMdocFormatSerializationSupport :
+    FormatSerializationSupport<MsdMdocCredentialTO, MsoMdocCredential, MsoMdocIssuanceRequest, MsoMdocIssuanceRequestTO> {
+    override fun credentialSupportedFromJson(csJson: MsdMdocCredentialTO): MsoMdocCredential {
+        val bindingMethods = csJson.cryptographicBindingMethodsSupported
+            ?.toCryptographicBindingMethods()
+            ?: emptyList()
+        val display = csJson.display?.map { it.toDomain() } ?: emptyList()
+        val proofTypesSupported = csJson.proofTypesSupported.toProofTypes()
+        val cryptographicSuitesSupported = csJson.cryptographicSuitesSupported ?: emptyList()
+
+        fun claims(): MsoMdocClaims =
+            csJson.claims?.mapValues { (_, claims) ->
+                claims.mapValues { (_, claim) ->
+                    claim.let { claimObject ->
+                        Claim(
+                            claimObject.mandatory ?: false,
+                            claimObject.valueType,
+                            claimObject.display?.map { displayObject ->
+                                Claim.Display(
+                                    displayObject.name,
+                                    displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
+                                )
+                            } ?: emptyList(),
+                        )
+                    }
+                }
+            } ?: emptyMap()
+
+        return MsoMdocCredential(
+            csJson.scope,
+            bindingMethods,
+            cryptographicSuitesSupported,
+            proofTypesSupported,
+            display,
+            csJson.docType,
+            claims(),
+            csJson.order ?: emptyList(),
+        )
+    }
+
+    override fun issuanceRequestToJson(request: MsoMdocIssuanceRequest): MsoMdocIssuanceRequestTO {
+        return when (val it = request.requestedCredentialResponseEncryption) {
+            is RequestedCredentialResponseEncryption.NotRequested -> {
+                MsoMdocIssuanceRequestTO(
+                    docType = request.doctype,
+                    proof = request.proof,
+                    claims = request.claimSet?.let {
+                        Json.encodeToJsonElement(it).jsonObject
+                    },
+                )
+            }
+
+            is RequestedCredentialResponseEncryption.Requested -> {
+                MsoMdocIssuanceRequestTO(
+                    docType = request.doctype,
+                    proof = request.proof,
+                    credentialEncryptionJwk = Json.parseToJsonElement(
+                        it.encryptionJwk.toPublicJWK().toString(),
+                    ).jsonObject,
+                    credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
+                    credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
+                    claims = request.claimSet?.let {
+                        Json.encodeToJsonElement(it).jsonObject
+                    },
+                )
+            }
         }
     }
 }
