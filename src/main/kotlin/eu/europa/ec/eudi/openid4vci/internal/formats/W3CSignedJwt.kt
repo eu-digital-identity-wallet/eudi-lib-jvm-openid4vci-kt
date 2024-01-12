@@ -26,7 +26,7 @@ import kotlinx.serialization.Serializable
 import java.util.*
 
 internal data object W3CSignedJwt :
-    IssuanceRequestFactory<W3CSignedJwtCredential, ClaimSet, W3CSignedJwt.Model.CredentialIssuanceRequest> {
+    IssuanceRequestFactory<W3CSignedJwtCredential, ClaimSet, W3CSignedJwtIssuanceRequest> {
 
     const val FORMAT = "jwt_vc_json"
 
@@ -35,7 +35,7 @@ internal data object W3CSignedJwt :
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<Model.CredentialIssuanceRequest> {
+    ): Result<W3CSignedJwtIssuanceRequest> {
         TODO("Not yet implemented")
     }
 
@@ -106,16 +106,16 @@ internal data object W3CSignedJwt :
                     }
                 },
             )
+    }
+}
 
-        class CredentialIssuanceRequest(
-            override val format: String,
-            override val proof: Proof?,
-            override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential {
+internal class W3CSignedJwtIssuanceRequest(
+    override val format: String,
+    override val proof: Proof?,
+    override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
+) : CredentialIssuanceRequest.SingleCredential {
 
-            override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO {
-                TODO("Not yet implemented")
-            }
-        }
+    override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO {
+        TODO("Not yet implemented")
     }
 }

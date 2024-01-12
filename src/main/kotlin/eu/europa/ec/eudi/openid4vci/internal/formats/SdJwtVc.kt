@@ -31,7 +31,7 @@ import kotlinx.serialization.json.*
 import java.util.*
 
 internal data object SdJwtVc :
-    IssuanceRequestFactory<SdJwtVcCredential, GenericClaimSet, SdJwtVc.Model.CredentialIssuanceRequest> {
+    IssuanceRequestFactory<SdJwtVcCredential, GenericClaimSet, SdJwtVcIssuanceRequest> {
 
     const val FORMAT = "vc+sd-jwt"
 
@@ -40,7 +40,7 @@ internal data object SdJwtVc :
         claimSet: GenericClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<Model.CredentialIssuanceRequest> = runCatching {
+    ): Result<SdJwtVcIssuanceRequest> = runCatching {
         fun GenericClaimSet.validate() {
             if ((supportedCredential.credentialDefinition.claims.isNullOrEmpty()) && claims.isNotEmpty()) {
                 throw CredentialIssuanceError.InvalidIssuanceRequest(
@@ -59,7 +59,7 @@ internal data object SdJwtVc :
 
         val validClaimSet = claimSet?.apply { validate() }
 
-        Model.CredentialIssuanceRequest(
+        SdJwtVcIssuanceRequest(
             type = supportedCredential.credentialDefinition.type,
             credentialEncryptionJwk = responseEncryptionSpec?.jwk,
             credentialResponseEncryptionAlg = responseEncryptionSpec?.algorithm,
@@ -149,74 +149,74 @@ internal data object SdJwtVc :
                 @SerialName("claims") val claims: JsonObject? = null,
             )
         }
+    }
+}
 
-        class CredentialIssuanceRequest private constructor(
-            override val proof: Proof? = null,
-            override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
-            val credentialDefinition: CredentialDefinition,
-        ) : SingleCredential {
+internal class SdJwtVcIssuanceRequest private constructor(
+    override val proof: Proof? = null,
+    override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
+    val credentialDefinition: CredentialDefinition,
+) : SingleCredential {
 
-            override val format: String = FORMAT
+    override val format: String = SdJwtVc.FORMAT
 
-            override fun toTransferObject(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
-                return when (val it = this.requestedCredentialResponseEncryption) {
-                    is RequestedCredentialResponseEncryption.NotRequested -> CredentialIssuanceRequestTO(
-                        proof = this.proof,
-                        credentialDefinition = CredentialIssuanceRequestTO.CredentialDefinitionTO(
-                            type = this.credentialDefinition.type,
-                            claims = this.credentialDefinition.claims?.let {
-                                buildJsonObject {
-                                    for (c in it.claims) {
-                                        put(c, JsonObject(emptyMap()))
-                                    }
-                                }
-                            },
-                        ),
-                    )
+    override fun toTransferObject(): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
+        return when (val it = this.requestedCredentialResponseEncryption) {
+            is RequestedCredentialResponseEncryption.NotRequested -> SdJwtVc.Model.CredentialIssuanceRequestTO(
+                proof = this.proof,
+                credentialDefinition = SdJwtVc.Model.CredentialIssuanceRequestTO.CredentialDefinitionTO(
+                    type = this.credentialDefinition.type,
+                    claims = this.credentialDefinition.claims?.let {
+                        buildJsonObject {
+                            for (c in it.claims) {
+                                put(c, JsonObject(emptyMap()))
+                            }
+                        }
+                    },
+                ),
+            )
 
-                    is RequestedCredentialResponseEncryption.Requested -> CredentialIssuanceRequestTO(
-                        proof = this.proof,
-                        credentialEncryptionJwk = Json.parseToJsonElement(
-                            it.encryptionJwk.toPublicJWK().toString(),
-                        ).jsonObject,
-                        credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
-                        credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
-                        credentialDefinition = CredentialIssuanceRequestTO.CredentialDefinitionTO(
-                            type = this.credentialDefinition.type,
-                            claims = this.credentialDefinition.claims?.let {
-                                Json.encodeToJsonElement(it.claims).jsonObject
-                            },
-                        ),
-                    )
-                }
-            }
+            is RequestedCredentialResponseEncryption.Requested -> SdJwtVc.Model.CredentialIssuanceRequestTO(
+                proof = this.proof,
+                credentialEncryptionJwk = Json.parseToJsonElement(
+                    it.encryptionJwk.toPublicJWK().toString(),
+                ).jsonObject,
+                credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString(),
+                credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString(),
+                credentialDefinition = SdJwtVc.Model.CredentialIssuanceRequestTO.CredentialDefinitionTO(
+                    type = this.credentialDefinition.type,
+                    claims = this.credentialDefinition.claims?.let {
+                        Json.encodeToJsonElement(it.claims).jsonObject
+                    },
+                ),
+            )
+        }
+    }
 
-            data class CredentialDefinition(val type: String, val claims: GenericClaimSet?)
+    data class CredentialDefinition(val type: String, val claims: GenericClaimSet?)
 
-            companion object {
-                operator fun invoke(
-                    type: String,
-                    proof: Proof? = null,
-                    credentialEncryptionJwk: JWK? = null,
-                    credentialResponseEncryptionAlg: JWEAlgorithm? = null,
-                    credentialResponseEncryptionMethod: EncryptionMethod? = null,
-                    claimSet: GenericClaimSet? = null,
-                ): Result<CredentialIssuanceRequest> = runCatching {
-                    CredentialIssuanceRequest(
-                        proof = proof,
-                        requestedCredentialResponseEncryption =
-                            SingleCredential.requestedCredentialResponseEncryption(
-                                credentialEncryptionJwk = credentialEncryptionJwk,
-                                credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
-                                credentialResponseEncryptionMethod = credentialResponseEncryptionMethod,
-                            ),
-                        credentialDefinition = CredentialDefinition(
-                            type = type,
-                            claims = claimSet,
-                        ),
-                    )
-                }
-            }
+    companion object {
+        operator fun invoke(
+            type: String,
+            proof: Proof? = null,
+            credentialEncryptionJwk: JWK? = null,
+            credentialResponseEncryptionAlg: JWEAlgorithm? = null,
+            credentialResponseEncryptionMethod: EncryptionMethod? = null,
+            claimSet: GenericClaimSet? = null,
+        ): Result<SdJwtVcIssuanceRequest> = runCatching {
+            SdJwtVcIssuanceRequest(
+                proof = proof,
+                requestedCredentialResponseEncryption =
+                    SingleCredential.requestedCredentialResponseEncryption(
+                        credentialEncryptionJwk = credentialEncryptionJwk,
+                        credentialResponseEncryptionAlg = credentialResponseEncryptionAlg,
+                        credentialResponseEncryptionMethod = credentialResponseEncryptionMethod,
+                    ),
+                credentialDefinition = CredentialDefinition(
+                    type = type,
+                    claims = claimSet,
+                ),
+            )
         }
     }
 }

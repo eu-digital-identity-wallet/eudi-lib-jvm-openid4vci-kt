@@ -27,7 +27,7 @@ import java.net.URL
 import java.util.*
 
 internal data object W3CJsonLdDataIntegrity :
-    IssuanceRequestFactory<W3CJsonLdDataIntegrityCredential, ClaimSet, W3CJsonLdDataIntegrity.Model.CredentialIssuanceRequest> {
+    IssuanceRequestFactory<W3CJsonLdDataIntegrityCredential, ClaimSet, W3CJsonLdDataIntegrityIssuanceRequest> {
 
     const val FORMAT = "ldp_vc"
 
@@ -36,7 +36,7 @@ internal data object W3CJsonLdDataIntegrity :
         claimSet: ClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<Model.CredentialIssuanceRequest> {
+    ): Result<W3CJsonLdDataIntegrityIssuanceRequest> {
         TODO("Not yet implemented")
     }
 
@@ -113,15 +113,15 @@ internal data object W3CJsonLdDataIntegrity :
                     }
                 },
             )
+    }
+}
 
-        class CredentialIssuanceRequest(
-            override val format: String,
-            override val proof: Proof?,
-            override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
-        ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.SingleCredential {
-            override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO {
-                TODO("Not yet implemented")
-            }
-        }
+internal class W3CJsonLdDataIntegrityIssuanceRequest(
+    override val format: String,
+    override val proof: Proof?,
+    override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
+) : CredentialIssuanceRequest.SingleCredential {
+    override fun toTransferObject(): CredentialIssuanceRequestTO.SingleCredentialTO {
+        TODO("Not yet implemented")
     }
 }

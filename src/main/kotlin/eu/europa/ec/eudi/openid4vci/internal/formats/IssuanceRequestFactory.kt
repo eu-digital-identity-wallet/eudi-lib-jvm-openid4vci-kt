@@ -43,14 +43,13 @@ internal fun interface IssuanceRequestFactory<
     ): Result<Req>
 }
 
-internal object Formats {
-
-    fun createIssuanceRequest(
-        supportedCredential: CredentialSupported,
-        claimSet: ClaimSet?,
-        proof: Proof?,
-        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<CredentialIssuanceRequest.SingleCredential> = when (supportedCredential) {
+internal fun createIssuanceRequest(
+    supportedCredential: CredentialSupported,
+    claimSet: ClaimSet?,
+    proof: Proof?,
+    responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+): Result<CredentialIssuanceRequest.SingleCredential> {
+    return when (supportedCredential) {
         is MsoMdocCredential ->
             MsoMdoc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, responseEncryptionSpec)
 
@@ -58,7 +57,12 @@ internal object Formats {
             SdJwtVc.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, responseEncryptionSpec)
 
         is W3CSignedJwtCredential ->
-            W3CSignedJwt.createIssuanceRequest(supportedCredential, claimSet.ensure(), proof, responseEncryptionSpec)
+            W3CSignedJwt.createIssuanceRequest(
+                supportedCredential,
+                claimSet.ensure(),
+                proof,
+                responseEncryptionSpec,
+            )
 
         is W3CJsonLdSignedJwtCredential ->
             W3CJsonLdSignedJwt.createIssuanceRequest(
@@ -76,13 +80,13 @@ internal object Formats {
                 responseEncryptionSpec,
             )
     }
-
-    private inline fun <reified C : ClaimSet> ClaimSet?.ensure(): C? =
-        this?.let {
-            if (it is C) it
-            else throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
-        }
 }
+
+private inline fun <reified C : ClaimSet> ClaimSet?.ensure(): C? =
+    this?.let {
+        if (it is C) it
+        else throw CredentialIssuanceError.InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
+    }
 
 @kotlinx.serialization.Serializable
 @OptIn(ExperimentalSerializationApi::class)

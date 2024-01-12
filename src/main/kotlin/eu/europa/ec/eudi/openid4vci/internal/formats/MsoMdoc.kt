@@ -38,7 +38,7 @@ fun CredentialIssuerMetadata.findMsoMdoc(docType: String): MsoMdocCredential? =
     findByFormat<MsoMdocCredential> { it.docType == docType }.values.firstOrNull()
 
 internal data object MsoMdoc :
-    IssuanceRequestFactory<MsoMdocCredential, MsoMdocClaimSet, MsoMdocRequest> {
+    IssuanceRequestFactory<MsoMdocCredential, MsoMdocClaimSet, MsoMdocIssuanceRequest> {
 
     const val FORMAT = "mso_mdoc"
 
@@ -47,7 +47,7 @@ internal data object MsoMdoc :
         claimSet: MsoMdocClaimSet?,
         proof: Proof?,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<MsoMdocRequest> = runCatching {
+    ): Result<MsoMdocIssuanceRequest> = runCatching {
         fun MsoMdocClaimSet.validate() {
             if (supportedCredential.claims.isEmpty() && isNotEmpty()) {
                 throw InvalidIssuanceRequest(
@@ -65,7 +65,7 @@ internal data object MsoMdoc :
 
         val validClaimSet = claimSet?.apply { validate() }
 
-        MsoMdocRequest(
+        MsoMdocIssuanceRequest(
             doctype = supportedCredential.docType,
             credentialEncryptionJwk = responseEncryptionSpec?.jwk,
             credentialResponseEncryptionAlg = responseEncryptionSpec?.algorithm,
@@ -150,7 +150,7 @@ internal data object MsoMdoc :
         ) : eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO
 
         fun transferObjectOf(
-            request: MsoMdocRequest,
+            request: MsoMdocIssuanceRequest,
         ): eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO.SingleCredentialTO {
             return when (val it = request.requestedCredentialResponseEncryption) {
                 is RequestedCredentialResponseEncryption.NotRequested -> {
@@ -185,7 +185,7 @@ internal data object MsoMdoc :
 /**
  * Issuance request for a credential of mso_mdoc format
  */
-internal class MsoMdocRequest private constructor(
+internal class MsoMdocIssuanceRequest private constructor(
     val doctype: String,
     override val proof: Proof? = null,
     override val requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption,
@@ -204,8 +204,8 @@ internal class MsoMdocRequest private constructor(
             credentialResponseEncryptionMethod: EncryptionMethod? = null,
             doctype: String,
             claimSet: MsoMdocClaimSet? = null,
-        ): Result<MsoMdocRequest> = runCatching {
-            MsoMdocRequest(
+        ): Result<MsoMdocIssuanceRequest> = runCatching {
+            MsoMdocIssuanceRequest(
                 proof = proof,
                 requestedCredentialResponseEncryption =
                     SingleCredential.requestedCredentialResponseEncryption(
