@@ -42,7 +42,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                 },
                 requestValidator = {
                     assertEquals(
-                        credentialIssuerMetadataUrl().value.toURI(),
+                        SampleIssuer.WellKnownUrl.value.toURI(),
                         it.url.toURI(),
                     )
                 },
@@ -50,7 +50,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             expectSuccessOnly = true,
         )
         assertFailsWith<UnableToFetchCredentialIssuerMetadata> {
-            resolver.resolve(credentialIssuerId()).getOrThrow()
+            resolver.resolve(SampleIssuer.Id).getOrThrow()
         }
     }
 
@@ -58,25 +58,25 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
     internal fun `fails when metadata cannot be parsed`() = runTest {
         val resolver = resolver(
             RequestMocker(
-                requestMatcher = match(credentialIssuerMetadataUrl().value.toURI()),
+                requestMatcher = match(SampleIssuer.WellKnownUrl.value.toURI()),
                 responseBuilder = jsonResponse("eu/europa/ec/eudi/openid4vci/internal/invalid_credential_issuer_metadata.json"),
                 requestValidator = {
                     assertEquals(
-                        credentialIssuerMetadataUrl().value.toURI(),
+                        SampleIssuer.WellKnownUrl.value.toURI(),
                         it.url.toURI(),
                     )
                 },
             ),
         )
         assertFailsWith<NonParseableCredentialIssuerMetadata> {
-            resolver.resolve(credentialIssuerId()).getOrThrow()
+            resolver.resolve(SampleIssuer.Id).getOrThrow()
         }
     }
 
     @Test
     internal fun `fails with unexpected credential issuer id`() = runTest {
         val credentialIssuerId = CredentialIssuerId("https://issuer.com").getOrThrow()
-        val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl(credentialIssuerId)
+        val credentialIssuerMetadataUrl = credentialIssuerId.metaDataUrl()
         val resolver = resolver(
             RequestMocker(
                 requestMatcher = match(credentialIssuerMetadataUrl.value.toURI()),
@@ -98,7 +98,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
     @Test
     internal fun `fails with when response encryption algorithms are not asymmetric`() = runTest {
         val credentialIssuerId = CredentialIssuerId("https://issuer.com").getOrThrow()
-        val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl(credentialIssuerId)
+        val credentialIssuerMetadataUrl = credentialIssuerId.metaDataUrl()
 
         val resolver = resolver(
             RequestMocker(
@@ -121,8 +121,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
     @Test
     internal fun `resolution success`() = runTest {
-        val credentialIssuerId = credentialIssuerId()
-        val credentialIssuerMetadataUrl = credentialIssuerMetadataUrl()
+        val credentialIssuerId = SampleIssuer.Id
+        val credentialIssuerMetadataUrl = SampleIssuer.WellKnownUrl
 
         val resolver = resolver(
             RequestMocker(

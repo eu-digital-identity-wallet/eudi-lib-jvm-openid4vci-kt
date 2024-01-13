@@ -38,44 +38,49 @@ import java.net.URI
 import java.net.URL
 import java.util.*
 
-/**
- * Gets the [CredentialIssuerId] used throughout the tests.
- */
-internal fun credentialIssuerId() = CredentialIssuerId("https://credential-issuer.example.com").getOrThrow()
+object SampleIssuer {
+    val Id: CredentialIssuerId = CredentialIssuerId("https://credential-issuer.example.com").getOrThrow()
+    val WellKnownUrl = Id.metaDataUrl()
+}
 
-/**
- * Get the URL for fetching the metadata of the Credential Issuer used throughout the tests.
- */
-internal fun credentialIssuerMetadataUrl(credentialIssuerId: CredentialIssuerId = credentialIssuerId()) =
-    HttpsUrl(
-        URLBuilder(credentialIssuerId.toString())
-            .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
-            .buildString(),
-    ).getOrThrow()
+object SampleAuthServer {
+    val Url = HttpsUrl("https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm").getOrThrow()
+    val OidcWellKnownUrl = oidcAuthorizationServerMetadataUrl(Url)
+    val OAuthWellKnownUrl = oauthAuthorizationServerMetadataUrl(Url)
 
-/**
- * Gets the issuer of the Authorization Server used throughout the tests.
- */
-internal fun authorizationServerIssuer() =
-    HttpsUrl("https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm").getOrThrow()
+    /**
+     * Get the URL for fetching the metadata of the OAuth Authorization Server used throughout the tests.
+     */
+    private fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: HttpsUrl) =
+        HttpsUrl(
+            URLBuilder(authorizationServerIssuer.value.toString())
+                .appendPathSegments("/.well-known/oauth-authorization-server", encodeSlash = false)
+                .buildString(),
+        ).getOrThrow()
+}
 
 /**
  * Get the URL for fetching the metadata of the OpenID Connect Authorization Server used throughout the tests.
  */
-internal fun oidcAuthorizationServerMetadataUrl(authorizationServerIssuer: HttpsUrl = authorizationServerIssuer()) =
+internal fun oidcAuthorizationServerMetadataUrl(authorizationServerIssuer: HttpsUrl) =
     HttpsUrl(
         URLBuilder(authorizationServerIssuer.value.toString())
             .appendPathSegments("/.well-known/openid-configuration", encodeSlash = false)
             .buildString(),
     ).getOrThrow()
 
+internal fun oidcMetaDataHandler(oidcServerUrl: HttpsUrl, oidcMetaDataResource: String): RequestMocker = RequestMocker(
+    match(oidcAuthorizationServerMetadataUrl(oidcServerUrl).value.toURI()),
+    jsonResponse(oidcMetaDataResource),
+)
+
 /**
- * Get the URL for fetching the metadata of the OAuth Authorization Server used throughout the tests.
+ * Get the URL for fetching the metadata of the Credential Issuer used throughout the tests.
  */
-internal fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: HttpsUrl = authorizationServerIssuer()) =
+internal fun CredentialIssuerId.metaDataUrl() =
     HttpsUrl(
-        URLBuilder(authorizationServerIssuer.value.toString())
-            .appendPathSegments("/.well-known/oauth-authorization-server", encodeSlash = false)
+        URLBuilder(toString())
+            .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
             .buildString(),
     ).getOrThrow()
 
@@ -306,8 +311,8 @@ internal fun mobileDrivingLicense() =
  */
 internal fun credentialIssuerMetadata() =
     CredentialIssuerMetadata(
-        credentialIssuerId(),
-        listOf(authorizationServerIssuer()),
+        SampleIssuer.Id,
+        listOf(SampleAuthServer.Url),
         CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials").getOrThrow(),
         CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/batch").getOrThrow(),
         CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/deferred").getOrThrow(),
@@ -340,7 +345,7 @@ internal fun credentialIssuerMetadata() =
  */
 internal fun oidcAuthorizationServerMetadata(): OIDCProviderMetadata =
     OIDCProviderMetadata(
-        Issuer(authorizationServerIssuer().value.toURI()),
+        Issuer(SampleAuthServer.Url.value.toURI()),
         listOf(
             "public",
             "pairwise",
@@ -646,7 +651,7 @@ internal fun oidcAuthorizationServerMetadata(): OIDCProviderMetadata =
  */
 internal fun oauthAuthorizationServerMetadata(): AuthorizationServerMetadata =
     AuthorizationServerMetadata(
-        Issuer(authorizationServerIssuer().value.toURI()),
+        Issuer(SampleAuthServer.Url.value.toURI()),
     ).apply {
         val realmBaseUrl = "https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm"
         val oidcProtocolBaseUrl = "$realmBaseUrl/protocol/openid-connect"
