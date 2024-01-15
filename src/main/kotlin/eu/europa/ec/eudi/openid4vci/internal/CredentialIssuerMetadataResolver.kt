@@ -15,37 +15,40 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuerMetadataJsonParser
+import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.coroutines.coroutineScope
 
 /**
- * Default implementation of [CredentialIssuerMetadataResolver].
+ * Service for fetching, parsing, and validating the metadata of a Credential Issuer.
  */
-internal class DefaultCredentialIssuerMetadataResolver(
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
-) : CredentialIssuerMetadataResolver {
+internal object CredentialIssuerMetadataResolver {
 
-    override suspend fun resolve(issuer: CredentialIssuerId): CredentialIssuerMetadata = coroutineScope {
+    suspend fun HttpClient.resolve(issuer: CredentialIssuerId): CredentialIssuerMetadata {
         val wellKnownUrl = issuer.wellKnown()
-        val json = ktorHttpClientFactory().use { client ->
-            try {
-                client.get(wellKnownUrl).body<String>()
-            } catch (t: Throwable) {
-                throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
-            }
+        val json = try {
+            get(wellKnownUrl).body<String>()
+        } catch (t: Throwable) {
+            throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
         }
         val metaData = CredentialIssuerMetadataJsonParser.parseMetaData(json)
-        if (metaData.credentialIssuerIdentifier != issuer) {
-            throw InvalidCredentialIssuerId(
-                IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
-            )
-        }
-        metaData
+        return metaData.also { it.mustHaveIssuer(issuer) }
+    }
+}
+
+private fun CredentialIssuerMetadata.mustHaveIssuer(issuer: CredentialIssuerId) {
+    ensure(credentialIssuerIdentifier == issuer) {
+        println("$issuer")
+        println("${this.credentialIssuerIdentifier}")
+        InvalidCredentialIssuerId(
+            IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
+        )
     }
 }
 

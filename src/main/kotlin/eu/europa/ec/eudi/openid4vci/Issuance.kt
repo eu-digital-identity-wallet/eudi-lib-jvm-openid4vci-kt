@@ -170,7 +170,7 @@ sealed interface SubmittedRequest {
      * State denoting a special case of request failure. Issuer has responded that the proof of possession provided in
      * the request was invalid. Along with the error, issuer responds with a new c_nonce to be used in the request retry.
      *
-     * @param cNonce The c_nonce provided from issuer along with the error
+     * @param cNonce The c_nonce provided from issuer along the error
      * @param errorDescription Description of the error that caused the failure
      */
     class InvalidProof(
@@ -308,7 +308,7 @@ interface RequestIssuance {
      * Special purpose operation to handle the case an 'invalid_proof' error response was received from issuer with
      * fresh c_nonce provided to be used with a request retry.
      *
-     * @param cNonce    The c_nonce provided from issuer along with the 'invalid_proof' error code.
+     * @param cNonce    The c_nonce provided from issuer along the 'invalid_proof' error code.
      * @return The new state of the request.
      */
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(

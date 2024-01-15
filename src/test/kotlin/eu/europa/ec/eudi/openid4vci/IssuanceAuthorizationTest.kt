@@ -16,9 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponse
-import eu.europa.ec.eudi.openid4vci.internal.PushedAuthorizationRequestResponse
-import eu.europa.ec.eudi.openid4vci.internal.TokenEndpointForm
+import eu.europa.ec.eudi.openid4vci.internal.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -75,90 +73,89 @@ class IssuanceAuthorizationTest {
     )
 
     @Test
-    fun `successful authorization with authorization code flow (wallet initiated)`() =
-        runTest {
-            val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                oidcWellKnownMocker(),
-                authServerWellKnownMocker(),
-                parPostMocker { request ->
-                    assertTrue(
-                        "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
-                    ) {
-                        request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
-                    }
-                    assertTrue("Not a form post") {
-                        request.body is FormDataContent
-                    }
-                    val form = request.body as FormDataContent
+    fun `successful authorization with authorization code flow (wallet initiated)`() = runTest {
+        val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker { request ->
+                assertTrue(
+                    "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
+                ) {
+                    request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
+                }
+                assertTrue("Not a form post") {
+                    request.body is FormDataContent
+                }
+                val form = request.body as FormDataContent
 
-                    assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
-                        form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
-                    }
-                    assertTrue("Missing scope eu.europa.ec.eudiw.pid_mso_mdoc") {
-                        form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc") ?: false
-                    }
-                    assertTrue("No issuer_state expected when issuance starts from wallet") {
-                        form.formData["issuer_state"] == null
-                    }
-                    assertTrue("PKCE code challenge was expected but not sent.") {
-                        form.formData["code_challenge"] != null
-                    }
-                    assertTrue("PKCE code challenge method was expected but not sent.") {
-                        form.formData["code_challenge_method"] != null
-                    }
-                },
-                tokenPostMocker { request ->
-                    assertTrue(
-                        "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
-                    ) {
-                        request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
-                    }
-                    assertTrue("Not a form post") {
-                        request.body is FormDataContent
-                    }
-                    val form = request.body as FormDataContent
-                    assertTrue("PKCE code verifier was expected but not sent.") {
-                        form.formData[TokenEndpointForm.AuthCodeFlow.CODE_VERIFIER_PARAM] != null
-                    }
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM] != null
-                    }
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM] != null
-                    }
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM] != null
-                    }
-                    val grantType = form.formData[TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM]
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM} was expected but not sent.") {
-                        grantType != null
-                    }
-                    assertTrue(
-                        "Expected grant_type is ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but instead sent $grantType.",
-                    ) {
-                        grantType == TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE
-                    }
-                },
-            )
+                assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
+                    form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
+                }
+                assertTrue("Missing scope eu.europa.ec.eudiw.pid_mso_mdoc") {
+                    form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc") ?: false
+                }
+                assertTrue("No issuer_state expected when issuance starts from wallet") {
+                    form.formData["issuer_state"] == null
+                }
+                assertTrue("PKCE code challenge was expected but not sent.") {
+                    form.formData["code_challenge"] != null
+                }
+                assertTrue("PKCE code challenge method was expected but not sent.") {
+                    form.formData["code_challenge_method"] != null
+                }
+            },
+            tokenPostMocker { request ->
+                assertTrue(
+                    "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
+                ) {
+                    request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
+                }
+                assertTrue("Not a form post") {
+                    request.body is FormDataContent
+                }
+                val form = request.body as FormDataContent
+                assertTrue("PKCE code verifier was expected but not sent.") {
+                    form.formData[TokenEndpointForm.AuthCodeFlow.CODE_VERIFIER_PARAM] != null
+                }
+                assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM} was expected but not sent.") {
+                    form.formData[TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM] != null
+                }
+                assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM} was expected but not sent.") {
+                    form.formData[TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM] != null
+                }
+                assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM} was expected but not sent.") {
+                    form.formData[TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM] != null
+                }
+                val grantType = form.formData[TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM]
+                assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM} was expected but not sent.") {
+                    grantType != null
+                }
+                assertTrue(
+                    "Expected grant_type is ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but instead sent $grantType.",
+                ) {
+                    grantType == TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE
+                }
+            },
+        )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
-            val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
-            val issuerState = issuerStateFromOffer(offer)
+        val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
+        val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
+        val issuerState = issuerStateFromOffer(offer)
 
-            with(issuer) {
-                val parRequested =
-                    pushAuthorizationCodeRequest(offer.credentials, issuerState).getOrThrow()
-                        .also { println(it) }
-
-                val authorizationCode = UUID.randomUUID().toString()
-
-                parRequested
-                    .handleAuthorizationCode(AuthorizationCode(authorizationCode))
+        with(issuer) {
+            val parRequested =
+                pushAuthorizationCodeRequest(offer.credentials, issuerState).getOrThrow()
                     .also { println(it) }
-                    .requestAccessToken().getOrThrow().also { println(it) }
-            }
+
+            val authorizationCode = UUID.randomUUID().toString()
+
+            parRequested
+                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
+                .also { println(it) }
+                .requestAccessToken().getOrThrow().also { println(it) }
         }
+    }
 
     @Test
     fun `successful authorization with authorization code flow`() =
@@ -539,23 +536,22 @@ class IssuanceAuthorizationTest {
     private suspend fun issuer(
         ktorHttpClientFactory: KtorHttpClientFactory,
         credentialIssuerIdentifier: CredentialIssuerId,
-    ): Issuer {
-        val issuerMetadata =
-            CredentialIssuerMetadataResolver(
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            ).resolve(credentialIssuerIdentifier)
+    ): Issuer = ktorHttpClientFactory().use { httpClient ->
+        with(httpClient) {
+            val issuerMetadata =
+                with(CredentialIssuerMetadataResolver) { resolve(credentialIssuerIdentifier) }
 
-        val authServerMetadata =
-            AuthorizationServerMetadataResolver(
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            ).resolve(issuerMetadata.authorizationServers[0]).getOrThrow()
+            val authServerMetadata = with(AuthorizationServerMetadataResolver) {
+                resolve(issuerMetadata.authorizationServers[0]).getOrThrow()
+            }
 
-        return Issuer.make(
-            authorizationServerMetadata = authServerMetadata,
-            config = vciWalletConfiguration,
-            ktorHttpClientFactory = ktorHttpClientFactory,
-            issuerMetadata = issuerMetadata,
-        )
+            Issuer.make(
+                authorizationServerMetadata = authServerMetadata,
+                config = vciWalletConfiguration,
+                ktorHttpClientFactory = ktorHttpClientFactory,
+                issuerMetadata = issuerMetadata,
+            )
+        }
     }
 
     private suspend fun credentialOffer(

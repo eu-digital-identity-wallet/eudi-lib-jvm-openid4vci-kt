@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.internal.AuthorizationServerMetadataResolver
+import eu.europa.ec.eudi.openid4vci.internal.CredentialIssuerMetadataResolver
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.apache.*
@@ -311,23 +313,25 @@ private fun issuanceLog(message: String) {
 private suspend fun buildIssuer(
     credentialIssuerIdentifier: CredentialIssuerId,
     config: OpenId4VCIConfig,
-): Pair<CIAuthorizationServerMetadata, Issuer> {
-    val issuerMetadata =
-        CredentialIssuerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
-            .resolve(credentialIssuerIdentifier)
+): Pair<CIAuthorizationServerMetadata, Issuer> =
+    httpClientFactory().use { httpClient ->
+        with(httpClient) {
+            val issuerMetadata = with(CredentialIssuerMetadataResolver) {
+                resolve(credentialIssuerIdentifier)
+            }
+            val authServerMetadata = with(AuthorizationServerMetadataResolver) {
+                resolve(issuerMetadata.authorizationServers[0]).getOrThrow()
+            }
 
-    val authServerMetadata =
-        AuthorizationServerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
-            .resolve(issuerMetadata.authorizationServers[0]).getOrThrow()
-
-    val issuer = Issuer.make(
-        authorizationServerMetadata = authServerMetadata,
-        config = config,
-        ktorHttpClientFactory = ::httpClientFactory,
-        issuerMetadata = issuerMetadata,
-    )
-    return Pair(authServerMetadata, issuer)
-}
+            val issuer = Issuer.make(
+                authorizationServerMetadata = authServerMetadata,
+                config = config,
+                ktorHttpClientFactory = ::httpClientFactory,
+                issuerMetadata = issuerMetadata,
+            )
+            Pair(authServerMetadata, issuer)
+        }
+    }
 
 private fun httpClientFactory(): HttpClient =
     HttpClient(Apache) {

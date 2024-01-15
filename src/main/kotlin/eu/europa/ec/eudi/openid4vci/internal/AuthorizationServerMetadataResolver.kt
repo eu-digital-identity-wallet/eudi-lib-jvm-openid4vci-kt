@@ -18,7 +18,8 @@ package eu.europa.ec.eudi.openid4vci.internal
 import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import com.nimbusds.oauth2.sdk.id.Issuer
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
-import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
+import eu.europa.ec.eudi.openid4vci.HttpsUrl
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -27,22 +28,23 @@ import net.minidev.json.JSONObject
 import java.net.URL
 
 /**
- * Default implementation for [AuthorizationServerMetadataResolver].
+ * Indicates an error during the resolution of an Authorization Server's metadata.
  */
-internal class DefaultAuthorizationServerMetadataResolver(
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
-) : AuthorizationServerMetadataResolver {
-    override suspend fun resolve(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> = runCatching {
-        ktorHttpClientFactory().use { client ->
-            with(client) {
-                fetchOidcServerMetadata(issuer)
-                    .recoverCatching { fetchOauthServerMetadata(issuer).getOrThrow() }
-                    .mapCatching { it.apply { expectIssuer(issuer) } }
-                    .mapError(::AuthorizationServerMetadataResolutionException)
-                    .getOrThrow()
-            }
+internal class AuthorizationServerMetadataResolutionException(reason: Throwable) : Exception(reason)
+
+/**
+ * Service for resolving the metadata of an Authorization Server.
+ */
+internal object AuthorizationServerMetadataResolver {
+
+    suspend fun HttpClient.resolve(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
+        runCatching {
+            fetchOidcServerMetadata(issuer)
+                .recoverCatching { fetchOauthServerMetadata(issuer).getOrThrow() }
+                .mapCatching { it.apply { expectIssuer(issuer) } }
+                .mapError(::AuthorizationServerMetadataResolutionException)
+                .getOrThrow()
         }
-    }
 }
 
 /**

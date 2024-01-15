@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
-import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
 import kotlinx.serialization.SerialName
 import java.io.Serializable
@@ -71,6 +70,7 @@ data class CredentialIssuerMetadata(
         val locale: String? = null,
     ) : Serializable
 }
+
 fun CredentialIssuerMetadata.findMsoMdoc(docType: String): MsoMdocCredential? =
     findByFormat<MsoMdocCredential> { it.docType == docType }.values.firstOrNull()
 
@@ -83,6 +83,7 @@ value class CredentialIssuerEndpoint(val value: HttpsUrl) {
     init {
         require(value.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
     }
+
     override fun toString(): String = value.toString()
 
     companion object {
@@ -192,28 +193,5 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
         CredentialIssuerMetadataValidationError(IllegalArgumentException("Credentials Supported Required")) {
 
         private fun readResolve(): Any = CredentialsSupportedRequired
-    }
-}
-
-/**
- * Service for fetching, parsing, and validating the metadata of a Credential Issuer.
- */
-fun interface CredentialIssuerMetadataResolver {
-
-    /**
-     * Tries to fetch and validate the metadata of a Credential Issuer.
-     */
-    suspend fun resolve(issuer: CredentialIssuerId): CredentialIssuerMetadata
-    companion object {
-
-        /**
-         * Creates a new [CredentialIssuerMetadataResolver] instance.
-         */
-        operator fun invoke(
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
-        ): CredentialIssuerMetadataResolver =
-            DefaultCredentialIssuerMetadataResolver(
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            )
     }
 }

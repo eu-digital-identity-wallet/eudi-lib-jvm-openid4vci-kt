@@ -15,7 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.NonParsableCredentialOfferEndpointUrl
+import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestValidationError.InvalidCredentialOfferUri
+import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialOfferRequestResolver
+import eu.europa.ec.eudi.openid4vci.internal.ensureSuccess
 import io.ktor.http.*
 import java.io.Serializable
 import kotlin.time.Duration
@@ -127,25 +131,27 @@ sealed interface CredentialOfferRequest : Serializable {
          * In case of [Result.Failure] a [CredentialOfferRequestException] is thrown.
          */
         operator fun invoke(url: String): Result<CredentialOfferRequest> = runCatching {
-            val builder = runCatching {
-                URLBuilder(url)
-            }.getOrElse { CredentialOfferRequestError.NonParsableCredentialOfferEndpointUrl(it).raise() }
+            val parameters = try {
+                URLBuilder(url).parameters
+            } catch (t: URLParserException) {
+                throw NonParsableCredentialOfferEndpointUrl(t).toException()
+            }
 
-            val parameters = builder.parameters
             val maybeByValue = parameters["credential_offer"]
-            val maybeByReference = parameters["credential_offer_uri"]
+                ?.takeIf { it.isNotEmpty() }
+                ?.let(::PassByValue)
 
+            val maybeByReference = parameters["credential_offer_uri"]?.let {
+                val offerUri = HttpsUrl(it).ensureSuccess { t -> InvalidCredentialOfferUri(t).toException() }
+                PassByReference(offerUri)
+            }
+
+            fun oneOfRequired(): Nothing = throw OneOfCredentialOfferOrCredentialOfferUri.toException()
             when {
-                !maybeByValue.isNullOrBlank() && !maybeByReference.isNullOrBlank() ->
-                    CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri.raise()
-
-                !maybeByValue.isNullOrBlank() -> PassByValue(maybeByValue)
-
-                !maybeByReference.isNullOrBlank() -> HttpsUrl(maybeByReference)
-                    .map { PassByReference(it) }
-                    .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialOfferUri(it).raise() }
-
-                else -> CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri.raise()
+                maybeByValue != null && maybeByReference != null -> oneOfRequired()
+                maybeByValue != null -> maybeByValue
+                maybeByReference != null -> maybeByReference
+                else -> oneOfRequired()
             }
         }
     }
@@ -180,17 +186,13 @@ sealed interface CredentialOfferRequestError : Serializable {
      * The metadata of the Authorization Server could not be resolved.
      */
     data class UnableToResolveAuthorizationServerMetadata(val reason: Throwable) : CredentialOfferRequestError
-
-    /**
-     * Wraps this [CredentialOfferRequestError] to a [CredentialOfferRequestException].
-     */
-    fun toException(): CredentialOfferRequestException = CredentialOfferRequestException(this)
-
-    /**
-     * Wraps this [CredentialOfferRequestError] to a [CredentialOfferRequestException] and throws it.
-     */
-    fun raise(): Nothing = throw toException()
 }
+
+/**
+ * Wraps this [CredentialOfferRequestError] to a [CredentialOfferRequestException].
+ */
+internal fun CredentialOfferRequestError.toException(): CredentialOfferRequestException =
+    CredentialOfferRequestException(this)
 
 /**
  * Validation error that can occur while trying to validate a [CredentialOfferRequest].
