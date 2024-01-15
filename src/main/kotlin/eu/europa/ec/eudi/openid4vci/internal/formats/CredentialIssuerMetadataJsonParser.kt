@@ -19,6 +19,7 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
+import eu.europa.ec.eudi.openid4vci.internal.ensure
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
@@ -284,9 +285,8 @@ private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
         }.toMap()
     } catch (it: Throwable) {
         throw CredentialIssuerMetadataValidationError.InvalidCredentialsSupported(it)
-    }.apply {
-        ifEmpty { throw CredentialIssuerMetadataValidationError.CredentialsSupportedRequired }
     }
+    ensure(credentialsSupported.isNotEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired }
 
     val display = display?.map { it.toDomain() } ?: emptyList()
 
@@ -418,9 +418,15 @@ private fun credentialSupportedFromJson(
     val cryptographicSuitesSupported = csJson.cryptographicSuitesSupported ?: emptyList()
 
     return W3CJsonLdDataIntegrityCredential(
-        csJson.scope, bindingMethods, cryptographicSuitesSupported, proofTypesSupported,
-        display, csJson.context, csJson.type, toDomain(csJson.credentialDefinition),
-        csJson.order ?: emptyList(),
+        scope = csJson.scope,
+        cryptographicBindingMethodsSupported = bindingMethods,
+        cryptographicSuitesSupported = cryptographicSuitesSupported,
+        proofTypesSupported = proofTypesSupported,
+        display = display,
+        context = csJson.context,
+        type = csJson.type,
+        credentialDefinition = toDomain(csJson.credentialDefinition),
+        order = csJson.order ?: emptyList(),
     )
 }
 
@@ -453,14 +459,14 @@ private fun credentialSupportedFromJson(csJson: W3CJsonLdSignedJwtCredentialTO):
     val cryptographicSuitesSupported = csJson.cryptographicSuitesSupported ?: emptyList()
 
     return W3CJsonLdSignedJwtCredential(
-        csJson.scope,
-        bindingMethods,
-        cryptographicSuitesSupported,
-        proofTypesSupported,
-        display,
-        csJson.context,
-        csJson.credentialDefinition.toDomain(),
-        csJson.order ?: emptyList(),
+        scope = csJson.scope,
+        cryptographicBindingMethodsSupported = bindingMethods,
+        cryptographicSuitesSupported = cryptographicSuitesSupported,
+        proofTypesSupported = proofTypesSupported,
+        display = display,
+        context = csJson.context,
+        credentialDefinition = csJson.credentialDefinition.toDomain(),
+        order = csJson.order ?: emptyList(),
     )
 }
 
@@ -492,13 +498,13 @@ private fun credentialSupportedFromJson(csJson: W3CSignedJwtCredentialTO): W3CSi
     val cryptographicSuitesSupported = csJson.cryptographicSuitesSupported ?: emptyList()
 
     return W3CSignedJwtCredential(
-        csJson.scope,
-        bindingMethods,
-        cryptographicSuitesSupported,
-        proofTypesSupported,
-        display,
-        csJson.credentialDefinition.toDomain(),
-        csJson.order ?: emptyList(),
+        scope = csJson.scope,
+        cryptographicBindingMethodsSupported = bindingMethods,
+        cryptographicSuitesSupported = cryptographicSuitesSupported,
+        proofTypesSupported = proofTypesSupported,
+        display = display,
+        credentialDefinition = csJson.credentialDefinition.toDomain(),
+        order = csJson.order ?: emptyList(),
     )
 }
 

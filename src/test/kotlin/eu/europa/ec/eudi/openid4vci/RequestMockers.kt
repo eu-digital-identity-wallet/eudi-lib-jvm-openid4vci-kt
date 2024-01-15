@@ -24,6 +24,20 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.*
 
+internal fun credentialIssuerMetaDataHandler(id: CredentialIssuerId, resource: String): RequestMocker = RequestMocker(
+    match(id.metaDataUrl().value.toURI()),
+    jsonResponse(resource),
+)
+internal fun oidcMetaDataHandler(oidcServerUrl: HttpsUrl, oidcMetaDataResource: String): RequestMocker = RequestMocker(
+    match(oidcAuthorizationServerMetadataUrl(oidcServerUrl).value.toURI()),
+    jsonResponse(oidcMetaDataResource),
+)
+
+internal fun oauthMetaDataHandler(oauth2ServerUrl: HttpsUrl, oauth2MetaDataResource: String): RequestMocker = RequestMocker(
+    match(oauthAuthorizationServerMetadataUrl(oauth2ServerUrl).value.toURI()),
+    jsonResponse(oauth2MetaDataResource),
+)
+
 internal fun oidcWellKnownMocker(): RequestMocker = RequestMocker(
     requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
     responseBuilder = {

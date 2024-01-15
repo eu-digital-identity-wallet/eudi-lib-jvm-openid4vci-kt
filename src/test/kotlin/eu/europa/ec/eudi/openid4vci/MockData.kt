@@ -52,7 +52,7 @@ object SampleAuthServer {
 /**
  * Get the URL for fetching the metadata of the OAuth Authorization Server used throughout the tests.
  */
-private fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: HttpsUrl) =
+internal fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: HttpsUrl) =
     HttpsUrl(
         URLBuilder(authorizationServerIssuer.value.toString())
             .appendPathSegments("/.well-known/oauth-authorization-server", encodeSlash = false)
@@ -68,20 +68,6 @@ internal fun oidcAuthorizationServerMetadataUrl(authorizationServerIssuer: Https
             .appendPathSegments("/.well-known/openid-configuration", encodeSlash = false)
             .buildString(),
     ).getOrThrow()
-
-internal fun credentialIssuerMetaDataHandler(id: CredentialIssuerId, resource: String): RequestMocker = RequestMocker(
-    match(id.metaDataUrl().value.toURI()),
-    jsonResponse(resource),
-)
-internal fun oidcMetaDataHandler(oidcServerUrl: HttpsUrl, oidcMetaDataResource: String): RequestMocker = RequestMocker(
-    match(oidcAuthorizationServerMetadataUrl(oidcServerUrl).value.toURI()),
-    jsonResponse(oidcMetaDataResource),
-)
-
-internal fun oauthMetaDataHandler(oauth2ServerUrl: HttpsUrl, oauth2MetaDataResource: String): RequestMocker = RequestMocker(
-    match(oauthAuthorizationServerMetadataUrl(oauth2ServerUrl).value.toURI()),
-    jsonResponse(oauth2MetaDataResource),
-)
 
 /**
  * Get the URL for fetching the metadata of the Credential Issuer used throughout the tests.

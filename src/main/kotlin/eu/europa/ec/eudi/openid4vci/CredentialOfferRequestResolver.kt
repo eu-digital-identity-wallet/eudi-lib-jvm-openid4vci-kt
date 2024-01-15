@@ -241,11 +241,7 @@ fun interface CredentialOfferRequestResolver {
      * Tries to parse a Credential Offer Endpoint [URL][uri], extract and validate a Credential Offer Request.
      */
     suspend fun resolve(uri: String): Result<CredentialOffer> =
-        CredentialOfferRequest(uri)
-            .fold(
-                { resolve(it) },
-                { Result.failure(it) },
-            )
+        CredentialOfferRequest(uri).fold(onSuccess = { resolve(it) }, onFailure = { Result.failure(it) })
 
     /**
      * Tries to validate and resolve a [Credential Offer Request][request].

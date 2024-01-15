@@ -27,6 +27,7 @@ import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 import eu.europa.ec.eudi.openid4vci.internal.formats.IssuanceRequestJsonMapper
@@ -155,10 +156,10 @@ internal sealed interface RequestedCredentialResponseEncryption : java.io.Serial
                             encryptionMethod = EncryptionMethod.A256GCM
 
                         credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null ->
-                            throw CredentialIssuanceError.InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
+                            throw InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
 
                         credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null ->
-                            throw CredentialIssuanceError.InvalidIssuanceRequest(
+                            throw InvalidIssuanceRequest(
                                 "Credential response encryption algorithm must be specified if Credential " +
                                     "response encryption method is provided",
                             )
@@ -230,9 +231,8 @@ internal class IssuanceRequester(
         accessToken: AccessToken,
         request: CredentialIssuanceRequest.BatchRequest,
     ): Result<CredentialIssuanceResponse> = runCatching {
-        if (issuerMetadata.batchCredentialEndpoint == null) {
-            throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance
-        }
+        ensureNotNull(issuerMetadata.batchCredentialEndpoint) { IssuerDoesNotSupportBatchIssuance }
+
         ktorHttpClientFactory().use { client ->
             val url = issuerMetadata.batchCredentialEndpoint.value.value
             val payload = IssuanceRequestJsonMapper.asJson(request)
@@ -318,9 +318,7 @@ internal class IssuanceRequester(
         accessToken: AccessToken,
         transactionId: TransactionId,
     ): Result<DeferredCredentialQueryOutcome> = runCatching {
-        if (issuerMetadata.deferredCredentialEndpoint == null) {
-            throw CredentialIssuanceError.IssuerDoesNotSupportDeferredIssuance
-        }
+        ensureNotNull(issuerMetadata.deferredCredentialEndpoint) { IssuerDoesNotSupportDeferredIssuance }
         ktorHttpClientFactory().use { client ->
             val url = issuerMetadata.deferredCredentialEndpoint.value.value
             val response = client.post(url) {
@@ -358,54 +356,56 @@ internal class IssuanceRequester(
             }
         }
 
-    private fun SingleIssuanceSuccessResponse.toDomain(): CredentialIssuanceResponse =
-        transactionId?.let {
-            CredentialIssuanceResponse(
-                cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
-                credentials = listOf(IssuedCredential.Deferred(TransactionId(transactionId))),
-            )
-        } ?: credential?.let {
-            CredentialIssuanceResponse(
-                cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
-                credentials = listOf(IssuedCredential.Issued(format, credential)),
-            )
-        } ?: throw CredentialIssuanceError.ResponseUnparsable(
-            "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
+    private fun SingleIssuanceSuccessResponse.toDomain(): CredentialIssuanceResponse {
+        val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
+        val issuedCredential = issuedCredentialOf(transactionId, credential, format)
+        return CredentialIssuanceResponse(
+            cNonce = cNonce,
+            credentials = listOf(issuedCredential),
         )
+    }
 
-    private fun BatchIssuanceSuccessResponse.toDomain(): CredentialIssuanceResponse =
-        CredentialIssuanceResponse(
-            cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) },
-            credentials = credentialResponses.map {
-                it.transactionId?.let { transactionId ->
-                    IssuedCredential.Deferred(TransactionId(transactionId))
-                } ?: it.credential?.let { credential ->
-                    IssuedCredential.Issued(it.format, credential)
-                } ?: throw CredentialIssuanceError.ResponseUnparsable(
-                    "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters",
-                )
-            },
+    private fun issuedCredentialOf(
+        transactionId: String?,
+        credential: String?,
+        format: String,
+    ): IssuedCredential {
+        ensure(!(transactionId == null && credential == null)) {
+            val error =
+                "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters"
+            ResponseUnparsable(error)
+        }
+        return when {
+            transactionId != null -> IssuedCredential.Deferred(TransactionId(transactionId))
+            credential != null -> IssuedCredential.Issued(format, credential)
+            else -> error("Cannot happen")
+        }
+    }
+
+    private fun BatchIssuanceSuccessResponse.toDomain(): CredentialIssuanceResponse {
+        val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
+        return CredentialIssuanceResponse(
+            cNonce = cNonce,
+            credentials = credentialResponses.map { issuedCredentialOf(it.transactionId, it.credential, it.format) },
         )
+    }
 
     private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError = when (error) {
-        "invalid_proof" -> cNonce?.let {
-            CredentialIssuanceError.InvalidProof(
-                cNonce = cNonce,
-                cNonceExpiresIn = cNonceExpiresInSeconds,
-                errorDescription = errorDescription,
-            )
-        }
-            ?: CredentialIssuanceError.ResponseUnparsable("Issuer responded with invalid_proof error but no c_nonce was provided")
+        "invalid_proof" ->
+            cNonce
+                ?.let { InvalidProof(cNonce, cNonceExpiresInSeconds, errorDescription) }
+                ?: ResponseUnparsable("Issuer responded with invalid_proof error but no c_nonce was provided")
 
-        "issuance_pending" -> interval?.let { CredentialIssuanceError.DeferredCredentialIssuancePending(interval) }
-            ?: CredentialIssuanceError.DeferredCredentialIssuancePending()
+        "issuance_pending" ->
+            interval
+                ?.let { DeferredCredentialIssuancePending(interval) }
+                ?: DeferredCredentialIssuancePending()
 
-        "invalid_token" -> CredentialIssuanceError.InvalidToken
-        "invalid_transaction_id " -> CredentialIssuanceError.InvalidTransactionId
-        "unsupported_credential_type " -> CredentialIssuanceError.UnsupportedCredentialType
-        "unsupported_credential_format " -> CredentialIssuanceError.UnsupportedCredentialFormat
-        "invalid_encryption_parameters " -> CredentialIssuanceError.InvalidEncryptionParameters
-
-        else -> CredentialIssuanceError.IssuanceRequestFailed(error, errorDescription)
+        "invalid_token" -> InvalidToken
+        "invalid_transaction_id " -> InvalidTransactionId
+        "unsupported_credential_type " -> UnsupportedCredentialType
+        "unsupported_credential_format " -> UnsupportedCredentialFormat
+        "invalid_encryption_parameters " -> InvalidEncryptionParameters
+        else -> IssuanceRequestFailed(error, errorDescription)
     }
 }

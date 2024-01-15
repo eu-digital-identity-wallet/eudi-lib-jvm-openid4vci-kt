@@ -53,7 +53,7 @@ internal sealed interface PushedAuthorizationRequestResponse {
     /**
      * Request failed
      *
-     * @param error The error reported from authorization server.
+     * @param error The error reported from the authorization server.
      * @param errorDescription A description of the error.
      */
     @Serializable
@@ -290,7 +290,7 @@ internal sealed interface TokenEndpointForm {
 
     class PreAuthCodeFlow : TokenEndpointForm {
         companion object {
-            const val GRANT_TYPE_PARAM = "grant_type"
+            private const val GRANT_TYPE_PARAM = "grant_type"
             const val GRANT_TYPE_PARAM_VALUE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
             const val USER_PIN_PARAM = "user_pin"
             const val PRE_AUTHORIZED_CODE_PARAM = "pre_authorized_code"

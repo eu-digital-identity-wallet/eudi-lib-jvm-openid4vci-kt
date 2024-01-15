@@ -17,42 +17,39 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdocIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVcIssuanceRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.hamcrest.MatcherAssert.assertThat
+import org.junit.jupiter.api.assertDoesNotThrow
 import java.net.URI
 import java.util.*
-import kotlin.test.Test
-import kotlin.test.assertTrue
-import kotlin.test.fail
+import kotlin.test.*
 
-class IssuanceSingleRequestTest {
-
-    private val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
-    private val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-    private val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
-
-    private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc = """
+private const val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
+private const val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
+private const val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
+private val AuthCodeGrantCredentialOfferWithNoGrantsMsoMdoc = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
           "credentials": ["$PID_MsoMdoc_SCOPE"]          
         }
-    """.trimIndent()
-
-    private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt = """
+""".trimIndent()
+private val AuthCodeGrantCredentialOfferWithNogGrantsVcSdJwt = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
           "credentials": ["$PID_SdJwtVC_SCOPE"]          
         }
-    """.trimIndent()
+""".trimIndent()
 
-    val vciWalletConfiguration = OpenId4VCIConfig(
+class IssuanceSingleRequestTest {
+
+    private val vciWalletConfiguration = OpenId4VCIConfig(
         clientId = "MyWallet_ClientId",
         authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
         keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
@@ -104,7 +101,7 @@ class IssuanceSingleRequestTest {
         val (offer, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
+                AuthCodeGrantCredentialOfferWithNoGrantsMsoMdoc,
             )
 
         val claimSet = MsoMdocClaimSet(
@@ -119,12 +116,10 @@ class IssuanceSingleRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialMetadata = offer.credentials[0]
-
-                    val submittedRequest = authorizedRequest.requestSingle(credentialMetadata, claimSet)
-                    assertThat(
-                        "When no proof is provided while issuing result must be NonceMissing",
-                        submittedRequest.getOrThrow() is SubmittedRequest.InvalidProof,
-                    )
+                    val submittedRequest = assertDoesNotThrow {
+                        authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
+                    }
+                    assertIs<SubmittedRequest.InvalidProof>(submittedRequest)
                 }
 
                 is AuthorizedRequest.ProofRequired ->
@@ -160,7 +155,7 @@ class IssuanceSingleRequestTest {
             val (offer, authorizedRequest, issuer) =
                 authorizeRequestForCredentialOffer(
                     mockedKtorHttpClientFactory,
-                    AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
+                    AuthCodeGrantCredentialOfferWithNoGrantsMsoMdoc,
                 )
 
             val claimSet = MsoMdocClaimSet(
@@ -174,19 +169,11 @@ class IssuanceSingleRequestTest {
                 when (authorizedRequest) {
                     is AuthorizedRequest.NoProofRequired -> {
                         val credentialMetadata = offer.credentials[0]
-                        authorizedRequest.requestSingle(credentialMetadata, claimSet)
-                            .fold(
-                                onSuccess = {
-                                    assertThat(
-                                        "Expected CredentialIssuanceException to be thrown but was not",
-                                        it is SubmittedRequest.Failed &&
-                                            it.error is CredentialIssuanceError.ResponseUnparsable,
-                                    )
-                                },
-                                onFailure = {
-                                    fail("No exception expected to be thrown")
-                                },
-                            )
+                        val request = assertDoesNotThrow {
+                            authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
+                        }
+                        assertIs<SubmittedRequest.Failed>(request)
+                        assertIs<CredentialIssuanceError.ResponseUnparsable>(request.error)
                     }
 
                     is AuthorizedRequest.ProofRequired ->
@@ -206,38 +193,23 @@ class IssuanceSingleRequestTest {
         val (_, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
+                AuthCodeGrantCredentialOfferWithNoGrantsMsoMdoc,
             )
 
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val claimSet_mso_mdoc =
-                        MsoMdocClaimSet(listOf("org.iso.18013.5.1" to "degree"))
+                    val claimSetMsoMdoc = MsoMdocClaimSet(listOf("org.iso.18013.5.1" to "degree"))
                     var credentialMetadata = CredentialIdentifier(PID_MsoMdoc_SCOPE)
-                    authorizedRequest.requestSingle(credentialMetadata, claimSet_mso_mdoc)
-                        .fold(
-                            onSuccess = { fail("Exception expected to be thrown") },
-                            onFailure = {
-                                assertThat(
-                                    "Expected CredentialIssuanceException to be thrown but was not",
-                                    it is CredentialIssuanceError.InvalidIssuanceRequest,
-                                )
-                            },
-                        )
+                    assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
+                        authorizedRequest.requestSingle(credentialMetadata, claimSetMsoMdoc).getOrThrow()
+                    }
 
-                    val claimSet_sd_jwt_vc = GenericClaimSet(listOf("degree"))
+                    val claimSetSdJwtVc = GenericClaimSet(listOf("degree"))
                     credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
-                    authorizedRequest.requestSingle(credentialMetadata, claimSet_sd_jwt_vc)
-                        .fold(
-                            onSuccess = { fail("Exception expected to be thrown") },
-                            onFailure = {
-                                assertThat(
-                                    "Expected CredentialIssuanceException to be thrown but was not",
-                                    it is CredentialIssuanceError.InvalidIssuanceRequest,
-                                )
-                            },
-                        )
+                    assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
+                        authorizedRequest.requestSingle(credentialMetadata, claimSetSdJwtVc).getOrThrow()
+                    }
                 }
 
                 is AuthorizedRequest.ProofRequired ->
@@ -295,9 +267,7 @@ class IssuanceSingleRequestTest {
                     val issuanceRequest =
                         Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as MsoMdocIssuanceRequestTO
                     issuanceRequest.proof?.let {
-                        assertTrue("Not a JWT proof sent.") {
-                            issuanceRequest.proof is Proof.Jwt
-                        }
+                        assertIs<Proof.Jwt>(issuanceRequest.proof)
                     }
                 },
             ),
@@ -306,7 +276,7 @@ class IssuanceSingleRequestTest {
         val (offer, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_mso_mdoc,
+                AuthCodeGrantCredentialOfferWithNoGrantsMsoMdoc,
             )
 
         val claimSet = MsoMdocClaimSet(
@@ -327,15 +297,14 @@ class IssuanceSingleRequestTest {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                            val response = proofRequired.requestSingle(
-                                credentialMetadata,
-                                claimSet,
-                                CryptoGenerator.rsaProofSigner(),
-                            )
-                            assertThat(
-                                "Second attempt should be successful",
-                                response.getOrThrow() is SubmittedRequest.Success,
-                            )
+                            val response = assertDoesNotThrow {
+                                proofRequired.requestSingle(
+                                    credentialMetadata,
+                                    claimSet,
+                                    CryptoGenerator.rsaProofSigner(),
+                                ).getOrThrow()
+                            }
+                            assertIs<SubmittedRequest.Success>(response)
                         }
 
                         is SubmittedRequest.Failed -> fail(
@@ -402,7 +371,7 @@ class IssuanceSingleRequestTest {
         val (offer, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
+                AuthCodeGrantCredentialOfferWithNogGrantsVcSdJwt,
             )
 
         val claimSet = GenericClaimSet(
@@ -423,17 +392,17 @@ class IssuanceSingleRequestTest {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                            val response = proofRequired.requestSingle(credentialMetadata, claimSet, CryptoGenerator.rsaProofSigner())
-                            assertThat(
-                                "Second attempt should be successful",
-                                response.getOrThrow() is SubmittedRequest.Success,
-                            )
+                            val response = assertDoesNotThrow {
+                                proofRequired.requestSingle(
+                                    credentialMetadata,
+                                    claimSet,
+                                    CryptoGenerator.rsaProofSigner(),
+                                ).getOrThrow()
+                            }
+                            assertIs<SubmittedRequest.Success>(response)
                         }
 
-                        is SubmittedRequest.Failed -> fail(
-                            "Failed with error ${submittedRequest.error}",
-                        )
-
+                        is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
                         is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
                     }
                 }
