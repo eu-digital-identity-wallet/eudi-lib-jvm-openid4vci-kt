@@ -25,6 +25,12 @@ internal fun <T> T.success(): Result<T> = Result.success(this)
 internal fun <T> Result<T>.mapError(map: (Throwable) -> Throwable): Result<T> =
     fold(onSuccess = { it.success() }, onFailure = { Result.failure(map(it)) })
 
+internal fun <T> Result<T>.ensureSuccess(ex: (Throwable) -> Throwable): T =
+    fold(
+        onSuccess = { it },
+        onFailure = { t -> throw ex(t) },
+    )
+
 @OptIn(ExperimentalContracts::class)
 internal inline fun ensure(value: Boolean, ex: () -> Throwable) {
     contract {

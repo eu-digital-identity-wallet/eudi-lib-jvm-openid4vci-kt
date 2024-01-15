@@ -78,8 +78,11 @@ fun CredentialIssuerMetadata.findMsoMdoc(docType: String): MsoMdocCredential? =
  * An endpoint of a Credential Issuer. It's an [HttpsUrl] that must not have a fragment.
  */
 @JvmInline
-value class CredentialIssuerEndpoint private constructor(val value: HttpsUrl) {
+value class CredentialIssuerEndpoint(val value: HttpsUrl) {
 
+    init {
+        require(value.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
+    }
     override fun toString(): String = value.toString()
 
     companion object {
@@ -88,11 +91,7 @@ value class CredentialIssuerEndpoint private constructor(val value: HttpsUrl) {
          * Parses the provided [value] as an [HttpsUrl] and tries to create a [CredentialIssuerEndpoint].
          */
         operator fun invoke(value: String): Result<CredentialIssuerEndpoint> =
-            HttpsUrl(value)
-                .mapCatching {
-                    require(it.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
-                    CredentialIssuerEndpoint(it)
-                }
+            HttpsUrl(value).mapCatching { CredentialIssuerEndpoint(it) }
     }
 }
 

@@ -161,7 +161,7 @@ internal fun universityDegreeLdpVc() =
             "VerifiableCredential_LDP_VC",
             "UniversityDegreeCredential_LDP_VC",
         ),
-        W3CJsonLdDataIntegrityCredential.CredentialDefinition(
+        W3CJsonLdCredentialDefinition(
             listOf(
                 URL("https://www.w3.org/2018/credentials/v1"),
                 URL("https://www.w3.org/2018/credentials/examples/v1"),
@@ -218,7 +218,7 @@ internal fun universityDegreeJwtVcJsonLD() =
             "https://www.w3.org/2018/credentials/v1",
             "https://www.w3.org/2018/credentials/examples/v1",
         ),
-        W3CJsonLdSignedJwtCredential.CredentialDefinition(
+        W3CJsonLdCredentialDefinition(
             listOf(
                 URL("https://www.w3.org/2018/credentials/v1"),
                 URL("https://www.w3.org/2018/credentials/examples/v1"),

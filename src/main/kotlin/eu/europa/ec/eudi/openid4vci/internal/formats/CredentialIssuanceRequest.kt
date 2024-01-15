@@ -80,10 +80,10 @@ internal sealed interface CredentialIssuanceRequest {
 }
 
 private inline fun <reified C : ClaimSet> ClaimSet?.ensureClaimSet(): C? =
-    this?.let {
-        if (it is C) it
-        else throw InvalidIssuanceRequest("Invalid Claim Set provided for issuance")
-    }
+    if (this != null) {
+        ensure(this is C) { InvalidIssuanceRequest("Invalid Claim Set provided for issuance") }
+        this
+    } else null
 
 private fun msoMdoc(supportedCredential: MsoMdocCredential, claimSet: MsoMdocClaimSet?): CredentialType.MsoMdocDocType {
     fun MsoMdocClaimSet.validate() {

@@ -126,6 +126,12 @@ data class SdJwtVcCredential(
     )
 }
 
+data class W3CJsonLdCredentialDefinition(
+    val context: List<URL>,
+    val type: List<String>,
+    val credentialSubject: Map<ClaimName, Claim?>?,
+)
+
 /**
  * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
  */
@@ -137,16 +143,9 @@ data class W3CJsonLdDataIntegrityCredential(
     override val display: List<Display> = emptyList(),
     val context: List<String> = emptyList(),
     val type: List<String> = emptyList(),
-    val credentialDefinition: CredentialDefinition,
+    val credentialDefinition: W3CJsonLdCredentialDefinition,
     val order: List<ClaimName> = emptyList(),
-) : CredentialSupported {
-
-    data class CredentialDefinition(
-        val context: List<URL>,
-        val type: List<String>,
-        val credentialSubject: Map<ClaimName, Claim?>?,
-    )
-}
+) : CredentialSupported
 
 /**
  * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
@@ -158,15 +157,9 @@ data class W3CJsonLdSignedJwtCredential(
     override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
     override val display: List<Display> = emptyList(),
     val context: List<String> = emptyList(),
-    val credentialDefinition: CredentialDefinition,
+    val credentialDefinition: W3CJsonLdCredentialDefinition,
     val order: List<ClaimName> = emptyList(),
-) : CredentialSupported {
-    data class CredentialDefinition(
-        val context: List<URL>,
-        val type: List<String>,
-        val credentialSubject: Map<ClaimName, Claim?>?,
-    )
-}
+) : CredentialSupported
 
 /**
  * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
