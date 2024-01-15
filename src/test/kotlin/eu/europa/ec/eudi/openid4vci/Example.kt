@@ -314,7 +314,7 @@ private suspend fun buildIssuer(
 ): Pair<CIAuthorizationServerMetadata, Issuer> {
     val issuerMetadata =
         CredentialIssuerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
-            .resolve(credentialIssuerIdentifier).getOrThrow()
+            .resolve(credentialIssuerIdentifier)
 
     val authServerMetadata =
         AuthorizationServerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)

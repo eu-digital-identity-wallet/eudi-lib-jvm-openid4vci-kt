@@ -30,23 +30,22 @@ internal class DefaultCredentialIssuerMetadataResolver(
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) : CredentialIssuerMetadataResolver {
 
-    override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> = coroutineScope {
-        runCatching {
-            val credentialIssuerMetadataContent = ktorHttpClientFactory().use { client ->
-                try {
-                    client.get(issuer.wellKnown()).body<String>()
-                } catch (t: Throwable) {
-                    throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
-                }
+    override suspend fun resolve(issuer: CredentialIssuerId): CredentialIssuerMetadata = coroutineScope {
+        val wellKnownUrl = issuer.wellKnown()
+        val json = ktorHttpClientFactory().use { client ->
+            try {
+                client.get(wellKnownUrl).body<String>()
+            } catch (t: Throwable) {
+                throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
             }
-            val metaData = CredentialIssuerMetadataJsonParser.parseMetaData(credentialIssuerMetadataContent)
-            if (metaData.credentialIssuerIdentifier != issuer) {
-                throw InvalidCredentialIssuerId(
-                    IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
-                )
-            }
-            metaData
         }
+        val metaData = CredentialIssuerMetadataJsonParser.parseMetaData(json)
+        if (metaData.credentialIssuerIdentifier != issuer) {
+            throw InvalidCredentialIssuerId(
+                IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
+            )
+        }
+        metaData
     }
 }
 

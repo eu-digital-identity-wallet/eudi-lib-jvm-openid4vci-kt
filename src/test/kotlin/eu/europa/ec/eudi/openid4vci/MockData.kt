@@ -47,17 +47,17 @@ object SampleAuthServer {
     val Url = HttpsUrl("https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm").getOrThrow()
     val OidcWellKnownUrl = oidcAuthorizationServerMetadataUrl(Url)
     val OAuthWellKnownUrl = oauthAuthorizationServerMetadataUrl(Url)
-
-    /**
-     * Get the URL for fetching the metadata of the OAuth Authorization Server used throughout the tests.
-     */
-    private fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: HttpsUrl) =
-        HttpsUrl(
-            URLBuilder(authorizationServerIssuer.value.toString())
-                .appendPathSegments("/.well-known/oauth-authorization-server", encodeSlash = false)
-                .buildString(),
-        ).getOrThrow()
 }
+
+/**
+ * Get the URL for fetching the metadata of the OAuth Authorization Server used throughout the tests.
+ */
+private fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: HttpsUrl) =
+    HttpsUrl(
+        URLBuilder(authorizationServerIssuer.value.toString())
+            .appendPathSegments("/.well-known/oauth-authorization-server", encodeSlash = false)
+            .buildString(),
+    ).getOrThrow()
 
 /**
  * Get the URL for fetching the metadata of the OpenID Connect Authorization Server used throughout the tests.
@@ -69,9 +69,18 @@ internal fun oidcAuthorizationServerMetadataUrl(authorizationServerIssuer: Https
             .buildString(),
     ).getOrThrow()
 
+internal fun credentialIssuerMetaDataHandler(id: CredentialIssuerId, resource: String): RequestMocker = RequestMocker(
+    match(id.metaDataUrl().value.toURI()),
+    jsonResponse(resource),
+)
 internal fun oidcMetaDataHandler(oidcServerUrl: HttpsUrl, oidcMetaDataResource: String): RequestMocker = RequestMocker(
     match(oidcAuthorizationServerMetadataUrl(oidcServerUrl).value.toURI()),
     jsonResponse(oidcMetaDataResource),
+)
+
+internal fun oauthMetaDataHandler(oauth2ServerUrl: HttpsUrl, oauth2MetaDataResource: String): RequestMocker = RequestMocker(
+    match(oauthAuthorizationServerMetadataUrl(oauth2ServerUrl).value.toURI()),
+    jsonResponse(oauth2MetaDataResource),
 )
 
 /**

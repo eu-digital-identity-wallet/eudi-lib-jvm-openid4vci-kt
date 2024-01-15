@@ -51,12 +51,12 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
     @Test
     internal fun `falls back to oauth server metadata`() = runTest {
         val resolver = mockResolver(
-            RequestMocker(
-                match(SampleAuthServer.OAuthWellKnownUrl.value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oauth_authorization_server_metadata.json"),
+            oauthMetaDataHandler(
+                SampleAuthServer.Url,
+                "eu/europa/ec/eudi/openid4vci/internal/oauth_authorization_server_metadata.json",
             ),
-        )
 
+        )
         val metadata = resolver.resolve(SampleAuthServer.Url).getOrThrow()
         assertIs<AuthorizationServerMetadata>(metadata)
         // equals not implemented by AuthorizationServerMetadata

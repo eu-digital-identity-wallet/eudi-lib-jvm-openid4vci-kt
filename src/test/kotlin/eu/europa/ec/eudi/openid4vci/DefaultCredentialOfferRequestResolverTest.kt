@@ -29,10 +29,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 match(SampleIssuer.WellKnownUrl.value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
-            RequestMocker(
-                match(SampleAuthServer.OidcWellKnownUrl.value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-            ),
+            oidcMetadataHandler,
         )
 
         val credentialOffer =
@@ -69,10 +66,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 match(SampleIssuer.WellKnownUrl.value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
-            RequestMocker(
-                match(SampleAuthServer.OidcWellKnownUrl.value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-            ),
+            oidcMetadataHandler,
         )
         val credentialOffer =
             getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_offer_with_unknown_format.json")
@@ -94,10 +88,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 match(SampleIssuer.WellKnownUrl.value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
-            RequestMocker(
-                match(SampleAuthServer.OidcWellKnownUrl.value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-            ),
+            oidcMetadataHandler,
         )
         val credentialOffer =
             getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_offer_with_blank_issuer_state.json")
@@ -119,10 +110,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 match(SampleIssuer.WellKnownUrl.value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
-            RequestMocker(
-                match(SampleAuthServer.OidcWellKnownUrl.value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-            ),
+
+            oidcMetadataHandler,
         )
         val credentialOffer =
             getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_offer_with_blank_pre_authorized_code.json")
@@ -146,10 +135,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 match(SampleIssuer.WellKnownUrl.value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
             ),
-            RequestMocker(
-                match(SampleAuthServer.OidcWellKnownUrl.value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
-            ),
+            oidcMetadataHandler,
             RequestMocker(
                 match(credentialOfferUri.value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer.json"),
@@ -191,6 +177,12 @@ private fun assertEquals(expected: CredentialOffer, offer: CredentialOffer) {
     assertEquals(expected.credentials, offer.credentials)
     assertEquals(expected.grants, offer.grants)
 }
+
+private var oidcMetadataHandler =
+    oidcMetaDataHandler(
+        SampleAuthServer.Url,
+        "eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json",
+    )
 
 private fun resolver(vararg request: RequestMocker): CredentialOfferRequestResolver =
     CredentialOfferRequestResolver(

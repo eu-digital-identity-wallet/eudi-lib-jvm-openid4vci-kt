@@ -543,7 +543,7 @@ class IssuanceAuthorizationTest {
         val issuerMetadata =
             CredentialIssuerMetadataResolver(
                 ktorHttpClientFactory = ktorHttpClientFactory,
-            ).resolve(credentialIssuerIdentifier).getOrThrow()
+            ).resolve(credentialIssuerIdentifier)
 
         val authServerMetadata =
             AuthorizationServerMetadataResolver(

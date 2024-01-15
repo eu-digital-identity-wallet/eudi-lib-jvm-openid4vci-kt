@@ -204,8 +204,7 @@ fun interface CredentialIssuerMetadataResolver {
     /**
      * Tries to fetch and validate the metadata of a Credential Issuer.
      */
-    suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata>
-
+    suspend fun resolve(issuer: CredentialIssuerId): CredentialIssuerMetadata
     companion object {
 
         /**

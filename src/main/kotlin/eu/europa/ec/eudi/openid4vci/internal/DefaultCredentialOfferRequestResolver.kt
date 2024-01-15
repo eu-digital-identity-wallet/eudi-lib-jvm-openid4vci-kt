@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.UnableToResolveCredentialIssuerMetadata
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.Required
@@ -94,8 +95,11 @@ internal class DefaultCredentialOfferRequestResolver(
             val credentialIssuerId = CredentialIssuerId(credentialOfferRequestObject.credentialIssuerIdentifier)
                 .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).raise() }
 
-            val credentialIssuerMetadata = credentialIssuerMetadataResolver.resolve(credentialIssuerId)
-                .getOrElse { CredentialOfferRequestError.UnableToResolveCredentialIssuerMetadata(it).raise() }
+            val credentialIssuerMetadata = try {
+                credentialIssuerMetadataResolver.resolve(credentialIssuerId)
+            } catch (t: Throwable) {
+                throw UnableToResolveCredentialIssuerMetadata(t).toException()
+            }
 
             val credentials = runCatching {
                 credentialOfferRequestObject.credentials
