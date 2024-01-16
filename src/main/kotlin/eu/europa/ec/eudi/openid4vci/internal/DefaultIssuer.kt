@@ -27,7 +27,7 @@ import java.util.*
  *     A default implementation is provided to callers.
  */
 internal class DefaultIssuer(
-    authorizationServerMetadata: CIAuthorizationServerMetadata,
+    val authorizationServerMetadata: CIAuthorizationServerMetadata,
     private val issuerMetadata: CredentialIssuerMetadata,
     config: OpenId4VCIConfig,
     ktorHttpClientFactory: KtorHttpClientFactory,

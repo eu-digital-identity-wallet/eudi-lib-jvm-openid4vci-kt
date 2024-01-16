@@ -53,7 +53,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             expectSuccessOnly = true,
         )
         assertFailsWith<UnableToFetchCredentialIssuerMetadata> {
-            resolver.resolve(SampleIssuer.Id)
+            resolver.resolve(SampleIssuer.Id).getOrThrow()
         }
     }
 
@@ -66,7 +66,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             ),
         )
         assertFailsWith<NonParseableCredentialIssuerMetadata> {
-            resolver.resolve(SampleIssuer.Id)
+            resolver.resolve(SampleIssuer.Id).getOrThrow()
         }
     }
 
@@ -81,7 +81,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         )
 
         assertFailsWith<InvalidCredentialIssuerId> {
-            resolver.resolve(credentialIssuerId)
+            resolver.resolve(credentialIssuerId).getOrThrow()
         }
     }
 
@@ -96,7 +96,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         )
         assertFailsWith<CredentialResponseAsymmetricEncryptionAlgorithmsRequired> {
-            resolver.resolve(credentialIssuerId)
+            resolver.resolve(credentialIssuerId).getOrThrow()
         }
     }
 
@@ -110,7 +110,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                 "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json",
             ),
         )
-        val metaData = assertDoesNotThrow { resolver.resolve(credentialIssuerId) }
+        val metaData = assertDoesNotThrow { resolver.resolve(credentialIssuerId).getOrThrow() }
         assertEquals(credentialIssuerMetadata(), metaData)
         println("End")
     }

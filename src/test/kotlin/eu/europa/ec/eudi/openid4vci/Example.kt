@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.apache.*
@@ -104,13 +105,17 @@ private class Wallet(
 ) {
 
     suspend fun issueByCredentialIdentifier(identifier: String): String {
-        val (authServerMetadata, issuer) = buildIssuer(credentialIssuerIdentifier, config)
+        val issuer = Issuer.make(
+
+            config = config,
+            ktorHttpClientFactory = ::httpClientFactory,
+            credentialIssuerId = credentialIssuerIdentifier,
+        )
         val credentialIdentifier = CredentialIdentifier(identifier)
 
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
             listOf(credentialIdentifier),
-            authServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
         // Authorize with auth code flow
@@ -145,7 +150,6 @@ private class Wallet(
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
             issuer,
             offer.credentials,
-            offer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI.toString(),
         )
 
         return when (authorizedRequest) {
@@ -168,10 +172,11 @@ private class Wallet(
     private suspend fun authorizeRequestWithAuthCodeUseCase(
         issuer: Issuer,
         credentialMetadata: List<CredentialIdentifier>,
-        parEndpoint: String,
     ): AuthorizedRequest =
         with(issuer) {
-            authorizationLog("Placing PAR to AS server's endpoint $parEndpoint")
+            check(issuer is DefaultIssuer)
+            val parEndPoint = issuer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
+            authorizationLog("Placing PAR to AS server's endpoint $parEndPoint")
 
             val parPlaced = pushAuthorizationCodeRequest(credentialMetadata, null).getOrThrow()
 
@@ -306,27 +311,6 @@ private fun authorizationLog(message: String) {
 
 private fun issuanceLog(message: String) {
     println("--> [ISSUANCE] $message")
-}
-
-private suspend fun buildIssuer(
-    credentialIssuerIdentifier: CredentialIssuerId,
-    config: OpenId4VCIConfig,
-): Pair<CIAuthorizationServerMetadata, Issuer> {
-    val issuerMetadata =
-        CredentialIssuerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
-            .resolve(credentialIssuerIdentifier)
-
-    val authServerMetadata =
-        AuthorizationServerMetadataResolver(ktorHttpClientFactory = ::httpClientFactory)
-            .resolve(issuerMetadata.authorizationServers[0]).getOrThrow()
-
-    val issuer = Issuer.make(
-        authorizationServerMetadata = authServerMetadata,
-        config = config,
-        ktorHttpClientFactory = ::httpClientFactory,
-        issuerMetadata = issuerMetadata,
-    )
-    return Pair(authServerMetadata, issuer)
 }
 
 private fun httpClientFactory(): HttpClient =

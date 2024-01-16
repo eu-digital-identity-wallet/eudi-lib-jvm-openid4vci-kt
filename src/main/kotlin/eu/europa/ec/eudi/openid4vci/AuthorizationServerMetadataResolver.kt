@@ -28,9 +28,9 @@ class AuthorizationServerMetadataResolutionException(reason: Throwable) : Except
 fun interface AuthorizationServerMetadataResolver {
 
     /**
-     * Resolves the metadata of an [issuer].
+     * Resolves the metadata of an [authServerUrl].
      */
-    suspend fun resolve(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata>
+    suspend fun resolve(authServerUrl: HttpsUrl): Result<CIAuthorizationServerMetadata>
 
     companion object {
 

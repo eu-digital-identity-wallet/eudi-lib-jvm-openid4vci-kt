@@ -19,10 +19,7 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
-import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
-import kotlinx.serialization.SerialName
 import java.io.Serializable
-import java.util.*
 
 sealed interface CredentialResponseEncryption : Serializable {
     data object NotRequired : CredentialResponseEncryption {
@@ -71,6 +68,7 @@ data class CredentialIssuerMetadata(
         val locale: String? = null,
     ) : Serializable
 }
+
 fun CredentialIssuerMetadata.findMsoMdoc(docType: String): MsoMdocCredential? =
     findByFormat<MsoMdocCredential> { it.docType == docType }.values.firstOrNull()
 
@@ -83,6 +81,7 @@ value class CredentialIssuerEndpoint(val value: HttpsUrl) {
     init {
         require(value.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
     }
+
     override fun toString(): String = value.toString()
 
     companion object {
@@ -93,27 +92,6 @@ value class CredentialIssuerEndpoint(val value: HttpsUrl) {
         operator fun invoke(value: String): Result<CredentialIssuerEndpoint> =
             HttpsUrl(value).mapCatching { CredentialIssuerEndpoint(it) }
     }
-}
-
-/**
- * The details of a Claim.
- */
-@kotlinx.serialization.Serializable
-data class Claim(
-    @SerialName("mandatory") val mandatory: Boolean? = false,
-    @SerialName("value_type") val valueType: String? = null,
-    @SerialName("display") val display: List<Display> = emptyList(),
-) : Serializable {
-
-    /**
-     * Display properties of a Claim.
-     */
-    @kotlinx.serialization.Serializable
-    data class Display(
-        @SerialName("name") val name: String? = null,
-        @kotlinx.serialization.Serializable(LocaleSerializer::class)
-        @SerialName("locale") val locale: Locale? = null,
-    ) : Serializable
 }
 
 /**
@@ -203,7 +181,8 @@ fun interface CredentialIssuerMetadataResolver {
     /**
      * Tries to fetch and validate the metadata of a Credential Issuer.
      */
-    suspend fun resolve(issuer: CredentialIssuerId): CredentialIssuerMetadata
+    suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata>
+
     companion object {
 
         /**

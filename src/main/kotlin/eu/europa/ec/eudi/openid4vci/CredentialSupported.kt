@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
+import kotlinx.serialization.SerialName
 import java.io.Serializable
 import java.net.URL
 import java.util.*
@@ -94,6 +96,26 @@ sealed interface CredentialSupported : Serializable {
     val display: List<Display>
 }
 
+/**
+ * The details of a Claim.
+ */
+@kotlinx.serialization.Serializable
+data class Claim(
+    @SerialName("mandatory") val mandatory: Boolean? = false,
+    @SerialName("value_type") val valueType: String? = null,
+    @SerialName("display") val display: List<Display> = emptyList(),
+) : Serializable {
+
+    /**
+     * Display properties of a Claim.
+     */
+    @kotlinx.serialization.Serializable
+    data class Display(
+        @SerialName("name") val name: String? = null,
+        @kotlinx.serialization.Serializable(LocaleSerializer::class)
+        @SerialName("locale") val locale: Locale? = null,
+    ) : Serializable
+}
 typealias Namespace = String
 typealias ClaimName = String
 typealias MsoMdocClaims = Map<Namespace, Map<ClaimName, Claim>>
