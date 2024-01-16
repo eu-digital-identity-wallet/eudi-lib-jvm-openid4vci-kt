@@ -77,14 +77,18 @@ internal class DefaultCredentialOfferRequestResolver(
 }
 
 private suspend fun HttpClient.resolve(request: CredentialOfferRequest): Result<CredentialOffer> = runCatching {
-    val credentialOfferRequestObject = fetch(request)
-
-    val credentialIssuerId = CredentialIssuerId(credentialOfferRequestObject.credentialIssuerIdentifier)
+    val credentialOffer = fetch(request)
+    val offeredCredentials = credentialOffer.credentials
+    ensure(offeredCredentials.isNotEmpty()) {
+        val e = IllegalArgumentException("credentials are required")
+        CredentialOfferRequestValidationError.InvalidCredentials(e).toException()
+    }
+    val credentialIssuerId = CredentialIssuerId(credentialOffer.credentialIssuerIdentifier)
         .ensureSuccess { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).toException() }
 
     val credentialIssuerMetadata = resolveIssuerMetaData(credentialIssuerId)
 
-    val credentials = credentialOfferRequestObject.credentials.map {
+    val credentials: List<CredentialIdentifier> = offeredCredentials.map {
         val credentialIdentifier = CredentialIdentifier(it)
         ensureNotNull(credentialIssuerMetadata.credentialsSupported[credentialIdentifier]) {
             val e = IllegalArgumentException("Offer contains unknown $credentialIdentifier")
@@ -92,13 +96,9 @@ private suspend fun HttpClient.resolve(request: CredentialOfferRequest): Result<
         }
         credentialIdentifier
     }
-    ensure(credentials.isNotEmpty()) {
-        val e = IllegalArgumentException("credentials are required")
-        CredentialOfferRequestValidationError.InvalidCredentials(e).toException()
-    }
 
     val grants = try {
-        credentialOfferRequestObject.grants?.toGrants(credentialIssuerMetadata)
+        credentialOffer.grants?.toGrants(credentialIssuerMetadata)
     } catch (t: Throwable) {
         throw CredentialOfferRequestValidationError.InvalidGrants(t).toException()
     }

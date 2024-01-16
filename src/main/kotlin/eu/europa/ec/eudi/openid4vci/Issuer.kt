@@ -16,10 +16,8 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
-import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer
-import eu.europa.ec.eudi.openid4vci.internal.IssuanceAuthorizer
-import eu.europa.ec.eudi.openid4vci.internal.IssuanceRequester
-import eu.europa.ec.eudi.openid4vci.internal.KeyGenerator
+import eu.europa.ec.eudi.openid4vci.internal.*
+import io.ktor.client.*
 
 typealias ResponseEncryptionSpecFactory = (CredentialResponseEncryption.Required, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec
 
@@ -30,6 +28,43 @@ typealias ResponseEncryptionSpecFactory = (CredentialResponseEncryption.Required
 interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredential {
 
     companion object {
+        suspend fun metaDataOf(
+            httpClient: HttpClient,
+            credentialIssuerId: CredentialIssuerId,
+        ): Pair<CredentialIssuerMetadata, CIAuthorizationServerMetadata> =
+            with(httpClient) {
+                val issuerMetaData = with(CredentialIssuerMetadataResolver) { resolve(credentialIssuerId) }
+                val authorizationServerMetadata = with(AuthorizationServerMetadataResolver) {
+                    resolve(issuerMetaData.authorizationServers[0])
+                }
+                issuerMetaData to authorizationServerMetadata.getOrThrow()
+            }
+
+        /**
+         * Factory method to create an [Issuer] using the passed http client factory
+         *
+         * @param authorizationServerMetadata   The authorization server metadata required from the underlying [IssuanceAuthorizer] component.
+         * @param issuerMetadata    The credential issuer metadata required from the underlying [IssuanceRequester] component.
+         * @param config    Configuration object
+         * @return An instance of Issuer based on ktor
+         */
+        suspend fun make(
+            credentialIssuerId: CredentialIssuerId,
+            config: OpenId4VCIConfig,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+        ): Issuer {
+            val (issuerMetadata, authorizationServerMetadata) = ktorHttpClientFactory().use { httpClient ->
+                metaDataOf(httpClient, credentialIssuerId)
+            }
+            return make(
+                authorizationServerMetadata,
+                issuerMetadata,
+                config,
+                ktorHttpClientFactory,
+                responseEncryptionSpecFactory,
+            )
+        }
 
         /**
          * Factory method to create an [Issuer] using the passed http client factory
