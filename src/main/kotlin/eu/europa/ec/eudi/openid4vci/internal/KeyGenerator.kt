@@ -15,16 +15,20 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.KeyUse
-import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import eu.europa.ec.eudi.openid4vci.KeyGenerationConfig
 import java.util.*
 
 object KeyGenerator {
 
+    fun generateEncryptionKey(config: KeyGenerationConfig, alg: JWEAlgorithm): JWK? = when (alg) {
+        in JWEAlgorithm.Family.ECDH_ES -> randomECEncryptionKey(config.ecKeyCurve)
+        in JWEAlgorithm.Family.RSA -> randomRSAEncryptionKey(config.rcaKeySize)
+        else -> null
+    }
     fun randomRSAEncryptionKey(size: Int): RSAKey = RSAKeyGenerator(size)
         .keyUse(KeyUse.ENCRYPTION)
         .keyID(UUID.randomUUID().toString())

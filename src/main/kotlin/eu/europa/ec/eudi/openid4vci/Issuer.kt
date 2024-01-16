@@ -53,26 +53,15 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             responseEncryptionSpecFactory,
         )
 
-        val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory = { requiredEncryption, keyGenerationConfig ->
-            requiredEncryption.algorithmsSupported.mapNotNull { alg ->
-                val encryptionKey = when {
-                    JWEAlgorithm.Family.ECDH_ES.contains(alg) ->
-                        KeyGenerator.randomECEncryptionKey(keyGenerationConfig.ecKeyCurve)
-
-                    JWEAlgorithm.Family.RSA.contains(alg) ->
-                        KeyGenerator.randomRSAEncryptionKey(keyGenerationConfig.rcaKeySize)
-
-                    else -> null
+        val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory = { requiredEncryption, cfg ->
+            fun genSpec(alg: JWEAlgorithm) =
+                KeyGenerator.generateEncryptionKey(cfg, alg)?.let { jwk ->
+                    val encryptionMethod = requiredEncryption.encryptionMethodsSupported[0]
+                    IssuanceResponseEncryptionSpec(jwk, alg, encryptionMethod)
                 }
-
-                encryptionKey?.let {
-                    IssuanceResponseEncryptionSpec(
-                        jwk = it,
-                        algorithm = alg,
-                        encryptionMethod = requiredEncryption.encryptionMethodsSupported[0],
-                    )
-                }
-            }.firstOrNull() ?: error("Could not create encryption spec")
+            requiredEncryption.algorithmsSupported
+                .firstNotNullOfOrNull { alg -> genSpec(alg) }
+                ?: error("Could not create encryption spec for ${requiredEncryption.algorithmsSupported}")
         }
     }
 }

@@ -124,34 +124,28 @@ value class TransactionId(val value: String) {
 }
 
 /**
- * A sealed hierarchy that defines the different key formats to be used in order to construct a Proof of Possession.
+ * A sealed hierarchy that defines the different key formats to be used to construct a Proof of Possession.
  */
 sealed interface BindingKey {
 
     /**
      * A JWK biding key
      */
-    data class Jwk(
-        val jwk: JWK,
-    ) : BindingKey {
+    data class Jwk(val jwk: JWK) : BindingKey {
         init {
             require(!jwk.isPrivate) { "Binding key of type Jwk must contain a public key" }
         }
     }
 
     /**
-     * A Did biding key
+     * A DID biding key
      */
-    data class Did(
-        val identity: String,
-    ) : BindingKey
+    data class Did(val identity: String) : BindingKey
 
     /**
      * An X509 biding key
      */
-    data class X509(
-        val chain: List<X509Certificate>,
-    ) : BindingKey {
+    data class X509(val chain: List<X509Certificate>) : BindingKey {
         init {
             require(chain.isNotEmpty()) { "Certificate chain cannot be empty" }
         }
