@@ -19,6 +19,7 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.NonParseableCr
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
+import eu.europa.ec.eudi.openid4vci.internal.resolveCredentialIssuerMetaData
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
@@ -31,7 +32,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
     @Test
     internal fun `fails when metadata cannot be fetched`() = runTest {
-        val resolver = resolver(
+        val resolve = resolver(
             RequestMocker(
                 requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
                 responseBuilder = {
@@ -53,42 +54,40 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             expectSuccessOnly = true,
         )
         assertFailsWith<UnableToFetchCredentialIssuerMetadata> {
-            resolver.resolve(SampleIssuer.Id).getOrThrow()
+            resolve(SampleIssuer.Id)
         }
     }
 
     @Test
     internal fun `fails when metadata cannot be parsed`() = runTest {
-        val resolver = resolver(
+        val resolve = resolver(
             credentialIssuerMetaDataHandler(
                 SampleIssuer.Id,
                 "eu/europa/ec/eudi/openid4vci/internal/invalid_credential_issuer_metadata.json",
             ),
         )
         assertFailsWith<NonParseableCredentialIssuerMetadata> {
-            resolver.resolve(SampleIssuer.Id).getOrThrow()
+            resolve(SampleIssuer.Id)
         }
     }
 
     @Test
     internal fun `fails with unexpected credential issuer id`() = runTest {
         val credentialIssuerId = CredentialIssuerId("https://issuer.com").getOrThrow()
-        val resolver = resolver(
+        val resolve = resolver(
             credentialIssuerMetaDataHandler(
                 credentialIssuerId,
                 "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json",
             ),
         )
 
-        assertFailsWith<InvalidCredentialIssuerId> {
-            resolver.resolve(credentialIssuerId).getOrThrow()
-        }
+        assertFailsWith<InvalidCredentialIssuerId> { resolve(credentialIssuerId) }
     }
 
     @Test
     internal fun `fails with when response encryption algorithms are not asymmetric`() = runTest {
         val credentialIssuerId = CredentialIssuerId("https://issuer.com").getOrThrow()
-        val resolver = resolver(
+        val resolve = resolver(
             credentialIssuerMetaDataHandler(
                 credentialIssuerId,
                 "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_no_asymmetric_algs.json",
@@ -96,7 +95,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         )
         assertFailsWith<CredentialResponseAsymmetricEncryptionAlgorithmsRequired> {
-            resolver.resolve(credentialIssuerId).getOrThrow()
+            resolve(credentialIssuerId)
         }
     }
 
@@ -104,19 +103,21 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
     internal fun `resolution success`() = runTest {
         val credentialIssuerId = SampleIssuer.Id
 
-        val resolver = resolver(
+        val resolve = resolver(
             credentialIssuerMetaDataHandler(
                 credentialIssuerId,
                 "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json",
             ),
         )
-        val metaData = assertDoesNotThrow { resolver.resolve(credentialIssuerId).getOrThrow() }
+        val metaData = assertDoesNotThrow { resolve(credentialIssuerId) }
         assertEquals(credentialIssuerMetadata(), metaData)
         println("End")
     }
 }
 
-private fun resolver(request: RequestMocker, expectSuccessOnly: Boolean = false): CredentialIssuerMetadataResolver =
-    CredentialIssuerMetadataResolver(
-        ktorHttpClientFactory = mockedKtorHttpClientFactory(request, expectSuccessOnly = expectSuccessOnly),
-    )
+private fun resolver(request: RequestMocker, expectSuccessOnly: Boolean = false):
+    suspend (CredentialIssuerId) -> CredentialIssuerMetadata = { issuerId ->
+    mockedKtorHttpClientFactory(request, expectSuccessOnly = expectSuccessOnly).invoke().use { httpClient ->
+        httpClient.resolveCredentialIssuerMetaData(issuerId)
+    }
+}

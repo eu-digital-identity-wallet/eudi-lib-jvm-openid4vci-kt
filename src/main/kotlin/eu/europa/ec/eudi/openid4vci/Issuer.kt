@@ -34,9 +34,9 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             credentialIssuerId: CredentialIssuerId,
         ): Pair<CredentialIssuerMetadata, CIAuthorizationServerMetadata> =
             with(httpClient) {
-                val issuerMetadata = resolveCredentialIssuerMetaData(credentialIssuerId).getOrThrow()
+                val issuerMetadata = resolveCredentialIssuerMetaData(credentialIssuerId)
                 val authServerUrl = issuerMetadata.authorizationServers[0]
-                val authorizationServerMetadata = resolveAuthServerMetaData(authServerUrl).getOrThrow()
+                val authorizationServerMetadata = resolveAuthServerMetaData(authServerUrl)
                 issuerMetadata to authorizationServerMetadata
             }
 

@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialOfferRequestResolver
+import eu.europa.ec.eudi.openid4vci.internal.resolveCredentialOffer
 import io.ktor.http.*
 import java.io.Serializable
 import kotlin.time.Duration
@@ -240,8 +240,10 @@ fun interface CredentialOfferRequestResolver {
     /**
      * Tries to parse a Credential Offer Endpoint [URL][uri], extract and validate a Credential Offer Request.
      */
-    suspend fun resolve(uri: String): Result<CredentialOffer> =
-        CredentialOfferRequest(uri).fold(onSuccess = { resolve(it) }, onFailure = { Result.failure(it) })
+    suspend fun resolve(uri: String): Result<CredentialOffer> = runCatching {
+        val request = CredentialOfferRequest(uri).getOrThrow()
+        resolve(request).getOrThrow()
+    }
 
     /**
      * Tries to validate and resolve a [Credential Offer Request][request].
@@ -255,9 +257,10 @@ fun interface CredentialOfferRequestResolver {
          */
         operator fun invoke(
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
-        ): CredentialOfferRequestResolver =
-            DefaultCredentialOfferRequestResolver(
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            )
+        ): CredentialOfferRequestResolver = CredentialOfferRequestResolver { request ->
+            ktorHttpClientFactory().use { httpClient ->
+                runCatching { httpClient.resolveCredentialOffer(request) }
+            }
+        }
     }
 }

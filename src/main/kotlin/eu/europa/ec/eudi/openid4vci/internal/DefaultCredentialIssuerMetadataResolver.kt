@@ -23,22 +23,9 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 
-/**
- * Default implementation of [CredentialIssuerMetadataResolver].
- */
-internal class DefaultCredentialIssuerMetadataResolver(
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
-) : CredentialIssuerMetadataResolver {
-
-    override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> =
-        ktorHttpClientFactory().use { client ->
-            client.resolveCredentialIssuerMetaData(issuer)
-        }
-}
-
-suspend fun HttpClient.resolveCredentialIssuerMetaData(
+internal suspend fun HttpClient.resolveCredentialIssuerMetaData(
     issuer: CredentialIssuerId,
-): Result<CredentialIssuerMetadata> = runCatching {
+): CredentialIssuerMetadata {
     val wellKnownUrl = issuer.wellKnown()
     val json = try {
         get(wellKnownUrl).body<String>()
@@ -46,7 +33,7 @@ suspend fun HttpClient.resolveCredentialIssuerMetaData(
         throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
     }
 
-    CredentialIssuerMetadataJsonParser.parseMetaData(json).also { metaData ->
+    return CredentialIssuerMetadataJsonParser.parseMetaData(json).also { metaData ->
         ensure(metaData.credentialIssuerIdentifier == issuer) {
             InvalidCredentialIssuerId(
                 IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),

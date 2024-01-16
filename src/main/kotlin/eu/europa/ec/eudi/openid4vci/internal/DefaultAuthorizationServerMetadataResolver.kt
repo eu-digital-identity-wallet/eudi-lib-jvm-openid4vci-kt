@@ -26,21 +26,12 @@ import io.ktor.http.*
 import net.minidev.json.JSONObject
 import java.net.URL
 
-/**
- * Default implementation for [AuthorizationServerMetadataResolver].
- */
-internal class DefaultAuthorizationServerMetadataResolver(
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
-) : AuthorizationServerMetadataResolver {
-    override suspend fun resolve(authServerUrl: HttpsUrl): Result<CIAuthorizationServerMetadata> =
-        ktorHttpClientFactory().use { client -> client.resolveAuthServerMetaData(authServerUrl) }
-}
-
-suspend fun HttpClient.resolveAuthServerMetaData(authServerUrl: HttpsUrl): Result<CIAuthorizationServerMetadata> =
+internal suspend fun HttpClient.resolveAuthServerMetaData(authServerUrl: HttpsUrl): CIAuthorizationServerMetadata =
     fetchOidcServerMetadata(authServerUrl)
         .recoverCatching { fetchOauthServerMetadata(authServerUrl).getOrThrow() }
         .mapCatching { it.apply { expectIssuer(authServerUrl) } }
         .mapError(::AuthorizationServerMetadataResolutionException)
+        .getOrThrow()
 
 /**
  * Tries to fetch the [CIAuthorizationServerMetadata] for the provided [OpenID Connect Authorization Server][issuer].
