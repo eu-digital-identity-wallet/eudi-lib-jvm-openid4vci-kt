@@ -88,7 +88,6 @@ data class Display(
  * Credentials supported by an Issuer.
  */
 sealed interface CredentialSupported : Serializable {
-
     val scope: String?
     val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod>
     val cryptographicSuitesSupported: List<String>

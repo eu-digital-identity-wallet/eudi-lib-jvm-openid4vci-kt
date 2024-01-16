@@ -19,7 +19,8 @@ import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.internal.*
 import io.ktor.client.*
 
-typealias ResponseEncryptionSpecFactory = (CredentialResponseEncryption.Required, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec
+typealias ResponseEncryptionSpecFactory =
+    (CredentialResponseEncryption.Required, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec
 
 /**
  * Aggregation interface providing all functionality required for performing a credential issuance request (batch or single)
