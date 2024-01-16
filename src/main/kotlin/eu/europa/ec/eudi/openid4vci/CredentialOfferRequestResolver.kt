@@ -25,45 +25,6 @@ import java.io.Serializable
 import kotlin.time.Duration
 
 /**
- * A Credential Offer.
- */
-data class CredentialOffer(
-    val credentialIssuerIdentifier: CredentialIssuerId,
-    val credentialIssuerMetadata: CredentialIssuerMetadata,
-    val authorizationServerMetadata: CIAuthorizationServerMetadata,
-    val credentials: List<CredentialIdentifier>,
-    val grants: Grants? = null,
-) : Serializable {
-    init {
-        require(credentials.isNotEmpty()) { "credentials must not be empty" }
-    }
-}
-
-/**
- * The Id of a Credential Issuer. An [HttpsUrl] that has no fragment or query parameters.
- */
-@JvmInline
-value class CredentialIssuerId private constructor(val value: HttpsUrl) {
-
-    override fun toString(): String =
-        value.value.toString()
-
-    companion object {
-
-        /**
-         * Parses the provided [value] as an [HttpsUrl] and tries to create a [CredentialIssuerId].
-         */
-        operator fun invoke(value: String): Result<CredentialIssuerId> =
-            HttpsUrl(value)
-                .mapCatching {
-                    require(it.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerId must not have a fragment" }
-                    require(it.value.query.isNullOrBlank()) { "CredentialIssuerId must not have query parameters " }
-                    CredentialIssuerId(it)
-                }
-    }
-}
-
-/**
  * The Grant Types a Credential Issuer can process for a Credential Offer.
  */
 sealed interface Grants : Serializable {
@@ -104,6 +65,21 @@ sealed interface Grants : Serializable {
         val authorizationCode: AuthorizationCode,
         val preAuthorizedCode: PreAuthorizedCode,
     ) : Grants
+}
+
+/**
+ * A Credential Offer.
+ */
+data class CredentialOffer(
+    val credentialIssuerIdentifier: CredentialIssuerId,
+    val credentialIssuerMetadata: CredentialIssuerMetadata,
+    val authorizationServerMetadata: CIAuthorizationServerMetadata,
+    val credentials: List<CredentialIdentifier>,
+    val grants: Grants? = null,
+) : Serializable {
+    init {
+        require(credentials.isNotEmpty()) { "credentials must not be empty" }
+    }
 }
 
 /**
@@ -214,7 +190,7 @@ sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestE
     data class InvalidCredentialOfferUri(val reason: Throwable) : CredentialOfferRequestValidationError
 
     /**
-     * The Id of the Credential Issuer is not valid.
+     * The ID of the Credential Issuer is not valid.
      */
     data class InvalidCredentialIssuerId(val reason: Throwable) : CredentialOfferRequestValidationError
 

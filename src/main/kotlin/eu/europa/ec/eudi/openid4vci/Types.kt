@@ -44,6 +44,30 @@ value class HttpsUrl private constructor(val value: URL) {
     }
 }
 
+/**
+ * The ID of a Credential Issuer. An [HttpsUrl] that has no fragment or query parameters.
+ */
+@JvmInline
+value class CredentialIssuerId private constructor(val value: HttpsUrl) {
+
+    override fun toString(): String =
+        value.value.toString()
+
+    companion object {
+
+        /**
+         * Parses the provided [value] as an [HttpsUrl] and tries to create a [CredentialIssuerId].
+         */
+        operator fun invoke(value: String): Result<CredentialIssuerId> =
+            HttpsUrl(value)
+                .mapCatching {
+                    require(it.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerId must not have a fragment" }
+                    require(it.value.query.isNullOrBlank()) { "CredentialIssuerId must not have query parameters " }
+                    CredentialIssuerId(it)
+                }
+    }
+}
+
 @JvmInline
 value class CredentialIdentifier(val value: String) {
     init {

@@ -18,10 +18,29 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
-import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
-import kotlinx.serialization.SerialName
 import java.io.Serializable
-import java.util.*
+
+/**
+ * An endpoint of a Credential Issuer. It's an [HttpsUrl] that must not have a fragment.
+ */
+@JvmInline
+value class CredentialIssuerEndpoint(val value: HttpsUrl) {
+
+    init {
+        require(value.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
+    }
+
+    override fun toString(): String = value.toString()
+
+    companion object {
+
+        /**
+         * Parses the provided [value] as an [HttpsUrl] and tries to create a [CredentialIssuerEndpoint].
+         */
+        operator fun invoke(value: String): Result<CredentialIssuerEndpoint> =
+            HttpsUrl(value).mapCatching { CredentialIssuerEndpoint(it) }
+    }
+}
 
 sealed interface CredentialResponseEncryption : Serializable {
     data object NotRequired : CredentialResponseEncryption {
@@ -58,10 +77,6 @@ data class CredentialIssuerMetadata(
         require(credentialsSupported.isNotEmpty()) { "credentialsSupported must not be empty" }
     }
 
-    inline fun <reified T : CredentialSupported> findByFormat(predicate: (T) -> Boolean): Map<CredentialIdentifier, T> {
-        return credentialsSupported.mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }.toMap()
-    }
-
     /**
      * The display properties of the Credential Issuer.
      */
@@ -74,48 +89,10 @@ data class CredentialIssuerMetadata(
 fun CredentialIssuerMetadata.findMsoMdoc(docType: String): MsoMdocCredential? =
     findByFormat<MsoMdocCredential> { it.docType == docType }.values.firstOrNull()
 
-/**
- * An endpoint of a Credential Issuer. It's an [HttpsUrl] that must not have a fragment.
- */
-@JvmInline
-value class CredentialIssuerEndpoint(val value: HttpsUrl) {
-
-    init {
-        require(value.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
-    }
-
-    override fun toString(): String = value.toString()
-
-    companion object {
-
-        /**
-         * Parses the provided [value] as an [HttpsUrl] and tries to create a [CredentialIssuerEndpoint].
-         */
-        operator fun invoke(value: String): Result<CredentialIssuerEndpoint> =
-            HttpsUrl(value).mapCatching { CredentialIssuerEndpoint(it) }
-    }
-}
-
-/**
- * The details of a Claim.
- */
-@kotlinx.serialization.Serializable
-data class Claim(
-    @SerialName("mandatory") val mandatory: Boolean? = false,
-    @SerialName("value_type") val valueType: String? = null,
-    @SerialName("display") val display: List<Display> = emptyList(),
-) : Serializable {
-
-    /**
-     * Display properties of a Claim.
-     */
-    @kotlinx.serialization.Serializable
-    data class Display(
-        @SerialName("name") val name: String? = null,
-        @kotlinx.serialization.Serializable(LocaleSerializer::class)
-        @SerialName("locale") val locale: Locale? = null,
-    ) : Serializable
-}
+inline fun <reified T : CredentialSupported> CredentialIssuerMetadata.findByFormat(
+    predicate: (T) -> Boolean,
+): Map<CredentialIdentifier, T> =
+    credentialsSupported.mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }.toMap()
 
 /**
  * Errors that can occur while trying to fetch and validate the metadata of a Credential Issuer.
