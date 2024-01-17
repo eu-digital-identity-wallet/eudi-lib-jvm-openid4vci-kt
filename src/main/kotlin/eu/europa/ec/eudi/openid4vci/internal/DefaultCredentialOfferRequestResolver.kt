@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.UnableToResolveAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.UnableToResolveCredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestValidationError.InvalidGrants
 import io.ktor.client.*
@@ -65,66 +66,68 @@ private data class PreAuthorizedCodeTO(
     @SerialName("authorization_server") val authorizationServer: String? = null,
 )
 
-internal suspend fun HttpClient.resolveCredentialOffer(request: CredentialOfferRequest): CredentialOffer {
-    val credentialOffer = fetchOffer(request)
-    val credentialIssuerId = CredentialIssuerId(credentialOffer.credentialIssuerIdentifier)
-        .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).raise() }
+internal class DefaultCredentialOfferRequestResolver(
+    private val httpClient: HttpClient,
+) : CredentialOfferRequestResolver {
+    override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> = runCatching {
+        val credentialOffer = fetchOffer(request)
+        val credentialIssuerId = CredentialIssuerId(credentialOffer.credentialIssuerIdentifier)
+            .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).raise() }
 
-    ensure(credentialOffer.credentials.isNotEmpty()) {
-        val er = IllegalArgumentException("credentials are required")
-        CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
+        ensure(credentialOffer.credentials.isNotEmpty()) {
+            val er = IllegalArgumentException("credentials are required")
+            CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
+        }
+
+        val credentialIssuerMetadata = fetchIssuerMetaData(credentialIssuerId)
+        val credentials = credentialOffer.credentials.map { CredentialIdentifier(it) }
+        ensure(credentialIssuerMetadata.credentialsSupported.keys.containsAll(credentials)) {
+            val er = IllegalArgumentException("Credential offer contains unknown credential ids")
+            CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
+        }
+
+        val grants = credentialOffer.grants?.toGrants(credentialIssuerMetadata)
+        val authorizationServer = grants?.authServer() ?: credentialIssuerMetadata.authorizationServers[0]
+        val authorizationServerMetadata = fetchAuthServerMetaData(authorizationServer)
+
+        CredentialOffer(
+            credentialIssuerId,
+            credentialIssuerMetadata,
+            authorizationServerMetadata,
+            credentials,
+            grants,
+        )
     }
 
-    val credentialIssuerMetadata = fetchIssuerMetaData(credentialIssuerId)
-    val credentials = credentialOffer.credentials.map { CredentialIdentifier(it) }
-    ensure(credentialIssuerMetadata.credentialsSupported.keys.containsAll(credentials)) {
-        val er = IllegalArgumentException("Credential offer contains unknown credential ids")
-        CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
+    private suspend fun fetchOffer(request: CredentialOfferRequest): CredentialOfferRequestTO {
+        val credentialOfferRequestObjectString: String = when (request) {
+            is CredentialOfferRequest.PassByValue -> request.value
+            is CredentialOfferRequest.PassByReference ->
+                try {
+                    httpClient.get(request.value.value).body()
+                } catch (t: Throwable) {
+                    throw CredentialOfferRequestError.UnableToFetchCredentialOffer(t).toException()
+                }
+        }
+        return try {
+            JsonSupport.decodeFromString<CredentialOfferRequestTO>(credentialOfferRequestObjectString)
+        } catch (t: Throwable) {
+            throw CredentialOfferRequestError.NonParseableCredentialOffer(t).toException()
+        }
     }
 
-    val grants = credentialOffer.grants?.toGrants(credentialIssuerMetadata)
-    val authorizationServer = grants?.authServer() ?: credentialIssuerMetadata.authorizationServers[0]
-    val authorizationServerMetadata = fetchAuthServerMetaData(authorizationServer)
+    private suspend fun fetchIssuerMetaData(credentialIssuerId: CredentialIssuerId): CredentialIssuerMetadata =
+        with(DefaultCredentialIssuerMetadataResolver(httpClient)) {
+            resolve(credentialIssuerId)
+                .getOrElse { throw UnableToResolveCredentialIssuerMetadata(it).toException() }
+        }
 
-    return CredentialOffer(
-        credentialIssuerId,
-        credentialIssuerMetadata,
-        authorizationServerMetadata,
-        credentials,
-        grants,
-    )
+    private suspend fun fetchAuthServerMetaData(authorizationServer: HttpsUrl): CIAuthorizationServerMetadata =
+        with(DefaultAuthorizationServerMetadataResolver(httpClient)) {
+            resolve(authorizationServer)
+                .getOrElse { throw UnableToResolveAuthorizationServerMetadata(it).toException() }
+        }
 }
-
-private suspend fun HttpClient.fetchOffer(request: CredentialOfferRequest): CredentialOfferRequestTO {
-    val credentialOfferRequestObjectString: String = when (request) {
-        is CredentialOfferRequest.PassByValue -> request.value
-        is CredentialOfferRequest.PassByReference ->
-            try {
-                get(request.value.value).body()
-            } catch (t: Throwable) {
-                throw CredentialOfferRequestError.UnableToFetchCredentialOffer(t).toException()
-            }
-    }
-    return try {
-        JsonSupport.decodeFromString<CredentialOfferRequestTO>(credentialOfferRequestObjectString)
-    } catch (t: Throwable) {
-        throw CredentialOfferRequestError.NonParseableCredentialOffer(t).toException()
-    }
-}
-
-private suspend fun HttpClient.fetchIssuerMetaData(credentialIssuerId: CredentialIssuerId): CredentialIssuerMetadata =
-    try {
-        resolveCredentialIssuerMetaData(credentialIssuerId)
-    } catch (t: CredentialIssuerMetadataError) {
-        throw UnableToResolveCredentialIssuerMetadata(t).toException()
-    }
-
-private suspend fun HttpClient.fetchAuthServerMetaData(authorizationServer: HttpsUrl): CIAuthorizationServerMetadata =
-    try {
-        resolveAuthServerMetaData(authorizationServer)
-    } catch (t: Throwable) {
-        CredentialOfferRequestError.UnableToResolveAuthorizationServerMetadata(t).raise()
-    }
 
 private fun Grants.authServer(): HttpsUrl? = when (this) {
     is Grants.AuthorizationCode -> authorizationServer
