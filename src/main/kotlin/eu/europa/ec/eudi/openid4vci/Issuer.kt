@@ -51,8 +51,8 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 metaData(httpClient, credentialIssuerId)
             }
             return DefaultIssuer(
-                authServerMetaData,
                 issuerMetadata,
+                authServerMetaData,
                 config,
                 ktorHttpClientFactory,
                 responseEncryptionSpecFactory,
@@ -74,8 +74,8 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Issuer = DefaultIssuer(
-            authorizationServerMetadata,
             issuerMetadata,
+            authorizationServerMetadata,
             config,
             ktorHttpClientFactory,
             responseEncryptionSpecFactory,

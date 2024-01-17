@@ -128,19 +128,16 @@ internal class IssuanceAuthorizer(
         val parEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
         val clientID = ClientID(config.clientId)
         val codeVerifier = CodeVerifier()
-
-        val authzRequest: AuthorizationRequest = with(
-            AuthorizationRequest.Builder(ResponseType("code"), clientID),
-        ) {
-            redirectionURI(config.authFlowRedirectionURI)
-            codeChallenge(codeVerifier, CodeChallengeMethod.S256)
-            scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray() + "openid"))
-            state(State(state))
-            issuerState?.let { customParameter("issuer_state", issuerState) }
-            build()
+        val pushedAuthorizationRequest = run {
+            val request = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
+                redirectionURI(config.authFlowRedirectionURI)
+                codeChallenge(codeVerifier, CodeChallengeMethod.S256)
+                scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray() + "openid"))
+                state(State(state))
+                issuerState?.let { customParameter("issuer_state", issuerState) }
+            }.build()
+            PushedAuthorizationRequest(parEndpoint, request)
         }
-
-        val pushedAuthorizationRequest = PushedAuthorizationRequest(parEndpoint, authzRequest)
         val response = pushAuthorizationRequest(parEndpoint, pushedAuthorizationRequest)
 
         response.authorizationCodeUrlOrFail(clientID, codeVerifier, state)
@@ -152,22 +149,19 @@ internal class IssuanceAuthorizer(
         state: String,
     ) = when (this) {
         is PushedAuthorizationRequestResponse.Success -> {
-            val httpsUrl =
-                with(
-                    URLBuilder(Url(authorizationServerMetadata.authorizationEndpointURI.toString())),
-                ) {
+            val authorizationCodeUrl = run {
+                val httpsUrl = URLBuilder(Url(authorizationServerMetadata.authorizationEndpointURI.toString())).apply {
                     parameters.append(AuthorizationUrl.PARAM_CLIENT_ID, clientID.value)
                     parameters.append(AuthorizationUrl.PARAM_STATE, state)
                     parameters.append(
                         AuthorizationUrl.PARAM_REQUEST_URI,
                         requestURI,
                     )
-                    build()
-                }
-
-            val getAuthorizationCodeURL = AuthorizationUrl(httpsUrl.toString())
+                }.build()
+                AuthorizationUrl(httpsUrl.toString())
+            }
             val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())
-            pkceVerifier to getAuthorizationCodeURL
+            pkceVerifier to authorizationCodeUrl
         }
 
         is PushedAuthorizationRequestResponse.Failure ->
@@ -263,51 +257,50 @@ internal class IssuanceAuthorizer(
 
 internal sealed interface TokenEndpointForm {
 
-    class AuthCodeFlow : TokenEndpointForm {
-        companion object {
-            const val GRANT_TYPE_PARAM = "grant_type"
-            const val GRANT_TYPE_PARAM_VALUE = "authorization_code"
-            const val REDIRECT_URI_PARAM = "redirect_uri"
-            const val CLIENT_ID_PARAM = "client_id"
-            const val CODE_VERIFIER_PARAM = "code_verifier"
-            const val AUTHORIZATION_CODE_PARAM = "code"
+    data object AuthCodeFlow : TokenEndpointForm {
 
-            fun of(
-                authorizationCode: String,
-                redirectionURI: URI,
-                clientId: String,
-                codeVerifier: String,
-            ): Map<String, String> =
-                mapOf(
-                    GRANT_TYPE_PARAM to GRANT_TYPE_PARAM_VALUE,
-                    AUTHORIZATION_CODE_PARAM to authorizationCode,
-                    REDIRECT_URI_PARAM to redirectionURI.toString(),
-                    CLIENT_ID_PARAM to clientId,
-                    CODE_VERIFIER_PARAM to codeVerifier,
-                )
-        }
+        const val GRANT_TYPE_PARAM = "grant_type"
+        const val GRANT_TYPE_PARAM_VALUE = "authorization_code"
+        const val REDIRECT_URI_PARAM = "redirect_uri"
+        const val CLIENT_ID_PARAM = "client_id"
+        const val CODE_VERIFIER_PARAM = "code_verifier"
+        const val AUTHORIZATION_CODE_PARAM = "code"
+
+        fun of(
+            authorizationCode: String,
+            redirectionURI: URI,
+            clientId: String,
+            codeVerifier: String,
+        ): Map<String, String> =
+            mapOf(
+                GRANT_TYPE_PARAM to GRANT_TYPE_PARAM_VALUE,
+                AUTHORIZATION_CODE_PARAM to authorizationCode,
+                REDIRECT_URI_PARAM to redirectionURI.toString(),
+                CLIENT_ID_PARAM to clientId,
+                CODE_VERIFIER_PARAM to codeVerifier,
+            )
     }
 
-    class PreAuthCodeFlow : TokenEndpointForm {
-        companion object {
-            private const val GRANT_TYPE_PARAM = "grant_type"
-            const val GRANT_TYPE_PARAM_VALUE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
-            const val USER_PIN_PARAM = "user_pin"
-            const val PRE_AUTHORIZED_CODE_PARAM = "pre_authorized_code"
+    data object PreAuthCodeFlow : TokenEndpointForm {
+        private const val GRANT_TYPE_PARAM = "grant_type"
+        const val GRANT_TYPE_PARAM_VALUE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+        const val USER_PIN_PARAM = "user_pin"
+        const val PRE_AUTHORIZED_CODE_PARAM = "pre_authorized_code"
 
-            fun of(preAuthorizedCode: String, userPin: String?): Map<String, String> {
-                return if (userPin != null) {
-                    mapOf(
-                        GRANT_TYPE_PARAM to URLEncoder.encode(GRANT_TYPE_PARAM_VALUE, "UTF-8"),
-                        PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
-                        USER_PIN_PARAM to userPin,
-                    )
-                } else {
-                    mapOf(
-                        GRANT_TYPE_PARAM to URLEncoder.encode(GRANT_TYPE_PARAM_VALUE, "UTF-8"),
-                        PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
-                    )
-                }
+        fun of(preAuthorizedCode: String, userPin: String?): Map<String, String> = when (userPin) {
+            null -> {
+                mapOf(
+                    GRANT_TYPE_PARAM to URLEncoder.encode(GRANT_TYPE_PARAM_VALUE, "UTF-8"),
+                    PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
+                )
+            }
+
+            else -> {
+                mapOf(
+                    GRANT_TYPE_PARAM to URLEncoder.encode(GRANT_TYPE_PARAM_VALUE, "UTF-8"),
+                    PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
+                    USER_PIN_PARAM to userPin,
+                )
             }
         }
     }

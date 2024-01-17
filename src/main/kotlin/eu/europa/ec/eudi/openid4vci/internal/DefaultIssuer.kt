@@ -17,20 +17,30 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.NoProofRequired
+import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.ProofRequired
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer
+import eu.europa.ec.eudi.openid4vci.UnauthorizedRequest.AuthorizationCodeRetrieved
+import eu.europa.ec.eudi.openid4vci.UnauthorizedRequest.ParRequested
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.BatchRequest
+
+private typealias ProofFactory = (CredentialSupported) -> Proof
 
 /**
  * Default implementation of [Issuer] interface
  *  @param issuerMetadata  The credential issuer's metadata.
+ *  @param authorizationServerMetadata The metadata of the OAUTH2 or OIDC server
+ *  that protects the credential issuer endpoints
+ *  @param config The configuration options
  *  @param ktorHttpClientFactory Factory method to generate ktor http clients
- *  @param responseEncryptionSpecFactory   Factory method to generate the expected issuer's encrypted response, if issuer enforces encrypted responses.
- *     A default implementation is provided to callers.
+ *  @param responseEncryptionSpecFactory   Factory method to generate the expected issuer's encrypted response,
+ *  if needed.
  */
 internal class DefaultIssuer(
-    val authorizationServerMetadata: CIAuthorizationServerMetadata,
     private val issuerMetadata: CredentialIssuerMetadata,
+    val authorizationServerMetadata: CIAuthorizationServerMetadata,
     config: OpenId4VCIConfig,
     ktorHttpClientFactory: KtorHttpClientFactory,
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
@@ -38,6 +48,7 @@ internal class DefaultIssuer(
 
     private val authorizer: IssuanceAuthorizer =
         IssuanceAuthorizer(authorizationServerMetadata, config, ktorHttpClientFactory)
+
     private val issuanceRequester: IssuanceRequester =
         IssuanceRequester(issuerMetadata, ktorHttpClientFactory)
 
@@ -62,24 +73,22 @@ internal class DefaultIssuer(
     override suspend fun pushAuthorizationCodeRequest(
         credentials: List<CredentialIdentifier>,
         issuerState: String?,
-    ): Result<UnauthorizedRequest.ParRequested> = runCatching {
-        val (codeVerifier, getAuthorizationCodeUrl) = run {
+    ): Result<ParRequested> = runCatching {
+        val (codeVerifier, authorizationCodeUrl) = run {
             val scopes = credentials.mapNotNull { credentialId ->
                 credentialSupportedById(credentialId).scope?.let { Scope(it) }
             }
             val state = State().value
             authorizer.submitPushedAuthorizationRequest(scopes, state, issuerState).getOrThrow()
         }
-
-        UnauthorizedRequest.ParRequested(getAuthorizationCodeUrl, codeVerifier)
+        ParRequested(authorizationCodeUrl, codeVerifier)
     }
 
-    override suspend fun UnauthorizedRequest.ParRequested.handleAuthorizationCode(
+    override suspend fun ParRequested.handleAuthorizationCode(
         authorizationCode: AuthorizationCode,
-    ): UnauthorizedRequest.AuthorizationCodeRetrieved =
-        UnauthorizedRequest.AuthorizationCodeRetrieved(authorizationCode, pkceVerifier)
+    ): AuthorizationCodeRetrieved = AuthorizationCodeRetrieved(authorizationCode, pkceVerifier)
 
-    override suspend fun UnauthorizedRequest.AuthorizationCodeRetrieved.requestAccessToken(): Result<AuthorizedRequest> =
+    override suspend fun AuthorizationCodeRetrieved.requestAccessToken(): Result<AuthorizedRequest> =
         authorizer.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier)
             .map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
 
@@ -92,70 +101,42 @@ internal class DefaultIssuer(
             preAuthorizationCode.pin,
         ).map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
 
-    override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
+    override suspend fun NoProofRequired.requestSingle(
         credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
     ): Result<SubmittedRequest> = runCatching {
-        requestIssuance(accessToken) {
-            singleRequest(credentialId, claimSet)
-        }
+        placeIssuanceRequest(accessToken) { singleRequest(credentialId, claimSet, null) }
     }
 
-    override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
+    override suspend fun ProofRequired.requestSingle(
         credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
         proofSigner: ProofSigner,
     ): Result<SubmittedRequest> = runCatching {
-        requestIssuance(accessToken) {
-            singleRequestWithProof(credentialId, claimSet, proofSigner, cNonce)
+        placeIssuanceRequest(accessToken) {
+            singleRequest(credentialId, claimSet, proofFactory(proofSigner, cNonce))
         }
     }
 
-    private fun singleRequestWithProof(
-        credentialId: CredentialIdentifier,
-        claimSet: ClaimSet?,
-        proofSigner: ProofSigner,
-        cNonce: CNonce,
-    ): CredentialIssuanceRequest.SingleRequest {
-        val credentialSupported = credentialSupportedById(credentialId)
-        val proof = ProofBuilder.ofType(ProofType.JWT) {
-            aud(issuerMetadata.credentialIssuerIdentifier.toString())
-            publicKey(proofSigner.getBindingKey())
-            credentialSpec(credentialSupported)
-            nonce(cNonce.value)
-            build(proofSigner)
-        }
-        return credentialSupported.constructIssuanceRequest(claimSet, proof)
-    }
-
-    private fun singleRequest(
-        credentialId: CredentialIdentifier,
-        claimSet: ClaimSet?,
-    ): CredentialIssuanceRequest.SingleRequest {
-        val credentialSupported = credentialSupportedById(credentialId)
-        return credentialSupported.constructIssuanceRequest(claimSet, proof = null)
-    }
-
-    override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
+    override suspend fun NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialIdentifier, ClaimSet?>>,
     ): Result<SubmittedRequest> = runCatching {
-        requestIssuance(accessToken) {
-            CredentialIssuanceRequest.BatchRequest(
-                credentialsMetadata.map { (credentialId, claimSet) ->
-                    singleRequest(credentialId, claimSet)
-                },
-            )
+        placeIssuanceRequest(accessToken) {
+            val credentialRequests = credentialsMetadata.map { (credentialId, claimSet) ->
+                singleRequest(credentialId, claimSet, null)
+            }
+            BatchRequest(credentialRequests)
         }
     }
 
-    override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
+    override suspend fun ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, ProofSigner>>,
     ): Result<SubmittedRequest> = runCatching {
-        requestIssuance(accessToken) {
+        placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (credentialId, claimSet, proofSigner) ->
-                singleRequestWithProof(credentialId, claimSet, proofSigner, cNonce)
+                singleRequest(credentialId, claimSet, proofFactory(proofSigner, cNonce))
             }
-            CredentialIssuanceRequest.BatchRequest(credentialRequests)
+            BatchRequest(credentialRequests)
         }
     }
 
@@ -166,33 +147,45 @@ internal class DefaultIssuer(
         }
     }
 
-    private fun CredentialSupported.constructIssuanceRequest(
+    private fun proofFactory(proofSigner: ProofSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
+        ProofBuilder.ofType(ProofType.JWT) {
+            aud(issuerMetadata.credentialIssuerIdentifier.toString())
+            publicKey(proofSigner.getBindingKey())
+            credentialSpec(credentialSupported)
+            nonce(cNonce.value)
+            build(proofSigner)
+        }
+    }
+
+    private fun singleRequest(
+        credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
-        proof: Proof?,
+        proofFactory: ProofFactory?,
     ): CredentialIssuanceRequest.SingleRequest {
+        val credentialSupported = credentialSupportedById(credentialId)
         fun assertSupported(p: Proof) {
             val proofType = when (p) {
                 is Proof.Jwt -> ProofType.JWT
                 is Proof.Cwt -> ProofType.CWT
             }
-            require(proofType in proofTypesSupported) {
-                "Provided proof type $proofType is not one of supported [$proofTypesSupported]."
+            require(proofType in credentialSupported.proofTypesSupported) {
+                "Provided proof type $proofType is not one of supported [${credentialSupported.proofTypesSupported}]."
             }
         }
-        proof?.let { assertSupported(it) }
-        return CredentialIssuanceRequest.singleRequest(this, claimSet, proof, responseEncryptionSpec)
+        val proof = proofFactory?.invoke(credentialSupported)?.also { assertSupported(it) }
+        return CredentialIssuanceRequest.singleRequest(credentialSupported, claimSet, proof, responseEncryptionSpec)
     }
 
-    override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
+    override suspend fun NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
-    ): AuthorizedRequest.ProofRequired = AuthorizedRequest.ProofRequired(accessToken, cNonce)
+    ): ProofRequired = ProofRequired(accessToken, cNonce)
 
     override suspend fun AuthorizedRequest.queryForDeferredCredential(
         deferredCredential: IssuedCredential.Deferred,
     ): Result<DeferredCredentialQueryOutcome> =
         issuanceRequester.placeDeferredCredentialRequest(accessToken, deferredCredential.transactionId)
 
-    private suspend fun requestIssuance(
+    private suspend fun placeIssuanceRequest(
         token: AccessToken,
         issuanceRequestSupplier: () -> CredentialIssuanceRequest,
     ): SubmittedRequest {
@@ -206,7 +199,7 @@ internal class DefaultIssuer(
                 )
             }
 
-            is CredentialIssuanceRequest.BatchRequest -> {
+            is BatchRequest -> {
                 issuanceRequester.placeBatchIssuanceRequest(token, credentialRequest).fold(
                     onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
@@ -219,6 +212,7 @@ internal class DefaultIssuer(
 private fun submitRequestFromError(error: Throwable): SubmittedRequest.Errored? = when (error) {
     is CredentialIssuanceError.InvalidProof ->
         SubmittedRequest.InvalidProof(CNonce(error.cNonce, error.cNonceExpiresIn))
+
     is CredentialIssuanceError -> SubmittedRequest.Failed(error)
     else -> null
 }
