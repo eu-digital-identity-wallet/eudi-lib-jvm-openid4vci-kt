@@ -106,7 +106,6 @@ private class Wallet(
 
     suspend fun issueByCredentialIdentifier(identifier: String): String {
         val issuer = Issuer.make(
-
             config = config,
             ktorHttpClientFactory = ::httpClientFactory,
             credentialIssuerId = credentialIssuerIdentifier,

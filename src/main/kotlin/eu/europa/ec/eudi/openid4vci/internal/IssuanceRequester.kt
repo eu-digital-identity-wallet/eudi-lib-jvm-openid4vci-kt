@@ -124,53 +124,14 @@ internal sealed interface RequestedCredentialResponseEncryption : java.io.Serial
     companion object {
 
         fun fromSpec(responseEncryptionSpec: IssuanceResponseEncryptionSpec?): RequestedCredentialResponseEncryption {
-            return invoke(
-                credentialEncryptionJwk = responseEncryptionSpec?.jwk,
-                credentialResponseEncryptionAlg = responseEncryptionSpec?.algorithm,
-                credentialResponseEncryptionMethod = responseEncryptionSpec?.encryptionMethod,
-            )
-        }
-
-        /**
-         * Utility method to create the [RequestedCredentialResponseEncryption] attribute of the issuance request.
-         * The Construction logic is independent of the credential format.
-         *
-         * @param credentialEncryptionJwk   Key pair in JWK format used for issuance response encryption/decryption
-         * @param credentialResponseEncryptionAlg   Encryption algorithm to be used
-         * @param credentialResponseEncryptionMethod Encryption method to be used
-         */
-        private operator fun invoke(
-            credentialEncryptionJwk: JWK?,
-            credentialResponseEncryptionAlg: JWEAlgorithm?,
-            credentialResponseEncryptionMethod: EncryptionMethod?,
-        ): RequestedCredentialResponseEncryption {
-            return when {
-                credentialEncryptionJwk == null &&
-                    credentialResponseEncryptionAlg == null &&
-                    credentialResponseEncryptionMethod == null -> NotRequested
-
-                else -> {
-                    var encryptionMethod = credentialResponseEncryptionMethod
-                    when {
-                        credentialResponseEncryptionAlg != null && credentialResponseEncryptionMethod == null ->
-                            encryptionMethod = EncryptionMethod.A256GCM
-
-                        credentialResponseEncryptionAlg != null && credentialEncryptionJwk == null ->
-                            throw InvalidIssuanceRequest("Encryption algorithm was provided but no encryption key")
-
-                        credentialResponseEncryptionAlg == null && credentialResponseEncryptionMethod != null ->
-                            throw InvalidIssuanceRequest(
-                                "Credential response encryption algorithm must be specified if Credential " +
-                                    "response encryption method is provided",
-                            )
-                    }
-                    Requested(
-                        encryptionJwk = credentialEncryptionJwk!!,
-                        responseEncryptionAlg = credentialResponseEncryptionAlg!!,
-                        responseEncryptionMethod = encryptionMethod!!,
-                    )
-                }
-            }
+            return responseEncryptionSpec?.let {
+                val (credentialEncryptionJwk, credentialResponseEncryptionAlg, credentialResponseEncryptionMethod) = it
+                Requested(
+                    encryptionJwk = credentialEncryptionJwk,
+                    responseEncryptionAlg = credentialResponseEncryptionAlg,
+                    responseEncryptionMethod = credentialResponseEncryptionMethod,
+                )
+            } ?: NotRequested
         }
     }
 }

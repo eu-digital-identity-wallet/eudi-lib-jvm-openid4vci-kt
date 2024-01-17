@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.internal.*
 import io.ktor.client.*
 
@@ -83,25 +82,12 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
 
         val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =
             { requiredEncryption, keyGenerationConfig ->
-                requiredEncryption.algorithmsSupported.mapNotNull { alg ->
-                    val encryptionKey = when {
-                        JWEAlgorithm.Family.ECDH_ES.contains(alg) ->
-                            KeyGenerator.randomECEncryptionKey(keyGenerationConfig.ecKeyCurve)
-
-                        JWEAlgorithm.Family.RSA.contains(alg) ->
-                            KeyGenerator.randomRSAEncryptionKey(keyGenerationConfig.rcaKeySize)
-
-                        else -> null
+                val method = requiredEncryption.encryptionMethodsSupported[0]
+                requiredEncryption.algorithmsSupported.firstNotNullOfOrNull { alg ->
+                    KeyGenerator.genKeyIfSupported(keyGenerationConfig, alg)?.let { jwk ->
+                        IssuanceResponseEncryptionSpec(jwk, alg, method)
                     }
-
-                    encryptionKey?.let {
-                        IssuanceResponseEncryptionSpec(
-                            jwk = it,
-                            algorithm = alg,
-                            encryptionMethod = requiredEncryption.encryptionMethodsSupported[0],
-                        )
-                    }
-                }.firstOrNull() ?: error("Could not create encryption spec")
+                } ?: error("Could not create encryption spec")
             }
     }
 }

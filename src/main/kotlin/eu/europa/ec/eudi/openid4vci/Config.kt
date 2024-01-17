@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import java.net.URI
 
@@ -33,6 +34,40 @@ data class OpenId4VCIConfig(
 )
 
 data class KeyGenerationConfig(
-    val ecKeyCurve: Curve,
+    val ecConfig: EcConfig?,
+    val rsaConfig: RsaConfig?,
+) {
+    companion object {
+        operator fun invoke(
+            ecKeyCurve: Curve,
+            rcaKeySize: Int,
+        ): KeyGenerationConfig = KeyGenerationConfig(EcConfig(ecKeyCurve), RsaConfig(rcaKeySize))
+
+        fun ecOnly(
+            ecKeyCurve: Curve,
+            supportedJWEAlgorithms: List<JWEAlgorithm> = JWEAlgorithm.Family.ECDH_ES.toMutableList().toList(),
+        ): KeyGenerationConfig = KeyGenerationConfig(EcConfig(ecKeyCurve, supportedJWEAlgorithms), null)
+    }
+}
+
+data class RsaConfig(
     val rcaKeySize: Int,
-)
+    val supportedJWEAlgorithms: List<JWEAlgorithm> = JWEAlgorithm.Family.RSA.toMutableList().toList(),
+) {
+    init {
+        require(JWEAlgorithm.Family.RSA.containsAll(supportedJWEAlgorithms)) {
+            "Provided algorithms that are not part of RSA family"
+        }
+    }
+}
+
+data class EcConfig(
+    val ecKeyCurve: Curve,
+    val supportedJWEAlgorithms: List<JWEAlgorithm> = JWEAlgorithm.Family.ECDH_ES.toMutableList().toList(),
+) {
+    init {
+        require(JWEAlgorithm.Family.ECDH_ES.containsAll(supportedJWEAlgorithms)) {
+            "Provided algorithms that are not part of ECDH_ES family"
+        }
+    }
+}
