@@ -34,9 +34,15 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             credentialIssuerId: CredentialIssuerId,
         ): Pair<CredentialIssuerMetadata, CIAuthorizationServerMetadata> =
             with(httpClient) {
-                val issuerMetadata = resolveCredentialIssuerMetaData(credentialIssuerId)
+                val issuerMetadata = run {
+                    val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
+                    resolver.resolve(credentialIssuerId).getOrThrow()
+                }
                 val authServerUrl = issuerMetadata.authorizationServers[0]
-                val authorizationServerMetadata = resolveAuthServerMetaData(authServerUrl)
+                val authorizationServerMetadata = run {
+                    val resolver = DefaultAuthorizationServerMetadataResolver(httpClient)
+                    resolver.resolve(authServerUrl).getOrThrow()
+                }
                 issuerMetadata to authorizationServerMetadata
             }
 

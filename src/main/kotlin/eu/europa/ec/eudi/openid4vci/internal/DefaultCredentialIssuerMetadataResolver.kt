@@ -15,7 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuerMetadataJsonParser
 import io.ktor.client.*
@@ -23,21 +26,23 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 
-internal suspend fun HttpClient.resolveCredentialIssuerMetaData(
-    issuer: CredentialIssuerId,
-): CredentialIssuerMetadata {
-    val wellKnownUrl = issuer.wellKnown()
-    val json = try {
-        get(wellKnownUrl).body<String>()
-    } catch (t: Throwable) {
-        throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
-    }
+internal class DefaultCredentialIssuerMetadataResolver(
+    private val httpClient: HttpClient,
+) : CredentialIssuerMetadataResolver {
+    override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> = runCatching {
+        val wellKnownUrl = issuer.wellKnown()
+        val json = try {
+            httpClient.get(wellKnownUrl).body<String>()
+        } catch (t: Throwable) {
+            throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
+        }
 
-    return CredentialIssuerMetadataJsonParser.parseMetaData(json).also { metaData ->
-        ensure(metaData.credentialIssuerIdentifier == issuer) {
-            InvalidCredentialIssuerId(
-                IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
-            )
+        CredentialIssuerMetadataJsonParser.parseMetaData(json).also { metaData ->
+            ensure(metaData.credentialIssuerIdentifier == issuer) {
+                InvalidCredentialIssuerId(
+                    IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
+                )
+            }
         }
     }
 }

@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.resolveCredentialOffer
+import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialOfferRequestResolver
 import io.ktor.http.*
 import java.io.Serializable
 import kotlin.time.Duration
@@ -259,7 +259,8 @@ fun interface CredentialOfferRequestResolver {
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): CredentialOfferRequestResolver = CredentialOfferRequestResolver { request ->
             ktorHttpClientFactory().use { httpClient ->
-                runCatching { httpClient.resolveCredentialOffer(request) }
+                val resolver = DefaultCredentialOfferRequestResolver(httpClient)
+                resolver.resolve(request)
             }
         }
     }

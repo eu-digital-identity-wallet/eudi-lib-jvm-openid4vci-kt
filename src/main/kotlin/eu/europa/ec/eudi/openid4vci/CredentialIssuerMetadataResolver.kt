@@ -18,7 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
-import eu.europa.ec.eudi.openid4vci.internal.resolveCredentialIssuerMetaData
+import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import java.io.Serializable
 
 sealed interface CredentialResponseEncryption : Serializable {
@@ -192,7 +192,8 @@ fun interface CredentialIssuerMetadataResolver {
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): CredentialIssuerMetadataResolver = CredentialIssuerMetadataResolver { issuerId ->
             ktorHttpClientFactory.invoke().use { httpClient ->
-                runCatching { httpClient.resolveCredentialIssuerMetaData(issuerId) }
+                val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
+                resolver.resolve(issuerId)
             }
         }
     }
