@@ -15,204 +15,35 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialSupportedTO
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuerMetadataJsonParser
+import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.coroutines.coroutineScope
-import kotlinx.serialization.Required
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
-/**
- * Unvalidated metadata of a Credential Issuer.
- */
-@Serializable
-private data class CredentialIssuerMetadataTO(
-    @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
-    @SerialName("authorization_servers") val authorizationServers: List<String>? = null,
-    @SerialName("credential_endpoint") @Required val credentialEndpoint: String,
-    @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
-    @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
-    @SerialName("credential_response_encryption_alg_values_supported")
-    val credentialResponseEncryptionAlgorithmsSupported: List<String>? = null,
-    @SerialName("credential_response_encryption_enc_values_supported")
-    val credentialResponseEncryptionMethodsSupported: List<String>? = null,
-    @SerialName("require_credential_response_encryption")
-    val requireCredentialResponseEncryption: Boolean? = null,
-    @SerialName("credential_identifiers_supported")
-    val credentialIdentifiersSupported: Boolean? = null,
-    @SerialName("credentials_supported") val credentialsSupported: Map<String, CredentialSupportedTO> = emptyMap(),
-    @SerialName("display") val display: List<DisplayTO>? = null,
-)
-
-/**
- * Display properties of a supported credential type for a certain language.
- */
-@Serializable
-internal data class CredentialSupportedDisplayTO(
-    @SerialName("name") @Required val name: String,
-    @SerialName("locale") val locale: String? = null,
-    @SerialName("logo") val logo: LogoObject? = null,
-    @SerialName("description") val description: String? = null,
-    @SerialName("background_color") val backgroundColor: String? = null,
-    @SerialName("text_color") val textColor: String? = null,
-)
-
-/**
- * Logo information.
- */
-@Serializable
-internal data class LogoObject(
-    @SerialName("url") val url: String? = null,
-    @SerialName("alt_text") val alternativeText: String? = null,
-)
-
-/**
- * The details of a Claim.
- */
-@Serializable
-internal data class ClaimTO(
-    @SerialName("mandatory") val mandatory: Boolean? = null,
-    @SerialName("value_type") val valueType: String? = null,
-    @SerialName("display") val display: List<DisplayTO>? = null,
-)
-
-/**
- * Display properties of a Claim.
- */
-@Serializable
-internal data class DisplayTO(
-    @SerialName("name") val name: String? = null,
-    @SerialName("locale") val locale: String? = null,
-)
-
-/**
- * Default implementation of [CredentialIssuerMetadataResolver].
- */
-internal class DefaultCredentialIssuerMetadataResolver(
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
-) : CredentialIssuerMetadataResolver {
-
-    override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> = coroutineScope {
-        runCatching {
-            val credentialIssuerMetadataContent = try {
-                val url =
-                    URLBuilder(issuer.toString())
-                        .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
-                        .build()
-                        .toURI()
-                        .toURL()
-
-                ktorHttpClientFactory().use { client -> client.get(url).body<String>() }
-            } catch (t: Throwable) {
-                throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
-            }
-
-            val credentialIssuerMetadataObject = try {
-                JsonSupport.decodeFromString<CredentialIssuerMetadataTO>(credentialIssuerMetadataContent)
-            } catch (t: Throwable) {
-                throw CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(t)
-            }
-
-            val result = credentialIssuerMetadataObject.toDomain().getOrThrow()
-
-            if (result.credentialIssuerIdentifier != issuer) {
-                throw InvalidCredentialIssuerId(
-                    IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
-                )
-            }
-            result
-        }
-    }
-}
-
-/**
- * Converts and validates  a [CredentialIssuerMetadataTO] as a [CredentialIssuerMetadata] instance.
- */
-private fun CredentialIssuerMetadataTO.toDomain(): Result<CredentialIssuerMetadata> = runCatching {
-    val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
-        .getOrThrowAs { InvalidCredentialIssuerId(it) }
-
-    val authorizationServers = authorizationServers
-        ?.let { servers -> servers.map { HttpsUrl(it).getOrThrowAs(::InvalidAuthorizationServer) } }
-        ?: listOf(credentialIssuerIdentifier.value)
-
-    val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
-        .getOrThrowAs(::InvalidCredentialEndpoint)
-
-    val batchCredentialEndpoint = batchCredentialEndpoint
-        ?.let { CredentialIssuerEndpoint(it).getOrThrowAs(::InvalidBatchCredentialEndpoint) }
-
-    val deferredCredentialEndpoint = deferredCredentialEndpoint
-        ?.let { CredentialIssuerEndpoint(it).getOrThrowAs(::InvalidDeferredCredentialEndpoint) }
-
-    val credentialsSupported = try {
-        credentialsSupported.map {
-            CredentialIdentifier(it.key) to it.value.toDomain()
-        }.toMap()
-    } catch (it: Throwable) {
-        throw InvalidCredentialsSupported(it)
-    }.apply {
-        ifEmpty { throw CredentialsSupportedRequired }
+internal suspend fun HttpClient.resolveCredentialIssuerMetaData(
+    issuer: CredentialIssuerId,
+): CredentialIssuerMetadata {
+    val wellKnownUrl = issuer.wellKnown()
+    val json = try {
+        get(wellKnownUrl).body<String>()
+    } catch (t: Throwable) {
+        throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
     }
 
-    val display = display?.map { it.toDomain() } ?: emptyList()
-
-    CredentialIssuerMetadata(
-        credentialIssuerIdentifier,
-        authorizationServers,
-        credentialEndpoint,
-        batchCredentialEndpoint,
-        deferredCredentialEndpoint,
-        credentialResponseEncryption().getOrThrow(),
-        credentialIdentifiersSupported ?: false,
-        credentialsSupported,
-        display,
-    )
-}
-
-private fun CredentialIssuerMetadataTO.credentialResponseEncryption(): Result<CredentialResponseEncryption> =
-    runCatching {
-        val requireEncryption = requireCredentialResponseEncryption ?: false
-        val encryptionAlgorithms = credentialResponseEncryptionAlgorithmsSupported
-            ?.map { JWEAlgorithm.parse(it) }
-            ?: emptyList()
-        val encryptionMethods = credentialResponseEncryptionMethodsSupported
-            ?.map { EncryptionMethod.parse(it) }
-            ?: emptyList()
-
-        if (requireEncryption) {
-            if (encryptionAlgorithms.isEmpty()) {
-                throw CredentialResponseEncryptionAlgorithmsRequired
-            }
-            val allAreAsymmetricAlgorithms = encryptionAlgorithms.all {
-                JWEAlgorithm.Family.ASYMMETRIC.contains(it)
-            }
-            if (!allAreAsymmetricAlgorithms) {
-                throw CredentialResponseAsymmetricEncryptionAlgorithmsRequired
-            }
-
-            CredentialResponseEncryption.Required(
-                encryptionAlgorithms,
-                encryptionMethods,
+    return CredentialIssuerMetadataJsonParser.parseMetaData(json).also { metaData ->
+        ensure(metaData.credentialIssuerIdentifier == issuer) {
+            InvalidCredentialIssuerId(
+                IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
             )
-        } else {
-            require(encryptionAlgorithms.isEmpty())
-            require(encryptionMethods.isEmpty())
-            CredentialResponseEncryption.NotRequired
         }
     }
+}
 
-/**
- * Converts a [DisplayTO] to a [CredentialIssuerMetadata.Display] instance.
- */
-private fun DisplayTO.toDomain(): CredentialIssuerMetadata.Display =
-    CredentialIssuerMetadata.Display(name, locale)
-
-private fun <T> Result<T>.getOrThrowAs(f: (Throwable) -> Throwable): T =
-    fold(onSuccess = { it }, onFailure = { throw f(it) })
+private fun CredentialIssuerId.wellKnown() = URLBuilder(Url(value.value.toURI()))
+    .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
+    .build()
+    .toURI()
+    .toURL()

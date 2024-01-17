@@ -15,13 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWEAlgorithm
-import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer
-import eu.europa.ec.eudi.openid4vci.internal.IssuanceAuthorizer
-import eu.europa.ec.eudi.openid4vci.internal.IssuanceRequester
-import eu.europa.ec.eudi.openid4vci.internal.KeyGenerator
+import eu.europa.ec.eudi.openid4vci.internal.*
+import io.ktor.client.*
 
-typealias ResponseEncryptionSpecFactory = (CredentialResponseEncryption.Required, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec
+typealias ResponseEncryptionSpecFactory =
+    (CredentialResponseEncryption.Required, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec
 
 /**
  * Aggregation interface providing all functionality required for performing a credential issuance request (batch or single)
@@ -30,6 +28,35 @@ typealias ResponseEncryptionSpecFactory = (CredentialResponseEncryption.Required
 interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredential {
 
     companion object {
+
+        suspend fun metaData(
+            httpClient: HttpClient,
+            credentialIssuerId: CredentialIssuerId,
+        ): Pair<CredentialIssuerMetadata, CIAuthorizationServerMetadata> =
+            with(httpClient) {
+                val issuerMetadata = resolveCredentialIssuerMetaData(credentialIssuerId)
+                val authServerUrl = issuerMetadata.authorizationServers[0]
+                val authorizationServerMetadata = resolveAuthServerMetaData(authServerUrl)
+                issuerMetadata to authorizationServerMetadata
+            }
+
+        suspend fun make(
+            config: OpenId4VCIConfig,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+            credentialIssuerId: CredentialIssuerId,
+        ): Issuer {
+            val (issuerMetadata, authServerMetaData) = ktorHttpClientFactory().use { httpClient ->
+                metaData(httpClient, credentialIssuerId)
+            }
+            return DefaultIssuer(
+                issuerMetadata,
+                authServerMetaData,
+                config,
+                ktorHttpClientFactory,
+                responseEncryptionSpecFactory,
+            )
+        }
 
         /**
          * Factory method to create an [Issuer] using the passed http client factory
@@ -46,34 +73,22 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Issuer = DefaultIssuer(
-            authorizationServerMetadata,
             issuerMetadata,
+            authorizationServerMetadata,
             config,
             ktorHttpClientFactory,
             responseEncryptionSpecFactory,
         )
 
-        val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory = { requiredEncryption, keyGenerationConfig ->
-            requiredEncryption.algorithmsSupported.mapNotNull { alg ->
-                val encryptionKey = when {
-                    JWEAlgorithm.Family.ECDH_ES.contains(alg) ->
-                        KeyGenerator.randomECEncryptionKey(keyGenerationConfig.ecKeyCurve)
-
-                    JWEAlgorithm.Family.RSA.contains(alg) ->
-                        KeyGenerator.randomRSAEncryptionKey(keyGenerationConfig.rcaKeySize)
-
-                    else -> null
-                }
-
-                encryptionKey?.let {
-                    IssuanceResponseEncryptionSpec(
-                        jwk = it,
-                        algorithm = alg,
-                        encryptionMethod = requiredEncryption.encryptionMethodsSupported[0],
-                    )
-                }
-            }.firstOrNull() ?: error("Could not create encryption spec")
-        }
+        val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =
+            { requiredEncryption, keyGenerationConfig ->
+                val method = requiredEncryption.encryptionMethodsSupported[0]
+                requiredEncryption.algorithmsSupported.firstNotNullOfOrNull { alg ->
+                    KeyGenerator.genKeyIfSupported(keyGenerationConfig, alg)?.let { jwk ->
+                        IssuanceResponseEncryptionSpec(jwk, alg, method)
+                    }
+                } ?: error("Could not create encryption spec")
+            }
     }
 }
 

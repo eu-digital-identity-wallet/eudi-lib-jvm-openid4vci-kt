@@ -34,7 +34,7 @@ import kotlin.test.fail
 
 class IssuanceAuthorizationTest {
 
-    val CredentialIssuer_URL = "https://credential-issuer.example.com"
+    private val CredentialIssuer_URL = "https://credential-issuer.example.com"
 
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
         {
@@ -143,7 +143,11 @@ class IssuanceAuthorizationTest {
             )
 
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
-            val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialIssuerId = credentialIssuerIdentifier,
+            )
             val issuerState = issuerStateFromOffer(offer)
 
             with(issuer) {
@@ -229,7 +233,11 @@ class IssuanceAuthorizationTest {
                 },
             )
 
-            val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialIssuerId = credentialIssuerIdentifier,
+            )
             with(issuer) {
                 val parRequested =
                     pushAuthorizationCodeRequest(
@@ -295,7 +303,11 @@ class IssuanceAuthorizationTest {
                 },
             )
 
-            val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialIssuerId = credentialIssuerIdentifier,
+            )
             with(issuer) {
                 authorizeWithPreAuthorizationCode(
                     listOf(
@@ -336,7 +348,11 @@ class IssuanceAuthorizationTest {
                 ),
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
-            val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialIssuerId = credentialIssuerIdentifier,
+            )
             val preAuthorizationCode = preAuthCodeFromOffer(offer)
 
             with(issuer) {
@@ -380,7 +396,11 @@ class IssuanceAuthorizationTest {
                 ),
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
-            val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialIssuerId = credentialIssuerIdentifier,
+            )
             val issuerState = issuerStateFromOffer(offer)
 
             with(issuer) {
@@ -423,7 +443,11 @@ class IssuanceAuthorizationTest {
                 ),
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
-            val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialIssuerId = credentialIssuerIdentifier,
+            )
             val issuerState = issuerStateFromOffer(offer)
 
             with(issuer) {
@@ -467,7 +491,11 @@ class IssuanceAuthorizationTest {
                 ),
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
-            val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialIssuerId = credentialIssuerIdentifier,
+            )
             val issuerState = issuerStateFromOffer(offer)
 
             with(issuer) {
@@ -515,7 +543,11 @@ class IssuanceAuthorizationTest {
                 ),
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
-            val issuer = issuer(mockedKtorHttpClientFactory, credentialIssuerIdentifier)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialIssuerId = credentialIssuerIdentifier,
+            )
             val preAuthCode = preAuthCodeFromOffer(offer)
 
             with(issuer) {
@@ -535,28 +567,6 @@ class IssuanceAuthorizationTest {
                     )
             }
         }
-
-    private suspend fun issuer(
-        ktorHttpClientFactory: KtorHttpClientFactory,
-        credentialIssuerIdentifier: CredentialIssuerId,
-    ): Issuer {
-        val issuerMetadata =
-            CredentialIssuerMetadataResolver(
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            ).resolve(credentialIssuerIdentifier).getOrThrow()
-
-        val authServerMetadata =
-            AuthorizationServerMetadataResolver(
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            ).resolve(issuerMetadata.authorizationServers[0]).getOrThrow()
-
-        return Issuer.make(
-            authorizationServerMetadata = authServerMetadata,
-            config = vciWalletConfiguration,
-            ktorHttpClientFactory = ktorHttpClientFactory,
-            issuerMetadata = issuerMetadata,
-        )
-    }
 
     private suspend fun credentialOffer(
         ktorHttpClientFactory: KtorHttpClientFactory,

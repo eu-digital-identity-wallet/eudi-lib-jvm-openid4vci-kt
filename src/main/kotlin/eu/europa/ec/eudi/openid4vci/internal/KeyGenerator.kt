@@ -15,23 +15,43 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import eu.europa.ec.eudi.openid4vci.EcConfig
+import eu.europa.ec.eudi.openid4vci.KeyGenerationConfig
+import eu.europa.ec.eudi.openid4vci.RsaConfig
 import java.util.*
 
 object KeyGenerator {
 
-    fun randomRSAEncryptionKey(size: Int): RSAKey = RSAKeyGenerator(size)
+    fun genKeyIfSupported(keyGenerationConfig: KeyGenerationConfig, alg: JWEAlgorithm): JWK? {
+        return when (alg) {
+            in JWEAlgorithm.Family.ECDH_ES ->
+                keyGenerationConfig.ecConfig?.takeIf { alg in it.supportedJWEAlgorithms }?.let {
+                    randomECEncryptionKey(it)
+                }
+
+            in JWEAlgorithm.Family.RSA ->
+                keyGenerationConfig.rsaConfig?.takeIf { alg in it.supportedJWEAlgorithms }?.let {
+                    randomRSAEncryptionKey(it)
+                }
+
+            else -> null
+        }
+    }
+
+    fun randomRSAEncryptionKey(rsaConfig: RsaConfig): RSAKey = RSAKeyGenerator(rsaConfig.rcaKeySize)
         .keyUse(KeyUse.ENCRYPTION)
         .keyID(UUID.randomUUID().toString())
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
 
-    fun randomECEncryptionKey(curve: Curve): ECKey = ECKeyGenerator(curve)
+    fun randomECEncryptionKey(ecConfig: EcConfig): ECKey = ECKeyGenerator(ecConfig.ecKeyCurve)
         .keyUse(KeyUse.ENCRYPTION)
         .keyID(UUID.randomUUID().toString())
         .issueTime(Date(System.currentTimeMillis()))

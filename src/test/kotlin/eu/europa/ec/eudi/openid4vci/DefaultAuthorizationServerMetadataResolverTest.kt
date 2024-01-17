@@ -17,23 +17,24 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
+import eu.europa.ec.eudi.openid4vci.internal.resolveAuthServerMetaData
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
-import kotlin.test.fail
 
 internal class DefaultAuthorizationServerMetadataResolverTest {
 
     @Test
     internal fun `resolution success`() = runTest {
-        val resolver = mockResolver(
+        val resolve = mockResolver(
             RequestMocker(
-                match(oidcAuthorizationServerMetadataUrl().value.toURI()),
+                match(SampleAuthServer.OidcWellKnownUrl.value.toURI()),
                 jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
             ),
         )
-        val meta = resolver.resolve(authorizationServerIssuer()).getOrThrow()
+        val meta = resolve(SampleAuthServer.Url)
         assertIs<OIDCProviderMetadata>(meta)
         // equals not implemented by OIDCProviderMetadata
         assertEquals(oidcAuthorizationServerMetadata().toJSONObject(), meta.toJSONObject())
@@ -42,30 +43,27 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
     @Test
     internal fun `fails when issuer does not match`() = runTest {
         val issuer = HttpsUrl("https://keycloak.netcompany.com/realms/pid-issuer-realm").getOrThrow()
-        val metadataUrl = oidcAuthorizationServerMetadataUrl(issuer)
-        val resolver = mockResolver(
-            RequestMocker(
-                match(metadataUrl.value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json"),
+        val resolve = mockResolver(
+            oidcMetaDataHandler(
+                issuer,
+                "eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata.json",
             ),
         )
-        val cause = resolver.resolve(issuer).fold(
-            onSuccess = { fail("Authorization Server metadata resolution should have failed") },
-            onFailure = causeIs<IllegalArgumentException>(),
-        )
+        val ex = assertFailsWith<AuthorizationServerMetadataResolutionException> { resolve(issuer) }
+        val cause = assertIs<IllegalArgumentException>(ex.cause)
         assertEquals("issuer does not match the expected value", cause.message)
     }
 
     @Test
     internal fun `falls back to oauth server metadata`() = runTest {
-        val resolver = mockResolver(
-            RequestMocker(
-                match(oauthAuthorizationServerMetadataUrl().value.toURI()),
-                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/oauth_authorization_server_metadata.json"),
+        val resolve = mockResolver(
+            oauthMetaDataHandler(
+                SampleAuthServer.Url,
+                "eu/europa/ec/eudi/openid4vci/internal/oauth_authorization_server_metadata.json",
             ),
-        )
 
-        val metadata = resolver.resolve(authorizationServerIssuer()).getOrThrow()
+        )
+        val metadata = resolve(SampleAuthServer.Url)
         assertIs<AuthorizationServerMetadata>(metadata)
         // equals not implemented by AuthorizationServerMetadata
         assertEquals(oauthAuthorizationServerMetadata().toJSONObject(), metadata.toJSONObject())
@@ -77,8 +75,11 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
     }
 }
 
-private fun mockResolver(mocker: RequestMocker): AuthorizationServerMetadataResolver =
-    AuthorizationServerMetadataResolver(
-        ktorHttpClientFactory =
-            mockedKtorHttpClientFactory(mocker),
-    )
+private fun mockResolver(
+    mocker: RequestMocker,
+): suspend (HttpsUrl) -> CIAuthorizationServerMetadata = { url ->
+
+    mockedKtorHttpClientFactory(mocker).invoke().use { httpClient ->
+        httpClient.resolveAuthServerMetaData(url)
+    }
+}

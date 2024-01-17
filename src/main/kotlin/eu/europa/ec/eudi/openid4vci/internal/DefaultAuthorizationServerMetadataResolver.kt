@@ -19,66 +19,59 @@ import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import com.nimbusds.oauth2.sdk.id.Issuer
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import eu.europa.ec.eudi.openid4vci.*
+import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import net.minidev.json.JSONObject
 import java.net.URL
 
+internal suspend fun HttpClient.resolveAuthServerMetaData(authServerUrl: HttpsUrl): CIAuthorizationServerMetadata =
+    fetchOidcServerMetadata(authServerUrl)
+        .recoverCatching { fetchOauthServerMetadata(authServerUrl).getOrThrow() }
+        .mapCatching { it.apply { expectIssuer(authServerUrl) } }
+        .mapError(::AuthorizationServerMetadataResolutionException)
+        .getOrThrow()
+
 /**
- * Default implementation for [AuthorizationServerMetadataResolver].
+ * Tries to fetch the [CIAuthorizationServerMetadata] for the provided [OpenID Connect Authorization Server][issuer].
+ * The well-known location __/.well-known/openid-configuration__ is used.
  */
-internal class DefaultAuthorizationServerMetadataResolver(
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
-) : AuthorizationServerMetadataResolver {
+private suspend fun HttpClient.fetchOidcServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
+    runCatching {
+        val url =
+            URLBuilder(issuer.value.toString())
+                .appendPathSegments("/.well-known/openid-configuration", encodeSlash = false)
+                .build()
+                .toURI()
+                .toURL()
 
-    override suspend fun resolve(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
-        fetchOidcServerMetadata(issuer)
-            .recoverCatching { fetchOauthServerMetadata(issuer).getOrThrow() }
-            .mapCatching { it.apply { expectIssuer(issuer) } }
-            .mapError(::AuthorizationServerMetadataResolutionException)
+        fetchAndParse(url, OIDCProviderMetadata::parse)
+    }
 
-    /**
-     * Tries to fetch the [CIAuthorizationServerMetadata] for the provided [OpenID Connect Authorization Server][issuer].
-     * The well-known location __/.well-known/openid-configuration__ is used.
-     */
-    private suspend fun fetchOidcServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
-        runCatching {
-            val url =
-                URLBuilder(issuer.value.toString())
-                    .appendPathSegments("/.well-known/openid-configuration", encodeSlash = false)
-                    .build()
-                    .toURI()
-                    .toURL()
+/**
+ * Tries to fetch the [CIAuthorizationServerMetadata] for the provided [OAuth2 Authorization Server][issuer].
+ * The well known location __/.well-known/oauth-authorization-server__ is used.
+ */
+private suspend fun HttpClient.fetchOauthServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
+    runCatching {
+        val url =
+            URLBuilder(issuer.value.toString())
+                .appendPathSegments("/.well-known/oauth-authorization-server", encodeSlash = false)
+                .build()
+                .toURI()
+                .toURL()
 
-            fetchAndParse(url, OIDCProviderMetadata::parse)
-        }
+        fetchAndParse(url, AuthorizationServerMetadata::parse)
+    }
 
-    /**
-     * Tries to fetch the [CIAuthorizationServerMetadata] for the provided [OAuth2 Authorization Server][issuer].
-     * The well known location __/.well-known/oauth-authorization-server__ is used.
-     */
-    private suspend fun fetchOauthServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
-        runCatching {
-            val url =
-                URLBuilder(issuer.value.toString())
-                    .appendPathSegments("/.well-known/oauth-authorization-server", encodeSlash = false)
-                    .build()
-                    .toURI()
-                    .toURL()
-
-            fetchAndParse(url, AuthorizationServerMetadata::parse)
-        }
-
-    /**
-     * Fetches the content of the provided [url], parses it as a [JSONObject], and further parses it
-     * using the provided [parser].
-     */
-    private suspend fun <T> fetchAndParse(url: URL, parser: (String) -> T): T =
-        ktorHttpClientFactory().use { client ->
-            val body = client.get(url).body<String>()
-            parser(body)
-        }
+/**
+ * Fetches the content of the provided [url], parses it as a [JSONObject], and further parses it
+ * using the provided [parser].
+ */
+private suspend fun <T> HttpClient.fetchAndParse(url: URL, parser: (String) -> T): T {
+    val body = get(url).body<String>()
+    return parser(body)
 }
 
 /**

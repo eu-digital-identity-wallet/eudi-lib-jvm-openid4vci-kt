@@ -18,11 +18,8 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
-import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
-import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
-import kotlinx.serialization.SerialName
+import eu.europa.ec.eudi.openid4vci.internal.resolveCredentialIssuerMetaData
 import java.io.Serializable
-import java.util.*
 
 sealed interface CredentialResponseEncryption : Serializable {
     data object NotRequired : CredentialResponseEncryption {
@@ -72,11 +69,18 @@ data class CredentialIssuerMetadata(
     ) : Serializable
 }
 
+fun CredentialIssuerMetadata.findMsoMdoc(docType: String): MsoMdocCredential? =
+    findByFormat<MsoMdocCredential> { it.docType == docType }.values.firstOrNull()
+
 /**
  * An endpoint of a Credential Issuer. It's an [HttpsUrl] that must not have a fragment.
  */
 @JvmInline
-value class CredentialIssuerEndpoint private constructor(val value: HttpsUrl) {
+value class CredentialIssuerEndpoint(val value: HttpsUrl) {
+
+    init {
+        require(value.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
+    }
 
     override fun toString(): String = value.toString()
 
@@ -86,33 +90,8 @@ value class CredentialIssuerEndpoint private constructor(val value: HttpsUrl) {
          * Parses the provided [value] as an [HttpsUrl] and tries to create a [CredentialIssuerEndpoint].
          */
         operator fun invoke(value: String): Result<CredentialIssuerEndpoint> =
-            HttpsUrl(value)
-                .mapCatching {
-                    require(it.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
-                    CredentialIssuerEndpoint(it)
-                }
+            HttpsUrl(value).mapCatching { CredentialIssuerEndpoint(it) }
     }
-}
-
-/**
- * The details of a Claim.
- */
-@kotlinx.serialization.Serializable
-data class Claim(
-    @SerialName("mandatory") val mandatory: Boolean? = false,
-    @SerialName("value_type") val valueType: String? = null,
-    @SerialName("display") val display: List<Display> = emptyList(),
-) : Serializable {
-
-    /**
-     * Display properties of a Claim.
-     */
-    @kotlinx.serialization.Serializable
-    data class Display(
-        @SerialName("name") val name: String? = null,
-        @kotlinx.serialization.Serializable(LocaleSerializer::class)
-        @SerialName("locale") val locale: Locale? = null,
-    ) : Serializable
 }
 
 /**
@@ -211,9 +190,10 @@ fun interface CredentialIssuerMetadataResolver {
          */
         operator fun invoke(
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
-        ): CredentialIssuerMetadataResolver =
-            DefaultCredentialIssuerMetadataResolver(
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            )
+        ): CredentialIssuerMetadataResolver = CredentialIssuerMetadataResolver { issuerId ->
+            ktorHttpClientFactory.invoke().use { httpClient ->
+                runCatching { httpClient.resolveCredentialIssuerMetaData(issuerId) }
+            }
+        }
     }
 }

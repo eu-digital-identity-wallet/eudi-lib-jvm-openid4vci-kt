@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.DefaultAuthorizationServerMetadataResolver
+import eu.europa.ec.eudi.openid4vci.internal.resolveAuthServerMetaData
 
 /**
  * Indicates an error during the resolution of an Authorization Server's metadata.
@@ -28,9 +28,9 @@ class AuthorizationServerMetadataResolutionException(reason: Throwable) : Except
 fun interface AuthorizationServerMetadataResolver {
 
     /**
-     * Resolves the metadata of an [issuer].
+     * Resolves the metadata of an [authServerUrl].
      */
-    suspend fun resolve(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata>
+    suspend fun resolve(authServerUrl: HttpsUrl): Result<CIAuthorizationServerMetadata>
 
     companion object {
 
@@ -39,9 +39,10 @@ fun interface AuthorizationServerMetadataResolver {
          */
         operator fun invoke(
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
-        ): AuthorizationServerMetadataResolver =
-            DefaultAuthorizationServerMetadataResolver(
-                ktorHttpClientFactory = ktorHttpClientFactory,
-            )
+        ): AuthorizationServerMetadataResolver = AuthorizationServerMetadataResolver { authServerUrl ->
+            ktorHttpClientFactory().use { httpClient ->
+                runCatching { httpClient.resolveAuthServerMetaData(authServerUrl) }
+            }
+        }
     }
 }

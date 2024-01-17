@@ -15,21 +15,32 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.NoProofRequired
+import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.ProofRequired
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer
+import eu.europa.ec.eudi.openid4vci.UnauthorizedRequest.AuthorizationCodeRetrieved
+import eu.europa.ec.eudi.openid4vci.UnauthorizedRequest.ParRequested
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
-import eu.europa.ec.eudi.openid4vci.internal.formats.Formats
-import java.util.*
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest.BatchRequest
+
+private typealias ProofFactory = (CredentialSupported) -> Proof
 
 /**
  * Default implementation of [Issuer] interface
  *  @param issuerMetadata  The credential issuer's metadata.
+ *  @param authorizationServerMetadata The metadata of the OAUTH2 or OIDC server
+ *  that protects the credential issuer endpoints
+ *  @param config The configuration options
  *  @param ktorHttpClientFactory Factory method to generate ktor http clients
- *  @param responseEncryptionSpecFactory   Factory method to generate the expected issuer's encrypted response, if issuer enforces encrypted responses.
- *     A default implementation is provided to callers.
+ *  @param responseEncryptionSpecFactory   Factory method to generate the expected issuer's encrypted response,
+ *  if needed.
  */
 internal class DefaultIssuer(
-    authorizationServerMetadata: CIAuthorizationServerMetadata,
     private val issuerMetadata: CredentialIssuerMetadata,
+    val authorizationServerMetadata: CIAuthorizationServerMetadata,
     config: OpenId4VCIConfig,
     ktorHttpClientFactory: KtorHttpClientFactory,
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
@@ -37,47 +48,47 @@ internal class DefaultIssuer(
 
     private val authorizer: IssuanceAuthorizer =
         IssuanceAuthorizer(authorizationServerMetadata, config, ktorHttpClientFactory)
+
     private val issuanceRequester: IssuanceRequester =
         IssuanceRequester(issuerMetadata, ktorHttpClientFactory)
 
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec? by lazy {
-        fun IssuanceResponseEncryptionSpec.isValid(meta: CredentialResponseEncryption.Required) {
-            if (!meta.algorithmsSupported.contains(algorithm)) {
-                throw CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
+        fun IssuanceResponseEncryptionSpec.validate(meta: CredentialResponseEncryption.Required) {
+            ensure(algorithm in meta.algorithmsSupported) {
+                ResponseEncryptionAlgorithmNotSupportedByIssuer
             }
-            if (!meta.encryptionMethodsSupported.contains(encryptionMethod)) {
-                throw CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer
+            ensure(encryptionMethod in meta.encryptionMethodsSupported) {
+                ResponseEncryptionMethodNotSupportedByIssuer
             }
         }
         when (val encryption = issuerMetadata.credentialResponseEncryption) {
             is CredentialResponseEncryption.NotRequired -> null
-            is CredentialResponseEncryption.Required -> responseEncryptionSpecFactory(encryption, config.keyGenerationConfig).also {
-                it.isValid(encryption)
-            }
+            is CredentialResponseEncryption.Required ->
+                responseEncryptionSpecFactory(encryption, config.keyGenerationConfig).apply {
+                    validate(encryption)
+                }
         }
     }
 
     override suspend fun pushAuthorizationCodeRequest(
         credentials: List<CredentialIdentifier>,
         issuerState: String?,
-    ): Result<UnauthorizedRequest.ParRequested> = runCatching {
-        val scopes = credentials.map {
-            it.matchIssuerSupportedCredential().scope?.let { Scope(it) }
-        }.filterNotNull()
-
-        val state = UUID.randomUUID().toString()
-        val (codeVerifier, getAuthorizationCodeUrl) =
+    ): Result<ParRequested> = runCatching {
+        val (codeVerifier, authorizationCodeUrl) = run {
+            val scopes = credentials.mapNotNull { credentialId ->
+                credentialSupportedById(credentialId).scope?.let { Scope(it) }
+            }
+            val state = State().value
             authorizer.submitPushedAuthorizationRequest(scopes, state, issuerState).getOrThrow()
-
-        UnauthorizedRequest.ParRequested(getAuthorizationCodeUrl, codeVerifier)
+        }
+        ParRequested(authorizationCodeUrl, codeVerifier)
     }
 
-    override suspend fun UnauthorizedRequest.ParRequested.handleAuthorizationCode(
+    override suspend fun ParRequested.handleAuthorizationCode(
         authorizationCode: AuthorizationCode,
-    ): UnauthorizedRequest.AuthorizationCodeRetrieved =
-        UnauthorizedRequest.AuthorizationCodeRetrieved(authorizationCode, pkceVerifier)
+    ): AuthorizationCodeRetrieved = AuthorizationCodeRetrieved(authorizationCode, pkceVerifier)
 
-    override suspend fun UnauthorizedRequest.AuthorizationCodeRetrieved.requestAccessToken(): Result<AuthorizedRequest> =
+    override suspend fun AuthorizationCodeRetrieved.requestAccessToken(): Result<AuthorizedRequest> =
         authorizer.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier)
             .map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
 
@@ -90,132 +101,118 @@ internal class DefaultIssuer(
             preAuthorizationCode.pin,
         ).map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
 
-    override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
+    override suspend fun NoProofRequired.requestSingle(
         credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
     ): Result<SubmittedRequest> = runCatching {
-        requestIssuance(accessToken) {
-            credentialId
-                .matchIssuerSupportedCredential()
-                .constructIssuanceRequest(claimSet, null)
-        }
+        placeIssuanceRequest(accessToken) { singleRequest(credentialId, claimSet, null) }
     }
 
-    override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
+    override suspend fun ProofRequired.requestSingle(
         credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
         proofSigner: ProofSigner,
     ): Result<SubmittedRequest> = runCatching {
-        requestIssuance(accessToken) {
-            with(credentialId.matchIssuerSupportedCredential()) {
-                constructIssuanceRequest(
-                    claimSet,
-                    ProofBuilder.ofType(ProofType.JWT) {
-                        aud(issuerMetadata.credentialIssuerIdentifier.toString())
-                        publicKey(proofSigner.getBindingKey())
-                        credentialSpec(this@with)
-                        nonce(cNonce.value)
-
-                        build(proofSigner)
-                    },
-                )
-            }
+        placeIssuanceRequest(accessToken) {
+            singleRequest(credentialId, claimSet, proofFactory(proofSigner, cNonce))
         }
     }
 
-    override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
+    override suspend fun NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialIdentifier, ClaimSet?>>,
     ): Result<SubmittedRequest> = runCatching {
-        requestIssuance(accessToken) {
-            CredentialIssuanceRequest.BatchCredentials(
-                credentialRequests = credentialsMetadata.map { (id, claimSet) ->
-                    id.matchIssuerSupportedCredential().constructIssuanceRequest(claimSet, null)
-                },
-            )
+        placeIssuanceRequest(accessToken) {
+            val credentialRequests = credentialsMetadata.map { (credentialId, claimSet) ->
+                singleRequest(credentialId, claimSet, null)
+            }
+            BatchRequest(credentialRequests)
         }
     }
 
-    override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
+    override suspend fun ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, ProofSigner>>,
     ): Result<SubmittedRequest> = runCatching {
-        requestIssuance(accessToken) {
-            val credentialRequests = credentialsMetadata.map { (id, claimSet, proofSigner) ->
-                with(id.matchIssuerSupportedCredential()) {
-                    constructIssuanceRequest(
-                        claimSet,
-                        ProofBuilder.ofType(ProofType.JWT) {
-                            aud(issuerMetadata.credentialIssuerIdentifier.toString())
-                            publicKey(proofSigner.getBindingKey())
-                            credentialSpec(this@with)
-                            nonce(cNonce.value)
-
-                            build(proofSigner)
-                        },
-                    )
-                }
+        placeIssuanceRequest(accessToken) {
+            val credentialRequests = credentialsMetadata.map { (credentialId, claimSet, proofSigner) ->
+                singleRequest(credentialId, claimSet, proofFactory(proofSigner, cNonce))
             }
-            CredentialIssuanceRequest.BatchCredentials(credentialRequests)
+            BatchRequest(credentialRequests)
         }
     }
 
-    private fun CredentialIdentifier.matchIssuerSupportedCredential(): CredentialSupported {
-        val credentialSupported = issuerMetadata.credentialsSupported[this]
-        requireNotNull(credentialSupported)
-        return credentialSupported
+    private fun credentialSupportedById(credentialId: CredentialIdentifier): CredentialSupported {
+        val credentialSupported = issuerMetadata.credentialsSupported[credentialId]
+        return requireNotNull(credentialSupported) {
+            "$credentialId was not found within issuer metadata"
+        }
     }
 
-    private fun CredentialSupported.constructIssuanceRequest(
+    private fun proofFactory(proofSigner: ProofSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
+        ProofBuilder.ofType(ProofType.JWT) {
+            aud(issuerMetadata.credentialIssuerIdentifier.toString())
+            publicKey(proofSigner.getBindingKey())
+            credentialSpec(credentialSupported)
+            nonce(cNonce.value)
+            build(proofSigner)
+        }
+    }
+
+    private fun singleRequest(
+        credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
-        proof: Proof?,
-    ): CredentialIssuanceRequest.SingleCredential {
+        proofFactory: ProofFactory?,
+    ): CredentialIssuanceRequest.SingleRequest {
+        val credentialSupported = credentialSupportedById(credentialId)
         fun assertSupported(p: Proof) {
             val proofType = when (p) {
                 is Proof.Jwt -> ProofType.JWT
                 is Proof.Cwt -> ProofType.CWT
             }
-            require(proofTypesSupported.contains(proofType)) {
-                "Provided proof type $proofType is not one of supported [${this.proofTypesSupported}]."
+            require(proofType in credentialSupported.proofTypesSupported) {
+                "Provided proof type $proofType is not one of supported [${credentialSupported.proofTypesSupported}]."
             }
         }
-        proof?.let { assertSupported(it) }
-        return Formats.createIssuanceRequest(this, claimSet, proof, responseEncryptionSpec).getOrThrow()
+        val proof = proofFactory?.invoke(credentialSupported)?.also { assertSupported(it) }
+        return CredentialIssuanceRequest.singleRequest(credentialSupported, claimSet, proof, responseEncryptionSpec)
     }
 
-    override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
+    override suspend fun NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
-    ): AuthorizedRequest.ProofRequired = AuthorizedRequest.ProofRequired(accessToken, cNonce)
+    ): ProofRequired = ProofRequired(accessToken, cNonce)
 
     override suspend fun AuthorizedRequest.queryForDeferredCredential(
         deferredCredential: IssuedCredential.Deferred,
     ): Result<DeferredCredentialQueryOutcome> =
         issuanceRequester.placeDeferredCredentialRequest(accessToken, deferredCredential.transactionId)
 
-    private suspend fun requestIssuance(
+    private suspend fun placeIssuanceRequest(
         token: AccessToken,
         issuanceRequestSupplier: () -> CredentialIssuanceRequest,
-    ): SubmittedRequest = when (val credentialRequest = issuanceRequestSupplier()) {
-        is CredentialIssuanceRequest.SingleCredential -> {
-            issuanceRequester.placeIssuanceRequest(token, credentialRequest).fold(
-                onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
-                onFailure = { handleIssuanceFailure(it) },
-            )
-        }
+    ): SubmittedRequest {
+        fun handleIssuanceFailure(error: Throwable): SubmittedRequest.Errored =
+            submitRequestFromError(error) ?: throw error
+        return when (val credentialRequest = issuanceRequestSupplier()) {
+            is CredentialIssuanceRequest.SingleRequest -> {
+                issuanceRequester.placeIssuanceRequest(token, credentialRequest).fold(
+                    onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
+                    onFailure = { handleIssuanceFailure(it) },
+                )
+            }
 
-        is CredentialIssuanceRequest.BatchCredentials -> {
-            issuanceRequester.placeBatchIssuanceRequest(token, credentialRequest).fold(
-                onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
-                onFailure = { handleIssuanceFailure(it) },
-            )
+            is BatchRequest -> {
+                issuanceRequester.placeBatchIssuanceRequest(token, credentialRequest).fold(
+                    onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
+                    onFailure = { handleIssuanceFailure(it) },
+                )
+            }
         }
     }
+}
 
-    private fun handleIssuanceFailure(error: Throwable): SubmittedRequest.Errored = when (error) {
-        is CredentialIssuanceError.InvalidProof ->
-            SubmittedRequest.InvalidProof(CNonce(error.cNonce, error.cNonceExpiresIn))
+private fun submitRequestFromError(error: Throwable): SubmittedRequest.Errored? = when (error) {
+    is CredentialIssuanceError.InvalidProof ->
+        SubmittedRequest.InvalidProof(CNonce(error.cNonce, error.cNonceExpiresIn))
 
-        is CredentialIssuanceError ->
-            SubmittedRequest.Failed(error)
-
-        else -> throw error
-    }
+    is CredentialIssuanceError -> SubmittedRequest.Failed(error)
+    else -> null
 }

@@ -39,7 +39,7 @@ internal sealed interface ProofBuilder {
 
     private class JwtProofBuilder : ProofBuilder {
 
-        val HEADER_TYPE = "openid4vci-proof+jwt"
+        private val headerType = "openid4vci-proof+jwt"
         val claimsSet = JWTClaimsSet.Builder()
         var publicKey: BindingKey? = null
         var credentialSpec: CredentialSupported? = null
@@ -70,7 +70,7 @@ internal sealed interface ProofBuilder {
             validate(algorithm)
 
             val headerBuilder = JWSHeader.Builder(algorithm)
-            headerBuilder.type(JOSEObjectType(HEADER_TYPE))
+            headerBuilder.type(JOSEObjectType(headerType))
 
             when (val key = publicKey!!) {
                 is BindingKey.Jwk -> headerBuilder.jwk(key.jwk.toPublicJWK())
