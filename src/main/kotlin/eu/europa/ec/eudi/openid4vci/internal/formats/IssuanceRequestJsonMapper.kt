@@ -15,8 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.formats
 
+import eu.europa.ec.eudi.openid4vci.IssuanceResponseEncryptionSpec
 import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.RequestedCredentialResponseEncryption
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -38,7 +38,7 @@ private fun toTransferObject(request: CredentialIssuanceRequest): CredentialIssu
 private fun transferObjectOfSingle(
     request: CredentialIssuanceRequest.SingleRequest,
 ): CredentialIssuanceRequestTO.SingleCredentialTO {
-    val (encryptionJwk, encryptionAlg, encryptionMethod) = split(request.encryption)
+    val (encryptionJwk, encryptionAlg, encryptionMethod) = request.encryption.transferObject()
 
     return when (val credential = request.credential) {
         is CredentialType.MsoMdocDocType -> MsoMdocIssuanceRequestTO(
@@ -71,15 +71,15 @@ private fun transferObjectOfSingle(
     }
 }
 
-private fun split(it: RequestedCredentialResponseEncryption): Triple<JsonObject?, String?, String?> {
-    return when (it) {
-        RequestedCredentialResponseEncryption.NotRequested -> Triple(null, null, null)
-        is RequestedCredentialResponseEncryption.Requested -> {
+private fun IssuanceResponseEncryptionSpec?.transferObject(): Triple<JsonObject?, String?, String?> {
+    return when (this) {
+        null -> Triple(null, null, null)
+        else -> {
             val credentialEncryptionJwk = Json.parseToJsonElement(
-                it.encryptionJwk.toPublicJWK().toString(),
+                jwk.toPublicJWK().toString(),
             ).jsonObject
-            val credentialResponseEncryptionAlg = it.responseEncryptionAlg.toString()
-            val credentialResponseEncryptionMethod = it.responseEncryptionMethod.toString()
+            val credentialResponseEncryptionAlg = algorithm.toString()
+            val credentialResponseEncryptionMethod = encryptionMethod.toString()
             Triple(credentialEncryptionJwk, credentialResponseEncryptionAlg, credentialResponseEncryptionMethod)
         }
     }

@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vci.internal.formats
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidIssuanceRequest
 import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.RequestedCredentialResponseEncryption
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
 
@@ -55,7 +54,7 @@ internal sealed interface CredentialIssuanceRequest {
      */
     data class SingleRequest(
         val proof: Proof?,
-        val encryption: RequestedCredentialResponseEncryption,
+        val encryption: IssuanceResponseEncryptionSpec?,
         val credential: CredentialType,
     ) : CredentialIssuanceRequest
 
@@ -66,7 +65,6 @@ internal sealed interface CredentialIssuanceRequest {
             proof: Proof?,
             responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
         ): SingleRequest {
-            val encryption = RequestedCredentialResponseEncryption.fromSpec(responseEncryptionSpec)
             val cd = when (supportedCredential) {
                 is MsoMdocCredential -> msoMdoc(supportedCredential, claimSet.ensureClaimSet())
                 is SdJwtVcCredential -> sdJwtVc(supportedCredential, claimSet.ensureClaimSet())
@@ -74,7 +72,7 @@ internal sealed interface CredentialIssuanceRequest {
                 is W3CJsonLdSignedJwtCredential -> error("Format $FORMAT_W3C_JSONLD_SIGNED_JWT not supported")
                 is W3CJsonLdDataIntegrityCredential -> error("Format $FORMAT_W3C_JSONLD_DATA_INTEGRITY not supported")
             }
-            return SingleRequest(proof, encryption, cd)
+            return SingleRequest(proof, responseEncryptionSpec, cd)
         }
     }
 }

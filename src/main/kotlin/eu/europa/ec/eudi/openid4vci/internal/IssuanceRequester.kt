@@ -15,12 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
-import com.nimbusds.jose.jwk.KeyType
-import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet
 import com.nimbusds.jose.proc.JWEDecryptionKeySelector
 import com.nimbusds.jose.proc.SecurityContext
@@ -80,61 +75,6 @@ private data class DeferredIssuanceSuccessResponse(
     @SerialName("format") val format: String,
     @SerialName("credential") val credential: String,
 )
-
-/**
- * Sealed hierarchy for the issuance response encryption specification as it is requested to the issuer server.
- */
-internal sealed interface RequestedCredentialResponseEncryption : java.io.Serializable {
-
-    /**
-     *  No encryption is requested
-     */
-    data object NotRequested : RequestedCredentialResponseEncryption {
-        private fun readResolve(): Any = NotRequested
-    }
-
-    /**
-     *  The encryption parameters that are sent along with the issuance request.
-     *
-     * @param encryptionJwk   Key pair in JWK format used for issuance response encryption/decryption
-     * @param responseEncryptionAlg   Encryption algorithm to be used
-     * @param responseEncryptionMethod Encryption method to be used
-     */
-    data class Requested(
-        val encryptionJwk: JWK,
-        val responseEncryptionAlg: JWEAlgorithm,
-        val responseEncryptionMethod: EncryptionMethod,
-    ) : RequestedCredentialResponseEncryption {
-        init {
-            // Validate algorithm provided is for asymmetric encryption
-            check(JWEAlgorithm.Family.ASYMMETRIC.contains(responseEncryptionAlg)) {
-                "Provided encryption algorithm is not an asymmetric encryption algorithm"
-            }
-            // Validate algorithm matches key
-            check(encryptionJwk.keyType == KeyType.forAlgorithm(responseEncryptionAlg)) {
-                "Encryption key and encryption algorithm do not match"
-            }
-            // Validate key is for encryption operation
-            check(encryptionJwk.keyUse == KeyUse.ENCRYPTION) {
-                "Provided key use is not encryption"
-            }
-        }
-    }
-
-    companion object {
-
-        fun fromSpec(responseEncryptionSpec: IssuanceResponseEncryptionSpec?): RequestedCredentialResponseEncryption {
-            return responseEncryptionSpec?.let {
-                val (credentialEncryptionJwk, credentialResponseEncryptionAlg, credentialResponseEncryptionMethod) = it
-                Requested(
-                    encryptionJwk = credentialEncryptionJwk,
-                    responseEncryptionAlg = credentialResponseEncryptionAlg,
-                    responseEncryptionMethod = credentialResponseEncryptionMethod,
-                )
-            } ?: NotRequested
-        }
-    }
-}
 
 /**
  * Models a response of the issuer to a successful issuance request.
@@ -219,18 +159,15 @@ internal class IssuanceRequester(
 
                 is CredentialResponseEncryption.Required -> {
                     val jwt = response.body<String>()
-                    val encryptionSpec =
-                        when (val requestedEncryptionSpec = request.encryption) {
-                            is RequestedCredentialResponseEncryption.Requested -> requestedEncryptionSpec
-                            is RequestedCredentialResponseEncryption.NotRequested ->
-                                throw IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
-                        }
+                    val encryptionSpec = ensureNotNull(request.encryption) {
+                        IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+                    }
 
                     DefaultJWTProcessor<SecurityContext>().apply {
                         jweKeySelector = JWEDecryptionKeySelector(
-                            encryptionSpec.responseEncryptionAlg,
-                            encryptionSpec.responseEncryptionMethod,
-                            ImmutableJWKSet(JWKSet(encryptionSpec.encryptionJwk)),
+                            encryptionSpec.algorithm,
+                            encryptionSpec.encryptionMethod,
+                            ImmutableJWKSet(JWKSet(encryptionSpec.jwk)),
                         )
                     }.process(jwt, null)
                         .toSingleIssuanceSuccessResponse()

@@ -18,6 +18,8 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.KeyType
+import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
 import java.net.URI
 import java.net.URL
@@ -162,7 +164,22 @@ data class IssuanceResponseEncryptionSpec constructor(
     val jwk: JWK,
     val algorithm: JWEAlgorithm,
     val encryptionMethod: EncryptionMethod,
-)
+) {
+    init {
+        // Validate algorithm provided is for asymmetric encryption
+        require(JWEAlgorithm.Family.ASYMMETRIC.contains(algorithm)) {
+            "Provided encryption algorithm is not an asymmetric encryption algorithm"
+        }
+        // Validate algorithm matches key
+        require(jwk.keyType == KeyType.forAlgorithm(algorithm)) {
+            "Encryption key and encryption algorithm do not match"
+        }
+        // Validate key is for encryption operation
+        require(jwk.keyUse == KeyUse.ENCRYPTION) {
+            "Provided key use is not encryption"
+        }
+    }
+}
 
 /**
  * A credential identified as a scope
