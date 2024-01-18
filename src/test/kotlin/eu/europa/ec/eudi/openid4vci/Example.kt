@@ -41,11 +41,12 @@ val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrT
 
 const val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
 const val PID_MsoMdoc = "eu.europa.ec.eudiw.pid_mso_mdoc"
+const val MDL = "org.iso.18013.5.1.mDL"
 
 val credentialOffer = """
     {
       "credential_issuer": "$CredentialIssuer_URL",
-      "credentials": [ "$PID_SdJwtVC", "$PID_MsoMdoc" ],
+      "credentials": [ "$PID_SdJwtVC", "$PID_MsoMdoc", "$MDL" ],
       "grants": {
         "authorization_code": {}
       }
@@ -56,6 +57,7 @@ fun main(): Unit = runTest {
     val proofSigners = mapOf(
         PID_SdJwtVC to CryptoGenerator.rsaProofSigner(),
         PID_MsoMdoc to CryptoGenerator.ecProofSigner(),
+        MDL to CryptoGenerator.ecProofSigner(),
     )
 
     val config = OpenId4VCIConfig(
@@ -85,12 +87,15 @@ private suspend fun walletInitiatedIssuanceWithOffer(wallet: Wallet) {
 }
 
 private suspend fun walletInitiatedIssuanceNoOffer(wallet: Wallet) {
-    println("[[Scenario: No offer passed, wallet initiates issuance by credential identifiers: $PID_SdJwtVC, $PID_MsoMdoc]]")
+    println("[[Scenario: No offer passed, wallet initiates issuance by credential identifiers: $PID_SdJwtVC, $PID_MsoMdoc, $MDL]]")
     val pidSdjwtVc = wallet.issueByCredentialIdentifier(PID_SdJwtVC)
     println("--> Issued PID $PID_SdJwtVC: $pidSdjwtVc \n")
 
     val pidMsoMdoc = wallet.issueByCredentialIdentifier(PID_MsoMdoc)
     println("--> Issued PID $PID_MsoMdoc: $pidMsoMdoc \n")
+
+    val mdl = wallet.issueByCredentialIdentifier(MDL)
+    println("--> Issued MDL $MDL: $mdl \n")
 }
 
 data class ActingUser(
