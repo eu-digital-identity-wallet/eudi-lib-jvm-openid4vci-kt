@@ -50,7 +50,7 @@ Library provides the following main api elements to facilitate consumers of this
 
 ### Resolve Credential Issuer and authorization server metadata
 
-To obtain the credential issuers metadata use [CredentialIssuerMetadataResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialIssuerMetadataResolver.kt) the following way
+To obtain the credentials issuer metadata use [CredentialIssuerMetadataResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialIssuerMetadataResolver.kt) the following way
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
@@ -69,6 +69,16 @@ import eu.europa.ec.eudi.openid4vci.*
 
 val resolver = AuthorizationServerMetadataResolver() // get a default implementation of the AuthorizationServerMetadataResolver interface
 val metadata: CIAuthorizationServerMetadata = resolver.resolve(HttpsUrl("https://...")).getOrThrow() // fetch and parse authorization server metadata
+```
+
+There is also a convenient method that obtains the credentials issuer metadata & the metadata of the first 
+authorization server with a single call
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+val credentialIssuerIdentifier = CredentialIssuerId("https://....").getOrThrow()
+val (issuerMetadata, authServerMetadata) = Issuer.metaData(credentialIssuerIdentifier)
 ```
 
 ### Resolve a credential offer presented by issuer
@@ -150,13 +160,15 @@ The Issuer interface provides a factory method to construct an issuer component.
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
-val issuer =  
-    Issuer.make(
-        authorizationServerMetadata, // authorization server metadata.
-        issuerMetadata, // credential issuer's metadata
-        openId4VCIConfig, // configuration attributes    
-        responseEncryptionSpecFactory // OPTIONAL, factory method to generate the expected issuer's encrypted response, if issuer enforces encrypted responses
-    )
+val credentialIssuerIdentifier = CredentialIssuerId("https://....").getOrThrow()
+val openId4VCIConfig = OpenId4VCIConfig(
+    clientId = "wallet-dev", // The client id of wallet (acting as an OAUTH2 client)
+    authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // Where the Credential Issuer should redirect after 
+                                                              // Authorization code flow succeeds
+    keyGenerationConfig = KeyGenerationConfig.ecOnly(Curve.P_256) // What kind of ephemeral keys could be generated
+                                                                  // to encrypt credential issuance response 
+)
+val issuer = Issuer.make(openId4VCIConfig, credentialIssuerIdentifier)
 ```
 
 #### Authorize request via Authorization Code Flow
