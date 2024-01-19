@@ -27,7 +27,7 @@ import eu.europa.ec.eudi.openid4vci.KeyGenerationConfig
 import eu.europa.ec.eudi.openid4vci.RsaConfig
 import java.util.*
 
-object KeyGenerator {
+internal object KeyGenerator {
 
     fun genKeyIfSupported(keyGenerationConfig: KeyGenerationConfig, alg: JWEAlgorithm): JWK? {
         return when (alg) {
