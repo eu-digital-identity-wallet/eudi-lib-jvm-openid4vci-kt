@@ -210,12 +210,12 @@ private class Wallet(
         with(issuer) {
             val proofSigner = proofSigners[credentialIdentifier.value]
                 ?: error("No signer found for credential $credentialIdentifier")
-            val requestOutcome =
+            val submittedRequest =
                 authorized.requestSingle(credentialIdentifier, null, proofSigner).getOrThrow()
 
-            return when (requestOutcome) {
+            return when (submittedRequest) {
                 is SubmittedRequest.Success -> {
-                    when (val issuedCredential = requestOutcome.credentials[0]) {
+                    when (val issuedCredential = submittedRequest.credentials[0]) {
                         is IssuedCredential.Issued -> issuedCredential.credential
                         is IssuedCredential.Deferred -> {
                             deferredCredentialUseCase(issuer, authorized, issuedCredential)
@@ -223,7 +223,7 @@ private class Wallet(
                     }
                 }
 
-                is SubmittedRequest.Failed -> throw requestOutcome.error
+                is SubmittedRequest.Failed -> throw submittedRequest.error
 
                 is SubmittedRequest.InvalidProof ->
                     throw IllegalStateException("Although providing a proof with c_nonce the proof is still invalid")
@@ -257,12 +257,12 @@ private class Wallet(
         credentialIdentifier: CredentialIdentifier,
     ): String {
         with(issuer) {
-            val requestOutcome =
+            val submittedRequest =
                 noProofRequiredState.requestSingle(credentialIdentifier, null).getOrThrow()
 
-            return when (requestOutcome) {
+            return when (submittedRequest) {
                 is SubmittedRequest.Success -> {
-                    when (val issuedCredential = requestOutcome.credentials[0]) {
+                    when (val issuedCredential = submittedRequest.credentials[0]) {
                         is IssuedCredential.Issued -> issuedCredential.credential
                         is IssuedCredential.Deferred -> {
                             deferredCredentialUseCase(issuer, noProofRequiredState, issuedCredential)
@@ -273,12 +273,12 @@ private class Wallet(
                 is SubmittedRequest.InvalidProof -> {
                     proofRequiredSubmissionUseCase(
                         issuer,
-                        noProofRequiredState.handleInvalidProof(requestOutcome.cNonce),
+                        noProofRequiredState.handleInvalidProof(submittedRequest.cNonce),
                         credentialIdentifier,
                     )
                 }
 
-                is SubmittedRequest.Failed -> throw requestOutcome.error
+                is SubmittedRequest.Failed -> throw submittedRequest.error
             }
         }
     }

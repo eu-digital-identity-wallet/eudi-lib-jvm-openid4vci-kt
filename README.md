@@ -10,7 +10,7 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
 * [Overview](#overview)
 * [Disclaimer](#disclaimer)
 * [How to use](#how-to-use)  
-* [OpenId4VCI features supported](#openid4vci-features-supported)
+* [Features supported](#features-supported)
 * [How to contribute](#how-to-contribute)
 * [License](#license)
 
@@ -148,8 +148,8 @@ stateDiagram-v2
 ```
 
 
-[Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) the following way to validate and resolve it to [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) component is the component that facilitates the authorization and submission of a credential issuance request (batch or single)
-As depicted from the below diagram it is consisted of two sub-components:
+[Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) is the component that facilitates the authorization and submission of a credential issuance request (batch or single).
+It is consisted of two sub-components:
 - **IssuanceAuthorizer**: A component responsible for all interactions with an authorization server to authorize a request for credential(s) issuance.
 - **IssuerRequester**: A component responsible for all interactions with credential issuer for submitting credential issuance requests.
 
@@ -214,10 +214,11 @@ with(issuer) {
 
     when (submittedRequest) {
         is SubmittedRequest.Success -> {
-            val result = requestOutcome.response.credentialResponses.get(0)
-            when (result) {
-                is CredentialIssuanceResponse.Result.Issued -> result.credential
-                is CredentialIssuanceResponse.Result.Deferred -> result.transactionId
+            when (val issuedCredential = submittedRequest.credentials[0]) {
+                is IssuedCredential.Issued -> issuedCredential.credential
+                is IssuedCredential.Deferred -> {
+                    deferredCredentialUseCase(issuer, authorized, issuedCredential)
+                }
             }
         }
         is SubmittedRequest.Failed -> // handle failed request
@@ -236,9 +237,9 @@ import eu.europa.ec.eudi.openid4vci.*
 with(issuer) {    
     val submittedRequest = authorizedRequest.requestBatch(credentialsMetadata).getOrThrow()
 
-    when (requestOutcome) {
+    when (submittedRequest) {
         is SubmittedRequest.Success -> {
-            val results = requestOutcome.response.credentialResponses.map {
+            val results = submittedRequest.credentials.map {
                 when (it) {
                     is CredentialIssuanceResponse.Result.Issued -> it.credential
                     is CredentialIssuanceResponse.Result.Deferred -> it.transactionId
@@ -262,18 +263,18 @@ Specification defines ([section 6.2](https://openid.github.io/OpenID4VCI/openid-
 if `authorization_details` parameter is used in authorization endpoint. Current version of library is not parsing/utilizing this response attribute.
 
 ### Credential Request
-Current version of the library only integrations with issuer's [Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-credential-endpoint),
+Current version of the library implements integrations with issuer's [Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-credential-endpoint),
 [Batch Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-batch-credential-endpoint) and
 [Deferred Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-deferred-credential-endpoin)
-are supported.
+endpoints.
 
-**NOTE:** Attribute `credential_identifier` of a single (or batch) credential request(s) is not supported.
+**NOTE:** Attribute `credential_identifier` of a credential request (single or batch) is not yet supported.
 
 #### Credential Format Profiles
-OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library focuses only on **mso_mdoc** format as specified in section [E.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-iso-mdl)  
+OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library fully supports **ISO mDL** profile and gives some initial support for **IETF SD-JWT VC** profile.  
 
 #### Proof Types
-OpenId4VCI specification defines two types of proofs that can be included in a credential issuance request, JWT proof type and CWT proof type (see section [7.2.1](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-7.2.1)). Current version of the library supports only JWT proof types
+OpenId4VCI specification (draft 12) defines two types of proofs that can be included in a credential issuance request, JWT proof type and CWT proof type. Current version of the library supports only JWT proof types
 
 ## How to contribute
 
