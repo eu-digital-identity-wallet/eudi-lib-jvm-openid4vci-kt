@@ -16,7 +16,8 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer
+import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer2
+import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.apache.*
@@ -36,23 +37,6 @@ import org.jsoup.nodes.FormElement
 import java.net.URI
 import java.net.URL
 
-const val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
-val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
-
-const val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-const val PID_MsoMdoc = "eu.europa.ec.eudiw.pid_mso_mdoc"
-const val MDL = "org.iso.18013.5.1.mDL"
-
-val credentialOffer = """
-    {
-      "credential_issuer": "$CredentialIssuer_URL",
-      "credentials": [ "$PID_SdJwtVC", "$PID_MsoMdoc", "$MDL" ],
-      "grants": {
-        "authorization_code": {}
-      }
-    }
-""".trimIndent()
-
 fun main(): Unit = runTest {
     val proofSigners = mapOf(
         PID_SdJwtVC to CryptoGenerator.rsaProofSigner(),
@@ -67,13 +51,13 @@ fun main(): Unit = runTest {
     )
 
     val user = ActingUser("tneal", "password")
-    val wallet = Wallet.ofUser(user, proofSigners, config)
+    val wallet = Wallet2.ofUser(user, proofSigners, config)
 
-    walletInitiatedIssuanceWithOffer(wallet)
-    walletInitiatedIssuanceNoOffer(wallet)
+    walletInitiatedIssuanceWithOffer2(wallet)
+    walletInitiatedIssuanceNoOffer2(wallet)
 }
 
-private suspend fun walletInitiatedIssuanceWithOffer(wallet: Wallet) {
+private suspend fun walletInitiatedIssuanceWithOffer2(wallet: Wallet2) {
     println("[[Scenario: Offer passed to wallet via url]] ")
 
     val offerUrl = "https://localhost/pid-issuer/credentialoffer?credential_offer=$credentialOffer"
@@ -86,7 +70,7 @@ private suspend fun walletInitiatedIssuanceWithOffer(wallet: Wallet) {
     println()
 }
 
-private suspend fun walletInitiatedIssuanceNoOffer(wallet: Wallet) {
+private suspend fun walletInitiatedIssuanceNoOffer2(wallet: Wallet2) {
     println("[[Scenario: No offer passed, wallet initiates issuance by credential identifiers: $PID_SdJwtVC, $PID_MsoMdoc, $MDL]]")
     val pidSdjwtVc = wallet.issueByCredentialIdentifier(PID_SdJwtVC)
     println("--> Issued PID $PID_SdJwtVC: $pidSdjwtVc \n")
@@ -98,39 +82,40 @@ private suspend fun walletInitiatedIssuanceNoOffer(wallet: Wallet) {
     println("--> Issued MDL $MDL: $mdl \n")
 }
 
-data class ActingUser(
-    val username: String,
-    val password: String,
-)
-
-private class Wallet(
+private class Wallet2(
     val actingUser: ActingUser,
     val proofSigners: Map<String, DelegatingProofSigner>,
     val config: OpenId4VCIConfig,
 ) {
-
     suspend fun issueByCredentialIdentifier(identifier: String): String {
-        val issuer = Issuer.make(
-            config = config,
-            ktorHttpClientFactory = ::httpClientFactory,
-            credentialIssuerId = credentialIssuerIdentifier,
-        )
+        val (issuerMetadata, authorizationServersMetadata) = httpClientFactory().use { client ->
+            Issuer2.metaData(client, credentialIssuerIdentifier)
+        }
+
         val credentialIdentifier = CredentialIdentifier(identifier)
+        ensure(issuerMetadata.credentialsSupported.get(credentialIdentifier) != null) {
+            error("Credential identifier $identifier not supported by issuer")
+        }
+
+        val offer = CredentialOffer(
+            credentialIssuerIdentifier = credentialIssuerIdentifier,
+            credentialIssuerMetadata = issuerMetadata,
+            authorizationServerMetadata = authorizationServersMetadata[0],
+            credentials = listOf(credentialIdentifier),
+        )
+
+        val issuer = Issuer2.make(
+            config = config,
+            credentialOffer = offer,
+        )
 
         // Authorize with auth code flow
-        val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
-            issuer,
-            listOf(credentialIdentifier),
-        )
+        val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer)
 
-        val outcome =
-            when (authorizedRequest) {
-                is AuthorizedRequest.NoProofRequired ->
-                    noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialIdentifier)
-
-                is AuthorizedRequest.ProofRequired ->
-                    proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialIdentifier)
-            }
+        val outcome = when (authorizedRequest) {
+            is AuthorizedRequest.NoProofRequired -> noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialIdentifier)
+            is AuthorizedRequest.ProofRequired -> proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialIdentifier)
+        }
 
         return outcome
     }
@@ -142,76 +127,61 @@ private class Wallet(
     }
 
     suspend fun issueByCredentialOffer(offer: CredentialOffer): List<Pair<String, String>> {
-        val issuerMetadata = offer.credentialIssuerMetadata
-        val issuer = Issuer.make(
-            authorizationServerMetadata = offer.authorizationServerMetadata,
+        val issuer = Issuer2.make(
             config = config,
-            issuerMetadata = issuerMetadata,
-            ktorHttpClientFactory = ::httpClientFactory,
+            credentialOffer = offer,
         )
 
         // Authorize with auth code flow
-        val authorizedRequest = authorizeRequestWithAuthCodeUseCase(
-            issuer,
-            offer.credentials,
-        )
+        val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer)
 
         return when (authorizedRequest) {
-            is AuthorizedRequest.NoProofRequired ->
-                offer.credentials.map { credentialId ->
-                    issuanceLog("Requesting issuance of '$credentialId'")
-                    val credential = noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId)
-                    credentialId.value to credential
-                }
+            is AuthorizedRequest.NoProofRequired -> offer.credentials.map { credentialId ->
+                issuanceLog("Requesting issuance of '$credentialId'")
+                val credential = noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId)
+                credentialId.value to credential
+            }
 
-            is AuthorizedRequest.ProofRequired ->
-                offer.credentials.map { credentialId ->
-                    issuanceLog("Requesting issuance of '$credentialId'")
-                    val credential = proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId)
-                    credentialId.value to credential
-                }
+            is AuthorizedRequest.ProofRequired -> offer.credentials.map { credentialId ->
+                issuanceLog("Requesting issuance of '$credentialId'")
+                val credential = proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId)
+                credentialId.value to credential
+            }
         }
     }
 
-    private suspend fun authorizeRequestWithAuthCodeUseCase(
-        issuer: Issuer,
-        credentialMetadata: List<CredentialIdentifier>,
-    ): AuthorizedRequest =
-        with(issuer) {
-            check(issuer is DefaultIssuer)
-//            val parEndPoint = issuer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
-//            authorizationLog("Placing PAR to AS server's endpoint $parEndPoint")
+    private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer2): AuthorizedRequest = with(issuer) {
+        check(issuer is DefaultIssuer2)
+        authorizationLog("Preparing authorization code request")
 
-            val parPlaced = pushAuthorizationCodeRequest(credentialMetadata, null).getOrThrow()
+        val prepareAuthorizationCodeRequest = issuer.prepareAuthorizationRequest().getOrThrow()
 
-            authorizationLog("Placed PAR. Get authorization code URL is: ${parPlaced.getAuthorizationCodeURL.value}")
+        authorizationLog("Get authorization code URL is: ${prepareAuthorizationCodeRequest.authorizationCodeURL.value}")
 
-            val authorizationCode = loginUserAndGetAuthCode(
-                parPlaced.getAuthorizationCodeURL.value,
-                actingUser,
-            ) ?: error("Could not retrieve authorization code")
+        val authorizationCode = loginUserAndGetAuthCode(
+            prepareAuthorizationCodeRequest.authorizationCodeURL.value,
+            actingUser,
+        ) ?: error("Could not retrieve authorization code")
 
-            authorizationLog("Authorization code retrieved: $authorizationCode")
+        authorizationLog("Authorization code retrieved: $authorizationCode")
 
-            val authorizedRequest = parPlaced
-                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
-                .requestAccessToken().getOrThrow()
+        val authorizedRequest = prepareAuthorizationCodeRequest.authorizeWithAuthorizationCode(
+            AuthorizationCode(authorizationCode),
+        ).getOrThrow()
 
-            authorizationLog("Authorization code exchanged with access token : ${authorizedRequest.accessToken.accessToken}")
+        authorizationLog("Authorization code exchanged with access token : ${authorizedRequest.accessToken.accessToken}")
 
-            authorizedRequest
-        }
+        authorizedRequest
+    }
 
     private suspend fun proofRequiredSubmissionUseCase(
-        issuer: Issuer,
+        issuer: Issuer2,
         authorized: AuthorizedRequest.ProofRequired,
         credentialIdentifier: CredentialIdentifier,
     ): String {
         with(issuer) {
-            val proofSigner = proofSigners[credentialIdentifier.value]
-                ?: error("No signer found for credential $credentialIdentifier")
-            val submittedRequest =
-                authorized.requestSingle(credentialIdentifier, null, proofSigner).getOrThrow()
+            val proofSigner = proofSigners[credentialIdentifier.value] ?: error("No signer found for credential $credentialIdentifier")
+            val submittedRequest = authorized.requestSingle(credentialIdentifier, null, proofSigner).getOrThrow()
 
             return when (submittedRequest) {
                 is SubmittedRequest.Success -> {
@@ -225,14 +195,15 @@ private class Wallet(
 
                 is SubmittedRequest.Failed -> throw submittedRequest.error
 
-                is SubmittedRequest.InvalidProof ->
-                    throw IllegalStateException("Although providing a proof with c_nonce the proof is still invalid")
+                is SubmittedRequest.InvalidProof -> throw IllegalStateException(
+                    "Although providing a proof with c_nonce the proof is still invalid",
+                )
             }
         }
     }
 
     private suspend fun deferredCredentialUseCase(
-        issuer: Issuer,
+        issuer: Issuer2,
         authorized: AuthorizedRequest,
         deferred: IssuedCredential.Deferred,
     ): String {
@@ -252,13 +223,12 @@ private class Wallet(
     }
 
     private suspend fun noProofRequiredSubmissionUseCase(
-        issuer: Issuer,
+        issuer: Issuer2,
         noProofRequiredState: AuthorizedRequest.NoProofRequired,
         credentialIdentifier: CredentialIdentifier,
     ): String {
         with(issuer) {
-            val submittedRequest =
-                noProofRequiredState.requestSingle(credentialIdentifier, null).getOrThrow()
+            val submittedRequest = noProofRequiredState.requestSingle(credentialIdentifier, null).getOrThrow()
 
             return when (submittedRequest) {
                 is SubmittedRequest.Success -> {
@@ -285,8 +255,7 @@ private class Wallet(
 
     private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
         return httpClientFactory().use { client ->
-            val loginUrl =
-                client.get(getAuthorizationCodeUrl).body<String>().extractASLoginUrl()
+            val loginUrl = client.get(getAuthorizationCodeUrl).body<String>().extractASLoginUrl()
 
             val formParameters = mapOf(
                 "username" to actingUser.username,
@@ -305,7 +274,7 @@ private class Wallet(
 
     companion object {
         fun ofUser(actingUser: ActingUser, proofSigners: Map<String, DelegatingProofSigner>, config: OpenId4VCIConfig) =
-            Wallet(actingUser, proofSigners, config)
+            Wallet2(actingUser, proofSigners, config)
     }
 }
 
@@ -317,25 +286,22 @@ private fun issuanceLog(message: String) {
     println("--> [ISSUANCE] $message")
 }
 
-private fun httpClientFactory(): HttpClient =
-    HttpClient(Apache) {
-        install(ContentNegotiation) {
-            json(
-                json = Json { ignoreUnknownKeys = true },
+private fun httpClientFactory(): HttpClient = HttpClient(Apache) {
+    install(ContentNegotiation) {
+        json(
+            json = Json { ignoreUnknownKeys = true },
+        )
+    }
+    install(HttpCookies)
+    engine {
+        customizeClient {
+            setSSLContext(
+                SSLContextBuilder.create().loadTrustMaterial(TrustSelfSignedStrategy()).build(),
             )
-        }
-        install(HttpCookies)
-        engine {
-            customizeClient {
-                setSSLContext(
-                    SSLContextBuilder.create()
-                        .loadTrustMaterial(TrustSelfSignedStrategy())
-                        .build(),
-                )
-                setSSLHostnameVerifier(NoopHostnameVerifier())
-            }
+            setSSLHostnameVerifier(NoopHostnameVerifier())
         }
     }
+}
 
 private fun String.extractASLoginUrl(): URL {
     val form = Jsoup.parse(this).body().getElementById("kc-form-login") as FormElement

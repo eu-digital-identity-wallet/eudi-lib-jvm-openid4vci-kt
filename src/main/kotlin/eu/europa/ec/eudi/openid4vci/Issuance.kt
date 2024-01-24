@@ -21,28 +21,6 @@ import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
 
 /**
- * Holds a https [java.net.URL] to be used at the second step of PAR flow for retrieving the authorization code.
- * Contains the 'request_uri' retrieved from the post to PAR endpoint of authorization server and the client_id.
- */
-class AuthorizationUrl private constructor(val url: HttpsUrl) {
-
-    override fun toString(): String = url.toString()
-
-    companion object {
-        const val PARAM_CLIENT_ID = "client_id"
-        const val PARAM_REQUEST_URI = "request_uri"
-        const val PARAM_STATE = "state"
-        operator fun invoke(url: String): AuthorizationUrl {
-            val httpsUrl = HttpsUrl(url).getOrThrow()
-            val query = requireNotNull(httpsUrl.value.query) { "URL must contain query parameter" }
-            require(query.contains("$PARAM_CLIENT_ID=")) { "URL must contain client_id query parameter" }
-            require(query.contains("$PARAM_REQUEST_URI=")) { "URL must contain request_uri query parameter" }
-            return AuthorizationUrl(httpsUrl)
-        }
-    }
-}
-
-/**
  * Sealed hierarchy of states that denote the individual steps that need to be taken to authorize a request for issuance
  * using the Authorized Code Flow, utilizing Pushed Authorization Request and PKCE.
  *
@@ -55,7 +33,7 @@ sealed interface UnauthorizedRequest {
      * State denoting that the pushed authorization request has been placed successfully and response processed
      */
     data class ParRequested(
-        val getAuthorizationCodeURL: AuthorizationUrl,
+        val getAuthorizationCodeURL: HttpsUrl,
         val pkceVerifier: PKCEVerifier,
     )
 
@@ -224,12 +202,10 @@ interface AuthorizeIssuance {
     /**
      * Action to authorize an issuance request using Pre-Authorized Code Flow.
      *
-     * @param credentials   Metadata of the credentials whose issuance needs to be authorized.
      * @param preAuthorizationCode  The pre-authorization code retrieved from a [CredentialOffer]
      * @return The new state of the request or error.
      */
     suspend fun authorizeWithPreAuthorizationCode(
-        credentials: List<CredentialIdentifier>,
         preAuthorizationCode: PreAuthorizationCode,
     ): Result<AuthorizedRequest>
 }
@@ -357,3 +333,18 @@ interface ProofSigner : JWSSigner {
 
     fun getAlgorithm(): JWSAlgorithm
 }
+
+interface AuthorizeIssuance2 {
+    suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared>
+
+    suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
+        authorizationCode: AuthorizationCode,
+    ): Result<AuthorizedRequest>
+
+    suspend fun authorizeWithPreAuthorizationCode(pin: String?): Result<AuthorizedRequest>
+}
+
+data class AuthorizationRequestPrepared(
+    val authorizationCodeURL: HttpsUrl,
+    val pkceVerifier: PKCEVerifier,
+)

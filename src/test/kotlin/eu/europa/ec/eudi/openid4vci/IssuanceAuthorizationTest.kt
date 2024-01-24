@@ -310,10 +310,6 @@ class IssuanceAuthorizationTest {
             )
             with(issuer) {
                 authorizeWithPreAuthorizationCode(
-                    listOf(
-                        CredentialIdentifier("eu.europa.ec.eudiw.pid_mso_mdoc"),
-                        CredentialIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
-                    ),
                     PreAuthorizationCode("eyJhbGciOiJSU0EtFYUaBy", "pin"),
                 )
             }
@@ -357,7 +353,6 @@ class IssuanceAuthorizationTest {
 
             with(issuer) {
                 val authorizedRequest = authorizeWithPreAuthorizationCode(
-                    offer.credentials,
                     PreAuthorizationCode(preAuthorizationCode, null),
                 ).getOrThrow()
 
@@ -552,7 +547,6 @@ class IssuanceAuthorizationTest {
 
             with(issuer) {
                 authorizeWithPreAuthorizationCode(
-                    offer.credentials,
                     PreAuthorizationCode(preAuthCode, null),
                 )
                     .fold(

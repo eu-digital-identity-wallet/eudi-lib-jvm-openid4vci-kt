@@ -122,7 +122,7 @@ internal class IssuanceAuthorizer(
         scopes: List<Scope>,
         state: String,
         issuerState: String?,
-    ): Result<Pair<PKCEVerifier, AuthorizationUrl>> = runCatching {
+    ): Result<Pair<PKCEVerifier, HttpsUrl>> = runCatching {
         require(scopes.isNotEmpty()) { "No scopes provided. Cannot submit par with no scopes." }
 
         val parEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
@@ -143,29 +143,48 @@ internal class IssuanceAuthorizer(
         response.authorizationCodeUrlOrFail(clientID, codeVerifier, state)
     }
 
+    fun authorizationRequestUrl(
+        scopes: List<Scope>,
+        state: String,
+        issuerState: String?,
+    ): Result<Pair<PKCEVerifier, HttpsUrl>> = runCatching {
+        require(scopes.isNotEmpty()) { "No scopes provided. Cannot submit par with no scopes." }
+
+        val clientID = ClientID(config.clientId)
+        val codeVerifier = CodeVerifier()
+        val authorizationRequest = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
+            endpointURI(authorizationServerMetadata.authorizationEndpointURI)
+            redirectionURI(config.authFlowRedirectionURI)
+            codeChallenge(codeVerifier, CodeChallengeMethod.S256)
+            scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray() + "openid"))
+            state(State(state))
+            issuerState?.let { customParameter("issuer_state", issuerState) }
+        }.build()
+
+        val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())
+        val url = HttpsUrl(authorizationRequest.toURI().toString()).getOrThrow()
+        pkceVerifier to url
+    }
+
     private fun PushedAuthorizationRequestResponse.authorizationCodeUrlOrFail(
         clientID: ClientID,
         codeVerifier: CodeVerifier,
         state: String,
-    ) = when (this) {
+    ): Pair<PKCEVerifier, HttpsUrl> = when (this) {
         is PushedAuthorizationRequestResponse.Success -> {
             val authorizationCodeUrl = run {
                 val httpsUrl = URLBuilder(Url(authorizationServerMetadata.authorizationEndpointURI.toString())).apply {
-                    parameters.append(AuthorizationUrl.PARAM_CLIENT_ID, clientID.value)
-                    parameters.append(AuthorizationUrl.PARAM_STATE, state)
-                    parameters.append(
-                        AuthorizationUrl.PARAM_REQUEST_URI,
-                        requestURI,
-                    )
+                    parameters.append(AuthorizationEndpointParams.PARAM_CLIENT_ID, clientID.value)
+                    parameters.append(AuthorizationEndpointParams.PARAM_STATE, state)
+                    parameters.append(AuthorizationEndpointParams.PARAM_REQUEST_URI, requestURI)
                 }.build()
-                AuthorizationUrl(httpsUrl.toString())
+                HttpsUrl(httpsUrl.toString()).getOrThrow()
             }
             val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())
             pkceVerifier to authorizationCodeUrl
         }
 
-        is PushedAuthorizationRequestResponse.Failure ->
-            throw PushedAuthorizationRequestFailed(error, errorDescription)
+        is PushedAuthorizationRequestResponse.Failure -> throw PushedAuthorizationRequestFailed(error, errorDescription)
     }
 
     /**
@@ -207,16 +226,14 @@ internal class IssuanceAuthorizer(
         requestAccessToken(params).accessTokenOrFail()
     }
 
-    private fun AccessTokenRequestResponse.accessTokenOrFail(): Pair<AccessToken, CNonce?> =
-        when (this) {
-            is AccessTokenRequestResponse.Success -> {
-                val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
-                AccessToken(accessToken) to cNonce
-            }
-
-            is AccessTokenRequestResponse.Failure ->
-                throw AccessTokenRequestFailed(error, errorDescription)
+    private fun AccessTokenRequestResponse.accessTokenOrFail(): Pair<AccessToken, CNonce?> = when (this) {
+        is AccessTokenRequestResponse.Success -> {
+            val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
+            AccessToken(accessToken) to cNonce
         }
+
+        is AccessTokenRequestResponse.Failure -> throw AccessTokenRequestFailed(error, errorDescription)
+    }
 
     private suspend fun requestAccessToken(params: Map<String, String>): AccessTokenRequestResponse =
         ktorHttpClientFactory().use { client ->
@@ -234,25 +251,28 @@ internal class IssuanceAuthorizer(
     private suspend fun pushAuthorizationRequest(
         parEndpoint: URI,
         pushedAuthorizationRequest: PushedAuthorizationRequest,
-    ): PushedAuthorizationRequestResponse =
-        ktorHttpClientFactory().use { client ->
-            val url = parEndpoint.toURL()
-            val formParameters = pushedAuthorizationRequest.asFormPostParams()
-            val response = client.submitForm(
-                url = url.toString(),
-                formParameters = Parameters.build {
-                    formParameters.entries.forEach { (k, v) -> append(k, v) }
-                },
+    ): PushedAuthorizationRequestResponse = ktorHttpClientFactory().use { client ->
+        val url = parEndpoint.toURL()
+        val formParameters = pushedAuthorizationRequest.asFormPostParams()
 
-            )
-            if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
-            else response.body<PushedAuthorizationRequestResponse.Failure>()
-        }
+        val response = client.submitForm(
+            url = url.toString(),
+            formParameters = Parameters.build {
+                formParameters.entries.forEach { (k, v) -> append(k, v) }
+            },
+        )
+        if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
+        else response.body<PushedAuthorizationRequestResponse.Failure>()
+    }
 
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =
-        authorizationRequest.toParameters()
-            .mapValues { (_, value) -> value[0] }
-            .toMap()
+        authorizationRequest.toParameters().mapValues { (_, value) -> value[0] }.toMap()
+}
+
+private object AuthorizationEndpointParams {
+    const val PARAM_CLIENT_ID = "client_id"
+    const val PARAM_REQUEST_URI = "request_uri"
+    const val PARAM_STATE = "state"
 }
 
 internal sealed interface TokenEndpointForm {
@@ -271,14 +291,13 @@ internal sealed interface TokenEndpointForm {
             redirectionURI: URI,
             clientId: String,
             codeVerifier: String,
-        ): Map<String, String> =
-            mapOf(
-                GRANT_TYPE_PARAM to GRANT_TYPE_PARAM_VALUE,
-                AUTHORIZATION_CODE_PARAM to authorizationCode,
-                REDIRECT_URI_PARAM to redirectionURI.toString(),
-                CLIENT_ID_PARAM to clientId,
-                CODE_VERIFIER_PARAM to codeVerifier,
-            )
+        ): Map<String, String> = mapOf(
+            GRANT_TYPE_PARAM to GRANT_TYPE_PARAM_VALUE,
+            AUTHORIZATION_CODE_PARAM to authorizationCode,
+            REDIRECT_URI_PARAM to redirectionURI.toString(),
+            CLIENT_ID_PARAM to clientId,
+            CODE_VERIFIER_PARAM to codeVerifier,
+        )
     }
 
     data object PreAuthCodeFlow : TokenEndpointForm {
