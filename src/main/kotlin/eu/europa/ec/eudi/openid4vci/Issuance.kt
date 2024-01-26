@@ -334,7 +334,7 @@ interface ProofSigner : JWSSigner {
     fun getAlgorithm(): JWSAlgorithm
 }
 
-interface AuthorizeIssuance2 {
+interface AuthorizeOfferIssuance {
     suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared>
 
     suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(

@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer2
+import eu.europa.ec.eudi.openid4vci.internal.DefaultOfferBasedIssuer
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -89,7 +89,7 @@ private class Wallet2(
 ) {
     suspend fun issueByCredentialIdentifier(identifier: String): String {
         val (issuerMetadata, authorizationServersMetadata) = httpClientFactory().use { client ->
-            Issuer2.metaData(client, credentialIssuerIdentifier)
+            OfferBasedIssuer.metaData(client, credentialIssuerIdentifier)
         }
 
         val credentialIdentifier = CredentialIdentifier(identifier)
@@ -104,7 +104,7 @@ private class Wallet2(
             credentials = listOf(credentialIdentifier),
         )
 
-        val issuer = Issuer2.make(
+        val issuer = OfferBasedIssuer.make(
             config = config,
             credentialOffer = offer,
         )
@@ -127,7 +127,7 @@ private class Wallet2(
     }
 
     suspend fun issueByCredentialOffer(offer: CredentialOffer): List<Pair<String, String>> {
-        val issuer = Issuer2.make(
+        val issuer = OfferBasedIssuer.make(
             config = config,
             credentialOffer = offer,
         )
@@ -150,8 +150,8 @@ private class Wallet2(
         }
     }
 
-    private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer2): AuthorizedRequest = with(issuer) {
-        check(issuer is DefaultIssuer2)
+    private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: OfferBasedIssuer): AuthorizedRequest = with(issuer) {
+        check(issuer is DefaultOfferBasedIssuer)
         authorizationLog("Preparing authorization code request")
 
         val prepareAuthorizationCodeRequest = issuer.prepareAuthorizationRequest().getOrThrow()
@@ -175,7 +175,7 @@ private class Wallet2(
     }
 
     private suspend fun proofRequiredSubmissionUseCase(
-        issuer: Issuer2,
+        issuer: OfferBasedIssuer,
         authorized: AuthorizedRequest.ProofRequired,
         credentialIdentifier: CredentialIdentifier,
     ): String {
@@ -203,7 +203,7 @@ private class Wallet2(
     }
 
     private suspend fun deferredCredentialUseCase(
-        issuer: Issuer2,
+        issuer: OfferBasedIssuer,
         authorized: AuthorizedRequest,
         deferred: IssuedCredential.Deferred,
     ): String {
@@ -223,7 +223,7 @@ private class Wallet2(
     }
 
     private suspend fun noProofRequiredSubmissionUseCase(
-        issuer: Issuer2,
+        issuer: OfferBasedIssuer,
         noProofRequiredState: AuthorizedRequest.NoProofRequired,
         credentialIdentifier: CredentialIdentifier,
     ): String {

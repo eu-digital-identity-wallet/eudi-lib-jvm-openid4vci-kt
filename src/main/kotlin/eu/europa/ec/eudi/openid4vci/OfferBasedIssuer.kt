@@ -17,11 +17,11 @@ package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.DefaultAuthorizationServerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
-import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer2
+import eu.europa.ec.eudi.openid4vci.internal.DefaultOfferBasedIssuer
 import eu.europa.ec.eudi.openid4vci.internal.KeyGenerator
 import io.ktor.client.*
 
-interface Issuer2 : AuthorizeIssuance2, RequestIssuance, QueryForDeferredCredential {
+interface OfferBasedIssuer : AuthorizeOfferIssuance, RequestIssuance, QueryForDeferredCredential {
 
     companion object {
 
@@ -46,8 +46,8 @@ interface Issuer2 : AuthorizeIssuance2, RequestIssuance, QueryForDeferredCredent
             credentialOffer: CredentialOffer,
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
-        ): Issuer2 {
-            return DefaultIssuer2(
+        ): OfferBasedIssuer {
+            return DefaultOfferBasedIssuer(
                 credentialOffer,
                 config,
                 ktorHttpClientFactory,

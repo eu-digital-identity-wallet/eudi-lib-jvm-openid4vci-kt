@@ -13,17 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal.impl
+package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.IssuanceAuthorizer
 
-internal class AuthorizeIssuance2Impl(
+internal class AuthorizeOfferIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     config: OpenId4VCIConfig,
     ktorHttpClientFactory: KtorHttpClientFactory,
-) : AuthorizeIssuance2 {
+) : AuthorizeOfferIssuance {
 
     private val authorizer: IssuanceAuthorizer =
         IssuanceAuthorizer(credentialOffer.authorizationServerMetadata, config, ktorHttpClientFactory)

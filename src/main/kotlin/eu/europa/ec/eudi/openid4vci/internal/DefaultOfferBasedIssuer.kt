@@ -16,18 +16,15 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.impl.AuthorizeIssuance2Impl
-import eu.europa.ec.eudi.openid4vci.internal.impl.QueryForDeferredCredentialImpl
-import eu.europa.ec.eudi.openid4vci.internal.impl.RequestIssuanceImpl
 
-internal class DefaultIssuer2 private constructor(
+internal class DefaultOfferBasedIssuer private constructor(
     private val credentialOffer: CredentialOffer,
-    private val authorizeIssuanceImpl: AuthorizeIssuance2Impl,
+    private val authorizeIssuanceImpl: AuthorizeOfferIssuanceImpl,
     private val requestIssuanceImpl: RequestIssuanceImpl,
     private val queryForDeferredCredentialImpl: QueryForDeferredCredentialImpl,
-) : Issuer2,
+) : OfferBasedIssuer,
     QueryForDeferredCredential by queryForDeferredCredentialImpl,
-    AuthorizeIssuance2 by authorizeIssuanceImpl {
+    AuthorizeOfferIssuance by authorizeIssuanceImpl {
 
         override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
             credentialId: CredentialIdentifier,
@@ -87,10 +84,10 @@ internal class DefaultIssuer2 private constructor(
                 config: OpenId4VCIConfig,
                 ktorHttpClientFactory: KtorHttpClientFactory,
                 responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
-            ): DefaultIssuer2 =
-                DefaultIssuer2(
+            ): DefaultOfferBasedIssuer =
+                DefaultOfferBasedIssuer(
                     credentialOffer = credentialOffer,
-                    authorizeIssuanceImpl = AuthorizeIssuance2Impl(
+                    authorizeIssuanceImpl = AuthorizeOfferIssuanceImpl(
                         credentialOffer = credentialOffer,
                         config = config,
                         ktorHttpClientFactory = ktorHttpClientFactory,

@@ -16,9 +16,6 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.impl.AuthorizeIssuanceImpl
-import eu.europa.ec.eudi.openid4vci.internal.impl.QueryForDeferredCredentialImpl
-import eu.europa.ec.eudi.openid4vci.internal.impl.RequestIssuanceImpl
 
 /**
  * Default implementation of [Issuer] interface
