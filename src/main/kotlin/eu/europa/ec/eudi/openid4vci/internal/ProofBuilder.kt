@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.util.Base64
 import com.nimbusds.jwt.JWTClaimsSet
@@ -65,46 +64,31 @@ internal sealed interface ProofBuilder {
         }
 
         override fun build(proofSigner: ProofSigner): Proof.Jwt {
-            val algorithm = proofSigner.getAlgorithm()
-
-            validate(algorithm)
-
-            val headerBuilder = JWSHeader.Builder(algorithm)
-            headerBuilder.type(JOSEObjectType(headerType))
-
-            when (val key = publicKey!!) {
-                is BindingKey.Jwk -> headerBuilder.jwk(key.jwk.toPublicJWK())
-                is BindingKey.Did -> headerBuilder.keyID(key.identity)
-                is BindingKey.X509 -> headerBuilder.x509CertChain(key.chain.map { Base64.encode(it.encoded) })
-            }
-
-            claimsSet.issueTime(Date.from(Instant.now()))
-
-            val signedJWT = SignedJWT(headerBuilder.build(), claimsSet.build())
-            signedJWT.sign(proofSigner)
-
-            return Proof.Jwt(signedJWT)
-        }
-
-        private fun validate(algorithm: JWSAlgorithm) {
-            checkNotNull(credentialSpec) {
+            val spec = checkNotNull(credentialSpec) {
                 "No credential specification provided"
             }
-            checkNotNull(publicKey) {
-                "No public key provided"
+            ensure(ProofType.JWT in spec.proofTypesSupported) {
+                CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
             }
-            checkNotNull(claimsSet.claims["aud"]) {
-                "Claim 'aud' is missing"
+            val header = run {
+                val algorithm = proofSigner.getAlgorithm()
+                val headerBuilder = JWSHeader.Builder(algorithm)
+                headerBuilder.type(JOSEObjectType(headerType))
+                when (val key = checkNotNull(publicKey) { "No public key provided" }) {
+                    is BindingKey.Jwk -> headerBuilder.jwk(key.jwk.toPublicJWK())
+                    is BindingKey.Did -> headerBuilder.keyID(key.identity)
+                    is BindingKey.X509 -> headerBuilder.x509CertChain(key.chain.map { Base64.encode(it.encoded) })
+                }
+                headerBuilder.build()
             }
-            checkNotNull(claimsSet.claims["nonce"]) {
-                "Claim 'nonce' is missing"
+            val claims = run {
+                checkNotNull(claimsSet.claims["aud"]) { "Claim 'aud' is missing" }
+                checkNotNull(claimsSet.claims["nonce"]) { "Claim 'nonce' is missing" }
+                claimsSet.issueTime(Date.from(Instant.now()))
+                claimsSet.build()
             }
-            if (!credentialSpec!!.cryptographicSuitesSupported.contains(algorithm.name)) {
-                throw CredentialIssuanceError.ProofGenerationError.CryptographicSuiteNotSupported
-            }
-            if (!credentialSpec!!.proofTypesSupported.contains(ProofType.JWT)) {
-                throw CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
-            }
+            val signedJWT = SignedJWT(header, claims).apply { sign(proofSigner) }
+            return Proof.Jwt(signedJWT)
         }
     }
 
