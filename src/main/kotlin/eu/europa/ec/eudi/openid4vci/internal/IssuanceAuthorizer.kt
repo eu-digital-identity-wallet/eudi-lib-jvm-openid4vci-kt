@@ -203,7 +203,7 @@ internal class IssuanceAuthorizer(
         preAuthorizedCode: String,
         pin: String?,
     ): Result<Pair<AccessToken, CNonce?>> = runCatching {
-        val params = TokenEndpointForm.PreAuthCodeFlow.of(preAuthorizedCode, pin)
+        val params = TokenEndpointForm.PreAuthCodeFlow.of(config.clientId, preAuthorizedCode, pin)
         requestAccessToken(params).accessTokenOrFail()
     }
 
@@ -282,14 +282,20 @@ internal sealed interface TokenEndpointForm {
     }
 
     data object PreAuthCodeFlow : TokenEndpointForm {
+        const val CLIENT_ID_PARAM = "client_id"
         private const val GRANT_TYPE_PARAM = "grant_type"
         const val GRANT_TYPE_PARAM_VALUE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
         const val USER_PIN_PARAM = "user_pin"
-        const val PRE_AUTHORIZED_CODE_PARAM = "pre_authorized_code"
+        const val PRE_AUTHORIZED_CODE_PARAM = "pre-authorized_code"
 
-        fun of(preAuthorizedCode: String, userPin: String?): Map<String, String> = when (userPin) {
+        fun of(
+            clientId: String,
+            preAuthorizedCode: String,
+            userPin: String?,
+        ): Map<String, String> = when (userPin) {
             null -> {
                 mapOf(
+                    CLIENT_ID_PARAM to clientId,
                     GRANT_TYPE_PARAM to URLEncoder.encode(GRANT_TYPE_PARAM_VALUE, "UTF-8"),
                     PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
                 )
@@ -297,6 +303,7 @@ internal sealed interface TokenEndpointForm {
 
             else -> {
                 mapOf(
+                    CLIENT_ID_PARAM to clientId,
                     GRANT_TYPE_PARAM to URLEncoder.encode(GRANT_TYPE_PARAM_VALUE, "UTF-8"),
                     PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
                     USER_PIN_PARAM to userPin,
