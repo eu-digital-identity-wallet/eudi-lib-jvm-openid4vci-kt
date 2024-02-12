@@ -136,13 +136,9 @@ data class SdJwtVcCredential(
     override val cryptographicSuitesSupported: List<String> = emptyList(),
     override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
     override val display: List<Display> = emptyList(),
-    val credentialDefinition: CredentialDefinition,
-) : CredentialSupported {
-    data class CredentialDefinition(
-        val type: String,
-        val claims: Map<ClaimName, Claim?>?,
-    )
-}
+    val type: String,
+    val claims: Map<ClaimName, Claim?>?,
+) : CredentialSupported
 
 data class W3CJsonLdCredentialDefinition(
     val context: List<URL>,

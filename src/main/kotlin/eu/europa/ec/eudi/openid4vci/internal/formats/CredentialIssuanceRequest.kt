@@ -118,11 +118,11 @@ private fun sdJwtVc(
 ): CredentialType.SdJwtVcType {
     fun GenericClaimSet.validate() {
         if (claims.isNotEmpty()) {
-            val supportedClaims = supportedCredential.credentialDefinition.claims
+            val supportedClaims = supportedCredential.claims
             ensure(!supportedClaims.isNullOrEmpty()) {
                 InvalidIssuanceRequest(
                     "Issuer does not support claims for credential " +
-                        "[$FORMAT_SD_JWT_VC-${supportedCredential.credentialDefinition.type}]",
+                        "[$FORMAT_SD_JWT_VC-${supportedCredential.type}]",
                 )
             }
             ensure(supportedClaims.keys.containsAll(claims)) {
@@ -133,7 +133,7 @@ private fun sdJwtVc(
 
     val validClaimSet = claimSet?.apply { validate() }
     return CredentialType.SdJwtVcType(
-        type = supportedCredential.credentialDefinition.type,
+        type = supportedCredential.type,
         claims = validClaimSet,
     )
 }

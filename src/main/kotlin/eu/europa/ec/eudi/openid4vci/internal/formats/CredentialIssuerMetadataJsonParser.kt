@@ -22,7 +22,6 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.Inva
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import eu.europa.ec.eudi.openid4vci.internal.ensureSuccess
-import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVcCredentialTO.CredentialDefinitionTO
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
@@ -94,17 +93,12 @@ private data class SdJwtVcCredentialTO(
     @SerialName("proof_types_supported")
     override val proofTypesSupported: List<String>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
-    @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
+    @SerialName("vct") val type: String,
+    @SerialName("claims") val claims: Map<String, ClaimTO>? = null,
 ) : CredentialSupportedTO {
     init {
         require(format == FORMAT_SD_JWT_VC) { "invalid format '$format'" }
     }
-
-    @Serializable
-    data class CredentialDefinitionTO(
-        @SerialName("type") val type: String,
-        @SerialName("claims") val claims: Map<String, ClaimTO>? = null,
-    )
 }
 
 @Serializable
@@ -352,25 +346,6 @@ private fun credentialSupportedFromTransferObject(transferObject: MsdMdocCredent
 }
 
 private fun credentialSupportedFromTransferObject(csJson: SdJwtVcCredentialTO): SdJwtVcCredential {
-    fun CredentialDefinitionTO.toDomain(): SdJwtVcCredential.CredentialDefinition =
-        SdJwtVcCredential.CredentialDefinition(
-            type = type,
-            claims = claims?.mapValues { nameAndClaim ->
-                nameAndClaim.value.let {
-                    Claim(
-                        it.mandatory ?: false,
-                        it.valueType,
-                        it.display?.map { displayObject ->
-                            Claim.Display(
-                                displayObject.name,
-                                displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                            )
-                        } ?: emptyList(),
-                    )
-                }
-            },
-        )
-
     val bindingMethods = csJson.cryptographicBindingMethodsSupported
         ?.map { cryptographicBindingMethodOf(it) }
         ?: emptyList()
@@ -384,7 +359,21 @@ private fun credentialSupportedFromTransferObject(csJson: SdJwtVcCredentialTO): 
         cryptographicSuitesSupported,
         proofTypesSupported,
         display,
-        csJson.credentialDefinition.toDomain(),
+        csJson.type,
+        csJson.claims?.mapValues { (_, claim) ->
+            claim.let {
+                Claim(
+                    it.mandatory ?: false,
+                    it.valueType,
+                    it.display?.map { displayObject ->
+                        Claim.Display(
+                            displayObject.name,
+                            displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
+                        )
+                    } ?: emptyList(),
+                )
+            }
+        },
     )
 }
 
