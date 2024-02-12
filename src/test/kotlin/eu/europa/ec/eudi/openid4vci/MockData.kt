@@ -258,7 +258,7 @@ internal fun universityDegreeJwtVcJsonLD() =
 internal fun mobileDrivingLicense() =
     MsoMdocCredential(
         "MobileDrivingLicense_msoMdoc",
-        listOf(CryptographicBindingMethod.MSO),
+        listOf(CryptographicBindingMethod.COSE),
         listOf("ES256", "ES384", "ES512"),
         listOf(ProofType.JWT),
         listOf(
