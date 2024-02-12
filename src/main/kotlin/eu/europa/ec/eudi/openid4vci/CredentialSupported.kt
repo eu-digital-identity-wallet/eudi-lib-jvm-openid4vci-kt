@@ -41,13 +41,6 @@ sealed interface CryptographicBindingMethod : Serializable {
     }
 
     /**
-     * MSO.
-     */
-    data object MSO : CryptographicBindingMethod {
-        private fun readResolve(): Any = MSO
-    }
-
-    /**
      * DID method.
      */
     data class DID(val method: String) : CryptographicBindingMethod
