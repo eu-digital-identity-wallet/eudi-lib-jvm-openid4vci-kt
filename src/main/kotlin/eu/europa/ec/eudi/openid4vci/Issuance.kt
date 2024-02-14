@@ -21,31 +21,13 @@ import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
 
 /**
- * Sealed hierarchy of states that denote the individual steps that need to be taken to authorize a request for issuance
- * using the Authorized Code Flow, utilizing Pushed Authorization Request and PKCE.
- *
- * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
- * @see <a href="https://www.rfc-editor.org/rfc/rfc9126.html">RFC9126</a>
+ * State holding the authorization request as a URL to be passed to front-channel for retrieving an authorization code in an oAuth2
+ * authorization code grant type flow.
  */
-sealed interface UnauthorizedRequest {
-
-    /**
-     * State denoting that the pushed authorization request has been placed successfully and response processed
-     */
-    data class ParRequested(
-        val getAuthorizationCodeURL: HttpsUrl,
-        val pkceVerifier: PKCEVerifier,
-    )
-
-    /**
-     * State denoting that caller has followed the [ParRequested.getAuthorizationCodeURL] URL and response received
-     * from authorization server and processed successfully.
-     */
-    data class AuthorizationCodeRetrieved(
-        val authorizationCode: AuthorizationCode,
-        val pkceVerifier: PKCEVerifier,
-    )
-}
+data class AuthorizationRequestPrepared(
+    val authorizationCodeURL: HttpsUrl,
+    val pkceVerifier: PKCEVerifier,
+)
 
 /**
  * Sealed hierarchy of states describing an authorized issuance request. These states hold an access token issued by the
@@ -157,67 +139,40 @@ sealed interface SubmittedRequest {
     ) : Errored
 }
 
-/**
- * An interface for authorizing a credential issuance request. Contains all the operation available to transition an [UnauthorizedRequest]
- * to an [AuthorizedRequest]
- */
-interface AuthorizeOfferIssuance {
+interface AuthorizeIssuance {
+
+    /**
+     * Initial step to authorize an issuance request using Authorized Code Flow.
+     * If the specified authorization server supports PAR then this method executes the first step of PAR by pushing the authorization
+     * request to authorization server's 'par endpoint'.
+     * If PAR is not supported then this method prepares the authorization request as a typical authorization code flow authorization
+     * request with the request's elements as query parameters.
+     *
+     * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
+     * @return an HTTPS URL of the authorization request to be placed
+     */
     suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared>
 
+    /**
+     * Using the access code retrieved after performing the authorization request prepared from a call to
+     * [AuthorizeOfferIssuance.prepareAuthorizationRequest()], it posts a request to authorization server's token endpoint to
+     * retrieve an access token. This step transitions state from [AuthorizationRequestPrepared] to an
+     * [AuthorizedRequest] state
+     *
+     * @param authorizationCode The authorization code returned from authorization server via front-channel
+     * @return an issuance request in authorized state
+     */
     suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
         authorizationCode: AuthorizationCode,
     ): Result<AuthorizedRequest>
 
-    suspend fun authorizeWithPreAuthorizationCode(pin: String?): Result<AuthorizedRequest>
-}
-
-interface AuthorizeIssuance {
-
-    /**
-     * Initial step to authorize an issuance request using Authorized Code Flow (utilizing PAR).
-     * Pushes the authorization request to authorization server's 'par endpoint'. Result of this transition is the
-     * [UnauthorizedRequest.ParRequested] state
-     *
-     * @param credentials   List of credentials whose issuance needs to be authorized.
-     * @param issuerState   Credential issuer state passed via a credential offer grant of type [Grants.AuthorizationCode].
-     * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
-     * @see <a href="https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-authorization-code-flow">OpenId4VCI</a>
-     * @return The new state of the request or error.
-     */
-    suspend fun pushAuthorizationCodeRequest(
-        credentials: List<CredentialIdentifier>,
-        issuerState: String?,
-    ): Result<UnauthorizedRequest.ParRequested>
-
-    /**
-     * Second step to authorize an issuance request using Authorized Code Flow (utilizing PAR).
-     * After authorization code is retrieved from front-channel, the authorization code is passed
-     * to transition request from [UnauthorizedRequest.ParRequested] state to state [UnauthorizedRequest.AuthorizationCodeRetrieved]
-     *
-     * @param authorizationCode The authorization code returned from authorization server via front-channel
-     * @return The new state of the request.
-     */
-    suspend fun UnauthorizedRequest.ParRequested.handleAuthorizationCode(
-        authorizationCode: AuthorizationCode,
-    ): UnauthorizedRequest.AuthorizationCodeRetrieved
-
-    /**
-     * Last step to authorize an issuance request using Authorized Code Flow (utilizing PAR).
-     * Using the access code retrieved from a previous step, posts a request to authorization server's token endpoint to
-     * retrieve an access token. This step transitions state from [UnauthorizedRequest.AuthorizationCodeRetrieved] to an
-     * [AuthorizedRequest] state
-     */
-    suspend fun UnauthorizedRequest.AuthorizationCodeRetrieved.requestAccessToken(): Result<AuthorizedRequest>
-
     /**
      * Action to authorize an issuance request using Pre-Authorized Code Flow.
      *
-     * @param preAuthorizationCode  The pre-authorization code retrieved from a [CredentialOffer]
-     * @return The new state of the request or error.
+     * @param pin   Optional parameter in case the credential offer specifies that a user provided pin is required for authorization
+     * @return an issuance request in authorized state
      */
-    suspend fun authorizeWithPreAuthorizationCode(
-        preAuthorizationCode: PreAuthorizationCode,
-    ): Result<AuthorizedRequest>
+    suspend fun authorizeWithPreAuthorizationCode(pin: String?): Result<AuthorizedRequest>
 }
 
 /**
@@ -343,11 +298,6 @@ interface ProofSigner : JWSSigner {
 
     fun getAlgorithm(): JWSAlgorithm
 }
-
-data class AuthorizationRequestPrepared(
-    val authorizationCodeURL: HttpsUrl,
-    val pkceVerifier: PKCEVerifier,
-)
 
 typealias ResponseEncryptionSpecFactory =
     (CredentialResponseEncryption.Required, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec

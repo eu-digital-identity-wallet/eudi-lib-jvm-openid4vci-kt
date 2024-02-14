@@ -18,11 +18,11 @@ package eu.europa.ec.eudi.openid4vci.internal
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vci.*
 
-internal class AuthorizeOfferIssuanceImpl(
+internal class AuthorizeIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     config: OpenId4VCIConfig,
     ktorHttpClientFactory: KtorHttpClientFactory,
-) : AuthorizeOfferIssuance {
+) : AuthorizeIssuance {
 
     private val authorizer: IssuanceAuthorizer =
         IssuanceAuthorizer(credentialOffer.authorizationServerMetadata, config, ktorHttpClientFactory)

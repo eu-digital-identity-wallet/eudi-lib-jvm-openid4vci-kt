@@ -17,12 +17,12 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
 
-internal class DefaultOfferBasedIssuer private constructor(
-    private val authorizeIssuanceImpl: AuthorizeOfferIssuanceImpl,
+internal class DefaultIssuer private constructor(
+    private val authorizeIssuanceImpl: AuthorizeIssuanceImpl,
     private val requestIssuanceImpl: RequestIssuanceImpl,
     private val queryForDeferredCredentialImpl: QueryForDeferredCredentialImpl,
 ) : Issuer,
-    AuthorizeOfferIssuance by authorizeIssuanceImpl,
+    AuthorizeIssuance by authorizeIssuanceImpl,
     RequestIssuance by requestIssuanceImpl,
     QueryForDeferredCredential by queryForDeferredCredentialImpl {
 
@@ -32,8 +32,8 @@ internal class DefaultOfferBasedIssuer private constructor(
                 config: OpenId4VCIConfig,
                 ktorHttpClientFactory: KtorHttpClientFactory,
                 responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
-            ): DefaultOfferBasedIssuer = DefaultOfferBasedIssuer(
-                authorizeIssuanceImpl = AuthorizeOfferIssuanceImpl(
+            ): DefaultIssuer = DefaultIssuer(
+                authorizeIssuanceImpl = AuthorizeIssuanceImpl(
                     credentialOffer = credentialOffer,
                     config = config,
                     ktorHttpClientFactory = ktorHttpClientFactory,
