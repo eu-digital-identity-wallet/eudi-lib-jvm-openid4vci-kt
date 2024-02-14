@@ -36,7 +36,7 @@ import org.jsoup.nodes.FormElement
 import java.net.URI
 import java.net.URL
 
-const val CredentialIssuer_URL = "https://eudi.netcompany-intrasoft.com/pid-issuer"
+const val CredentialIssuer_URL = "https://issuer-backend.eudiw.dev"
 val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
 
 const val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"

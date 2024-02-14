@@ -60,7 +60,7 @@ fun main(): Unit = runTest {
 private suspend fun walletInitiatedIssuanceWithOffer2(wallet: Wallet2) {
     println("[[Scenario: Offer passed to wallet via url]] ")
 
-    val offerUrl = "https://localhost/pid-issuer/credentialoffer?credential_offer=$credentialOffer"
+    val offerUrl = "https://issuer-backend.eudiw.dev/credentialoffer?credential_offer=$credentialOffer"
     val credentials = wallet.issueByCredentialOfferUrl(offerUrl)
 
     println("--> Issued credentials :")
