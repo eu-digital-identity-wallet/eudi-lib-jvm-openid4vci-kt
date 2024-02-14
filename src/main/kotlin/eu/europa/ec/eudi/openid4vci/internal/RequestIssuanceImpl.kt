@@ -19,6 +19,7 @@ import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 
 internal class RequestIssuanceImpl(
+    private val credentialOffer: CredentialOffer,
     private val issuerMetadata: CredentialIssuerMetadata,
     private val config: OpenId4VCIConfig,
     ktorHttpClientFactory: KtorHttpClientFactory,
@@ -50,6 +51,9 @@ internal class RequestIssuanceImpl(
         credentialId: CredentialIdentifier,
         claimSet: ClaimSet?,
     ): Result<SubmittedRequest> = runCatching {
+        require(credentialOffer.credentials.contains(credentialId)) {
+            "The requested credential is not authorized for issuance"
+        }
         placeIssuanceRequest(accessToken) { singleRequest(credentialId, claimSet, null) }
     }
 
@@ -58,6 +62,9 @@ internal class RequestIssuanceImpl(
         claimSet: ClaimSet?,
         proofSigner: ProofSigner,
     ): Result<SubmittedRequest> = runCatching {
+        require(credentialOffer.credentials.contains(credentialId)) {
+            "The requested credential is not authorized for issuance"
+        }
         placeIssuanceRequest(accessToken) {
             singleRequest(credentialId, claimSet, proofFactory(proofSigner, cNonce))
         }
@@ -66,6 +73,9 @@ internal class RequestIssuanceImpl(
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<Pair<CredentialIdentifier, ClaimSet?>>,
     ): Result<SubmittedRequest> = runCatching {
+        require(credentialOffer.credentials.containsAll(credentialsMetadata.map { (identifier, _) -> identifier })) {
+            "One or more of the requested credentials are not authorized for issuance"
+        }
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (credentialId, claimSet) ->
                 singleRequest(credentialId, claimSet, null)
@@ -77,6 +87,9 @@ internal class RequestIssuanceImpl(
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, ProofSigner>>,
     ): Result<SubmittedRequest> = runCatching {
+        require(credentialOffer.credentials.containsAll(credentialsMetadata.map { (identifier, _) -> identifier })) {
+            "One or more of the requested credentials are not authorized for issuance"
+        }
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (credentialId, claimSet, proofSigner) ->
                 singleRequest(credentialId, claimSet, proofFactory(proofSigner, cNonce))

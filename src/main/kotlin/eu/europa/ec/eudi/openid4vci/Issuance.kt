@@ -161,6 +161,16 @@ sealed interface SubmittedRequest {
  * An interface for authorizing a credential issuance request. Contains all the operation available to transition an [UnauthorizedRequest]
  * to an [AuthorizedRequest]
  */
+interface AuthorizeOfferIssuance {
+    suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared>
+
+    suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
+        authorizationCode: AuthorizationCode,
+    ): Result<AuthorizedRequest>
+
+    suspend fun authorizeWithPreAuthorizationCode(pin: String?): Result<AuthorizedRequest>
+}
+
 interface AuthorizeIssuance {
 
     /**
@@ -334,17 +344,176 @@ interface ProofSigner : JWSSigner {
     fun getAlgorithm(): JWSAlgorithm
 }
 
-interface AuthorizeOfferIssuance {
-    suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared>
-
-    suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
-        authorizationCode: AuthorizationCode,
-    ): Result<AuthorizedRequest>
-
-    suspend fun authorizeWithPreAuthorizationCode(pin: String?): Result<AuthorizedRequest>
-}
-
 data class AuthorizationRequestPrepared(
     val authorizationCodeURL: HttpsUrl,
     val pkceVerifier: PKCEVerifier,
 )
+
+typealias ResponseEncryptionSpecFactory =
+    (CredentialResponseEncryption.Required, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec
+
+/**
+ * Errors that can happen in the process of issuance process
+ */
+sealed class CredentialIssuanceError(message: String) : Throwable(message) {
+
+    /**
+     * Failure when placing Pushed Authorization Request to Authorization Server
+     */
+    data class PushedAuthorizationRequestFailed(
+        val error: String,
+        val errorDescription: String?,
+    ) : CredentialIssuanceError("$error+${errorDescription?.let { " description=$it" }}")
+
+    /**
+     * Failure when requesting access token from Authorization Server
+     */
+    data class AccessTokenRequestFailed(
+        val error: String,
+        val errorDescription: String?,
+    ) : CredentialIssuanceError("$error+${errorDescription?.let { " description=$it" }}")
+
+    /**
+     * Failure when creating an issuance request
+     */
+    class InvalidIssuanceRequest(
+        message: String,
+    ) : CredentialIssuanceError(message)
+
+    /**
+     * Issuer rejected the issuance request because no c_nonce was provided along with the proof.
+     * A fresh c_nonce is provided by the issuer.
+     */
+    data class InvalidProof(
+        val cNonce: String,
+        val cNonceExpiresIn: Long? = 5,
+        val errorDescription: String? = null,
+    ) : CredentialIssuanceError("Invalid Proof")
+
+    /**
+     * Issuer has not issued yet deferred credential. Retry interval (in seconds) is provided to caller
+     */
+    data class DeferredCredentialIssuancePending(
+        val retryInterval: Long = 5,
+    ) : CredentialIssuanceError("DeferredCredentialIssuancePending")
+
+    /**
+     * Invalid access token passed to issuance server
+     */
+    data object InvalidToken : CredentialIssuanceError("InvalidToken") {
+        private fun readResolve(): Any = InvalidToken
+    }
+
+    /**
+     * Invalid transaction id passed to issuance server in the context of deferred credential requests
+     */
+    data object InvalidTransactionId : CredentialIssuanceError("InvalidTransactionId") {
+        private fun readResolve(): Any = InvalidTransactionId
+    }
+
+    /**
+     * Invalid credential type requested to issuance server
+     */
+    data object UnsupportedCredentialType : CredentialIssuanceError("UnsupportedCredentialType") {
+        private fun readResolve(): Any = UnsupportedCredentialType
+    }
+
+    /**
+     * Un-supported credential type requested to issuance server
+     */
+    data object UnsupportedCredentialFormat : CredentialIssuanceError("UnsupportedCredentialFormat") {
+        private fun readResolve(): Any = UnsupportedCredentialFormat
+    }
+
+    /**
+     * Invalid encryption parameters passed to issuance server
+     */
+    data object InvalidEncryptionParameters : CredentialIssuanceError("InvalidEncryptionParameters") {
+        private fun readResolve(): Any = InvalidEncryptionParameters
+    }
+
+    /**
+     * Issuance server does not support batch credential requests
+     */
+    data object IssuerDoesNotSupportBatchIssuance : CredentialIssuanceError("IssuerDoesNotSupportBatchIssuance") {
+        private fun readResolve(): Any = IssuerDoesNotSupportBatchIssuance
+    }
+
+    /**
+     * Issuance server does not support deferred credential issuance
+     */
+    data object IssuerDoesNotSupportDeferredIssuance : CredentialIssuanceError("IssuerDoesNotSupportDeferredIssuance") {
+        private fun readResolve(): Any = IssuerDoesNotSupportDeferredIssuance
+    }
+
+    /**
+     * Generic failure during issuance request
+     */
+    data class IssuanceRequestFailed(
+        val error: String,
+        val errorDescription: String? = null,
+    ) : CredentialIssuanceError("$error+${errorDescription?.let { " description=$it" }}")
+
+    /**
+     * Issuance server response is un-parsable
+     */
+    data class ResponseUnparsable(val error: String) : CredentialIssuanceError("ResponseUnparsable")
+
+    /**
+     * Sealed hierarchy of errors related to proof generation
+     */
+    sealed class ProofGenerationError(message: String) : CredentialIssuanceError(message) {
+
+        /**
+         * Binding method specified is not supported from issuer server
+         */
+        data object CryptographicSuiteNotSupported : ProofGenerationError("BindingMethodNotSupported") {
+            private fun readResolve(): Any = CryptographicSuiteNotSupported
+        }
+
+        /**
+         * Cryptographic binding method is not supported from the issuance server for a specific credential
+         */
+        data object CryptographicBindingMethodNotSupported :
+            ProofGenerationError("CryptographicBindingMethodNotSupported") {
+            private fun readResolve(): Any = CryptographicBindingMethodNotSupported
+        }
+
+        /**
+         * Proof type provided for specific credential is not supported from issuance server
+         */
+        data object ProofTypeNotSupported : ProofGenerationError("ProofTypeNotSupported") {
+            private fun readResolve(): Any = ProofTypeNotSupported
+        }
+    }
+
+    /**
+     * Sealed hierarchy of errors related to validation of encryption parameters passed along with the issuance request.
+     */
+    sealed class ResponseEncryptionError(message: String) : CredentialIssuanceError(message) {
+
+        /**
+         * Response encryption algorithm specified in request is not supported from issuance server
+         */
+        data object ResponseEncryptionAlgorithmNotSupportedByIssuer :
+            ProofGenerationError("ResponseEncryptionAlgorithmNotSupportedByIssuer") {
+            private fun readResolve(): Any = ResponseEncryptionAlgorithmNotSupportedByIssuer
+        }
+
+        /**
+         * Response encryption method specified in request is not supported from issuance server
+         */
+        data object ResponseEncryptionMethodNotSupportedByIssuer :
+            ProofGenerationError("ResponseEncryptionMethodNotSupportedByIssuer") {
+            private fun readResolve(): Any = ResponseEncryptionMethodNotSupportedByIssuer
+        }
+
+        /**
+         * Issuer enforces encrypted responses but encryption parameters not provided in request
+         */
+        data object IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided :
+            ProofGenerationError("IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided") {
+            private fun readResolve(): Any = IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+        }
+    }
+}

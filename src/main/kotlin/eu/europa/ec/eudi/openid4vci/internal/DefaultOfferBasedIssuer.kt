@@ -18,65 +18,13 @@ package eu.europa.ec.eudi.openid4vci.internal
 import eu.europa.ec.eudi.openid4vci.*
 
 internal class DefaultOfferBasedIssuer private constructor(
-    private val credentialOffer: CredentialOffer,
     private val authorizeIssuanceImpl: AuthorizeOfferIssuanceImpl,
     private val requestIssuanceImpl: RequestIssuanceImpl,
     private val queryForDeferredCredentialImpl: QueryForDeferredCredentialImpl,
-) : OfferBasedIssuer,
-    QueryForDeferredCredential by queryForDeferredCredentialImpl,
-    AuthorizeOfferIssuance by authorizeIssuanceImpl {
-
-        override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
-            credentialId: CredentialIdentifier,
-            claimSet: ClaimSet?,
-        ): Result<SubmittedRequest> {
-            require(credentialOffer.credentials.contains(credentialId)) {
-                "The requested credential is not authorized for issuance"
-            }
-            return with(requestIssuanceImpl) {
-                this@requestSingle.requestSingle(credentialId, claimSet)
-            }
-        }
-
-        override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-            credentialId: CredentialIdentifier,
-            claimSet: ClaimSet?,
-            proofSigner: ProofSigner,
-        ): Result<SubmittedRequest> {
-            require(credentialOffer.credentials.contains(credentialId)) {
-                "The requested credential is not authorized for issuance"
-            }
-            return with(requestIssuanceImpl) {
-                this@requestSingle.requestSingle(credentialId, claimSet, proofSigner)
-            }
-        }
-
-        override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-            credentialsMetadata: List<Pair<CredentialIdentifier, ClaimSet?>>,
-        ): Result<SubmittedRequest> {
-            require(credentialOffer.credentials.containsAll(credentialsMetadata.map { (identifier, _) -> identifier })) {
-                "One or more of the requested credentials are not authorized for issuance"
-            }
-            return with(requestIssuanceImpl) {
-                this@requestBatch.requestBatch(credentialsMetadata)
-            }
-        }
-
-        override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-            credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, ProofSigner>>,
-        ): Result<SubmittedRequest> {
-            require(credentialOffer.credentials.containsAll(credentialsMetadata.map { (identifier, _) -> identifier })) {
-                "One or more of the requested credentials are not authorized for issuance"
-            }
-            return with(requestIssuanceImpl) {
-                this@requestBatch.requestBatch(credentialsMetadata)
-            }
-        }
-
-        override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(cNonce: CNonce): AuthorizedRequest.ProofRequired =
-            with(requestIssuanceImpl) {
-                this@handleInvalidProof.handleInvalidProof(cNonce)
-            }
+) : Issuer,
+    AuthorizeOfferIssuance by authorizeIssuanceImpl,
+    RequestIssuance by requestIssuanceImpl,
+    QueryForDeferredCredential by queryForDeferredCredentialImpl {
 
         companion object {
             operator fun invoke(
@@ -84,24 +32,23 @@ internal class DefaultOfferBasedIssuer private constructor(
                 config: OpenId4VCIConfig,
                 ktorHttpClientFactory: KtorHttpClientFactory,
                 responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
-            ): DefaultOfferBasedIssuer =
-                DefaultOfferBasedIssuer(
+            ): DefaultOfferBasedIssuer = DefaultOfferBasedIssuer(
+                authorizeIssuanceImpl = AuthorizeOfferIssuanceImpl(
                     credentialOffer = credentialOffer,
-                    authorizeIssuanceImpl = AuthorizeOfferIssuanceImpl(
-                        credentialOffer = credentialOffer,
-                        config = config,
-                        ktorHttpClientFactory = ktorHttpClientFactory,
-                    ),
-                    requestIssuanceImpl = RequestIssuanceImpl(
-                        issuerMetadata = credentialOffer.credentialIssuerMetadata,
-                        config = config,
-                        ktorHttpClientFactory = ktorHttpClientFactory,
-                        responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-                    ),
-                    queryForDeferredCredentialImpl = QueryForDeferredCredentialImpl(
-                        credentialOffer.credentialIssuerMetadata,
-                        ktorHttpClientFactory,
-                    ),
-                )
+                    config = config,
+                    ktorHttpClientFactory = ktorHttpClientFactory,
+                ),
+                requestIssuanceImpl = RequestIssuanceImpl(
+                    credentialOffer = credentialOffer,
+                    issuerMetadata = credentialOffer.credentialIssuerMetadata,
+                    config = config,
+                    ktorHttpClientFactory = ktorHttpClientFactory,
+                    responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+                ),
+                queryForDeferredCredentialImpl = QueryForDeferredCredentialImpl(
+                    credentialOffer.credentialIssuerMetadata,
+                    ktorHttpClientFactory,
+                ),
+            )
         }
     }

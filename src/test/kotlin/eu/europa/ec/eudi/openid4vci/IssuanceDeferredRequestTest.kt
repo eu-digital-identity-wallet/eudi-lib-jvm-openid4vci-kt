@@ -386,18 +386,15 @@ class IssuanceDeferredRequestTest {
             .getOrThrow()
 
         val issuer = Issuer.make(
-            authorizationServerMetadata = offer.authorizationServerMetadata,
             config = vciWalletConfiguration,
-            issuerMetadata = offer.credentialIssuerMetadata,
+            credentialOffer = offer,
             ktorHttpClientFactory = ktorHttpClientFactory,
         )
 
         val authorizedRequest = with(issuer) {
-            val parRequested = issuer.pushAuthorizationCodeRequest(offer.credentials, null).getOrThrow()
+            val parRequested = prepareAuthorizationRequest().getOrThrow()
             val authorizationCode = UUID.randomUUID().toString()
-            parRequested
-                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
-                .requestAccessToken().getOrThrow()
+            parRequested.authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode)).getOrThrow()
         }
         return Triple(offer, authorizedRequest, issuer)
     }

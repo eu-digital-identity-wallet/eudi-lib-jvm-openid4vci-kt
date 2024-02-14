@@ -57,7 +57,7 @@ internal class AuthorizeOfferIssuanceImpl(
     ): Result<AuthorizedRequest> = authorizer.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier)
         .map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
 
-    override suspend fun authorizeWithPreAuthorizationCode(pin: String?): Result<AuthorizedRequest> {
+    override suspend fun authorizeWithPreAuthorizationCode(pin: String?): Result<AuthorizedRequest> = runCatching {
         val offeredGrants = credentialOffer.grants
         require(offeredGrants != null) { "Grant not specified in credential offer." }
         val preAuthorizedCode = when (offeredGrants) {
