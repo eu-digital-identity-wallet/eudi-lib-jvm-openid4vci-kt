@@ -20,6 +20,9 @@ import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataReso
 import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer
 import eu.europa.ec.eudi.openid4vci.internal.KeyGenerator
 import io.ktor.client.*
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredential {
 
@@ -28,18 +31,23 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
         suspend fun metaData(
             httpClient: HttpClient,
             credentialIssuerId: CredentialIssuerId,
-        ): Pair<CredentialIssuerMetadata, List<CIAuthorizationServerMetadata>> =
+        ): Pair<CredentialIssuerMetadata, List<CIAuthorizationServerMetadata>> = coroutineScope {
             with(httpClient) {
                 val issuerMetadata = run {
                     val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
                     resolver.resolve(credentialIssuerId).getOrThrow()
                 }
-                val authorizationServersMetadata = issuerMetadata.authorizationServers.distinct().map { authServerUrl ->
-                    val resolver = DefaultAuthorizationServerMetadataResolver(httpClient)
-                    resolver.resolve(authServerUrl).getOrThrow()
-                }
+                val authorizationServersMetadata =
+                    issuerMetadata.authorizationServers.distinct().map { authServerUrl ->
+                        async {
+                            val resolver = DefaultAuthorizationServerMetadataResolver(httpClient)
+                            resolver.resolve(authServerUrl).getOrThrow()
+                        }
+                    }.awaitAll()
+
                 issuerMetadata to authorizationServersMetadata
             }
+        }
 
         fun make(
             config: OpenId4VCIConfig,
@@ -55,13 +63,14 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             )
         }
 
-        val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory = { requiredEncryption, keyGenerationConfig ->
-            val method = requiredEncryption.encryptionMethodsSupported[0]
-            requiredEncryption.algorithmsSupported.firstNotNullOfOrNull { alg ->
-                KeyGenerator.genKeyIfSupported(keyGenerationConfig, alg)?.let { jwk ->
-                    IssuanceResponseEncryptionSpec(jwk, alg, method)
-                }
-            } ?: error("Could not create encryption spec")
-        }
+        val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =
+            { requiredEncryption, keyGenerationConfig ->
+                val method = requiredEncryption.encryptionMethodsSupported[0]
+                requiredEncryption.algorithmsSupported.firstNotNullOfOrNull { alg ->
+                    KeyGenerator.genKeyIfSupported(keyGenerationConfig, alg)?.let { jwk ->
+                        IssuanceResponseEncryptionSpec(jwk, alg, method)
+                    }
+                } ?: error("Could not create encryption spec")
+            }
     }
 }
