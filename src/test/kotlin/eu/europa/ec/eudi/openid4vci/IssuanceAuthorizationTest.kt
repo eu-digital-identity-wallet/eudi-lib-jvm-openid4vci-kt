@@ -77,7 +77,6 @@ class IssuanceAuthorizationTest {
     @Test
     fun `successful authorization with authorization code flow (wallet initiated)`() =
         runTest {
-            val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 oidcWellKnownMocker(),
                 authServerWellKnownMocker(),
@@ -145,29 +144,21 @@ class IssuanceAuthorizationTest {
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
             val issuer = Issuer.make(
                 config = vciWalletConfiguration,
+                credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-                credentialIssuerId = credentialIssuerIdentifier,
             )
-            val issuerState = issuerStateFromOffer(offer)
-
             with(issuer) {
-                val parRequested =
-                    pushAuthorizationCodeRequest(offer.credentials, issuerState).getOrThrow()
-                        .also { println(it) }
-
+                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
-
-                parRequested
-                    .handleAuthorizationCode(AuthorizationCode(authorizationCode))
+                authRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode))
                     .also { println(it) }
-                    .requestAccessToken().getOrThrow().also { println(it) }
             }
         }
 
     @Test
     fun `successful authorization with authorization code flow`() =
         runTest {
-            val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 oidcWellKnownMocker(),
                 authServerWellKnownMocker(),
@@ -233,34 +224,24 @@ class IssuanceAuthorizationTest {
                 },
             )
 
+            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
             val issuer = Issuer.make(
                 config = vciWalletConfiguration,
+                credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-                credentialIssuerId = credentialIssuerIdentifier,
             )
             with(issuer) {
-                val parRequested =
-                    pushAuthorizationCodeRequest(
-                        listOf(
-                            CredentialIdentifier("eu.europa.ec.eudiw.pid_mso_mdoc"),
-                            CredentialIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
-                        ),
-                        null,
-                    ).getOrThrow()
-
+                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
-
-                parRequested
-                    .handleAuthorizationCode(AuthorizationCode(authorizationCode))
+                authRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode))
                     .also { println(it) }
-                    .requestAccessToken().getOrThrow().also { println(it) }
             }
         }
 
     @Test
     fun `successful authorization with pre-authorization code flow`() =
         runTest {
-            val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
                 oidcWellKnownMocker(),
@@ -302,27 +283,20 @@ class IssuanceAuthorizationTest {
                     }
                 },
             )
-
+            val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
                 config = vciWalletConfiguration,
+                credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-                credentialIssuerId = credentialIssuerIdentifier,
             )
             with(issuer) {
-                authorizeWithPreAuthorizationCode(
-                    listOf(
-                        CredentialIdentifier("eu.europa.ec.eudiw.pid_mso_mdoc"),
-                        CredentialIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
-                    ),
-                    PreAuthorizationCode("eyJhbGciOiJSU0EtFYUaBy", "pin"),
-                )
+                authorizeWithPreAuthorizationCode("pin")
             }
         }
 
     @Test
     fun `(pre-auth code flow) when access token endpoint return nonce then authorized request must be ProofRequired`() =
         runTest {
-            val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
                 oidcWellKnownMocker(),
@@ -350,17 +324,25 @@ class IssuanceAuthorizationTest {
             val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
                 config = vciWalletConfiguration,
+                credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-                credentialIssuerId = credentialIssuerIdentifier,
             )
-            val preAuthorizationCode = preAuthCodeFromOffer(offer)
 
             with(issuer) {
-                val authorizedRequest = authorizeWithPreAuthorizationCode(
-                    offer.credentials,
-                    PreAuthorizationCode(preAuthorizationCode, null),
-                ).getOrThrow()
+                // Validate error is thrown when pin not provided although required
+                authorizeWithPreAuthorizationCode(null)
+                    .fold(
+                        onSuccess = {
+                            fail("Exception expected to be thrown")
+                        },
+                        onFailure = {
+                            assertTrue("Expected PushedAuthorizationRequestFailed to be thrown but was not") {
+                                it is IllegalStateException
+                            }
+                        },
+                    )
 
+                val authorizedRequest = authorizeWithPreAuthorizationCode("pin").getOrThrow()
                 assertTrue("Token endpoint provides c_nonce but authorized request is not ProofRequired") {
                     authorizedRequest is AuthorizedRequest.ProofRequired
                 }
@@ -370,7 +352,6 @@ class IssuanceAuthorizationTest {
     @Test
     fun `(auth code flow) when access token endpoint return nonce then authorized request must be ProofRequired`() =
         runTest {
-            val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
                 oidcWellKnownMocker(),
@@ -398,18 +379,14 @@ class IssuanceAuthorizationTest {
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
                 config = vciWalletConfiguration,
+                credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-                credentialIssuerId = credentialIssuerIdentifier,
             )
-            val issuerState = issuerStateFromOffer(offer)
 
             with(issuer) {
-                val authorizedRequest = pushAuthorizationCodeRequest(
-                    offer.credentials,
-                    issuerState,
-                ).getOrThrow()
-                    .handleAuthorizationCode(AuthorizationCode("auth-code"))
-                    .requestAccessToken().getOrThrow()
+                val authorizedRequest = prepareAuthorizationRequest().getOrThrow()
+                    .authorizeWithAuthorizationCode(AuthorizationCode("auth-code"))
+                    .getOrThrow()
 
                 assertTrue("Token endpoint provides c_nonce but authorized request is not ProofRequired") {
                     authorizedRequest is AuthorizedRequest.ProofRequired
@@ -420,7 +397,6 @@ class IssuanceAuthorizationTest {
     @Test
     fun `when par endpoint responds with failure, exception PushedAuthorizationRequestFailed is thrown`() =
         runTest {
-            val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
                 oidcWellKnownMocker(),
@@ -445,13 +421,11 @@ class IssuanceAuthorizationTest {
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
                 config = vciWalletConfiguration,
+                credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-                credentialIssuerId = credentialIssuerIdentifier,
             )
-            val issuerState = issuerStateFromOffer(offer)
-
             with(issuer) {
-                pushAuthorizationCodeRequest(offer.credentials, issuerState)
+                prepareAuthorizationRequest()
                     .fold(
                         onSuccess = {
                             fail("Exception expected to be thrown")
@@ -468,7 +442,6 @@ class IssuanceAuthorizationTest {
     @Test
     fun `when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown (auth code flow)`() =
         runTest {
-            val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
                 oidcWellKnownMocker(),
@@ -493,17 +466,15 @@ class IssuanceAuthorizationTest {
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
                 config = vciWalletConfiguration,
+                credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-                credentialIssuerId = credentialIssuerIdentifier,
             )
-            val issuerState = issuerStateFromOffer(offer)
 
             with(issuer) {
-                val parPlaced = pushAuthorizationCodeRequest(offer.credentials, issuerState).getOrThrow()
+                val parPlaced = prepareAuthorizationRequest().getOrThrow()
                 val authorizationCode = UUID.randomUUID().toString()
                 parPlaced
-                    .handleAuthorizationCode(AuthorizationCode(authorizationCode))
-                    .requestAccessToken()
+                    .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode))
                     .fold(
                         onSuccess = {
                             fail("Exception expected to be thrown")
@@ -520,7 +491,6 @@ class IssuanceAuthorizationTest {
     @Test
     fun `when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown (pre-auth code flow)`() =
         runTest {
-            val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
                 oidcWellKnownMocker(),
@@ -545,16 +515,12 @@ class IssuanceAuthorizationTest {
             val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
                 config = vciWalletConfiguration,
+                credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-                credentialIssuerId = credentialIssuerIdentifier,
             )
-            val preAuthCode = preAuthCodeFromOffer(offer)
 
             with(issuer) {
-                authorizeWithPreAuthorizationCode(
-                    offer.credentials,
-                    PreAuthorizationCode(preAuthCode, null),
-                )
+                authorizeWithPreAuthorizationCode("pin")
                     .fold(
                         onSuccess = {
                             fail("Exception expected to be thrown")
@@ -575,26 +541,5 @@ class IssuanceAuthorizationTest {
         return CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
             .resolve("https://$CredentialIssuer_URL/credentialoffer?credential_offer=$credentialOfferStr")
             .getOrThrow()
-    }
-
-    private fun issuerStateFromOffer(offer: CredentialOffer): String? {
-        val issuerState =
-            when (val grants = offer.grants) {
-                is Grants.AuthorizationCode -> grants.issuerState
-                is Grants.Both -> grants.authorizationCode.issuerState
-                null -> null
-                else -> fail("Not expected offer grant type")
-            }
-        return issuerState
-    }
-
-    private fun preAuthCodeFromOffer(offer: CredentialOffer): String {
-        val preAuthorizationCode =
-            when (val grants = offer.grants) {
-                is Grants.PreAuthorizedCode -> grants.preAuthorizedCode
-                is Grants.Both -> grants.preAuthorizedCode.preAuthorizedCode
-                else -> fail("Not expected offer grant type")
-            }
-        return preAuthorizationCode
     }
 }

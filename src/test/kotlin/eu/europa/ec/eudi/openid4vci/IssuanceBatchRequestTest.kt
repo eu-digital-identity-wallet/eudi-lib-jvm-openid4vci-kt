@@ -191,18 +191,15 @@ class IssuanceBatchRequestTest {
             .getOrThrow()
 
         val issuer = Issuer.make(
-            authorizationServerMetadata = offer.authorizationServerMetadata,
             config = vciWalletConfiguration,
+            credentialOffer = offer,
             ktorHttpClientFactory = ktorHttpClientFactory,
-            issuerMetadata = offer.credentialIssuerMetadata,
         )
 
         val authorizedRequest = with(issuer) {
-            val parRequested = issuer.pushAuthorizationCodeRequest(offer.credentials, null).getOrThrow()
+            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
             val authorizationCode = UUID.randomUUID().toString()
-            parRequested
-                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
-                .requestAccessToken().getOrThrow()
+            authRequestPrepared.authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode)).getOrThrow()
         }
         return Triple(offer, authorizedRequest, issuer)
     }

@@ -160,7 +160,7 @@ sealed interface BindingKey {
     }
 }
 
-data class IssuanceResponseEncryptionSpec constructor(
+data class IssuanceResponseEncryptionSpec(
     val jwk: JWK,
     val algorithm: JWEAlgorithm,
     val encryptionMethod: EncryptionMethod,
