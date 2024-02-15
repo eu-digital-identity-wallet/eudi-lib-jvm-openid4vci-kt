@@ -71,14 +71,14 @@ val resolver = AuthorizationServerMetadataResolver() // get a default implementa
 val metadata: CIAuthorizationServerMetadata = resolver.resolve(HttpsUrl("https://...")).getOrThrow() // fetch and parse authorization server metadata
 ```
 
-There is also a convenient method that obtains the credentials issuer metadata & the metadata of the first 
-authorization server with a single call
+There is also a convenient method that obtains the credentials issuer metadata & the metadata of all 
+authorization servers with a single call
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
 val credentialIssuerIdentifier = CredentialIssuerId("https://....").getOrThrow()
-val (issuerMetadata, authServerMetadata) = Issuer.metaData(credentialIssuerIdentifier)
+val (issuerMetadata, authServersMetadata) = Issuer.metaData(httpClient, credentialIssuerIdentifier)
 ```
 
 ### Resolve a credential offer presented by issuer
@@ -112,16 +112,15 @@ title: Authorization Code Flow state transision diagram
 stateDiagram-v2 
     state c_nonce_returned <<choice>>    
     state join_state <<join>>
-    [*] --> UnauthorizedRequest.ParRequested: pushAuthorizationCodeRequest
-    UnauthorizedRequest.ParRequested --> UnauthorizedRequest.AuthorizationCodeRetrieved: handleAuthorizationCode
-    UnauthorizedRequest.AuthorizationCodeRetrieved --> c_nonce_exists: requestAccessToken
+    [*] --> AuthorizationRequestPrepared: prepareAuthorizationRequest    
+    AuthorizationRequestPrepared --> c_nonce_exists: authorizeWithAuthorizationCode
     c_nonce_exists --> c_nonce_returned 
     c_nonce_returned --> AuthorizedRequest.ProofRequired : yes
     c_nonce_returned --> AuthorizedRequest.NoProofRequired : no
     AuthorizedRequest.ProofRequired --> join_state: requestSingle (with proof)
     AuthorizedRequest.ProofRequired --> join_state: requestBatch (with proof)
-    AuthorizedRequest.NoProofRequired --> join_state: requestSingle
-    AuthorizedRequest.NoProofRequired --> join_state: requestBatch
+    AuthorizedRequest.NoProofRequired --> join_state: requestSingle (no proof)
+    AuthorizedRequest.NoProofRequired --> join_state: requestBatch (no proof)
     join_state --> SubmittedRequest.InvalidProof
     join_state --> SubmittedRequest.Success
     join_state --> SubmittedRequest.Failed
@@ -134,14 +133,14 @@ title: PreAuthorization Code Flow state transision diagram
 stateDiagram-v2    
     state c_nonce_returned <<choice>>
     state join_state <<join>>    
-    [*] --> c_nonce_exists: authorizeWithPreAuthorizationCode (providing Pre-Authorized Code and Pin)
+    [*] --> c_nonce_exists: authorizeWithPreAuthorizationCode
     c_nonce_exists --> c_nonce_returned 
     c_nonce_returned --> AuthorizedRequest.ProofRequired : yes
     c_nonce_returned --> AuthorizedRequest.NoProofRequired : no     
     AuthorizedRequest.ProofRequired --> join_state: requestSingle (with proof)
     AuthorizedRequest.ProofRequired --> join_state: requestBatch (with proof)
-    AuthorizedRequest.NoProofRequired --> join_state: requestSingle
-    AuthorizedRequest.NoProofRequired --> join_state: requestBatch
+    AuthorizedRequest.NoProofRequired --> join_state: requestSingle (no proof)
+    AuthorizedRequest.NoProofRequired --> join_state: requestBatch (no proof)
     join_state --> SubmittedRequest.InvalidProof 
     join_state --> SubmittedRequest.Success
     join_state --> SubmittedRequest.Failed    
@@ -155,12 +154,12 @@ It is consisted of two sub-components:
 
 #### Initialize an Issuer
 
-The Issuer interface provides a factory method to construct an issuer component. 
+An [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) component is initialized against a credential offer either resolved from an issuance service credential offer URL or manually constructed. 
+The [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) interface provides a factory method to construct an issuer component. 
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
-val credentialIssuerIdentifier = CredentialIssuerId("https://....").getOrThrow()
 val openId4VCIConfig = OpenId4VCIConfig(
     clientId = "wallet-dev", // The client id of wallet (acting as an OAUTH2 client)
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // Where the Credential Issuer should redirect after 
@@ -168,36 +167,42 @@ val openId4VCIConfig = OpenId4VCIConfig(
     keyGenerationConfig = KeyGenerationConfig.ecOnly(Curve.P_256) // What kind of ephemeral keys could be generated
                                                                   // to encrypt credential issuance response 
 )
-val issuer = Issuer.make(openId4VCIConfig, credentialIssuerIdentifier)
+val credentialOffer: CredentialOffer = CredentialOfferRequestResolver().resolve(coUrl).getOrThrow()
+val issuer = Issuer.make(openId4VCIConfig, credentialOffer)
 ```
+A resolved [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) object contains the mandatory elements required for issuance.
+- The issuer's identifier 
+- The selected authorization server that will authorize the issuance
+- The specific credentials that will be requested
 
 #### Authorize request via Authorization Code Flow
 
-Given an `issuer` use [Authorization Code Flow](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-3.4) to authorize an issuance request.     
+Given an `issuer` that is initialized with a specific credential offer, use [Authorization Code Flow](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-3.4) to authorize an issuance request.     
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {
-    val parPlaced = pushAuthorizationCodeRequest(credentialIdentifiers, null).getOrThrow()
-    val authorizationCode = ... // using url parPlaced.getAuthorizationCodeURL authenticate via front-channel on authorization server and retrieve authorization code 
-    val authorizedRequest = 
-        parPlaced
-        .handleAuthorizationCode(IssuanceAuthorization.AuthorizationCode(authorizationCode))
-        .requestAccessToken().getOrThrow()
+    val preparedAuthorizationRequest = prepareAuthorizationRequest().getOrThrow()
+    val authorizationCode: String = ... // using url preparedAuthorizationRequest.authorizationCodeURL authenticate via front-channel on authorization server and retrieve authorization code 
+    val authorizedRequest =
+        preparedAuthorizationRequest.authorizeWithAuthorizationCode(
+            AuthorizationCode(authorizationCode),
+        ).getOrThrow()
 }
 ```
 
 #### Authorize request via Pre-Authorization Code Flow
 
-Given an `issuer` use [Pre-Authorization Code Flow](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-3.5) to authorize an issuance request.
+Given an `issuer` that is initialized with a specific credential offer, use [Pre-Authorization Code Flow](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-3.5) to authorize an issuance request.
+It is expected that the credential offer will contain the pre-authorization code and defines the need to provide a pin or not. 
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {
-    val preAuthorizationCode = ... // pre-authorization code as contained in a credential offer 
-    val authorizedRequest = authorizeWithPreAuthorizationCode(credentialIdentifiers, preAuthorizationCode).getOrThrow()    
+    val pin = ... // Pin retrieved from another channel 
+    val authorizedRequest = authorizeWithPreAuthorizationCode(pin).getOrThrow()    
 }
 ```
 
@@ -227,6 +232,8 @@ with(issuer) {
 }
 ```
 
+**NOTE:** Only credentials that were included in credential offer that initialized the [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) component can be passed. 
+
 #### Request batch credential issuance
 
 Given an `authorizedRequest` and in the context of an `issuer` a batch credential issuance request can be placed as follows
@@ -251,6 +258,8 @@ with(issuer) {
     }
 }
 ```
+
+**NOTE:** Only credentials that were included in credential offer that initialized the [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) component can be passed.
 
 ## Features supported
 
