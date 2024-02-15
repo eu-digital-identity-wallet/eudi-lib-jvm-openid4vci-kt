@@ -44,55 +44,10 @@ The released software is an initial development release version:
 
 Library provides the following main api elements to facilitate consumers of this api with the operations related to verifiable credentials issuance  
 
-- **Metadata resolvers**: Components that interact with credential issuer and its authorization server to obtain and parse their metadata.  
-- **Credential offer resolver**: A component that interacts with credential issuer to resolve and validate a credential offer presented by the issuer.  
 - **Issuer component**: A component that offers all operation required to authorize and submit a credential issuance request.
+- **Credential offer resolver**: A component that interacts with credential issuer to resolve and validate a credential offer presented by the issuer.  
+- **Metadata resolvers**: Components that interact with credential issuer and its authorization server to obtain and parse their metadata.  
 
-### Resolve Credential Issuer and authorization server metadata
-
-To obtain the credentials issuer metadata use [CredentialIssuerMetadataResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialIssuerMetadataResolver.kt) the following way
-
-```kotlin
-import eu.europa.ec.eudi.openid4vci.*
-
-val credentialIssuerIdentifier = CredentialIssuerId("https://....").getOrThrow() // credential issuer id is a https url with no query or fragment components
-val resolver = CredentialIssuerMetadataResolver() // get a default implementation of the CredentialIssuerMetadataResolver interface 
-val metadata: CredentialIssuerMetadata = resolver.resolve(credentialIssuerIdentifier).getOrThrow()  // fetch and parse credential issuer metadata
-```
-In case of metadata parsing failure a `Result.failure()` will be returned to caller wrapping the exception thrown while parsing metadata.
-
-
-
-To obtain the authorization server's  metadata use [AuthorizationServerMetadataResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/AuthorizationServerMetadataResolver.kt) the following way
-```kotlin
-import eu.europa.ec.eudi.openid4vci.*
-
-val resolver = AuthorizationServerMetadataResolver() // get a default implementation of the AuthorizationServerMetadataResolver interface
-val metadata: CIAuthorizationServerMetadata = resolver.resolve(HttpsUrl("https://...")).getOrThrow() // fetch and parse authorization server metadata
-```
-
-There is also a convenient method that obtains the credentials issuer metadata & the metadata of all 
-authorization servers with a single call
-
-```kotlin
-import eu.europa.ec.eudi.openid4vci.*
-
-val credentialIssuerIdentifier = CredentialIssuerId("https://....").getOrThrow()
-val (issuerMetadata, authServersMetadata) = Issuer.metaData(httpClient, credentialIssuerIdentifier)
-```
-
-### Resolve a credential offer presented by issuer
-
-A CredentialOfferRequestResolver uses internally the two metadata resolvers mentioned above to resolve metadata of issuer and its authorization server
-
-Given a credential offer url use [CredentialOfferRequestResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) the following way to validate and resolve it to [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt)
-
-```kotlin
-import eu.europa.ec.eudi.openid4vci.*
-
-val credentialOfferRequestResolver = CredentialOfferRequestResolver()
-val credentialOffer: CredentialOffer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
-```
 
 ### Credential Issuance
 
@@ -148,7 +103,7 @@ stateDiagram-v2
 
 
 [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) is the component that facilitates the authorization and submission of a credential issuance request (batch or single).
-It is consisted of two sub-components:
+It is the main entry point for the functionality provided from the library, and it is consisted of two sub-components:
 - **IssuanceAuthorizer**: A component responsible for all interactions with an authorization server to authorize a request for credential(s) issuance.
 - **IssuerRequester**: A component responsible for all interactions with credential issuer for submitting credential issuance requests.
 
@@ -260,6 +215,50 @@ with(issuer) {
 ```
 
 **NOTE:** Only credentials that were included in credential offer that initialized the [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) component can be passed.
+
+### Resolve a credential offer presented by issuer
+
+A CredentialOfferRequestResolver uses internally the two metadata resolvers mentioned above to resolve metadata of issuer and its authorization server
+
+Given a credential offer url use [CredentialOfferRequestResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) the following way to validate and resolve it to [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt)
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+val credentialOfferRequestResolver = CredentialOfferRequestResolver()
+val credentialOffer: CredentialOffer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
+```
+
+### Resolve Credential Issuer and authorization server metadata
+
+To obtain the credentials issuer metadata use [CredentialIssuerMetadataResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialIssuerMetadataResolver.kt) the following way
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+val credentialIssuerIdentifier = CredentialIssuerId("https://....").getOrThrow() // credential issuer id is a https url with no query or fragment components
+val resolver = CredentialIssuerMetadataResolver() // get a default implementation of the CredentialIssuerMetadataResolver interface 
+val metadata: CredentialIssuerMetadata = resolver.resolve(credentialIssuerIdentifier).getOrThrow()  // fetch and parse credential issuer metadata
+```
+In case of metadata parsing failure a `Result.failure()` will be returned to caller wrapping the exception thrown while parsing metadata.
+
+To obtain the authorization server's  metadata use [AuthorizationServerMetadataResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/AuthorizationServerMetadataResolver.kt) the following way
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+val resolver = AuthorizationServerMetadataResolver() // get a default implementation of the AuthorizationServerMetadataResolver interface
+val metadata: CIAuthorizationServerMetadata = resolver.resolve(HttpsUrl("https://...")).getOrThrow() // fetch and parse authorization server metadata
+```
+
+There is also a convenient method that obtains the credentials issuer metadata & the metadata of all
+authorization servers with a single call
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+val credentialIssuerIdentifier = CredentialIssuerId("https://....").getOrThrow()
+val (issuerMetadata, authServersMetadata) = Issuer.metaData(httpClient, credentialIssuerIdentifier)
+```
 
 ## Features supported
 
