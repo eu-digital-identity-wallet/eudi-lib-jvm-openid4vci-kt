@@ -47,7 +47,7 @@ const val MDL = "org.iso.18013.5.1.mDL"
 val credentialOffer = """
     {
       "credential_issuer": "$CredentialIssuer_URL",
-      "credentials": [ "$PID_SdJwtVC", "$PID_MsoMdoc", "$MDL" ],
+      "credential_configuration_ids": [ "$PID_SdJwtVC", "$PID_MsoMdoc", "$MDL" ],
       "grants": {
         "authorization_code": {}
       }
@@ -114,7 +114,7 @@ private class Wallet(
             Issuer.metaData(client, credentialIssuerIdentifier)
         }
 
-        val credentialIdentifier = CredentialIdentifier(identifier)
+        val credentialIdentifier = CredentialConfigurationIdentifier(identifier)
         ensure(issuerMetadata.credentialsSupported.get(credentialIdentifier) != null) {
             error("Credential identifier $identifier not supported by issuer")
         }
@@ -123,7 +123,7 @@ private class Wallet(
             credentialIssuerIdentifier = credentialIssuerIdentifier,
             credentialIssuerMetadata = issuerMetadata,
             authorizationServerMetadata = authorizationServersMetadata[0],
-            credentials = listOf(credentialIdentifier),
+            credentialConfigurationIdentifiers = listOf(credentialIdentifier),
         )
 
         val issuer = Issuer.make(
@@ -158,13 +158,13 @@ private class Wallet(
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer)
 
         return when (authorizedRequest) {
-            is AuthorizedRequest.NoProofRequired -> offer.credentials.map { credentialId ->
+            is AuthorizedRequest.NoProofRequired -> offer.credentialConfigurationIdentifiers.map { credentialId ->
                 issuanceLog("Requesting issuance of '$credentialId'")
                 val credential = noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId)
                 credentialId.value to credential
             }
 
-            is AuthorizedRequest.ProofRequired -> offer.credentials.map { credentialId ->
+            is AuthorizedRequest.ProofRequired -> offer.credentialConfigurationIdentifiers.map { credentialId ->
                 issuanceLog("Requesting issuance of '$credentialId'")
                 val credential = proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId)
                 credentialId.value to credential
@@ -199,7 +199,7 @@ private class Wallet(
     private suspend fun proofRequiredSubmissionUseCase(
         issuer: Issuer,
         authorized: AuthorizedRequest.ProofRequired,
-        credentialIdentifier: CredentialIdentifier,
+        credentialIdentifier: CredentialConfigurationIdentifier,
     ): String {
         with(issuer) {
             val proofSigner = proofSigners[credentialIdentifier.value] ?: error("No signer found for credential $credentialIdentifier")
@@ -247,7 +247,7 @@ private class Wallet(
     private suspend fun noProofRequiredSubmissionUseCase(
         issuer: Issuer,
         noProofRequiredState: AuthorizedRequest.NoProofRequired,
-        credentialIdentifier: CredentialIdentifier,
+        credentialIdentifier: CredentialConfigurationIdentifier,
     ): String {
         with(issuer) {
             val submittedRequest = noProofRequiredState.requestSingle(credentialIdentifier, null).getOrThrow()

@@ -47,7 +47,7 @@ value class HttpsUrl private constructor(val value: URL) {
 }
 
 @JvmInline
-value class CredentialIdentifier(val value: String) {
+value class CredentialConfigurationIdentifier(val value: String) {
     init {
         require(value.isNotEmpty()) { "value cannot be empty" }
     }
@@ -83,18 +83,6 @@ value class AccessToken(val accessToken: String) {
 value class AuthorizationCode(val code: String) {
     init {
         require(code.isNotEmpty()) { "Authorization code must not be empty" }
-    }
-}
-
-/**
- * Pre-Authorization code to be exchanged with an access token
- */
-data class PreAuthorizationCode(
-    val preAuthorizedCode: String,
-    val pin: String?,
-) {
-    init {
-        require(preAuthorizedCode.isNotEmpty()) { "Pre-Authorization code must not be empty" }
     }
 }
 

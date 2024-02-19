@@ -42,7 +42,7 @@ class IssuanceBatchRequestTest {
     private val CREDENTIAL_OFFER_NO_GRANTS = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["$PID_MsoMdoc_SCOPE", "$PID_SdJwtVC_SCOPE"]          
+          "credential_configuration_ids": ["$PID_MsoMdoc_SCOPE", "$PID_SdJwtVC_SCOPE"]          
         }
     """.trimIndent()
 
@@ -127,8 +127,8 @@ class IssuanceBatchRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialMetadata = listOf(
-                        CredentialIdentifier(PID_MsoMdoc_SCOPE) to claimSet_mso_mdoc,
-                        CredentialIdentifier(PID_SdJwtVC_SCOPE) to claimSet_sd_jwt_vc,
+                        CredentialConfigurationIdentifier(PID_MsoMdoc_SCOPE) to claimSet_mso_mdoc,
+                        CredentialConfigurationIdentifier(PID_SdJwtVC_SCOPE) to claimSet_sd_jwt_vc,
                     )
 
                     val submittedRequest =
@@ -141,12 +141,12 @@ class IssuanceBatchRequestTest {
                             val proofSigner = CryptoGenerator.rsaProofSigner()
                             val credentialMetadataTriples = listOf(
                                 Triple(
-                                    CredentialIdentifier(PID_MsoMdoc_SCOPE),
+                                    CredentialConfigurationIdentifier(PID_MsoMdoc_SCOPE),
                                     claimSet_mso_mdoc,
                                     proofSigner,
                                 ),
                                 Triple(
-                                    CredentialIdentifier(PID_SdJwtVC_SCOPE),
+                                    CredentialConfigurationIdentifier(PID_SdJwtVC_SCOPE),
                                     claimSet_sd_jwt_vc,
                                     proofSigner,
                                 ),

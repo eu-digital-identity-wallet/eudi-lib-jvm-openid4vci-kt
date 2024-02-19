@@ -48,21 +48,21 @@ internal class RequestIssuanceImpl(
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
-        credentialId: CredentialIdentifier,
+        credentialId: CredentialConfigurationIdentifier,
         claimSet: ClaimSet?,
     ): Result<SubmittedRequest> = runCatching {
-        require(credentialOffer.credentials.contains(credentialId)) {
+        require(credentialOffer.credentialConfigurationIdentifiers.contains(credentialId)) {
             "The requested credential is not authorized for issuance"
         }
         placeIssuanceRequest(accessToken) { singleRequest(credentialId, claimSet, null) }
     }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-        credentialId: CredentialIdentifier,
+        credentialId: CredentialConfigurationIdentifier,
         claimSet: ClaimSet?,
         proofSigner: ProofSigner,
     ): Result<SubmittedRequest> = runCatching {
-        require(credentialOffer.credentials.contains(credentialId)) {
+        require(credentialOffer.credentialConfigurationIdentifiers.contains(credentialId)) {
             "The requested credential is not authorized for issuance"
         }
         placeIssuanceRequest(accessToken) {
@@ -71,9 +71,9 @@ internal class RequestIssuanceImpl(
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<CredentialIdentifier, ClaimSet?>>,
+        credentialsMetadata: List<Pair<CredentialConfigurationIdentifier, ClaimSet?>>,
     ): Result<SubmittedRequest> = runCatching {
-        require(credentialOffer.credentials.containsAll(credentialsMetadata.map { (identifier, _) -> identifier })) {
+        require(credentialOffer.credentialConfigurationIdentifiers.containsAll(credentialsMetadata.map { (identifier, _) -> identifier })) {
             "One or more of the requested credentials are not authorized for issuance"
         }
         placeIssuanceRequest(accessToken) {
@@ -85,9 +85,9 @@ internal class RequestIssuanceImpl(
     }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, ProofSigner>>,
+        credentialsMetadata: List<Triple<CredentialConfigurationIdentifier, ClaimSet?, ProofSigner>>,
     ): Result<SubmittedRequest> = runCatching {
-        require(credentialOffer.credentials.containsAll(credentialsMetadata.map { (identifier, _) -> identifier })) {
+        require(credentialOffer.credentialConfigurationIdentifiers.containsAll(credentialsMetadata.map { (identifier, _) -> identifier })) {
             "One or more of the requested credentials are not authorized for issuance"
         }
         placeIssuanceRequest(accessToken) {
@@ -98,7 +98,7 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private fun credentialSupportedById(credentialId: CredentialIdentifier): CredentialSupported {
+    private fun credentialSupportedById(credentialId: CredentialConfigurationIdentifier): CredentialSupported {
         val credentialSupported = issuerMetadata.credentialsSupported[credentialId]
         return requireNotNull(credentialSupported) {
             "$credentialId was not found within issuer metadata"
@@ -116,7 +116,7 @@ internal class RequestIssuanceImpl(
     }
 
     private fun singleRequest(
-        credentialId: CredentialIdentifier,
+        credentialId: CredentialConfigurationIdentifier,
         claimSet: ClaimSet?,
         proofFactory: ProofFactory?,
     ): CredentialIssuanceRequest.SingleRequest {

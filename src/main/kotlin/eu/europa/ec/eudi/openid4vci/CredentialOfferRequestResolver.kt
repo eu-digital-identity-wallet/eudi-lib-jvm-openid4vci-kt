@@ -27,11 +27,11 @@ data class CredentialOffer(
     val credentialIssuerIdentifier: CredentialIssuerId,
     val credentialIssuerMetadata: CredentialIssuerMetadata,
     val authorizationServerMetadata: CIAuthorizationServerMetadata,
-    val credentials: List<CredentialIdentifier>,
+    val credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
     val grants: Grants? = null,
 ) : Serializable {
     init {
-        require(credentials.isNotEmpty()) { "credentials must not be empty" }
+        require(credentialConfigurationIdentifiers.isNotEmpty()) { "credentials must not be empty" }
     }
 }
 
@@ -83,7 +83,7 @@ sealed interface Grants : Serializable {
      */
     data class PreAuthorizedCode(
         val preAuthorizedCode: String,
-        val pinRequired: Boolean = false,
+        val txCode: TxCode? = null,
         val interval: Duration,
         val authorizationServer: HttpsUrl? = null,
     ) : Grants {
@@ -100,6 +100,26 @@ sealed interface Grants : Serializable {
         val authorizationCode: AuthorizationCode,
         val preAuthorizedCode: PreAuthorizedCode,
     ) : Grants
+}
+
+data class TxCode(
+    val inputMode: TxCodeInputMode = TxCodeInputMode.NUMERIC,
+    val length: Int? = null,
+    val description: String? = null,
+)
+
+enum class TxCodeInputMode {
+    NUMERIC,
+    TEXT,
+    ;
+
+    companion object {
+        fun of(str: String): TxCodeInputMode = when (str) {
+            "numeric" -> NUMERIC
+            "text" -> TEXT
+            else -> error("Unsupported tx_code input method")
+        }
+    }
 }
 
 /**

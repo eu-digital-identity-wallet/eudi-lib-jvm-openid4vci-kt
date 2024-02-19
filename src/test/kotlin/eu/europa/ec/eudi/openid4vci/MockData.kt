@@ -317,10 +317,10 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
     ),
     true,
     mapOf(
-        CredentialIdentifier("UniversityDegree_JWT") to universityDegreeJwt(),
-        CredentialIdentifier("MobileDrivingLicense_msoMdoc") to mobileDrivingLicense(),
-        CredentialIdentifier("UniversityDegree_LDP_VC") to universityDegreeLdpVc(),
-        CredentialIdentifier("UniversityDegree_JWT_VC_JSON-LD") to universityDegreeJwtVcJsonLD(),
+        CredentialConfigurationIdentifier("UniversityDegree_JWT") to universityDegreeJwt(),
+        CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc") to mobileDrivingLicense(),
+        CredentialConfigurationIdentifier("UniversityDegree_LDP_VC") to universityDegreeLdpVc(),
+        CredentialConfigurationIdentifier("UniversityDegree_JWT_VC_JSON-LD") to universityDegreeJwtVcJsonLD(),
     ),
     listOf(CredentialIssuerMetadata.Display("credential-issuer.example.com", "en-US")),
 )

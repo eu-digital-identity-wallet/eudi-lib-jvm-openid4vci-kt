@@ -163,10 +163,10 @@ interface AuthorizeIssuance {
     /**
      * Action to authorize an issuance request using Pre-Authorized Code Flow.
      *
-     * @param pin   Optional parameter in case the credential offer specifies that a user provided pin is required for authorization
+     * @param txCode   Optional parameter in case the credential offer specifies that a user provided pin is required for authorization
      * @return an issuance request in authorized state
      */
-    suspend fun authorizeWithPreAuthorizationCode(pin: String?): Result<AuthorizedRequest>
+    suspend fun authorizeWithPreAuthorizationCode(txCode: String?): Result<AuthorizedRequest>
 }
 
 /**
@@ -198,7 +198,7 @@ interface RequestIssuance {
      *  @return The new state of the request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
-        credentialId: CredentialIdentifier,
+        credentialId: CredentialConfigurationIdentifier,
         claimSet: ClaimSet?,
     ): Result<SubmittedRequest>
 
@@ -213,7 +213,7 @@ interface RequestIssuance {
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-        credentialId: CredentialIdentifier,
+        credentialId: CredentialConfigurationIdentifier,
         claimSet: ClaimSet?,
         proofSigner: ProofSigner,
     ): Result<SubmittedRequest>
@@ -226,7 +226,7 @@ interface RequestIssuance {
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<CredentialIdentifier, ClaimSet?>>,
+        credentialsMetadata: List<Pair<CredentialConfigurationIdentifier, ClaimSet?>>,
     ): Result<SubmittedRequest>
 
     /**
@@ -236,7 +236,7 @@ interface RequestIssuance {
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, ProofSigner>>,
+        credentialsMetadata: List<Triple<CredentialConfigurationIdentifier, ClaimSet?, ProofSigner>>,
     ): Result<SubmittedRequest>
 
     /**

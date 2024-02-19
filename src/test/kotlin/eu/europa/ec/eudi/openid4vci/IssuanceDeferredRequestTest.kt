@@ -38,7 +38,7 @@ class IssuanceDeferredRequestTest {
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["$PID_SdJwtVC_SCOPE"]          
+          "credential_configuration_ids": ["$PID_SdJwtVC_SCOPE"]          
         }
     """.trimIndent()
 
@@ -77,7 +77,7 @@ class IssuanceDeferredRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
+                    val credentialMetadata = CredentialConfigurationIdentifier(PID_SdJwtVC_SCOPE)
                     val submittedRequest =
                         authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
                     when (submittedRequest) {
@@ -152,7 +152,7 @@ class IssuanceDeferredRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
+                    val credentialMetadata = CredentialConfigurationIdentifier(PID_SdJwtVC_SCOPE)
                     val submittedRequest =
                         authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
                     when (submittedRequest) {
@@ -240,7 +240,7 @@ class IssuanceDeferredRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
+                    val credentialMetadata = CredentialConfigurationIdentifier(PID_SdJwtVC_SCOPE)
                     val submittedRequest =
                         authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
                     when (submittedRequest) {
