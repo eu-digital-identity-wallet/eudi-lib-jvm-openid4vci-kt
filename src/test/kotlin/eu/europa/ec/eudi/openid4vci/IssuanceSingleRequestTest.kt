@@ -37,19 +37,19 @@ private const val PID_MsoMdoc_ID = "eu.europa.ec.eudiw.pid_mso_mdoc"
 private val CredentialOffer = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["$PID_SdJwtVC_ID", "$PID_MsoMdoc_ID"]          
+          "credential_configuration_ids": ["$PID_SdJwtVC_ID", "$PID_MsoMdoc_ID"]          
         }
 """.trimIndent()
 private val CredentialOfferMsoMdoc = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["$PID_MsoMdoc_ID"]          
+          "credential_configuration_ids": ["$PID_MsoMdoc_ID"]          
         }
 """.trimIndent()
 private val CredentialOfferWithSdJwtVc = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["$PID_SdJwtVC_ID"]          
+          "credential_configuration_ids": ["$PID_SdJwtVC_ID"]          
         }
 """.trimIndent()
 
@@ -121,7 +121,7 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = offer.credentials[0]
+                    val credentialMetadata = offer.credentialConfigurationIdentifiers[0]
                     val submittedRequest = assertDoesNotThrow {
                         authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
                     }
@@ -174,7 +174,7 @@ class IssuanceSingleRequestTest {
             with(issuer) {
                 when (authorizedRequest) {
                     is AuthorizedRequest.NoProofRequired -> {
-                        val credentialMetadata = offer.credentials[0]
+                        val credentialMetadata = offer.credentialConfigurationIdentifiers[0]
                         val request = assertDoesNotThrow {
                             authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
                         }
@@ -206,13 +206,13 @@ class IssuanceSingleRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val claimSetMsoMdoc = MsoMdocClaimSet(listOf("org.iso.18013.5.1" to "degree"))
-                    var credentialMetadata = CredentialIdentifier(PID_MsoMdoc_ID)
+                    var credentialMetadata = CredentialConfigurationIdentifier(PID_MsoMdoc_ID)
                     assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
                         authorizedRequest.requestSingle(credentialMetadata, claimSetMsoMdoc).getOrThrow()
                     }
 
                     val claimSetSdJwtVc = GenericClaimSet(listOf("degree"))
-                    credentialMetadata = CredentialIdentifier(PID_SdJwtVC_ID)
+                    credentialMetadata = CredentialConfigurationIdentifier(PID_SdJwtVC_ID)
                     assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
                         authorizedRequest.requestSingle(credentialMetadata, claimSetSdJwtVc).getOrThrow()
                     }
@@ -241,7 +241,7 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = CredentialIdentifier("UniversityDegree")
+                    val credentialMetadata = CredentialConfigurationIdentifier("UniversityDegree")
                     assertFailsWith<IllegalArgumentException> {
                         authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
                     }
@@ -325,7 +325,7 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = offer.credentials[0]
+                    val credentialMetadata = offer.credentialConfigurationIdentifiers[0]
                     val submittedRequest =
                         authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
                     when (submittedRequest) {
@@ -420,7 +420,7 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = offer.credentials[0]
+                    val credentialMetadata = offer.credentialConfigurationIdentifiers[0]
                     val submittedRequest =
                         authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
                     when (submittedRequest) {

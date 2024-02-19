@@ -46,7 +46,7 @@ class IssuanceEncryptedResponsesTest {
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["eu.europa.ec.eudiw.pid_mso_mdoc"]          
+          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc"]          
         }
     """.trimIndent()
 
@@ -91,7 +91,7 @@ class IssuanceEncryptedResponsesTest {
             assertFailsWith<ResponseEncryptionAlgorithmNotSupportedByIssuer>(
                 block = {
                     with(issuer) {
-                        noProofRequired.requestSingle(offer.credentials[0], null).getOrThrow()
+                        noProofRequired.requestSingle(offer.credentialConfigurationIdentifiers[0], null).getOrThrow()
                     }
                 },
             )
@@ -131,7 +131,7 @@ class IssuanceEncryptedResponsesTest {
             assertFailsWith<ResponseEncryptionMethodNotSupportedByIssuer>(
                 block = {
                     with(issuer) {
-                        noProofRequired.requestSingle(offer.credentials[0], null).getOrThrow()
+                        noProofRequired.requestSingle(offer.credentialConfigurationIdentifiers[0], null).getOrThrow()
                     }
                 },
             )
@@ -203,7 +203,7 @@ class IssuanceEncryptedResponsesTest {
             with(issuer) {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
                 noProofRequired
-                    .requestSingle(offer.credentials[0], null).getOrThrow()
+                    .requestSingle(offer.credentialConfigurationIdentifiers[0], null).getOrThrow()
             }
         }
 
@@ -311,7 +311,7 @@ class IssuanceEncryptedResponsesTest {
             with(issuer) {
                 when (authorizedRequest) {
                     is AuthorizedRequest.NoProofRequired -> {
-                        val credentialMetadata = offer.credentials[0]
+                        val credentialMetadata = offer.credentialConfigurationIdentifiers[0]
                         val submittedRequest =
                             authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
                         when (submittedRequest) {

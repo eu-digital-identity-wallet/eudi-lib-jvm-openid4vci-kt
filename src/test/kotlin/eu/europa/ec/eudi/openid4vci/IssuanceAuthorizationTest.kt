@@ -38,7 +38,7 @@ class IssuanceAuthorizationTest {
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
         {
           "credential_issuer": "$CredentialIssuer_URL",
-          "credentials": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
           "grants": {
             "authorization_code": {
               "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
@@ -50,18 +50,20 @@ class IssuanceAuthorizationTest {
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS = """
         {
           "credential_issuer": "$CredentialIssuer_URL",
-          "credentials": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"]          
+          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"]          
         }
     """.trimIndent()
 
     private val PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
         {
           "credential_issuer": "$CredentialIssuer_URL",
-          "credentials": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
           "grants": {
             "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
               "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
-              "user_pin_required": true
+              "tx_code": {
+                "input_mode": "numeric"
+              }
             }
           }
         }
@@ -264,8 +266,8 @@ class IssuanceAuthorizationTest {
                     assertTrue("Parameter ${TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM} was expected but not sent.") {
                         form.formData[TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM] != null
                     }
-                    assertTrue("Parameter ${TokenEndpointForm.PreAuthCodeFlow.USER_PIN_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.PreAuthCodeFlow.USER_PIN_PARAM] != null
+                    assertTrue("Parameter ${TokenEndpointForm.PreAuthCodeFlow.TX_CODE_PARAM} was expected but not sent.") {
+                        form.formData[TokenEndpointForm.PreAuthCodeFlow.TX_CODE_PARAM] != null
                     }
 
                     val grantType = form.formData[TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM]
@@ -287,6 +289,97 @@ class IssuanceAuthorizationTest {
             )
             with(issuer) {
                 authorizeWithPreAuthorizationCode("pin").getOrThrow()
+            }
+        }
+
+    @Test
+    fun `(pre-auth flow) when pre-authorized grant's tx_code is of wrong length exception is raised`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                oidcWellKnownMocker(),
+            )
+
+            val preAuthGrantOffer = """
+                {
+                  "credential_issuer": "$CredentialIssuer_URL",
+                  "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+                  "grants": {
+                    "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+                      "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
+                      "tx_code": {
+                        "input_mode": "text",
+                        "length": 4
+                      }
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            val offer = credentialOffer(mockedKtorHttpClientFactory, preAuthGrantOffer)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                credentialOffer = offer,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            )
+
+            with(issuer) {
+                authorizeWithPreAuthorizationCode("123456")
+                    .fold(
+                        onSuccess = {
+                            fail("Exception expected to be thrown")
+                        },
+                        onFailure = {
+                            assertTrue("Expected an IllegalArgumentException to be thrown but was not") {
+                                it is IllegalArgumentException
+                            }
+                        },
+                    )
+            }
+        }
+
+    @Test
+    fun `(pre-auth flow) when pre-authorized grant's tx_code is of wrong input mode exception is raised`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                oidcWellKnownMocker(),
+            )
+
+            val preAuthGrantOffer = """
+                {
+                  "credential_issuer": "$CredentialIssuer_URL",
+                  "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+                  "grants": {
+                    "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+                      "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
+                      "tx_code": {
+                        "input_mode": "numeric"
+                      }
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            val offer = credentialOffer(mockedKtorHttpClientFactory, preAuthGrantOffer)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                credentialOffer = offer,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            )
+
+            with(issuer) {
+                authorizeWithPreAuthorizationCode("AbdSS2356")
+                    .fold(
+                        onSuccess = {
+                            fail("Exception expected to be thrown")
+                        },
+                        onFailure = {
+                            assertTrue("Expected an IllegalArgumentException to be thrown but was not") {
+                                it is IllegalArgumentException
+                            }
+                        },
+                    )
             }
         }
 
@@ -332,13 +425,13 @@ class IssuanceAuthorizationTest {
                             fail("Exception expected to be thrown")
                         },
                         onFailure = {
-                            assertTrue("Expected PushedAuthorizationRequestFailed to be thrown but was not") {
-                                it is IllegalStateException
+                            assertTrue("Expected IllegalStateException to be thrown but was not") {
+                                it is IllegalArgumentException
                             }
                         },
                     )
 
-                val authorizedRequest = authorizeWithPreAuthorizationCode("pin").getOrThrow()
+                val authorizedRequest = authorizeWithPreAuthorizationCode("123456").getOrThrow()
                 assertTrue("Token endpoint provides c_nonce but authorized request is not ProofRequired") {
                     authorizedRequest is AuthorizedRequest.ProofRequired
                 }
@@ -421,7 +514,7 @@ class IssuanceAuthorizationTest {
             val noProofRequiredOffer = """
             {
               "credential_issuer": "$CredentialIssuer_URL",
-              "credentials": ["MobileDrivingLicense_msoMdoc"],
+              "credential_configuration_ids": ["MobileDrivingLicense_msoMdoc"],
               "grants": {
                 "authorization_code": {
                   "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
@@ -618,7 +711,7 @@ class IssuanceAuthorizationTest {
             )
 
             with(issuer) {
-                authorizeWithPreAuthorizationCode("pin")
+                authorizeWithPreAuthorizationCode("123456")
                     .fold(
                         onSuccess = {
                             fail("Exception expected to be thrown")

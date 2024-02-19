@@ -26,9 +26,10 @@ internal class AuthorizeIssuanceImpl(
 
     private val authorizer: IssuanceAuthorizer =
         IssuanceAuthorizer(credentialOffer.authorizationServerMetadata, config, ktorHttpClientFactory)
+
     override suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared> = runCatching {
-        val scopes = credentialOffer.credentials.mapNotNull { credentialId ->
-            credentialSupportedById(credentialId).scope?.let { Scope(it) }
+        val scopes = credentialOffer.credentialConfigurationIdentifiers.mapNotNull { credentialConfigurationId ->
+            credentialSupportedById(credentialConfigurationId).scope?.let { Scope(it) }
         }
         val state = State().value
         val issuerState = when (credentialOffer.grants) {
@@ -45,10 +46,10 @@ internal class AuthorizeIssuanceImpl(
         AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier)
     }
 
-    private fun credentialSupportedById(credentialId: CredentialIdentifier): CredentialSupported {
-        val credentialSupported = credentialOffer.credentialIssuerMetadata.credentialsSupported[credentialId]
+    private fun credentialSupportedById(credentialConfigurationId: CredentialConfigurationIdentifier): CredentialSupported {
+        val credentialSupported = credentialOffer.credentialIssuerMetadata.credentialsSupported[credentialConfigurationId]
         return requireNotNull(credentialSupported) {
-            "$credentialId was not found within issuer metadata"
+            "$credentialConfigurationId was not found within issuer metadata"
         }
     }
 
@@ -64,7 +65,7 @@ internal class AuthorizeIssuanceImpl(
         }
     }
 
-    override suspend fun authorizeWithPreAuthorizationCode(pin: String?): Result<AuthorizedRequest> = runCatching {
+    override suspend fun authorizeWithPreAuthorizationCode(txCode: String?): Result<AuthorizedRequest> = runCatching {
         val offeredGrants = credentialOffer.grants
         require(offeredGrants != null) { "Grant not specified in credential offer." }
         val preAuthorizedCode = when (offeredGrants) {
@@ -72,11 +73,23 @@ internal class AuthorizeIssuanceImpl(
             is Grants.Both -> offeredGrants.preAuthorizedCode
             is Grants.AuthorizationCode -> error("Pre-authorized code grant expected")
         }
-        if (preAuthorizedCode.pinRequired && pin.isNullOrEmpty()) {
-            error("Issuer's grant is pre-authorization code with pin required but no pin passed")
+        preAuthorizedCode.txCode?.let {
+            require(!txCode.isNullOrEmpty()) {
+                "Issuer's grant is pre-authorization code with transaction code required but no transaction code passed"
+            }
+            preAuthorizedCode.txCode.length?.let {
+                require(preAuthorizedCode.txCode.length == txCode.length) {
+                    "Expected transaction code length is ${preAuthorizedCode.txCode.length} but code of length ${txCode.length} passed"
+                }
+            }
+            if (TxCodeInputMode.NUMERIC == preAuthorizedCode.txCode.inputMode) {
+                require(txCode.toIntOrNull() != null) {
+                    "Issuers expects transaction code to be numeric but is not."
+                }
+            }
         }
         val offerRequiresProofs = credentialOffer.requiresProofs()
-        val (accessToken, cNonce) = authorizer.requestAccessTokenPreAuthFlow(preAuthorizedCode.preAuthorizedCode, pin).getOrThrow()
+        val (accessToken, cNonce) = authorizer.requestAccessTokenPreAuthFlow(preAuthorizedCode.preAuthorizedCode, txCode).getOrThrow()
 
         when {
             cNonce != null && offerRequiresProofs -> AuthorizedRequest.ProofRequired(accessToken, cNonce)
@@ -85,5 +98,5 @@ internal class AuthorizeIssuanceImpl(
     }
 
     private fun CredentialOffer.requiresProofs(): Boolean =
-        credentials.any { !credentialIssuerMetadata.credentialsSupported[it]?.proofTypesSupported.isNullOrEmpty() }
+        credentialConfigurationIdentifiers.any { !credentialIssuerMetadata.credentialsSupported[it]?.proofTypesSupported.isNullOrEmpty() }
 }

@@ -286,7 +286,7 @@ private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
 
     ensure(credentialsSupported.isNotEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired }
     val credentialsSupported = credentialsSupported.map { (id, credentialSupportedTO) ->
-        val credentialId = CredentialIdentifier(id)
+        val credentialId = CredentialConfigurationIdentifier(id)
         val credential = credentialSupportedTO.toDomain()
             .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
         credentialId to credential

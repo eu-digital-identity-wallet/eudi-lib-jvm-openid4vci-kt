@@ -213,15 +213,15 @@ internal class IssuanceAuthorizer(
      * pre-authorization code flow
      *
      * @param preAuthorizedCode The pre-authorization code.
-     * @param pin  Extra pin code to be passed if specified as required in the credential offer.
+     * @param txCode  Extra transaction code to be passed if specified as required in the credential offer.
      * @return The result of the request as a pair of the access token and the optional c_nonce information returned
      *      from token endpoint.
      */
     suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: String,
-        pin: String?,
+        txCode: String?,
     ): Result<Pair<AccessToken, CNonce?>> = runCatching {
-        val params = TokenEndpointForm.PreAuthCodeFlow.of(config.clientId, preAuthorizedCode, pin)
+        val params = TokenEndpointForm.PreAuthCodeFlow.of(config.clientId, preAuthorizedCode, txCode)
         requestAccessToken(params).accessTokenOrFail()
     }
 
@@ -303,14 +303,14 @@ internal sealed interface TokenEndpointForm {
         const val CLIENT_ID_PARAM = "client_id"
         private const val GRANT_TYPE_PARAM = "grant_type"
         const val GRANT_TYPE_PARAM_VALUE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
-        const val USER_PIN_PARAM = "user_pin"
+        const val TX_CODE_PARAM = "tx_code"
         const val PRE_AUTHORIZED_CODE_PARAM = "pre-authorized_code"
 
         fun of(
             clientId: String,
             preAuthorizedCode: String,
-            userPin: String?,
-        ): Map<String, String> = when (userPin) {
+            txCode: String?,
+        ): Map<String, String> = when (txCode) {
             null -> {
                 mapOf(
                     CLIENT_ID_PARAM to clientId,
@@ -324,7 +324,7 @@ internal sealed interface TokenEndpointForm {
                     CLIENT_ID_PARAM to clientId,
                     GRANT_TYPE_PARAM to GRANT_TYPE_PARAM_VALUE,
                     PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
-                    USER_PIN_PARAM to userPin,
+                    TX_CODE_PARAM to txCode,
                 )
             }
         }
