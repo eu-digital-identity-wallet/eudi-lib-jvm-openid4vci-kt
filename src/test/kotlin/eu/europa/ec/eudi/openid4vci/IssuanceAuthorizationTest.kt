@@ -291,7 +291,7 @@ class IssuanceAuthorizationTest {
         }
 
     @Test
-    fun `(pre-auth code flow) when access token endpoint return nonce then authorized request must be ProofRequired`() =
+    fun `(pre-auth flow) when token endpoint returns nonce and offer requires proofs then authorized request must be ProofRequired`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
@@ -346,7 +346,7 @@ class IssuanceAuthorizationTest {
         }
 
     @Test
-    fun `(auth code flow) when access token endpoint return nonce then authorized request must be ProofRequired`() =
+    fun `(auth code flow) when token endpoint returns nonce and offer requires proofs then authorized request must be ProofRequired`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
@@ -386,6 +386,108 @@ class IssuanceAuthorizationTest {
 
                 assertTrue("Token endpoint provides c_nonce but authorized request is not ProofRequired") {
                     authorizedRequest is AuthorizedRequest.ProofRequired
+                }
+            }
+        }
+
+    @Test
+    fun `when token endpoint returns nonce and offer does not require proofs then authorized request must be NoProofRequired`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                oidcWellKnownMocker(),
+                parPostMocker(),
+                RequestMocker(
+                    requestMatcher = endsWith("/token", HttpMethod.Post),
+                    responseBuilder = {
+                        respond(
+                            content = Json.encodeToString(
+                                AccessTokenRequestResponse.Success(
+                                    accessToken = UUID.randomUUID().toString(),
+                                    expiresIn = 3600,
+                                    cNonce = "dfghhj34wpCJp",
+                                    cNonceExpiresIn = 86400,
+                                ),
+                            ),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(
+                                HttpHeaders.ContentType to listOf("application/json"),
+                            ),
+                        )
+                    },
+                ),
+            )
+
+            val noProofRequiredOffer = """
+            {
+              "credential_issuer": "$CredentialIssuer_URL",
+              "credentials": ["MobileDrivingLicense_msoMdoc"],
+              "grants": {
+                "authorization_code": {
+                  "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
+                }
+              }
+            }
+            """.trimIndent()
+
+            val offer = credentialOffer(mockedKtorHttpClientFactory, noProofRequiredOffer)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                credentialOffer = offer,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            )
+
+            with(issuer) {
+                val authorizedRequest = prepareAuthorizationRequest().getOrThrow()
+                    .authorizeWithAuthorizationCode(AuthorizationCode("auth-code"))
+                    .getOrThrow()
+
+                assertTrue("Offer does not require proofs but authorized request is ProofRequired instead of NoProofRequired") {
+                    authorizedRequest is AuthorizedRequest.NoProofRequired
+                }
+            }
+        }
+
+    @Test
+    fun `when token endpoint does not return nonce and offer require proofs then authorized request must be NoProofRequired`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                oidcWellKnownMocker(),
+                parPostMocker(),
+                RequestMocker(
+                    requestMatcher = endsWith("/token", HttpMethod.Post),
+                    responseBuilder = {
+                        respond(
+                            content = Json.encodeToString(
+                                AccessTokenRequestResponse.Success(
+                                    accessToken = UUID.randomUUID().toString(),
+                                    expiresIn = 3600,
+                                ),
+                            ),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(
+                                HttpHeaders.ContentType to listOf("application/json"),
+                            ),
+                        )
+                    },
+                ),
+            )
+
+            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                credentialOffer = offer,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            )
+
+            with(issuer) {
+                val authorizedRequest = prepareAuthorizationRequest().getOrThrow()
+                    .authorizeWithAuthorizationCode(AuthorizationCode("auth-code"))
+                    .getOrThrow()
+
+                assertTrue("Expected authorized request to be of type NoProofRequired but is ProofRequired") {
+                    authorizedRequest is AuthorizedRequest.NoProofRequired
                 }
             }
         }

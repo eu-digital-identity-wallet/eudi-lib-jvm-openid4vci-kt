@@ -53,6 +53,7 @@ internal object ProofSerializer : KSerializer<Proof> {
         @SerialName("proof_type") val proofType: String,
         @SerialName("jwt") val jwt: String? = null,
         @SerialName("cwt") val cwt: String? = null,
+        @SerialName("ldp_vp") val ldpVp: String? = null,
     )
 
     private val proofSerializer = serializer<ProofJson>()
@@ -92,6 +93,14 @@ internal object ProofSerializer : KSerializer<Proof> {
                 ProofJson(
                     proofType = ProofType.JWT.toString().lowercase(),
                     jwt = value.jwt.serialize(),
+                ),
+            )
+
+            is Proof.LdpVp -> proofSerializer.serialize(
+                encoder,
+                ProofJson(
+                    proofType = ProofType.LDP_VP.toString().lowercase(),
+                    jwt = value.ldpVp,
                 ),
             )
         }
