@@ -125,8 +125,9 @@ internal class RequestIssuanceImpl(
             val proofType = when (p) {
                 is Proof.Jwt -> ProofType.JWT
                 is Proof.Cwt -> ProofType.CWT
+                is Proof.LdpVp -> ProofType.LDP_VP
             }
-            require(proofType in credentialSupported.proofTypesSupported) {
+            require(proofType in credentialSupported.proofTypesSupported!!.keys) {
                 "Provided proof type $proofType is not one of supported [${credentialSupported.proofTypesSupported}]."
             }
         }

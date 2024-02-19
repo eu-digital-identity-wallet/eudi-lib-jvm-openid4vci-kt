@@ -54,8 +54,15 @@ internal class AuthorizeIssuanceImpl(
 
     override suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
         authorizationCode: AuthorizationCode,
-    ): Result<AuthorizedRequest> = authorizer.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier)
-        .map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
+    ): Result<AuthorizedRequest> = kotlin.runCatching {
+        val offerRequiresProofs = credentialOffer.requiresProofs()
+        val (accessToken, cNonce) = authorizer.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier).getOrThrow()
+
+        when {
+            cNonce != null && offerRequiresProofs -> AuthorizedRequest.ProofRequired(accessToken, cNonce)
+            else -> AuthorizedRequest.NoProofRequired(accessToken)
+        }
+    }
 
     override suspend fun authorizeWithPreAuthorizationCode(pin: String?): Result<AuthorizedRequest> = runCatching {
         val offeredGrants = credentialOffer.grants
@@ -68,7 +75,15 @@ internal class AuthorizeIssuanceImpl(
         if (preAuthorizedCode.pinRequired && pin.isNullOrEmpty()) {
             error("Issuer's grant is pre-authorization code with pin required but no pin passed")
         }
-        return authorizer.requestAccessTokenPreAuthFlow(preAuthorizedCode.preAuthorizedCode, pin)
-            .map { (accessToken, cNonce) -> AuthorizedRequest(accessToken, cNonce) }
+        val offerRequiresProofs = credentialOffer.requiresProofs()
+        val (accessToken, cNonce) = authorizer.requestAccessTokenPreAuthFlow(preAuthorizedCode.preAuthorizedCode, pin).getOrThrow()
+
+        when {
+            cNonce != null && offerRequiresProofs -> AuthorizedRequest.ProofRequired(accessToken, cNonce)
+            else -> AuthorizedRequest.NoProofRequired(accessToken)
+        }
     }
+
+    private fun CredentialOffer.requiresProofs(): Boolean =
+        credentials.any { !credentialIssuerMetadata.credentialsSupported[it]?.proofTypesSupported.isNullOrEmpty() }
 }

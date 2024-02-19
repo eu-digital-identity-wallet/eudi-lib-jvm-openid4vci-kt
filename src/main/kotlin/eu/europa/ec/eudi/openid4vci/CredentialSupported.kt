@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
 import eu.europa.ec.eudi.openid4vci.internal.LocaleSerializer
 import kotlinx.serialization.SerialName
 import java.io.Serializable
@@ -40,10 +41,6 @@ sealed interface CryptographicBindingMethod : Serializable {
         private fun readResolve(): Any = COSE
     }
 
-    data object MSO : CryptographicBindingMethod {
-        private fun readResolve(): Any = MSO
-    }
-
     /**
      * DID method.
      */
@@ -56,6 +53,7 @@ sealed interface CryptographicBindingMethod : Serializable {
 enum class ProofType : Serializable {
     JWT,
     CWT,
+    LDP_VP,
 }
 
 typealias CssColor = String
@@ -87,8 +85,8 @@ data class Display(
 sealed interface CredentialSupported : Serializable {
     val scope: String?
     val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod>
-    val cryptographicSuitesSupported: List<String>
-    val proofTypesSupported: List<ProofType>
+    val credentialSigningAlgorithmsSupported: List<String>
+    val proofTypesSupported: Map<ProofType, List<JWSAlgorithm>>?
     val display: List<Display>
 }
 
@@ -122,8 +120,8 @@ typealias MsoMdocClaims = Map<Namespace, Map<ClaimName, Claim>>
 data class MsoMdocCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val cryptographicSuitesSupported: List<String> = emptyList(),
-    override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
+    override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
+    override val proofTypesSupported: Map<ProofType, List<JWSAlgorithm>>? = null,
     override val display: List<Display> = emptyList(),
     val docType: String,
     val claims: MsoMdocClaims = emptyMap(),
@@ -133,8 +131,8 @@ data class MsoMdocCredential(
 data class SdJwtVcCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val cryptographicSuitesSupported: List<String> = emptyList(),
-    override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
+    override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
+    override val proofTypesSupported: Map<ProofType, List<JWSAlgorithm>>? = null,
     override val display: List<Display> = emptyList(),
     val type: String,
     val claims: Map<ClaimName, Claim?>?,
@@ -152,8 +150,8 @@ data class W3CJsonLdCredentialDefinition(
 data class W3CJsonLdDataIntegrityCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val cryptographicSuitesSupported: List<String> = emptyList(),
-    override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
+    override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
+    override val proofTypesSupported: Map<ProofType, List<JWSAlgorithm>>? = null,
     override val display: List<Display> = emptyList(),
     val context: List<String> = emptyList(),
     val type: List<String> = emptyList(),
@@ -167,8 +165,8 @@ data class W3CJsonLdDataIntegrityCredential(
 data class W3CJsonLdSignedJwtCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val cryptographicSuitesSupported: List<String> = emptyList(),
-    override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
+    override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
+    override val proofTypesSupported: Map<ProofType, List<JWSAlgorithm>>? = null,
     override val display: List<Display> = emptyList(),
     val context: List<String> = emptyList(),
     val credentialDefinition: W3CJsonLdCredentialDefinition,
@@ -181,8 +179,8 @@ data class W3CJsonLdSignedJwtCredential(
 data class W3CSignedJwtCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val cryptographicSuitesSupported: List<String> = emptyList(),
-    override val proofTypesSupported: List<ProofType> = listOf(ProofType.JWT),
+    override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
+    override val proofTypesSupported: Map<ProofType, List<JWSAlgorithm>>? = null,
     override val display: List<Display> = emptyList(),
     val credentialDefinition: CredentialDefinition,
     val order: List<ClaimName> = emptyList(),

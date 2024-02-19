@@ -44,4 +44,12 @@ internal sealed interface Proof {
      */
     @JvmInline
     value class Cwt(val cwt: String) : Proof
+
+    /**
+     * Proof of possession is structured as a LDP_VP
+     *
+     * @param ldpVp The proof LDP_VP
+     */
+    @JvmInline
+    value class LdpVp(val ldpVp: String) : Proof
 }
