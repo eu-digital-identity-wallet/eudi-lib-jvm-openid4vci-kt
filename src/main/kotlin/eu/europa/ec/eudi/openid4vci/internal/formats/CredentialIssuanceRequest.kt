@@ -21,12 +21,6 @@ import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
 
-internal const val FORMAT_MSO_MDOC = "mso_mdoc"
-internal const val FORMAT_SD_JWT_VC = "vc+sd-jwt"
-internal const val FORMAT_W3C_JSONLD_DATA_INTEGRITY = "ldp_vc"
-internal const val FORMAT_W3C_JSONLD_SIGNED_JWT = "jwt_vc_json-ld"
-internal const val FORMAT_W3C_SIGNED_JWT = "jwt_vc_json"
-
 internal sealed interface CredentialType {
     data class MsoMdocDocType(val doctype: String, val claimSet: MsoMdocClaimSet?) : CredentialType
 

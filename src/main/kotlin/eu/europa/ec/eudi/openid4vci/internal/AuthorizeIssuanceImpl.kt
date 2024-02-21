@@ -18,6 +18,24 @@ package eu.europa.ec.eudi.openid4vci.internal
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vci.*
 
+internal sealed interface AuthorizationDetail {
+    data class ByCredentialConfiguration(
+        val credentialConfigurationId: CredentialConfigurationIdentifier,
+    ) : AuthorizationDetail
+
+    sealed class ByFormat(
+        val format: String,
+    ) : AuthorizationDetail
+}
+
+internal data class MsoMdocAuthorizationDetails(
+    val doctype: String,
+) : AuthorizationDetail.ByFormat(FORMAT_MSO_MDOC)
+
+internal data class SdJwtVcAuthorizationDetails(
+    val vct: String,
+) : AuthorizationDetail.ByFormat(FORMAT_SD_JWT_VC)
+
 internal class AuthorizeIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     config: OpenId4VCIConfig,
@@ -28,8 +46,11 @@ internal class AuthorizeIssuanceImpl(
         IssuanceAuthorizer(credentialOffer.authorizationServerMetadata, config, ktorHttpClientFactory)
 
     override suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared> = runCatching {
-        val scopes = credentialOffer.credentialConfigurationIdentifiers.mapNotNull { credentialConfigurationId ->
-            credentialSupportedById(credentialConfigurationId).scope?.let { Scope(it) }
+        val scopes = mutableListOf<Scope>()
+        val authDetails = mutableListOf<AuthorizationDetail>()
+        credentialOffer.credentialConfigurationIdentifiers.map { credentialConfigurationId ->
+            credentialSupportedById(credentialConfigurationId).scope?.let { scopes.add(Scope(it)) }
+                ?: authDetails.add(AuthorizationDetail.ByCredentialConfiguration(credentialConfigurationId))
         }
         val state = State().value
         val issuerState = when (credentialOffer.grants) {
@@ -40,8 +61,8 @@ internal class AuthorizeIssuanceImpl(
 
         val authorizationServerSupportsPar = credentialOffer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI != null
         val (codeVerifier, authorizationCodeUrl) = when (authorizationServerSupportsPar) {
-            true -> authorizer.submitPushedAuthorizationRequest(scopes, state, issuerState).getOrThrow()
-            false -> authorizer.authorizationRequestUrl(scopes, state, issuerState).getOrThrow()
+            true -> authorizer.submitPushedAuthorizationRequest(scopes, authDetails, state, issuerState).getOrThrow()
+            false -> authorizer.authorizationRequestUrl(scopes, authDetails, state, issuerState).getOrThrow()
         }
         AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier)
     }
