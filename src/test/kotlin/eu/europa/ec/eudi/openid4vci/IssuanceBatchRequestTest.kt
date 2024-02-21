@@ -18,8 +18,6 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.BatchIssuanceSuccessResponse
 import eu.europa.ec.eudi.openid4vci.internal.CertificateIssuanceResponse
-import eu.europa.ec.eudi.openid4vci.internal.formats.FORMAT_MSO_MDOC
-import eu.europa.ec.eudi.openid4vci.internal.formats.FORMAT_SD_JWT_VC
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*

@@ -30,6 +30,7 @@ import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.fail
+import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail as NimbusAuthorizationDetail
 
 class IssuanceAuthorizationTest {
 
@@ -723,6 +724,52 @@ class IssuanceAuthorizationTest {
                         },
                     )
             }
+        }
+
+    @Test
+    fun `when offer has a credential with no 'scope' in its configuration, then authorization_details attribute is included in request`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                parPostMocker { request ->
+                    val form = request.body as FormDataContent
+                    assertTrue("Missing authorization_details request attribute") {
+                        form.formData["authorization_details"] != null
+                    }
+                    val authDetails = NimbusAuthorizationDetail.parseList(form.formData["authorization_details"])
+                    assertTrue("Missing authorization_details eu.europa.ec.eudiw.pid_mso_mdoc") {
+                        authDetails.any {
+                            it.getField("credential_configuration_id") != null &&
+                                it.getField("credential_configuration_id").equals("eu.europa.ec.eudiw.pid_mso_mdoc")
+                        }
+                    }
+
+                    assertTrue("Missing scope attribute") {
+                        form.formData["scope"] != null
+                    }
+                    assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
+                        form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
+                    }
+                },
+                RequestMocker(
+                    requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
+                    responseBuilder = {
+                        respond(
+                            content = getResourceAsText("well-known/openid-credential-issuer_no_scopes.json"),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType to listOf("application/json")),
+                        )
+                    },
+                ),
+            )
+            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+            val issuer = Issuer.make(
+                config = vciWalletConfiguration,
+                credentialOffer = offer,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            )
+
+            issuer.prepareAuthorizationRequest()
         }
 
     private suspend fun credentialOffer(

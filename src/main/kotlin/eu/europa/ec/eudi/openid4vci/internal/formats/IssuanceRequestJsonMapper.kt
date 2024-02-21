@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.formats
 
+import eu.europa.ec.eudi.openid4vci.FORMAT_MSO_MDOC
+import eu.europa.ec.eudi.openid4vci.FORMAT_SD_JWT_VC
 import eu.europa.ec.eudi.openid4vci.IssuanceResponseEncryptionSpec
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import kotlinx.serialization.ExperimentalSerializationApi
