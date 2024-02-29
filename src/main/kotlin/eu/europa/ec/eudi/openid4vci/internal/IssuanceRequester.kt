@@ -49,16 +49,15 @@ private data class GenericErrorResponse(
 
 @Serializable
 private data class SingleIssuanceSuccessResponse(
-    @SerialName("format") val format: String,
     @SerialName("credential") val credential: String? = null,
     @SerialName("transaction_id") val transactionId: String? = null,
+    @SerialName("notification_id") val notificationId: String? = null,
     @SerialName("c_nonce") val cNonce: String? = null,
     @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
 )
 
 @Serializable
 internal data class CertificateIssuanceResponse(
-    @SerialName("format") val format: String,
     @SerialName("credential") val credential: String? = null,
     @SerialName("transaction_id") val transactionId: String? = null,
 )
@@ -72,7 +71,6 @@ internal data class BatchIssuanceSuccessResponse(
 
 @Serializable
 private data class DeferredIssuanceSuccessResponse(
-    @SerialName("format") val format: String,
     @SerialName("credential") val credential: String,
 )
 
@@ -181,9 +179,9 @@ internal class IssuanceRequester(
 
     private fun JWTClaimsSet.toSingleIssuanceSuccessResponse(): SingleIssuanceSuccessResponse =
         SingleIssuanceSuccessResponse(
-            format = getStringClaim("format"),
             credential = getStringClaim("credential"),
             transactionId = getStringClaim("transaction_id"),
+            notificationId = getStringClaim("notification_id"),
             cNonce = getStringClaim("c_nonce"),
             cNonceExpiresInSeconds = getLongClaim("c_nonce_expires_in"),
         )
@@ -239,7 +237,6 @@ internal class IssuanceRequester(
             val success = response.body<DeferredIssuanceSuccessResponse>()
             DeferredCredentialQueryOutcome.Issued(
                 IssuedCredential.Issued(
-                    format = success.format,
                     credential = success.credential,
                 ),
             )
@@ -256,7 +253,7 @@ internal class IssuanceRequester(
 
     private fun SingleIssuanceSuccessResponse.toDomain(): CredentialIssuanceResponse {
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
-        val issuedCredential = issuedCredentialOf(transactionId, credential, format)
+        val issuedCredential = issuedCredentialOf(transactionId, credential)
         return CredentialIssuanceResponse(
             cNonce = cNonce,
             credentials = listOf(issuedCredential),
@@ -266,7 +263,6 @@ internal class IssuanceRequester(
     private fun issuedCredentialOf(
         transactionId: String?,
         credential: String?,
-        format: String,
     ): IssuedCredential {
         ensure(!(transactionId == null && credential == null)) {
             val error =
@@ -275,7 +271,7 @@ internal class IssuanceRequester(
         }
         return when {
             transactionId != null -> IssuedCredential.Deferred(TransactionId(transactionId))
-            credential != null -> IssuedCredential.Issued(format, credential)
+            credential != null -> IssuedCredential.Issued(credential)
             else -> error("Cannot happen")
         }
     }
@@ -284,7 +280,7 @@ internal class IssuanceRequester(
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
         return CredentialIssuanceResponse(
             cNonce = cNonce,
-            credentials = credentialResponses.map { issuedCredentialOf(it.transactionId, it.credential, it.format) },
+            credentials = credentialResponses.map { issuedCredentialOf(it.transactionId, it.credential) },
         )
     }
 

@@ -39,6 +39,7 @@ sealed interface AuthorizedRequest {
      * Access token authorizing the request(s) to issue credential(s)
      */
     val accessToken: AccessToken
+    val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?
 
     /**
      * Issuer authorized issuance
@@ -47,6 +48,7 @@ sealed interface AuthorizedRequest {
      */
     data class NoProofRequired(
         override val accessToken: AccessToken,
+        override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
     ) : AuthorizedRequest
 
     /**
@@ -59,6 +61,7 @@ sealed interface AuthorizedRequest {
     data class ProofRequired(
         override val accessToken: AccessToken,
         val cNonce: CNonce,
+        override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
     ) : AuthorizedRequest
 }
 
@@ -70,11 +73,9 @@ sealed interface IssuedCredential {
     /**
      * Credential was issued from server and the result is returned inline.
      *
-     * @param format The format of the issued credential
      * @param credential The issued credential
      */
     data class Issued(
-        val format: String,
         val credential: String,
     ) : IssuedCredential
 
@@ -192,13 +193,13 @@ interface RequestIssuance {
     /**
      *  Requests the issuance of a single credential having an [AuthorizedRequest.NoProofRequired] authorization.
      *
-     *  @param credentialId   The identifier of the credential that will be requested.
+     *  @param requestCredentialIdentifier   The identifier of the credential that will be requested.
      *  @param claimSet Optional parameter to specify the specific set of claims that are requested to be included in the
      *          credential to be issued.
      *  @return The new state of the request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
-        credentialId: CredentialConfigurationIdentifier,
+        requestCredentialIdentifier: IssuanceRequestCredentialIdentifier,
         claimSet: ClaimSet?,
     ): Result<SubmittedRequest>
 
@@ -206,14 +207,14 @@ interface RequestIssuance {
      *  Requests the issuance of a single credential having an [AuthorizedRequest.ProofRequired] authorization. In this
      *  case caller must provide a binding key that will be used for generating a Proof of Possession that issuer expects.
      *
-     *  @param credentialId   The identifier of the credential that will be requested.
+     *  @param requestCredentialIdentifier   The identifier of the credential that will be requested.
      *  @param claimSet     Optional parameter to specify the specific set of claims that are requested to be included in the
      *          credential to be issued.
      *  @param proofSigner  Signer component of the proof to be sent.
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-        credentialId: CredentialConfigurationIdentifier,
+        requestCredentialIdentifier: IssuanceRequestCredentialIdentifier,
         claimSet: ClaimSet?,
         proofSigner: ProofSigner,
     ): Result<SubmittedRequest>
@@ -226,7 +227,7 @@ interface RequestIssuance {
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<CredentialConfigurationIdentifier, ClaimSet?>>,
+        credentialsMetadata: List<Pair<IssuanceRequestCredentialIdentifier, ClaimSet?>>,
     ): Result<SubmittedRequest>
 
     /**
@@ -236,7 +237,7 @@ interface RequestIssuance {
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<CredentialConfigurationIdentifier, ClaimSet?, ProofSigner>>,
+        credentialsMetadata: List<Triple<IssuanceRequestCredentialIdentifier, ClaimSet?, ProofSigner>>,
     ): Result<SubmittedRequest>
 
     /**

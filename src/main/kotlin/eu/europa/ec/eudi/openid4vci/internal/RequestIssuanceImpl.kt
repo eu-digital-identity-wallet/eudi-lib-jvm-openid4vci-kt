@@ -48,34 +48,27 @@ internal class RequestIssuanceImpl(
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
-        credentialId: CredentialConfigurationIdentifier,
+        requestCredentialIdentifier: IssuanceRequestCredentialIdentifier,
         claimSet: ClaimSet?,
     ): Result<SubmittedRequest> = runCatching {
-        require(credentialOffer.credentialConfigurationIdentifiers.contains(credentialId)) {
-            "The requested credential is not authorized for issuance"
+        placeIssuanceRequest(accessToken) {
+            singleRequest(requestCredentialIdentifier, claimSet, null)
         }
-        placeIssuanceRequest(accessToken) { singleRequest(credentialId, claimSet, null) }
     }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-        credentialId: CredentialConfigurationIdentifier,
+        requestCredentialIdentifier: IssuanceRequestCredentialIdentifier,
         claimSet: ClaimSet?,
         proofSigner: ProofSigner,
     ): Result<SubmittedRequest> = runCatching {
-        require(credentialOffer.credentialConfigurationIdentifiers.contains(credentialId)) {
-            "The requested credential is not authorized for issuance"
-        }
         placeIssuanceRequest(accessToken) {
-            singleRequest(credentialId, claimSet, proofFactory(proofSigner, cNonce))
+            singleRequest(requestCredentialIdentifier, claimSet, proofFactory(proofSigner, cNonce))
         }
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<CredentialConfigurationIdentifier, ClaimSet?>>,
+        credentialsMetadata: List<Pair<IssuanceRequestCredentialIdentifier, ClaimSet?>>,
     ): Result<SubmittedRequest> = runCatching {
-        require(credentialOffer.credentialConfigurationIdentifiers.containsAll(credentialsMetadata.map { (identifier, _) -> identifier })) {
-            "One or more of the requested credentials are not authorized for issuance"
-        }
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (credentialId, claimSet) ->
                 singleRequest(credentialId, claimSet, null)
@@ -85,11 +78,8 @@ internal class RequestIssuanceImpl(
     }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<CredentialConfigurationIdentifier, ClaimSet?, ProofSigner>>,
+        credentialsMetadata: List<Triple<IssuanceRequestCredentialIdentifier, ClaimSet?, ProofSigner>>,
     ): Result<SubmittedRequest> = runCatching {
-        require(credentialOffer.credentialConfigurationIdentifiers.containsAll(credentialsMetadata.map { (identifier, _) -> identifier })) {
-            "One or more of the requested credentials are not authorized for issuance"
-        }
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (credentialId, claimSet, proofSigner) ->
                 singleRequest(credentialId, claimSet, proofFactory(proofSigner, cNonce))
@@ -116,28 +106,56 @@ internal class RequestIssuanceImpl(
     }
 
     private fun singleRequest(
-        credentialId: CredentialConfigurationIdentifier,
+        requestCredentialIdentifier: IssuanceRequestCredentialIdentifier,
         claimSet: ClaimSet?,
         proofFactory: ProofFactory?,
-    ): CredentialIssuanceRequest.SingleRequest {
-        val credentialSupported = credentialSupportedById(credentialId)
-        fun assertSupported(p: Proof) {
-            val proofType = when (p) {
-                is Proof.Jwt -> ProofType.JWT
-                is Proof.Cwt -> ProofType.CWT
-                is Proof.LdpVp -> ProofType.LDP_VP
-            }
-            require(proofType in credentialSupported.proofTypesSupported!!.keys) {
-                "Provided proof type $proofType is not one of supported [${credentialSupported.proofTypesSupported}]."
-            }
+    ): CredentialIssuanceRequest.SingleRequest =
+        requestCredentialIdentifier.fold(
+            ifLeft = { formatBasedRequest(it, claimSet, proofFactory) },
+            ifRight = { identifierBasedRequest(it, proofFactory) },
+        )
+
+    private fun formatBasedRequest(
+        credentialConfigurationId: CredentialConfigurationIdentifier,
+        claimSet: ClaimSet?,
+        proofFactory: ProofFactory?,
+    ): CredentialIssuanceRequest.FormatBased {
+        require(credentialOffer.credentialConfigurationIdentifiers.contains(credentialConfigurationId)) {
+            "The requested credential is not authorized for issuance"
         }
-        val proof = proofFactory?.invoke(credentialSupported)?.also { assertSupported(it) }
-        return CredentialIssuanceRequest.singleRequest(credentialSupported, claimSet, proof, responseEncryptionSpec)
+        val credentialSupported = credentialSupportedById(credentialConfigurationId)
+        val proof = proofFactory?.invoke(credentialSupported)?.also { assertProofSupported(it, credentialSupported) }
+        return CredentialIssuanceRequest.formatBased(credentialSupported, claimSet, proof, responseEncryptionSpec)
+    }
+
+    private fun identifierBasedRequest(
+        requestCredentialIdentifier: Pair<CredentialIdentifier, CredentialConfigurationIdentifier>,
+        proofFactory: ProofFactory?,
+    ): CredentialIssuanceRequest.IdentifierBased {
+        val (credentialId, credentialConfigurationId) = requestCredentialIdentifier
+        require(credentialOffer.credentialConfigurationIdentifiers.contains(credentialConfigurationId)) {
+            "The requested credential is not authorized for issuance"
+        }
+        // TODO: Check if credentialId is in the list of identifiers retrieved from token endpoint ??? Maybe too strict
+        val credentialSupported = credentialSupportedById(credentialConfigurationId)
+        val proof = proofFactory?.invoke(credentialSupported)?.also { assertProofSupported(it, credentialSupported) }
+        return CredentialIssuanceRequest.IdentifierBased(credentialId, proof, responseEncryptionSpec)
+    }
+
+    private fun assertProofSupported(p: Proof, credentialSupported: CredentialSupported) {
+        val proofType = when (p) {
+            is Proof.Jwt -> ProofType.JWT
+            is Proof.Cwt -> ProofType.CWT
+            is Proof.LdpVp -> ProofType.LDP_VP
+        }
+        require(proofType in credentialSupported.proofTypesSupported!!.keys) {
+            "Provided proof type $proofType is not one of supported [${credentialSupported.proofTypesSupported}]."
+        }
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
-    ): AuthorizedRequest.ProofRequired = AuthorizedRequest.ProofRequired(accessToken, cNonce)
+    ): AuthorizedRequest.ProofRequired = AuthorizedRequest.ProofRequired(accessToken, cNonce, credentialIdentifiers)
 
     private suspend fun placeIssuanceRequest(
         token: AccessToken,

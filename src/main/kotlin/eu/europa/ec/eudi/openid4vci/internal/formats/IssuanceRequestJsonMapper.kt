@@ -40,49 +40,52 @@ private fun toTransferObject(request: CredentialIssuanceRequest): CredentialIssu
 private fun transferObjectOfSingle(
     request: CredentialIssuanceRequest.SingleRequest,
 ): CredentialIssuanceRequestTO.SingleCredentialTO {
-    val (encryptionJwk, encryptionAlg, encryptionMethod) = request.encryption.transferObject()
+    val credentialResponseEncryptionSpecTO = request.encryption.transferObject()
 
-    return when (val credential = request.credential) {
-        is CredentialType.MsoMdocDocType -> MsoMdocIssuanceRequestTO(
-            proof = request.proof,
-            credentialEncryptionJwk = encryptionJwk,
-            credentialResponseEncryptionAlg = encryptionAlg,
-            credentialResponseEncryptionMethod = encryptionMethod,
-            docType = credential.doctype,
-            claims = credential.claimSet?.let {
-                Json.encodeToJsonElement(it).jsonObject
-            },
-        )
+    return when (request) {
+        is CredentialIssuanceRequest.FormatBased ->
+            when (val credential = request.credential) {
+                is CredentialType.MsoMdocDocType -> MsoMdocIssuanceRequestTO(
+                    proof = request.proof,
+                    credentialResponseEncryptionSpec = credentialResponseEncryptionSpecTO,
+                    docType = credential.doctype,
+                    claims = credential.claimSet?.let {
+                        Json.encodeToJsonElement(it).jsonObject
+                    },
+                )
 
-        is CredentialType.SdJwtVcType -> SdJwtVcIssuanceRequestTO(
-            proof = request.proof,
-            credentialEncryptionJwk = encryptionJwk,
-            credentialResponseEncryptionAlg = encryptionAlg,
-            credentialResponseEncryptionMethod = encryptionMethod,
-            credentialDefinition = SdJwtVcIssuanceRequestTO.CredentialDefinitionTO(
-                type = credential.type,
-                claims = credential.claims?.let {
-                    buildJsonObject {
-                        it.claims.forEach { claimName ->
-                            put(claimName, JsonObject(emptyMap()))
+                is CredentialType.SdJwtVcType -> SdJwtVcIssuanceRequestTO(
+                    proof = request.proof,
+                    credentialResponseEncryptionSpec = credentialResponseEncryptionSpecTO,
+                    vct = credential.type,
+                    claims = credential.claims?.let {
+                        buildJsonObject {
+                            it.claims.forEach { claimName ->
+                                put(claimName, JsonObject(emptyMap()))
+                            }
                         }
-                    }
-                },
-            ),
+                    },
+                )
+            }
+
+        is CredentialIssuanceRequest.IdentifierBased -> IdentifierBasedTO(
+            proof = request.proof,
+            credentialResponseEncryptionSpec = credentialResponseEncryptionSpecTO,
+            configurationId = request.credentialId.value,
         )
     }
 }
 
-private fun IssuanceResponseEncryptionSpec?.transferObject(): Triple<JsonObject?, String?, String?> {
+private fun IssuanceResponseEncryptionSpec?.transferObject(): CredentialResponseEncryptionSpecTO? {
     return when (this) {
-        null -> Triple(null, null, null)
+        null -> null
         else -> {
             val credentialEncryptionJwk = Json.parseToJsonElement(
                 jwk.toPublicJWK().toString(),
             ).jsonObject
             val credentialResponseEncryptionAlg = algorithm.toString()
             val credentialResponseEncryptionMethod = encryptionMethod.toString()
-            Triple(credentialEncryptionJwk, credentialResponseEncryptionAlg, credentialResponseEncryptionMethod)
+            CredentialResponseEncryptionSpecTO(credentialEncryptionJwk, credentialResponseEncryptionAlg, credentialResponseEncryptionMethod)
         }
     }
 }
@@ -101,36 +104,38 @@ internal sealed interface CredentialIssuanceRequestTO {
     @Serializable
     sealed interface SingleCredentialTO : CredentialIssuanceRequestTO {
         val proof: Proof?
-        val credentialEncryptionJwk: JsonObject?
-        val credentialResponseEncryptionAlg: String?
-        val credentialResponseEncryptionMethod: String?
+        val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO?
     }
 }
+
+@Serializable
+internal data class CredentialResponseEncryptionSpecTO(
+    @SerialName("jwk") val jwk: JsonObject,
+    @SerialName("alg") val encryptionAlgorithm: String,
+    @SerialName("enc") val encryptionMethod: String,
+)
+
+@Serializable
+internal data class IdentifierBasedTO(
+    @SerialName("proof") override val proof: Proof? = null,
+    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO?,
+    @SerialName("credential_identifier") val configurationId: String,
+) : CredentialIssuanceRequestTO.SingleCredentialTO
 
 @Serializable
 @SerialName(FORMAT_MSO_MDOC)
 internal data class MsoMdocIssuanceRequestTO(
     @SerialName("doctype") val docType: String,
     @SerialName("proof") override val proof: Proof? = null,
-    @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
-    @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
-    @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String? = null,
+    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO?,
     @SerialName("claims") val claims: JsonObject?,
 ) : CredentialIssuanceRequestTO.SingleCredentialTO
 
 @Serializable
 @SerialName(FORMAT_SD_JWT_VC)
 internal data class SdJwtVcIssuanceRequestTO(
+    @SerialName("vct") val vct: String,
     @SerialName("proof") override val proof: Proof? = null,
-    @SerialName("credential_encryption_jwk") override val credentialEncryptionJwk: JsonObject? = null,
-    @SerialName("credential_response_encryption_alg") override val credentialResponseEncryptionAlg: String? = null,
-    @SerialName("credential_response_encryption_enc") override val credentialResponseEncryptionMethod: String? = null,
-    @SerialName("credential_definition") val credentialDefinition: CredentialDefinitionTO,
-) : CredentialIssuanceRequestTO.SingleCredentialTO {
-
-    @Serializable
-    data class CredentialDefinitionTO(
-        @SerialName("type") val type: String,
-        @SerialName("claims") val claims: JsonObject? = null,
-    )
-}
+    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO?,
+    @SerialName("claims") val claims: JsonObject? = null,
+) : CredentialIssuanceRequestTO.SingleCredentialTO
