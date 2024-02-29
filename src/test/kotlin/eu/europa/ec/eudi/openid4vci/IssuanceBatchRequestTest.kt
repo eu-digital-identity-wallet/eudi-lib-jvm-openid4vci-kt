@@ -34,13 +34,13 @@ class IssuanceBatchRequestTest {
 
     val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
 
-    val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-    val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
+    val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
+    val PID_MsoMdoc = "eu.europa.ec.eudiw.pid_mso_mdoc"
 
     private val CREDENTIAL_OFFER_NO_GRANTS = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_MsoMdoc_SCOPE", "$PID_SdJwtVC_SCOPE"]          
+          "credential_configuration_ids": ["$PID_MsoMdoc", "$PID_SdJwtVC"]          
         }
     """.trimIndent()
 
@@ -66,11 +66,9 @@ class IssuanceBatchRequestTest {
                                 BatchIssuanceSuccessResponse(
                                     credentialResponses = listOf(
                                         CertificateIssuanceResponse(
-                                            format = FORMAT_MSO_MDOC,
                                             credential = "issued_credential_content_mso_mdoc",
                                         ),
                                         CertificateIssuanceResponse(
-                                            format = FORMAT_SD_JWT_VC,
                                             credential = "issued_credential_content_sd_jwt_vc",
                                         ),
                                     ),
@@ -125,8 +123,8 @@ class IssuanceBatchRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialMetadata = listOf(
-                        CredentialConfigurationIdentifier(PID_MsoMdoc_SCOPE) to claimSet_mso_mdoc,
-                        CredentialConfigurationIdentifier(PID_SdJwtVC_SCOPE) to claimSet_sd_jwt_vc,
+                        Either.Left(CredentialConfigurationIdentifier(PID_MsoMdoc)) to claimSet_mso_mdoc,
+                        Either.Left(CredentialConfigurationIdentifier(PID_SdJwtVC)) to claimSet_sd_jwt_vc,
                     )
 
                     val submittedRequest =
@@ -139,12 +137,12 @@ class IssuanceBatchRequestTest {
                             val proofSigner = CryptoGenerator.rsaProofSigner()
                             val credentialMetadataTriples = listOf(
                                 Triple(
-                                    CredentialConfigurationIdentifier(PID_MsoMdoc_SCOPE),
+                                    Either.Left(CredentialConfigurationIdentifier(PID_MsoMdoc)),
                                     claimSet_mso_mdoc,
                                     proofSigner,
                                 ),
                                 Triple(
-                                    CredentialConfigurationIdentifier(PID_SdJwtVC_SCOPE),
+                                    Either.Left(CredentialConfigurationIdentifier(PID_SdJwtVC)),
                                     claimSet_sd_jwt_vc,
                                     proofSigner,
                                 ),
@@ -158,8 +156,7 @@ class IssuanceBatchRequestTest {
 
                             assertTrue("Second attempt should be successful") {
                                 (response as SubmittedRequest.Success).credentials.all {
-                                    it is IssuedCredential.Issued &&
-                                        it.format in listOf(FORMAT_MSO_MDOC, FORMAT_SD_JWT_VC)
+                                    it is IssuedCredential.Issued
                                 }
                             }
                         }

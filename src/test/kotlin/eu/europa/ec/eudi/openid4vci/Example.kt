@@ -37,7 +37,8 @@ import org.jsoup.nodes.FormElement
 import java.net.URI
 import java.net.URL
 
-const val CredentialIssuer_URL = "https://dev.issuer-backend.eudiw.dev"
+// const val CredentialIssuer_URL = "https://dev.issuer-backend.eudiw.dev"
+const val CredentialIssuer_URL = "http://localhost:8080"
 val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
 
 const val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
@@ -199,11 +200,14 @@ private class Wallet(
     private suspend fun proofRequiredSubmissionUseCase(
         issuer: Issuer,
         authorized: AuthorizedRequest.ProofRequired,
-        credentialIdentifier: CredentialConfigurationIdentifier,
+        credentialConfigurationId: CredentialConfigurationIdentifier,
     ): String {
         with(issuer) {
-            val proofSigner = proofSigners[credentialIdentifier.value] ?: error("No signer found for credential $credentialIdentifier")
-            val submittedRequest = authorized.requestSingle(credentialIdentifier, null, proofSigner).getOrThrow()
+            val proofSigner = proofSigners[credentialConfigurationId.value]
+                ?: error("No signer found for credential $credentialConfigurationId")
+
+            val submittedRequest =
+                authorized.requestSingle(Either.Left(credentialConfigurationId), null, proofSigner).getOrThrow()
 
             return when (submittedRequest) {
                 is SubmittedRequest.Success -> {
@@ -247,10 +251,10 @@ private class Wallet(
     private suspend fun noProofRequiredSubmissionUseCase(
         issuer: Issuer,
         noProofRequiredState: AuthorizedRequest.NoProofRequired,
-        credentialIdentifier: CredentialConfigurationIdentifier,
+        credentialConfigurationId: CredentialConfigurationIdentifier,
     ): String {
         with(issuer) {
-            val submittedRequest = noProofRequiredState.requestSingle(credentialIdentifier, null).getOrThrow()
+            val submittedRequest = noProofRequiredState.requestSingle(Either.Left(credentialConfigurationId), null).getOrThrow()
 
             return when (submittedRequest) {
                 is SubmittedRequest.Success -> {
@@ -266,7 +270,7 @@ private class Wallet(
                     proofRequiredSubmissionUseCase(
                         issuer,
                         noProofRequiredState.handleInvalidProof(submittedRequest.cNonce),
-                        credentialIdentifier,
+                        credentialConfigurationId,
                     )
                 }
 

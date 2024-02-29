@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponse
+import eu.europa.ec.eudi.openid4vci.internal.OidCredentialAuthorizationDetail
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdocIssuanceRequestTO
@@ -24,6 +26,7 @@ import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.hamcrest.MatcherAssert.assertThat
 import org.junit.jupiter.api.assertDoesNotThrow
@@ -104,11 +107,10 @@ class IssuanceSingleRequestTest {
                 },
             ),
         )
-        val (offer, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CredentialOfferMsoMdoc,
-            )
+        val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            mockedKtorHttpClientFactory,
+            CredentialOfferMsoMdoc,
+        )
 
         val claimSet = MsoMdocClaimSet(
             claims = listOf(
@@ -121,72 +123,72 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = offer.credentialConfigurationIdentifiers[0]
+                    val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
                     val submittedRequest = assertDoesNotThrow {
-                        authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
+                        authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSet).getOrThrow()
                     }
                     assertIs<SubmittedRequest.InvalidProof>(submittedRequest)
                 }
 
-                is AuthorizedRequest.ProofRequired ->
-                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+                is AuthorizedRequest.ProofRequired -> fail(
+                    "State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint",
+                )
             }
         }
     }
 
     @Test
-    fun `when issuer responds with 'invalid_proof' and no c_nonce then ResponseUnparsable error is returned `() =
-        runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                oidcWellKnownMocker(),
-                authServerWellKnownMocker(),
-                parPostMocker(),
-                tokenPostMocker(),
-                singleIssuanceRequestMocker(
-                    responseBuilder = {
-                        respond(
-                            content = """
+    fun `when issuer responds with 'invalid_proof' and no c_nonce then ResponseUnparsable error is returned `() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            singleIssuanceRequestMocker(
+                responseBuilder = {
+                    respond(
+                        content = """
                             {
                                 "error": "invalid_proof"                               
                             } 
-                            """.trimIndent(),
-                            status = HttpStatusCode.BadRequest,
-                            headers = headersOf(
-                                HttpHeaders.ContentType to listOf("application/json"),
-                            ),
-                        )
-                    },
-                ),
-            )
-            val (offer, authorizedRequest, issuer) =
-                authorizeRequestForCredentialOffer(
-                    mockedKtorHttpClientFactory,
-                    CredentialOfferMsoMdoc,
-                )
+                        """.trimIndent(),
+                        status = HttpStatusCode.BadRequest,
+                        headers = headersOf(
+                            HttpHeaders.ContentType to listOf("application/json"),
+                        ),
+                    )
+                },
+            ),
+        )
+        val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            mockedKtorHttpClientFactory,
+            CredentialOfferMsoMdoc,
+        )
 
-            val claimSet = MsoMdocClaimSet(
-                claims = listOf(
-                    "org.iso.18013.5.1" to "given_name",
-                    "org.iso.18013.5.1" to "family_name",
-                    "org.iso.18013.5.1" to "birth_date",
-                ),
-            )
-            with(issuer) {
-                when (authorizedRequest) {
-                    is AuthorizedRequest.NoProofRequired -> {
-                        val credentialMetadata = offer.credentialConfigurationIdentifiers[0]
-                        val request = assertDoesNotThrow {
-                            authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
-                        }
-                        assertIs<SubmittedRequest.Failed>(request)
-                        assertIs<CredentialIssuanceError.ResponseUnparsable>(request.error)
+        val claimSet = MsoMdocClaimSet(
+            claims = listOf(
+                "org.iso.18013.5.1" to "given_name",
+                "org.iso.18013.5.1" to "family_name",
+                "org.iso.18013.5.1" to "birth_date",
+            ),
+        )
+        with(issuer) {
+            when (authorizedRequest) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                    val request = assertDoesNotThrow {
+                        authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSet).getOrThrow()
                     }
-
-                    is AuthorizedRequest.ProofRequired ->
-                        fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+                    assertIs<SubmittedRequest.Failed>(request)
+                    assertIs<CredentialIssuanceError.ResponseUnparsable>(request.error)
                 }
+
+                is AuthorizedRequest.ProofRequired -> fail(
+                    "State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint",
+                )
             }
         }
+    }
 
     @Test
     fun `when issuance request contains unsupported claims exception CredentialIssuanceException is thrown`() = runTest {
@@ -196,30 +198,30 @@ class IssuanceSingleRequestTest {
             parPostMocker(),
             tokenPostMocker(),
         )
-        val (_, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CredentialOffer,
-            )
+        val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            mockedKtorHttpClientFactory,
+            CredentialOffer,
+        )
 
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val claimSetMsoMdoc = MsoMdocClaimSet(listOf("org.iso.18013.5.1" to "degree"))
-                    var credentialMetadata = CredentialConfigurationIdentifier(PID_MsoMdoc_ID)
+                    var credentialConfigurationId = CredentialConfigurationIdentifier(PID_MsoMdoc_ID)
                     assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
-                        authorizedRequest.requestSingle(credentialMetadata, claimSetMsoMdoc).getOrThrow()
+                        authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSetMsoMdoc).getOrThrow()
                     }
 
                     val claimSetSdJwtVc = GenericClaimSet(listOf("degree"))
-                    credentialMetadata = CredentialConfigurationIdentifier(PID_SdJwtVC_ID)
+                    credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC_ID)
                     assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
-                        authorizedRequest.requestSingle(credentialMetadata, claimSetSdJwtVc).getOrThrow()
+                        authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSetSdJwtVc).getOrThrow()
                     }
                 }
 
-                is AuthorizedRequest.ProofRequired ->
-                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+                is AuthorizedRequest.ProofRequired -> fail(
+                    "State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint",
+                )
             }
         }
     }
@@ -232,24 +234,64 @@ class IssuanceSingleRequestTest {
             parPostMocker(),
             tokenPostMocker(),
         )
-        val (_, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CredentialOffer,
-            )
+        val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            mockedKtorHttpClientFactory,
+            CredentialOffer,
+        )
 
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = CredentialConfigurationIdentifier("UniversityDegree")
+                    val credentialConfigurationId = CredentialConfigurationIdentifier("UniversityDegree")
                     assertFailsWith<IllegalArgumentException> {
-                        authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
+                        authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), null).getOrThrow()
                     }
                 }
 
-                is AuthorizedRequest.ProofRequired ->
-                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+                is AuthorizedRequest.ProofRequired -> fail(
+                    "State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint",
+                )
             }
+        }
+    }
+
+    @Test
+    fun `when token endpoint returns authorization_details they are parsed properly`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            // Token endpoint mocker
+            RequestMocker(
+                requestMatcher = endsWith("/token", HttpMethod.Post),
+                responseBuilder = {
+                    respond(
+                        content = Json.encodeToString(
+                            AccessTokenRequestResponse.Success(
+                                accessToken = UUID.randomUUID().toString(),
+                                expiresIn = 3600,
+                                authorizationDetails = authorizationDetails(
+                                    listOf(
+                                        CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(
+                            HttpHeaders.ContentType to listOf("application/json"),
+                        ),
+                    )
+                },
+            ),
+        )
+        val (_, authorizedRequest, _) = authorizeRequestForCredentialOffer(
+            mockedKtorHttpClientFactory,
+            CredentialOffer,
+        )
+
+        assertTrue("Identifiers expected to be parsed") {
+            !authorizedRequest.credentialIdentifiers.isNullOrEmpty()
         }
     }
 
@@ -264,8 +306,7 @@ class IssuanceSingleRequestTest {
             singleIssuanceRequestMocker(
                 responseBuilder = {
                     val textContent = it?.body as TextContent
-                    val issuanceRequest =
-                        Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as MsoMdocIssuanceRequestTO
+                    val issuanceRequest = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as MsoMdocIssuanceRequestTO
                     if (issuanceRequest.proof != null) {
                         respond(
                             content = """
@@ -299,8 +340,7 @@ class IssuanceSingleRequestTest {
                 },
                 requestValidator = {
                     val textContent = it.body as TextContent
-                    val issuanceRequest =
-                        Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as MsoMdocIssuanceRequestTO
+                    val issuanceRequest = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as MsoMdocIssuanceRequestTO
                     issuanceRequest.proof?.let {
                         assertIs<Proof.Jwt>(issuanceRequest.proof)
                     }
@@ -308,11 +348,10 @@ class IssuanceSingleRequestTest {
             ),
         )
 
-        val (offer, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CredentialOfferMsoMdoc,
-            )
+        val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            mockedKtorHttpClientFactory,
+            CredentialOfferMsoMdoc,
+        )
 
         val claimSet = MsoMdocClaimSet(
             claims = listOf(
@@ -325,16 +364,14 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = offer.credentialConfigurationIdentifiers[0]
-                    val submittedRequest =
-                        authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
+                    val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                    val submittedRequest = authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSet).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
-                            val proofRequired =
-                                authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val response = assertDoesNotThrow {
                                 proofRequired.requestSingle(
-                                    credentialMetadata,
+                                    Either.Left(credentialConfigurationId),
                                     claimSet,
                                     CryptoGenerator.rsaProofSigner(),
                                 ).getOrThrow()
@@ -350,8 +387,9 @@ class IssuanceSingleRequestTest {
                     }
                 }
 
-                is AuthorizedRequest.ProofRequired ->
-                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+                is AuthorizedRequest.ProofRequired -> fail(
+                    "State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint",
+                )
             }
         }
     }
@@ -367,8 +405,7 @@ class IssuanceSingleRequestTest {
             singleIssuanceRequestMocker(
                 responseBuilder = {
                     val textContent = it?.body as TextContent
-                    val issuanceRequest =
-                        Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as SdJwtVcIssuanceRequestTO
+                    val issuanceRequest = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as SdJwtVcIssuanceRequestTO
                     if (issuanceRequest.proof != null) {
                         respond(
                             content = """
@@ -403,11 +440,10 @@ class IssuanceSingleRequestTest {
             ),
         )
 
-        val (offer, authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CredentialOfferWithSdJwtVc,
-            )
+        val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            mockedKtorHttpClientFactory,
+            CredentialOfferWithSdJwtVc,
+        )
 
         val claimSet = GenericClaimSet(
             claims = listOf(
@@ -420,16 +456,14 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = offer.credentialConfigurationIdentifiers[0]
-                    val submittedRequest =
-                        authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
+                    val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                    val submittedRequest = authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSet).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
-                            val proofRequired =
-                                authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val response = assertDoesNotThrow {
                                 proofRequired.requestSingle(
-                                    credentialMetadata,
+                                    Either.Left(credentialConfigurationId),
                                     claimSet,
                                     CryptoGenerator.rsaProofSigner(),
                                 ).getOrThrow()
@@ -447,6 +481,19 @@ class IssuanceSingleRequestTest {
             }
         }
     }
+
+    private fun authorizationDetails(
+        configurationIds: List<CredentialConfigurationIdentifier>,
+    ): List<OidCredentialAuthorizationDetail.ByCredentialConfiguration> =
+        configurationIds.map {
+            OidCredentialAuthorizationDetail.ByCredentialConfiguration(
+                credentialConfigurationId = it,
+                credentialIdentifiers = listOf(
+                    CredentialIdentifier("${it.value}_1"),
+                    CredentialIdentifier("${it.value}_2"),
+                ),
+            )
+        }
 
     private suspend fun authorizeRequestForCredentialOffer(
         ktorHttpClientFactory: KtorHttpClientFactory,

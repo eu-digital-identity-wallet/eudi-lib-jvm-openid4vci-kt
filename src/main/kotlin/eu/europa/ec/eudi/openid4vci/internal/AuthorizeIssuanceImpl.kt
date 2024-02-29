@@ -17,24 +17,31 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vci.*
+import kotlinx.serialization.Serializable
 
-internal sealed interface AuthorizationDetail {
+internal sealed interface OidCredentialAuthorizationDetail {
+
+    @Serializable
     data class ByCredentialConfiguration(
         val credentialConfigurationId: CredentialConfigurationIdentifier,
-    ) : AuthorizationDetail
+        val credentialIdentifiers: List<CredentialIdentifier>? = null,
+    ) : OidCredentialAuthorizationDetail
 
+    @Serializable
     sealed class ByFormat(
         val format: String,
-    ) : AuthorizationDetail
+    ) : OidCredentialAuthorizationDetail
 }
 
+@Serializable
 internal data class MsoMdocAuthorizationDetails(
     val doctype: String,
-) : AuthorizationDetail.ByFormat(FORMAT_MSO_MDOC)
+) : OidCredentialAuthorizationDetail.ByFormat(FORMAT_MSO_MDOC)
 
+@Serializable
 internal data class SdJwtVcAuthorizationDetails(
     val vct: String,
-) : AuthorizationDetail.ByFormat(FORMAT_SD_JWT_VC)
+) : OidCredentialAuthorizationDetail.ByFormat(FORMAT_SD_JWT_VC)
 
 internal class AuthorizeIssuanceImpl(
     private val credentialOffer: CredentialOffer,
@@ -47,10 +54,10 @@ internal class AuthorizeIssuanceImpl(
 
     override suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared> = runCatching {
         val scopes = mutableListOf<Scope>()
-        val authDetails = mutableListOf<AuthorizationDetail>()
+        val authDetails = mutableListOf<OidCredentialAuthorizationDetail>()
         credentialOffer.credentialConfigurationIdentifiers.map { credentialConfigurationId ->
             credentialSupportedById(credentialConfigurationId).scope?.let { scopes.add(Scope(it)) }
-                ?: authDetails.add(AuthorizationDetail.ByCredentialConfiguration(credentialConfigurationId))
+                ?: authDetails.add(OidCredentialAuthorizationDetail.ByCredentialConfiguration(credentialConfigurationId))
         }
         val state = State().value
         val issuerState = when (credentialOffer.grants) {
@@ -78,11 +85,19 @@ internal class AuthorizeIssuanceImpl(
         authorizationCode: AuthorizationCode,
     ): Result<AuthorizedRequest> = kotlin.runCatching {
         val offerRequiresProofs = credentialOffer.requiresProofs()
-        val (accessToken, cNonce) = authorizer.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier).getOrThrow()
+        val (accessToken, cNonce, authDetails) =
+            authorizer.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier).getOrThrow()
+        val credentialIdentifiers = authDetails?.let {
+            authDetails
+                .filter { !it.credentialIdentifiers.isNullOrEmpty() }
+                .map {
+                    it.credentialConfigurationId to it.credentialIdentifiers!!
+                }
+        }?.toMap()
 
         when {
-            cNonce != null && offerRequiresProofs -> AuthorizedRequest.ProofRequired(accessToken, cNonce)
-            else -> AuthorizedRequest.NoProofRequired(accessToken)
+            cNonce != null && offerRequiresProofs -> AuthorizedRequest.ProofRequired(accessToken, cNonce, credentialIdentifiers)
+            else -> AuthorizedRequest.NoProofRequired(accessToken, credentialIdentifiers)
         }
     }
 
@@ -113,8 +128,8 @@ internal class AuthorizeIssuanceImpl(
         val (accessToken, cNonce) = authorizer.requestAccessTokenPreAuthFlow(preAuthorizedCode.preAuthorizedCode, txCode).getOrThrow()
 
         when {
-            cNonce != null && offerRequiresProofs -> AuthorizedRequest.ProofRequired(accessToken, cNonce)
-            else -> AuthorizedRequest.NoProofRequired(accessToken)
+            cNonce != null && offerRequiresProofs -> AuthorizedRequest.ProofRequired(accessToken, cNonce, emptyMap())
+            else -> AuthorizedRequest.NoProofRequired(accessToken, emptyMap())
         }
     }
 

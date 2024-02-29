@@ -83,6 +83,9 @@ internal sealed interface AccessTokenRequestResponse {
         @SerialName("expires_in") val expiresIn: Long,
         @SerialName("c_nonce") val cNonce: String? = null,
         @SerialName("c_nonce_expires_in") val cNonceExpiresIn: Long? = null,
+        @SerialName(
+            "authorization_details",
+        ) val authorizationDetails: List<OidCredentialAuthorizationDetail.ByCredentialConfiguration>? = null,
     ) : AccessTokenRequestResponse
 
     /**
@@ -121,7 +124,7 @@ internal class IssuanceAuthorizer(
      */
     suspend fun submitPushedAuthorizationRequest(
         credentialsScopes: List<Scope>,
-        credentialsAuthorizationDetails: List<AuthorizationDetail>,
+        credentialsAuthorizationDetails: List<OidCredentialAuthorizationDetail>,
         state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, HttpsUrl>> = runCatching {
@@ -156,7 +159,7 @@ internal class IssuanceAuthorizer(
 
     fun authorizationRequestUrl(
         credentialsScopes: List<Scope>,
-        credentialsAuthorizationDetails: List<AuthorizationDetail>,
+        credentialsAuthorizationDetails: List<OidCredentialAuthorizationDetail>,
         state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, HttpsUrl>> = runCatching {
@@ -220,7 +223,7 @@ internal class IssuanceAuthorizer(
     suspend fun requestAccessTokenAuthFlow(
         authorizationCode: String,
         codeVerifier: String,
-    ): Result<Pair<AccessToken, CNonce?>> = runCatching {
+    ): Result<Triple<AccessToken, CNonce?, List<OidCredentialAuthorizationDetail.ByCredentialConfiguration>?>> = runCatching {
         val params = TokenEndpointForm.AuthCodeFlow.of(
             authorizationCode,
             config.authFlowRedirectionURI,
@@ -244,17 +247,23 @@ internal class IssuanceAuthorizer(
         txCode: String?,
     ): Result<Pair<AccessToken, CNonce?>> = runCatching {
         val params = TokenEndpointForm.PreAuthCodeFlow.of(config.clientId, preAuthorizedCode, txCode)
-        requestAccessToken(params).accessTokenOrFail()
+        val result = requestAccessToken(params).accessTokenOrFail()
+        result.first to result.second
     }
 
-    private fun AccessTokenRequestResponse.accessTokenOrFail(): Pair<AccessToken, CNonce?> = when (this) {
-        is AccessTokenRequestResponse.Success -> {
-            val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
-            AccessToken(accessToken) to cNonce
+    private fun AccessTokenRequestResponse.accessTokenOrFail(): Triple<
+        AccessToken,
+        CNonce?,
+        List<OidCredentialAuthorizationDetail.ByCredentialConfiguration>?,
+        > =
+
+        when (this) {
+            is AccessTokenRequestResponse.Success -> {
+                val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
+                Triple(AccessToken(accessToken), cNonce, authorizationDetails)
+            }
+            is AccessTokenRequestResponse.Failure -> throw AccessTokenRequestFailed(error, errorDescription)
         }
-
-        is AccessTokenRequestResponse.Failure -> throw AccessTokenRequestFailed(error, errorDescription)
-    }
 
     private suspend fun requestAccessToken(params: Map<String, String>): AccessTokenRequestResponse =
         ktorHttpClientFactory().use { client ->
@@ -290,18 +299,20 @@ internal class IssuanceAuthorizer(
         authorizationRequest.toParameters().mapValues { (_, value) -> value[0] }.toMap()
 }
 
-private fun List<AuthorizationDetail>.toNimbusAuthorizationDetails(): MutableList<NimbusAuthorizationDetail> =
+private fun List<OidCredentialAuthorizationDetail>.toNimbusAuthorizationDetails(): MutableList<NimbusAuthorizationDetail> =
     map {
         when (it) {
-            is AuthorizationDetail.ByCredentialConfiguration ->
+            is OidCredentialAuthorizationDetail.ByCredentialConfiguration ->
                 NimbusAuthorizationDetail.Builder(AuthorizationType("openid_credential"))
                     .field("credential_configuration_id", it.credentialConfigurationId.value)
                     .build()
+
             is MsoMdocAuthorizationDetails ->
                 NimbusAuthorizationDetail.Builder(AuthorizationType("openid_credential"))
                     .field("format", it.format)
                     .field("doctype", it.doctype)
                     .build()
+
             is SdJwtVcAuthorizationDetails ->
                 NimbusAuthorizationDetail.Builder(AuthorizationType("openid_credential"))
                     .field("format", it.format)

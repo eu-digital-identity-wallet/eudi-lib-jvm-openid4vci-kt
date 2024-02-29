@@ -91,7 +91,8 @@ class IssuanceEncryptedResponsesTest {
             assertFailsWith<ResponseEncryptionAlgorithmNotSupportedByIssuer>(
                 block = {
                     with(issuer) {
-                        noProofRequired.requestSingle(offer.credentialConfigurationIdentifiers[0], null).getOrThrow()
+                        val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                        noProofRequired.requestSingle(Either.Left(credentialConfigurationId), null).getOrThrow()
                     }
                 },
             )
@@ -131,7 +132,8 @@ class IssuanceEncryptedResponsesTest {
             assertFailsWith<ResponseEncryptionMethodNotSupportedByIssuer>(
                 block = {
                     with(issuer) {
-                        noProofRequired.requestSingle(offer.credentialConfigurationIdentifiers[0], null).getOrThrow()
+                        val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                        noProofRequired.requestSingle(Either.Left(credentialConfigurationId), null).getOrThrow()
                     }
                 },
             )
@@ -173,17 +175,9 @@ class IssuanceEncryptedResponsesTest {
                     requestValidator = {
                         val textContent = it.body as TextContent
                         val issuanceRequestTO = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text)
-                        assertTrue("No encryption key expected to be sent") {
+                        assertTrue("No encryption parameters expected to be sent") {
                             issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
-                                issuanceRequestTO.credentialEncryptionJwk == null
-                        }
-                        assertTrue("No encryption algorithm expected to be sent") {
-                            issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
-                                issuanceRequestTO.credentialResponseEncryptionAlg == null
-                        }
-                        assertTrue("No response encryption method expected to be sent") {
-                            issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
-                                issuanceRequestTO.credentialResponseEncryptionMethod == null
+                                issuanceRequestTO.credentialResponseEncryptionSpec == null
                         }
                     },
                 ),
@@ -202,8 +196,9 @@ class IssuanceEncryptedResponsesTest {
 
             with(issuer) {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
+                val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
                 noProofRequired
-                    .requestSingle(offer.credentialConfigurationIdentifiers[0], null).getOrThrow()
+                    .requestSingle(Either.Left(credentialConfigurationId), null).getOrThrow()
             }
         }
 
@@ -230,9 +225,9 @@ class IssuanceEncryptedResponsesTest {
                         if (textContent.text.contains("\"proof\":")) {
                             val issuanceRequestTO = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text)
                             issuanceRequestTO as CredentialIssuanceRequestTO.SingleCredentialTO
-                            val jwk = JWK.parse(issuanceRequestTO.credentialEncryptionJwk.toString())
-                            val alg = JWEAlgorithm.parse(issuanceRequestTO.credentialResponseEncryptionAlg)
-                            val enc = EncryptionMethod.parse(issuanceRequestTO.credentialResponseEncryptionMethod)
+                            val jwk = JWK.parse(issuanceRequestTO.credentialResponseEncryptionSpec?.jwk.toString())
+                            val alg = JWEAlgorithm.parse(issuanceRequestTO.credentialResponseEncryptionSpec?.encryptionAlgorithm)
+                            val enc = EncryptionMethod.parse(issuanceRequestTO.credentialResponseEncryptionSpec?.encryptionMethod)
                             respond(
                                 content = encryptedResponse(jwk, alg, enc).getOrThrow(),
                                 status = HttpStatusCode.OK,
@@ -274,15 +269,15 @@ class IssuanceEncryptedResponsesTest {
                         }
                         assertTrue("Missing response encryption JWK") {
                             issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
-                                issuanceRequestTO.credentialEncryptionJwk != null
+                                issuanceRequestTO.credentialResponseEncryptionSpec?.jwk != null
                         }
                         assertTrue("Missing response encryption algorithm") {
                             issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
-                                issuanceRequestTO.credentialResponseEncryptionAlg != null
+                                issuanceRequestTO.credentialResponseEncryptionSpec?.encryptionAlgorithm != null
                         }
                         assertTrue("Missing response encryption method") {
                             issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
-                                issuanceRequestTO.credentialResponseEncryptionMethod != null
+                                issuanceRequestTO.credentialResponseEncryptionSpec?.encryptionMethod != null
                         }
                     },
                 ),
@@ -311,15 +306,19 @@ class IssuanceEncryptedResponsesTest {
             with(issuer) {
                 when (authorizedRequest) {
                     is AuthorizedRequest.NoProofRequired -> {
-                        val credentialMetadata = offer.credentialConfigurationIdentifiers[0]
+                        val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
                         val submittedRequest =
-                            authorizedRequest.requestSingle(credentialMetadata, claimSet).getOrThrow()
+                            authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSet).getOrThrow()
                         when (submittedRequest) {
                             is SubmittedRequest.InvalidProof -> {
                                 val proofRequired =
                                     authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                                 val response =
-                                    proofRequired.requestSingle(credentialMetadata, claimSet, CryptoGenerator.rsaProofSigner())
+                                    proofRequired.requestSingle(
+                                        Either.Left(credentialConfigurationId),
+                                        claimSet,
+                                        CryptoGenerator.rsaProofSigner(),
+                                    )
                                 assertThat(
                                     "Second attempt should be successful",
                                     response.getOrThrow() is SubmittedRequest.Success,

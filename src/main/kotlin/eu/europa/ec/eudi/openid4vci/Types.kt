@@ -21,6 +21,7 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
+import kotlinx.serialization.Serializable
 import java.net.URI
 import java.net.URL
 import java.security.cert.X509Certificate
@@ -53,7 +54,16 @@ value class HttpsUrl private constructor(val value: URL) {
 }
 
 @JvmInline
+@Serializable
 value class CredentialConfigurationIdentifier(val value: String) {
+    init {
+        require(value.isNotEmpty()) { "value cannot be empty" }
+    }
+}
+
+@JvmInline
+@Serializable
+value class CredentialIdentifier(val value: String) {
     init {
         require(value.isNotEmpty()) { "value cannot be empty" }
     }
@@ -186,3 +196,21 @@ value class Scope(val value: String) {
 }
 
 typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata
+typealias IssuanceRequestCredentialIdentifier =
+    Either<CredentialConfigurationIdentifier, Pair<CredentialIdentifier, CredentialConfigurationIdentifier>>
+sealed interface Either<out L, out R> {
+
+    fun <B> fold(ifLeft: (L) -> B, ifRight: (R) -> B): B =
+        when (this) {
+            is Left -> ifLeft(this.value)
+            is Right -> ifRight(this.value)
+        }
+
+    data class Left<out L>(
+        val value: L,
+    ) : Either<L, Nothing>
+
+    data class Right<out R>(
+        val value: R,
+    ) : Either<Nothing, R>
+}
