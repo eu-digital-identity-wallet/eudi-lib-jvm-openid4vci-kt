@@ -16,17 +16,14 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponse
-import eu.europa.ec.eudi.openid4vci.internal.OidCredentialAuthorizationDetail
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.IdentifierBasedIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.MsoMdocIssuanceRequestTO
-import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVcIssuanceRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.hamcrest.MatcherAssert.assertThat
 import org.junit.jupiter.api.assertDoesNotThrow
@@ -119,7 +116,7 @@ class IssuanceSingleRequestTest {
                 "org.iso.18013.5.1" to "birth_date",
             ),
 
-        )
+            )
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
@@ -256,46 +253,6 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
-    fun `when token endpoint returns authorization_details they are parsed properly`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker(),
-            // Token endpoint mocker
-            RequestMocker(
-                requestMatcher = endsWith("/token", HttpMethod.Post),
-                responseBuilder = {
-                    respond(
-                        content = Json.encodeToString(
-                            AccessTokenRequestResponse.Success(
-                                accessToken = UUID.randomUUID().toString(),
-                                expiresIn = 3600,
-                                authorizationDetails = authorizationDetails(
-                                    listOf(
-                                        CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
-                                    ),
-                                ),
-                            ),
-                        ),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(
-                            HttpHeaders.ContentType to listOf("application/json"),
-                        ),
-                    )
-                },
-            ),
-        )
-        val (_, authorizedRequest, _) = authorizeRequestForCredentialOffer(
-            mockedKtorHttpClientFactory,
-            CredentialOffer,
-        )
-
-        assertTrue("Identifiers expected to be parsed") {
-            !authorizedRequest.credentialIdentifiers.isNullOrEmpty()
-        }
-    }
-
-    @Test
     fun `successful issuance of credential in mso_mdoc format`() = runTest {
         val credential = "issued_credential_content_mso_mdoc"
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
@@ -304,40 +261,7 @@ class IssuanceSingleRequestTest {
             parPostMocker(),
             tokenPostMocker(),
             singleIssuanceRequestMocker(
-                responseBuilder = {
-                    val textContent = it?.body as TextContent
-                    val issuanceRequest = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as MsoMdocIssuanceRequestTO
-                    if (issuanceRequest.proof != null) {
-                        respond(
-                            content = """
-                                {
-                                  "format": "mso_mdoc",
-                                  "credential": "$credential",
-                                  "c_nonce": "wlbQc6pCJp",
-                                  "c_nonce_expires_in": 86400
-                                }
-                            """.trimIndent(),
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(
-                                HttpHeaders.ContentType to listOf("application/json"),
-                            ),
-                        )
-                    } else {
-                        respond(
-                            content = """
-                                {
-                                    "error": "invalid_proof",
-                                    "c_nonce": "ERE%@^TGWYEYWEY",
-                                    "c_nonce_expires_in": 34
-                                } 
-                            """.trimIndent(),
-                            status = HttpStatusCode.BadRequest,
-                            headers = headersOf(
-                                HttpHeaders.ContentType to listOf("application/json"),
-                            ),
-                        )
-                    }
-                },
+                credential = credential,
                 requestValidator = {
                     val textContent = it.body as TextContent
                     val issuanceRequest = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as MsoMdocIssuanceRequestTO
@@ -403,40 +327,7 @@ class IssuanceSingleRequestTest {
             parPostMocker(),
             tokenPostMocker(),
             singleIssuanceRequestMocker(
-                responseBuilder = {
-                    val textContent = it?.body as TextContent
-                    val issuanceRequest = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text) as SdJwtVcIssuanceRequestTO
-                    if (issuanceRequest.proof != null) {
-                        respond(
-                            content = """
-                                {
-                                  "format": "vc+sd-jwt",
-                                  "credential": "$credential",
-                                  "c_nonce": "wlbQc6pCJp",
-                                  "c_nonce_expires_in": 86400
-                                }
-                            """.trimIndent(),
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(
-                                HttpHeaders.ContentType to listOf("application/json"),
-                            ),
-                        )
-                    } else {
-                        respond(
-                            content = """
-                                {
-                                    "error": "invalid_proof",
-                                    "c_nonce": "ERE%@^TGWYEYWEY",
-                                    "c_nonce_expires_in": 34
-                                } 
-                            """.trimIndent(),
-                            status = HttpStatusCode.BadRequest,
-                            headers = headersOf(
-                                HttpHeaders.ContentType to listOf("application/json"),
-                            ),
-                        )
-                    }
-                },
+                credential = credential,
             ),
         )
 
@@ -482,18 +373,77 @@ class IssuanceSingleRequestTest {
         }
     }
 
-    private fun authorizationDetails(
-        configurationIds: List<CredentialConfigurationIdentifier>,
-    ): List<OidCredentialAuthorizationDetail.ByCredentialConfiguration> =
-        configurationIds.map {
-            OidCredentialAuthorizationDetail.ByCredentialConfiguration(
-                credentialConfigurationId = it,
-                credentialIdentifiers = listOf(
-                    CredentialIdentifier("${it.value}_1"),
-                    CredentialIdentifier("${it.value}_2"),
-                ),
-            )
+    @Test
+    fun `when `() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMockerWithAuthDetails(
+                listOf(CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
+            ),
+            singleIssuanceRequestMocker(
+                credential = "credential",
+                requestValidator = {
+                    val textContent = it.body as TextContent
+                    val issuanceRequestTO = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text)
+                    assertThat(
+                        "Wrong credential request type",
+                        issuanceRequestTO is IdentifierBasedIssuanceRequestTO,
+                    )
+                }
+            ),
+        )
+        val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            mockedKtorHttpClientFactory,
+            CredentialOffer,
+        )
+
+        with(issuer) {
+            when (authorizedRequest) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    val credentialIdentifier = authorizedRequest.credentialIdentifiers?.let {
+                        it.entries.first().key to it.entries.first().value[0]
+                    } ?: error("No credential identifier")
+                    authorizedRequest.requestSingle(Either.Right(credentialIdentifier), null).getOrThrow()
+                }
+
+                is AuthorizedRequest.ProofRequired ->
+                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+            }
         }
+    }
+
+    @Test
+    fun `when token endpoint returns authorization_details they are parsed properly`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMockerWithAuthDetails(
+                listOf(CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
+            ),
+            singleIssuanceRequestMocker(
+                credential = "credential",
+                requestValidator = {
+                    val textContent = it.body as TextContent
+                    val issuanceRequestTO = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text)
+                    assertThat(
+                        "Wrong credential request type",
+                        issuanceRequestTO is IdentifierBasedIssuanceRequestTO,
+                    )
+                },
+            ),
+        )
+        val (_, authorizedRequest, _) = authorizeRequestForCredentialOffer(
+            mockedKtorHttpClientFactory,
+            CredentialOffer,
+        )
+
+        assertTrue("Identifiers expected to be parsed") {
+            !authorizedRequest.credentialIdentifiers.isNullOrEmpty()
+        }
+    }
 
     private suspend fun authorizeRequestForCredentialOffer(
         ktorHttpClientFactory: KtorHttpClientFactory,

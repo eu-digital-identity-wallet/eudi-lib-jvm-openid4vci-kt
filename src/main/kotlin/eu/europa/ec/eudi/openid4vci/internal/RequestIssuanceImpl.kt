@@ -129,10 +129,10 @@ internal class RequestIssuanceImpl(
     }
 
     private fun identifierBasedRequest(
-        requestCredentialIdentifier: Pair<CredentialIdentifier, CredentialConfigurationIdentifier>,
+        requestCredentialIdentifier: Pair<CredentialConfigurationIdentifier, CredentialIdentifier>,
         proofFactory: ProofFactory?,
     ): CredentialIssuanceRequest.IdentifierBased {
-        val (credentialId, credentialConfigurationId) = requestCredentialIdentifier
+        val (credentialConfigurationId, credentialId) = requestCredentialIdentifier
         require(credentialOffer.credentialConfigurationIdentifiers.contains(credentialConfigurationId)) {
             "The requested credential is not authorized for issuance"
         }
