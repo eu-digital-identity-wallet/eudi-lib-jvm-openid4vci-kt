@@ -68,7 +68,7 @@ private fun transferObjectOfSingle(
                 )
             }
 
-        is CredentialIssuanceRequest.IdentifierBased -> IdentifierBasedTO(
+        is CredentialIssuanceRequest.IdentifierBased -> IdentifierBasedIssuanceRequestTO(
             proof = request.proof,
             credentialResponseEncryptionSpec = credentialResponseEncryptionSpecTO,
             configurationId = request.credentialId.value,
@@ -116,7 +116,7 @@ internal data class CredentialResponseEncryptionSpecTO(
 )
 
 @Serializable
-internal data class IdentifierBasedTO(
+internal data class IdentifierBasedIssuanceRequestTO(
     @SerialName("proof") override val proof: Proof? = null,
     @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO?,
     @SerialName("credential_identifier") val configurationId: String,
