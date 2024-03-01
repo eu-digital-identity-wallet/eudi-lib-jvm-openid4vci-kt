@@ -116,7 +116,7 @@ class IssuanceSingleRequestTest {
                 "org.iso.18013.5.1" to "birth_date",
             ),
 
-            )
+        )
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
@@ -391,7 +391,7 @@ class IssuanceSingleRequestTest {
                         "Wrong credential request type",
                         issuanceRequestTO is IdentifierBasedIssuanceRequestTO,
                     )
-                }
+                },
             ),
         )
         val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
