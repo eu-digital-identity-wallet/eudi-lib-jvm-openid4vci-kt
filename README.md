@@ -170,7 +170,7 @@ import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {
     val submittedRequest =
-        authorizedRequest.requestSingle(credentialIdentifiers, claimSet, bindingKey).getOrThrow()
+        authorizedRequest.requestSingle(credentialIdentifier, claimSet, proofSigner).getOrThrow()
 
     when (submittedRequest) {
         is SubmittedRequest.Success -> {
