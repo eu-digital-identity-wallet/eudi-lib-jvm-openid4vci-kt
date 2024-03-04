@@ -123,8 +123,8 @@ class IssuanceBatchRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialMetadata = listOf(
-                        Either.Left(CredentialConfigurationIdentifier(PID_MsoMdoc)) to claimSet_mso_mdoc,
-                        Either.Left(CredentialConfigurationIdentifier(PID_SdJwtVC)) to claimSet_sd_jwt_vc,
+                        (CredentialConfigurationIdentifier(PID_MsoMdoc) to null) to claimSet_mso_mdoc,
+                        (CredentialConfigurationIdentifier(PID_SdJwtVC) to null) to claimSet_sd_jwt_vc,
                     )
 
                     val submittedRequest =
@@ -137,12 +137,12 @@ class IssuanceBatchRequestTest {
                             val proofSigner = CryptoGenerator.rsaProofSigner()
                             val credentialMetadataTriples = listOf(
                                 Triple(
-                                    Either.Left(CredentialConfigurationIdentifier(PID_MsoMdoc)),
+                                    CredentialConfigurationIdentifier(PID_MsoMdoc) to null,
                                     claimSet_mso_mdoc,
                                     proofSigner,
                                 ),
                                 Triple(
-                                    Either.Left(CredentialConfigurationIdentifier(PID_SdJwtVC)),
+                                    CredentialConfigurationIdentifier(PID_SdJwtVC) to null,
                                     claimSet_sd_jwt_vc,
                                     proofSigner,
                                 ),

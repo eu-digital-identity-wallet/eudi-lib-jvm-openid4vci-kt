@@ -109,11 +109,13 @@ internal class RequestIssuanceImpl(
         requestCredentialIdentifier: IssuanceRequestCredentialIdentifier,
         claimSet: ClaimSet?,
         proofFactory: ProofFactory?,
-    ): CredentialIssuanceRequest.SingleRequest =
-        requestCredentialIdentifier.fold(
-            ifLeft = { formatBasedRequest(it, claimSet, proofFactory) },
-            ifRight = { identifierBasedRequest(it, proofFactory) },
-        )
+    ): CredentialIssuanceRequest.SingleRequest {
+        val (credentialConfigurationId, credentialId) = requestCredentialIdentifier
+        return credentialId?.let {
+            identifierBasedRequest(credentialConfigurationId to credentialId, proofFactory)
+        }
+            ?: formatBasedRequest(requestCredentialIdentifier.first, claimSet, proofFactory)
+    }
 
     private fun formatBasedRequest(
         credentialConfigurationId: CredentialConfigurationIdentifier,

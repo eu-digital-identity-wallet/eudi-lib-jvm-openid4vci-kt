@@ -196,21 +196,4 @@ value class Scope(val value: String) {
 }
 
 typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata
-typealias IssuanceRequestCredentialIdentifier =
-    Either<CredentialConfigurationIdentifier, Pair<CredentialConfigurationIdentifier, CredentialIdentifier>>
-sealed interface Either<out L, out R> {
-
-    fun <B> fold(ifLeft: (L) -> B, ifRight: (R) -> B): B =
-        when (this) {
-            is Left -> ifLeft(this.value)
-            is Right -> ifRight(this.value)
-        }
-
-    data class Left<out L>(
-        val value: L,
-    ) : Either<L, Nothing>
-
-    data class Right<out R>(
-        val value: R,
-    ) : Either<Nothing, R>
-}
+typealias IssuanceRequestCredentialIdentifier = Pair<CredentialConfigurationIdentifier, CredentialIdentifier?>
