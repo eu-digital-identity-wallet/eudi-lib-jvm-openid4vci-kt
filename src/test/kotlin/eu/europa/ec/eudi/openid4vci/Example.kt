@@ -37,8 +37,7 @@ import org.jsoup.nodes.FormElement
 import java.net.URI
 import java.net.URL
 
-// const val CredentialIssuer_URL = "https://dev.issuer-backend.eudiw.dev"
-const val CredentialIssuer_URL = "http://localhost:8080"
+const val CredentialIssuer_URL = "https://dev.issuer-backend.eudiw.dev"
 val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
 
 const val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
@@ -207,7 +206,7 @@ private class Wallet(
                 ?: error("No signer found for credential $credentialConfigurationId")
 
             val submittedRequest =
-                authorized.requestSingle(Either.Left(credentialConfigurationId), null, proofSigner).getOrThrow()
+                authorized.requestSingle(credentialConfigurationId to null, null, proofSigner).getOrThrow()
 
             return when (submittedRequest) {
                 is SubmittedRequest.Success -> {
@@ -254,7 +253,7 @@ private class Wallet(
         credentialConfigurationId: CredentialConfigurationIdentifier,
     ): String {
         with(issuer) {
-            val submittedRequest = noProofRequiredState.requestSingle(Either.Left(credentialConfigurationId), null).getOrThrow()
+            val submittedRequest = noProofRequiredState.requestSingle(credentialConfigurationId to null, null).getOrThrow()
 
             return when (submittedRequest) {
                 is SubmittedRequest.Success -> {

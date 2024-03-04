@@ -92,7 +92,7 @@ class IssuanceEncryptedResponsesTest {
                 block = {
                     with(issuer) {
                         val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
-                        noProofRequired.requestSingle(Either.Left(credentialConfigurationId), null).getOrThrow()
+                        noProofRequired.requestSingle(credentialConfigurationId to null, null).getOrThrow()
                     }
                 },
             )
@@ -133,7 +133,7 @@ class IssuanceEncryptedResponsesTest {
                 block = {
                     with(issuer) {
                         val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
-                        noProofRequired.requestSingle(Either.Left(credentialConfigurationId), null).getOrThrow()
+                        noProofRequired.requestSingle(credentialConfigurationId to null, null).getOrThrow()
                     }
                 },
             )
@@ -198,7 +198,7 @@ class IssuanceEncryptedResponsesTest {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
                 val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
                 noProofRequired
-                    .requestSingle(Either.Left(credentialConfigurationId), null).getOrThrow()
+                    .requestSingle(credentialConfigurationId to null, null).getOrThrow()
             }
         }
 
@@ -307,15 +307,16 @@ class IssuanceEncryptedResponsesTest {
                 when (authorizedRequest) {
                     is AuthorizedRequest.NoProofRequired -> {
                         val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                        val requestCredentialIdentifier = credentialConfigurationId to null
                         val submittedRequest =
-                            authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSet).getOrThrow()
+                            authorizedRequest.requestSingle(requestCredentialIdentifier, claimSet).getOrThrow()
                         when (submittedRequest) {
                             is SubmittedRequest.InvalidProof -> {
                                 val proofRequired =
                                     authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                                 val response =
                                     proofRequired.requestSingle(
-                                        Either.Left(credentialConfigurationId),
+                                        requestCredentialIdentifier,
                                         claimSet,
                                         CryptoGenerator.rsaProofSigner(),
                                     )

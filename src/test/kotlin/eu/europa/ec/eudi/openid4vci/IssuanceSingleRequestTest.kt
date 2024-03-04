@@ -122,7 +122,7 @@ class IssuanceSingleRequestTest {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
                     val submittedRequest = assertDoesNotThrow {
-                        authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSet).getOrThrow()
+                        authorizedRequest.requestSingle(credentialConfigurationId to null, claimSet).getOrThrow()
                     }
                     assertIs<SubmittedRequest.InvalidProof>(submittedRequest)
                 }
@@ -174,7 +174,7 @@ class IssuanceSingleRequestTest {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
                     val request = assertDoesNotThrow {
-                        authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSet).getOrThrow()
+                        authorizedRequest.requestSingle(credentialConfigurationId to null, claimSet).getOrThrow()
                     }
                     assertIs<SubmittedRequest.Failed>(request)
                     assertIs<CredentialIssuanceError.ResponseUnparsable>(request.error)
@@ -206,13 +206,13 @@ class IssuanceSingleRequestTest {
                     val claimSetMsoMdoc = MsoMdocClaimSet(listOf("org.iso.18013.5.1" to "degree"))
                     var credentialConfigurationId = CredentialConfigurationIdentifier(PID_MsoMdoc_ID)
                     assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
-                        authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSetMsoMdoc).getOrThrow()
+                        authorizedRequest.requestSingle(credentialConfigurationId to null, claimSetMsoMdoc).getOrThrow()
                     }
 
                     val claimSetSdJwtVc = GenericClaimSet(listOf("degree"))
                     credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC_ID)
                     assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
-                        authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSetSdJwtVc).getOrThrow()
+                        authorizedRequest.requestSingle(credentialConfigurationId to null, claimSetSdJwtVc).getOrThrow()
                     }
                 }
 
@@ -241,7 +241,7 @@ class IssuanceSingleRequestTest {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = CredentialConfigurationIdentifier("UniversityDegree")
                     assertFailsWith<IllegalArgumentException> {
-                        authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), null).getOrThrow()
+                        authorizedRequest.requestSingle(credentialConfigurationId to null, null).getOrThrow()
                     }
                 }
 
@@ -289,13 +289,14 @@ class IssuanceSingleRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
-                    val submittedRequest = authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSet).getOrThrow()
+                    val requestCredentialIdentifier = credentialConfigurationId to null
+                    val submittedRequest = authorizedRequest.requestSingle(requestCredentialIdentifier, claimSet).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val response = assertDoesNotThrow {
                                 proofRequired.requestSingle(
-                                    Either.Left(credentialConfigurationId),
+                                    requestCredentialIdentifier,
                                     claimSet,
                                     CryptoGenerator.rsaProofSigner(),
                                 ).getOrThrow()
@@ -348,13 +349,14 @@ class IssuanceSingleRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
-                    val submittedRequest = authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), claimSet).getOrThrow()
+                    val configurationBasedIdentifier = credentialConfigurationId to null
+                    val submittedRequest = authorizedRequest.requestSingle(configurationBasedIdentifier, claimSet).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val response = assertDoesNotThrow {
                                 proofRequired.requestSingle(
-                                    Either.Left(credentialConfigurationId),
+                                    configurationBasedIdentifier,
                                     claimSet,
                                     CryptoGenerator.rsaProofSigner(),
                                 ).getOrThrow()
@@ -374,7 +376,7 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
-    fun `when `() = runTest {
+    fun `when token endpoint returns credential identifiers, issuance request must be IdentifierBasedIssuanceRequestTO`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
             oidcWellKnownMocker(),
             authServerWellKnownMocker(),
@@ -405,7 +407,7 @@ class IssuanceSingleRequestTest {
                     val credentialIdentifier = authorizedRequest.credentialIdentifiers?.let {
                         it.entries.first().key to it.entries.first().value[0]
                     } ?: error("No credential identifier")
-                    authorizedRequest.requestSingle(Either.Right(credentialIdentifier), null).getOrThrow()
+                    authorizedRequest.requestSingle(credentialIdentifier, null).getOrThrow()
                 }
 
                 is AuthorizedRequest.ProofRequired ->

@@ -77,7 +77,7 @@ class IssuanceDeferredRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = Either.Left(CredentialConfigurationIdentifier(PID_SdJwtVC))
+                    val credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC) to null
                     val submittedRequest =
                         authorizedRequest.requestSingle(credentialConfigurationId, null).getOrThrow()
                     when (submittedRequest) {
@@ -153,15 +153,16 @@ class IssuanceDeferredRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC)
+                    val requestCredentialIdentifier = credentialConfigurationId to null
                     val submittedRequest =
-                        authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), null).getOrThrow()
+                        authorizedRequest.requestSingle(requestCredentialIdentifier, null).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val secondSubmittedRequest =
                                 proofRequired.requestSingle(
-                                    Either.Left(credentialConfigurationId),
+                                    requestCredentialIdentifier,
                                     null,
                                     CryptoGenerator.rsaProofSigner(),
                                 ).getOrThrow()
@@ -245,15 +246,16 @@ class IssuanceDeferredRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC)
+                    val requestCredentialIdentifier = credentialConfigurationId to null
                     val submittedRequest =
-                        authorizedRequest.requestSingle(Either.Left(credentialConfigurationId), null).getOrThrow()
+                        authorizedRequest.requestSingle(requestCredentialIdentifier, null).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val secondSubmittedRequest =
                                 proofRequired.requestSingle(
-                                    Either.Left(credentialConfigurationId),
+                                    requestCredentialIdentifier,
                                     null,
                                     CryptoGenerator.rsaProofSigner(),
                                 ).getOrThrow()

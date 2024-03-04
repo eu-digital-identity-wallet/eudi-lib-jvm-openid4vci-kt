@@ -632,7 +632,7 @@ class IssuanceAuthorizationTest {
         }
 
     @Test
-    fun `when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown (auth code flow)`() =
+    fun `(auth code flow) when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
@@ -681,7 +681,7 @@ class IssuanceAuthorizationTest {
         }
 
     @Test
-    fun `when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown (pre-auth code flow)`() =
+    fun `(pre-auth code flow) when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
