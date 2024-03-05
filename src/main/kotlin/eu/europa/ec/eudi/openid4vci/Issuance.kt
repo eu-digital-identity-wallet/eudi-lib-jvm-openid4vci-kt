@@ -73,10 +73,12 @@ sealed interface IssuedCredential {
     /**
      * Credential was issued from server and the result is returned inline.
      *
-     * @param credential The issued credential
+     * @param credential The issued credential.
+     * @param notificationId The identifier to be used in issuer's notification endpoint.
      */
     data class Issued(
         val credential: String,
+        val notificationId: NotificationId? = null,
     ) : IssuedCredential
 
     /**
@@ -282,6 +284,25 @@ fun interface QueryForDeferredCredential {
     ): Result<DeferredCredentialQueryOutcome>
 }
 
+data class Notification(
+    val id: NotificationId,
+    val event: NotifiedEvent,
+    val eventDescription: String? = null,
+)
+
+enum class NotifiedEvent {
+    CREDENTIAL_ACCEPTED,
+    CREDENTIAL_FAILURE,
+    CREDENTIAL_DELETED,
+}
+
+fun interface NotifyIssuer {
+
+    suspend fun AuthorizedRequest.notify(
+        notification: Notification,
+    ): Result<Unit>
+}
+
 /**
  * Interface for implementing the signing process of a proof. It extends [JWSSigner] of nimbus.
  * Implementations should be initialized with the specifics of the proof signing, that is the binding key to be included
@@ -392,12 +413,26 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     }
 
     /**
+     * Issuance server does not support notifications
+     */
+    data object IssuerDoesNotSupportNotifications : CredentialIssuanceError("IssuerDoesNotSupportNotifications") {
+        private fun readResolve(): Any = IssuerDoesNotSupportNotifications
+    }
+
+    /**
      * Generic failure during issuance request
      */
     data class IssuanceRequestFailed(
         val error: String,
         val errorDescription: String? = null,
     ) : CredentialIssuanceError("$error+${errorDescription?.let { " description=$it" }}")
+
+    /**
+     * Generic failure during notification
+     */
+    data class NotificationFailed(
+        val error: String,
+    ) : CredentialIssuanceError(error)
 
     /**
      * Issuance server response is un-parsable

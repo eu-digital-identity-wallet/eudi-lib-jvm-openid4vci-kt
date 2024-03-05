@@ -139,3 +139,10 @@ internal data class SdJwtVcIssuanceRequestTO(
     @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO?,
     @SerialName("claims") val claims: JsonObject? = null,
 ) : CredentialIssuanceRequestTO.SingleCredentialTO
+
+@Serializable
+internal class NotificationTO(
+    @SerialName("notification_id") val notificationId: String,
+    @SerialName("event") val event: String,
+    @SerialName("event_description") val eventDescription: String? = null,
+)

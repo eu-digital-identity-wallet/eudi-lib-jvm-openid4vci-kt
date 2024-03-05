@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.BatchIssuanceSuccessResponse
 import eu.europa.ec.eudi.openid4vci.internal.CertificateIssuanceResponse
 import io.ktor.client.engine.mock.*
@@ -24,31 +23,11 @@ import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.net.URI
-import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
 class IssuanceBatchRequestTest {
-
-    val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
-
-    val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-    val PID_MsoMdoc = "eu.europa.ec.eudiw.pid_mso_mdoc"
-
-    private val CREDENTIAL_OFFER_NO_GRANTS = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_MsoMdoc", "$PID_SdJwtVC"]          
-        }
-    """.trimIndent()
-
-    val vciWalletConfiguration = OpenId4VCIConfig(
-        clientId = "MyWallet_ClientId",
-        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-    )
 
     @Test
     fun `successful batch issuance`() = runTest {
@@ -100,7 +79,7 @@ class IssuanceBatchRequestTest {
             ) {},
         )
         val (_, authorizedRequest, issuer) =
-            initIssuerWithOfferAndAuthorize(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
+            authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
 
         val claimSet_mso_mdoc = MsoMdocClaimSet(
             claims = listOf(
@@ -175,27 +154,5 @@ class IssuanceBatchRequestTest {
                     fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
             }
         }
-    }
-
-    private suspend fun initIssuerWithOfferAndAuthorize(
-        ktorHttpClientFactory: KtorHttpClientFactory,
-        credentialOfferStr: String,
-    ): Triple<CredentialOffer, AuthorizedRequest, Issuer> {
-        val offer = CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
-            .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
-            .getOrThrow()
-
-        val issuer = Issuer.make(
-            config = vciWalletConfiguration,
-            credentialOffer = offer,
-            ktorHttpClientFactory = ktorHttpClientFactory,
-        )
-
-        val authorizedRequest = with(issuer) {
-            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
-            val authorizationCode = UUID.randomUUID().toString()
-            authRequestPrepared.authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode)).getOrThrow()
-        }
-        return Triple(offer, authorizedRequest, issuer)
     }
 }

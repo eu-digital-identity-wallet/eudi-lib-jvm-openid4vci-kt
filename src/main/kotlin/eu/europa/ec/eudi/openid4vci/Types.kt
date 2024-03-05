@@ -130,6 +130,18 @@ value class TransactionId(val value: String) {
 }
 
 /**
+ * An identifier to be used in notification endpoint of issuer.
+ *
+ * @param value The identifier's value
+ */
+@JvmInline
+value class NotificationId(val value: String) {
+    init {
+        require(value.isNotEmpty()) { "Value cannot be empty" }
+    }
+}
+
+/**
  * A sealed hierarchy that defines the different key formats to be used in order to construct a Proof of Possession.
  */
 sealed interface BindingKey {

@@ -283,6 +283,10 @@ private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
         CredentialIssuerEndpoint(it)
             .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidDeferredCredentialEndpoint)
     }
+    val notificationEndpoint = notificationEndpoint?.let {
+        CredentialIssuerEndpoint(it)
+            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
+    }
 
     ensure(credentialsSupported.isNotEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired }
     val credentialsSupported = credentialsSupported.map { (id, credentialSupportedTO) ->
@@ -300,6 +304,7 @@ private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
         credentialEndpoint,
         batchCredentialEndpoint,
         deferredCredentialEndpoint,
+        notificationEndpoint,
         credentialResponseEncryption(),
         credentialIdentifiersSupported,
         credentialsSupported,

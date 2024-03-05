@@ -101,9 +101,6 @@ internal sealed interface AccessTokenRequestResponse {
     ) : AccessTokenRequestResponse
 }
 
-/**
- * Default implementation of [IssuanceAuthorizer] interface.
- */
 internal class IssuanceAuthorizer(
     private val authorizationServerMetadata: CIAuthorizationServerMetadata,
     private val config: OpenId4VCIConfig,

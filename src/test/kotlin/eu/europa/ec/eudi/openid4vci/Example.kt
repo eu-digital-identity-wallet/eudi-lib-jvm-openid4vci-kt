@@ -40,14 +40,14 @@ import java.net.URL
 const val CredentialIssuer_URL = "https://dev.issuer-backend.eudiw.dev"
 val credentialIssuerIdentifier = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
 
-const val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-const val PID_MsoMdoc = "eu.europa.ec.eudiw.pid_mso_mdoc"
-const val MDL = "org.iso.18013.5.1.mDL"
+const val PID_SdJwtVC_config_id = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
+const val PID_MsoMdoc_config_id = "eu.europa.ec.eudiw.pid_mso_mdoc"
+const val MDL_config_id = "org.iso.18013.5.1.mDL"
 
 val credentialOffer = """
     {
       "credential_issuer": "$CredentialIssuer_URL",
-      "credential_configuration_ids": [ "$PID_SdJwtVC", "$PID_MsoMdoc", "$MDL" ],
+      "credential_configuration_ids": [ "$PID_SdJwtVC_config_id", "$PID_MsoMdoc_config_id", "$MDL_config_id" ],
       "grants": {
         "authorization_code": {}
       }
@@ -56,9 +56,9 @@ val credentialOffer = """
 
 fun main(): Unit = runTest {
     val proofSigners = mapOf(
-        PID_SdJwtVC to CryptoGenerator.rsaProofSigner(),
-        PID_MsoMdoc to CryptoGenerator.ecProofSigner(),
-        MDL to CryptoGenerator.ecProofSigner(),
+        PID_SdJwtVC_config_id to CryptoGenerator.rsaProofSigner(),
+        PID_MsoMdoc_config_id to CryptoGenerator.ecProofSigner(),
+        MDL_config_id to CryptoGenerator.ecProofSigner(),
     )
 
     val config = OpenId4VCIConfig(
@@ -88,15 +88,19 @@ private suspend fun walletInitiatedIssuanceWithOffer(wallet: Wallet) {
 }
 
 private suspend fun walletInitiatedIssuanceNoOffer(wallet: Wallet) {
-    println("[[Scenario: No offer passed, wallet initiates issuance by credential identifiers: $PID_SdJwtVC, $PID_MsoMdoc, $MDL]]")
-    val pidSdjwtVc = wallet.issueByCredentialIdentifier(PID_SdJwtVC)
-    println("--> Issued PID $PID_SdJwtVC: $pidSdjwtVc \n")
+    println(
+        "[[Scenario: No offer passed, wallet initiates issuance by credential identifiers:" +
+            " $PID_SdJwtVC_config_id, $PID_MsoMdoc_config_id, $MDL_config_id]]",
+    )
 
-    val pidMsoMdoc = wallet.issueByCredentialIdentifier(PID_MsoMdoc)
-    println("--> Issued PID $PID_MsoMdoc: $pidMsoMdoc \n")
+    val pidSdjwtVc = wallet.issueByCredentialIdentifier(PID_SdJwtVC_config_id)
+    println("--> Issued PID $PID_SdJwtVC_config_id: $pidSdjwtVc \n")
 
-    val mdl = wallet.issueByCredentialIdentifier(MDL)
-    println("--> Issued MDL $MDL: $mdl \n")
+    val pidMsoMdoc = wallet.issueByCredentialIdentifier(PID_MsoMdoc_config_id)
+    println("--> Issued PID $PID_MsoMdoc_config_id: $pidMsoMdoc \n")
+
+    val mdl = wallet.issueByCredentialIdentifier(MDL_config_id)
+    println("--> Issued MDL $MDL_config_id: $mdl \n")
 }
 
 data class ActingUser(

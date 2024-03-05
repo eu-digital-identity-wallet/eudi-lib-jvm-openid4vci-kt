@@ -21,10 +21,12 @@ internal class DefaultIssuer private constructor(
     private val authorizeIssuanceImpl: AuthorizeIssuanceImpl,
     private val requestIssuanceImpl: RequestIssuanceImpl,
     private val queryForDeferredCredentialImpl: QueryForDeferredCredentialImpl,
+    private val notifyIssuerImpl: NotifyIssuerImpl,
 ) : Issuer,
     AuthorizeIssuance by authorizeIssuanceImpl,
     RequestIssuance by requestIssuanceImpl,
-    QueryForDeferredCredential by queryForDeferredCredentialImpl {
+    QueryForDeferredCredential by queryForDeferredCredentialImpl,
+    NotifyIssuer by notifyIssuerImpl {
 
         companion object {
             operator fun invoke(
@@ -46,8 +48,12 @@ internal class DefaultIssuer private constructor(
                     responseEncryptionSpecFactory = responseEncryptionSpecFactory,
                 ),
                 queryForDeferredCredentialImpl = QueryForDeferredCredentialImpl(
-                    credentialOffer.credentialIssuerMetadata,
-                    ktorHttpClientFactory,
+                    issuerMetadata = credentialOffer.credentialIssuerMetadata,
+                    ktorHttpClientFactory = ktorHttpClientFactory,
+                ),
+                notifyIssuerImpl = NotifyIssuerImpl(
+                    issuerMetadata = credentialOffer.credentialIssuerMetadata,
+                    ktorHttpClientFactory = ktorHttpClientFactory,
                 ),
             )
         }

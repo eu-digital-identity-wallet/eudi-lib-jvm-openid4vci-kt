@@ -109,7 +109,7 @@ internal fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit = {})
     )
 
 internal fun tokenPostMockerWithAuthDetails(
-    l: List<CredentialConfigurationIdentifier>,
+    configurationIds: List<CredentialConfigurationIdentifier>,
     validator: (request: HttpRequestData) -> Unit = {},
 ): RequestMocker =
     RequestMocker(
@@ -120,7 +120,7 @@ internal fun tokenPostMockerWithAuthDetails(
                     AccessTokenRequestResponse.Success(
                         accessToken = UUID.randomUUID().toString(),
                         expiresIn = 3600,
-                        authorizationDetails = authorizationDetails(l),
+                        authorizationDetails = authorizationDetails(configurationIds),
                     ),
                 ),
                 status = HttpStatusCode.OK,
@@ -184,6 +184,7 @@ private fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(request: H
             content = """
                     {                                  
                       "credential": "$credential",
+                      "notification_id": "valbQc6p55LS",
                       "c_nonce": "wlbQc6pCJp",
                       "c_nonce_expires_in": 86400
                     }
