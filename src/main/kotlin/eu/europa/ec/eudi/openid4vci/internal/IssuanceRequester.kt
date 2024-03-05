@@ -26,6 +26,7 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 import eu.europa.ec.eudi.openid4vci.internal.formats.IssuanceRequestJsonMapper
+import eu.europa.ec.eudi.openid4vci.internal.formats.NotificationTO
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -60,6 +61,7 @@ private data class SingleIssuanceSuccessResponse(
 internal data class CertificateIssuanceResponse(
     @SerialName("credential") val credential: String? = null,
     @SerialName("transaction_id") val transactionId: String? = null,
+    @SerialName("notification_id") val notificationId: String? = null,
 )
 
 @Serializable
@@ -88,9 +90,6 @@ internal data class CredentialIssuanceResponse(
     val cNonce: CNonce?,
 )
 
-/**
- * Default implementation of [IssuanceRequester] interface.
- */
 internal class IssuanceRequester(
     private val issuerMetadata: CredentialIssuerMetadata,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
@@ -226,6 +225,32 @@ internal class IssuanceRequester(
         }
     }
 
+    suspend fun notifyIssuer(
+        accessToken: AccessToken,
+        notification: Notification,
+    ): Result<Unit> = runCatching {
+        ensureNotNull(issuerMetadata.notificationEndpoint) { IssuerDoesNotSupportNotifications }
+        ktorHttpClientFactory().use { client ->
+            val url = issuerMetadata.notificationEndpoint.value.value
+            val payload = NotificationTO(
+                notificationId = notification.id.value,
+                event = notification.event.name.lowercase(),
+                eventDescription = notification.eventDescription,
+            )
+            val response = client.post(url) {
+                bearerAuth(accessToken.accessToken)
+                contentType(ContentType.Application.Json)
+                setBody(payload)
+            }
+            if (response.status.isSuccess()) {
+                Unit
+            } else {
+                val errorResponse = response.body<GenericErrorResponse>()
+                throw NotificationFailed(errorResponse.error)
+            }
+        }
+    }
+
     private fun TransactionId.toDeferredRequestTO(): DeferredIssuanceRequestTO =
         DeferredIssuanceRequestTO(value)
 
@@ -253,7 +278,7 @@ internal class IssuanceRequester(
 
     private fun SingleIssuanceSuccessResponse.toDomain(): CredentialIssuanceResponse {
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
-        val issuedCredential = issuedCredentialOf(transactionId, credential)
+        val issuedCredential = issuedCredentialOf(transactionId, notificationId, credential)
         return CredentialIssuanceResponse(
             cNonce = cNonce,
             credentials = listOf(issuedCredential),
@@ -262,6 +287,7 @@ internal class IssuanceRequester(
 
     private fun issuedCredentialOf(
         transactionId: String?,
+        notificationId: String?,
         credential: String?,
     ): IssuedCredential {
         ensure(!(transactionId == null && credential == null)) {
@@ -271,7 +297,10 @@ internal class IssuanceRequester(
         }
         return when {
             transactionId != null -> IssuedCredential.Deferred(TransactionId(transactionId))
-            credential != null -> IssuedCredential.Issued(credential)
+            credential != null -> {
+                val notificationIdentifier = notificationId?.let { NotificationId(notificationId) }
+                IssuedCredential.Issued(credential, notificationIdentifier)
+            }
             else -> error("Cannot happen")
         }
     }
@@ -280,7 +309,7 @@ internal class IssuanceRequester(
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
         return CredentialIssuanceResponse(
             cNonce = cNonce,
-            credentials = credentialResponses.map { issuedCredentialOf(it.transactionId, it.credential) },
+            credentials = credentialResponses.map { issuedCredentialOf(it.transactionId, it.notificationId, it.credential) },
         )
     }
 

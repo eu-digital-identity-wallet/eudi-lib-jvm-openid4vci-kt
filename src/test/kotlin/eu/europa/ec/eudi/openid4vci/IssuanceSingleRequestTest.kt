@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.IdentifierBasedIssuanceRequestTO
@@ -27,39 +26,9 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.hamcrest.MatcherAssert.assertThat
 import org.junit.jupiter.api.assertDoesNotThrow
-import java.net.URI
-import java.util.*
 import kotlin.test.*
 
-private const val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
-private const val PID_SdJwtVC_ID = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-private const val PID_MsoMdoc_ID = "eu.europa.ec.eudiw.pid_mso_mdoc"
-private val CredentialOffer = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_SdJwtVC_ID", "$PID_MsoMdoc_ID"]          
-        }
-""".trimIndent()
-private val CredentialOfferMsoMdoc = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_MsoMdoc_ID"]          
-        }
-""".trimIndent()
-private val CredentialOfferWithSdJwtVc = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_SdJwtVC_ID"]          
-        }
-""".trimIndent()
-
 class IssuanceSingleRequestTest {
-
-    private val vciWalletConfiguration = OpenId4VCIConfig(
-        clientId = "MyWallet_ClientId",
-        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-    )
 
     @Test
     fun `when issuance requested with no proof then InvalidProof error is raised with c_nonce passed`() = runTest {
@@ -106,7 +75,7 @@ class IssuanceSingleRequestTest {
         )
         val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
-            CredentialOfferMsoMdoc,
+            CredentialOfferMsoMdoc_NO_GRANTS,
         )
 
         val claimSet = MsoMdocClaimSet(
@@ -159,7 +128,7 @@ class IssuanceSingleRequestTest {
         )
         val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
-            CredentialOfferMsoMdoc,
+            CredentialOfferMsoMdoc_NO_GRANTS,
         )
 
         val claimSet = MsoMdocClaimSet(
@@ -197,20 +166,20 @@ class IssuanceSingleRequestTest {
         )
         val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
-            CredentialOffer,
+            CREDENTIAL_OFFER_NO_GRANTS,
         )
 
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val claimSetMsoMdoc = MsoMdocClaimSet(listOf("org.iso.18013.5.1" to "degree"))
-                    var credentialConfigurationId = CredentialConfigurationIdentifier(PID_MsoMdoc_ID)
+                    var credentialConfigurationId = CredentialConfigurationIdentifier(PID_MsoMdoc)
                     assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
                         authorizedRequest.requestSingle(credentialConfigurationId to null, claimSetMsoMdoc).getOrThrow()
                     }
 
                     val claimSetSdJwtVc = GenericClaimSet(listOf("degree"))
-                    credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC_ID)
+                    credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC)
                     assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
                         authorizedRequest.requestSingle(credentialConfigurationId to null, claimSetSdJwtVc).getOrThrow()
                     }
@@ -233,7 +202,7 @@ class IssuanceSingleRequestTest {
         )
         val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
-            CredentialOffer,
+            CREDENTIAL_OFFER_NO_GRANTS,
         )
 
         with(issuer) {
@@ -274,7 +243,7 @@ class IssuanceSingleRequestTest {
 
         val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
-            CredentialOfferMsoMdoc,
+            CredentialOfferMsoMdoc_NO_GRANTS,
         )
 
         val claimSet = MsoMdocClaimSet(
@@ -334,7 +303,7 @@ class IssuanceSingleRequestTest {
 
         val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
-            CredentialOfferWithSdJwtVc,
+            CredentialOfferWithSdJwtVc_NO_GRANTS,
         )
 
         val claimSet = GenericClaimSet(
@@ -398,7 +367,7 @@ class IssuanceSingleRequestTest {
         )
         val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
-            CredentialOffer,
+            CREDENTIAL_OFFER_NO_GRANTS,
         )
 
         with(issuer) {
@@ -439,33 +408,11 @@ class IssuanceSingleRequestTest {
         )
         val (_, authorizedRequest, _) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
-            CredentialOffer,
+            CREDENTIAL_OFFER_NO_GRANTS,
         )
 
         assertTrue("Identifiers expected to be parsed") {
             !authorizedRequest.credentialIdentifiers.isNullOrEmpty()
         }
-    }
-
-    private suspend fun authorizeRequestForCredentialOffer(
-        ktorHttpClientFactory: KtorHttpClientFactory,
-        credentialOfferStr: String,
-    ): Triple<CredentialOffer, AuthorizedRequest, Issuer> {
-        val offer = CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
-            .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
-            .getOrThrow()
-
-        val issuer = Issuer.make(
-            config = vciWalletConfiguration,
-            credentialOffer = offer,
-            ktorHttpClientFactory = ktorHttpClientFactory,
-        )
-
-        val authorizedRequest = with(issuer) {
-            val parRequested = prepareAuthorizationRequest().getOrThrow()
-            val authorizationCode = UUID.randomUUID().toString()
-            parRequested.authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode)).getOrThrow()
-        }
-        return Triple(offer, authorizedRequest, issuer)
     }
 }

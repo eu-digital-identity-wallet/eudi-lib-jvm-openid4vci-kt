@@ -15,14 +15,21 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.*
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JOSEObjectType
+import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWEHeader
 import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.RSAEncrypter
-import com.nimbusds.jose.jwk.*
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -33,28 +40,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.hamcrest.MatcherAssert.assertThat
-import java.net.URI
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
-private const val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
 class IssuanceEncryptedResponsesTest {
-
-    private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc"]          
-        }
-    """.trimIndent()
-
-    private val vciWalletConfiguration = OpenId4VCIConfig(
-        clientId = "MyWallet_ClientId",
-        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-    )
 
     @Test
     fun `when encryption algorithm is not supported by issuer then throw ResponseEncryptionAlgorithmNotSupportedByIssuer`() =
@@ -80,10 +72,10 @@ class IssuanceEncryptedResponsesTest {
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
-            val (offer, authorizedRequest, issuer) = initIssuerWithOfferAndAuthorize(
-                mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
-                issuanceResponseEncryptionSpec,
+            val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
             )
 
             val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
@@ -122,10 +114,10 @@ class IssuanceEncryptedResponsesTest {
                 encryptionMethod = EncryptionMethod.A256GCM,
             )
 
-            val (offer, authorizedRequest, issuer) = initIssuerWithOfferAndAuthorize(
-                mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
-                issuanceResponseEncryptionSpec,
+            val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
             )
             val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
 
@@ -187,12 +179,11 @@ class IssuanceEncryptedResponsesTest {
                 algorithm = JWEAlgorithm.RSA_OAEP_256,
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
-            val (offer, authorizedRequest, issuer) =
-                initIssuerWithOfferAndAuthorize(
-                    mockedKtorHttpClientFactory,
-                    AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
-                    issuanceResponseEncryptionSpec,
-                )
+            val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
+            )
 
             with(issuer) {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
@@ -296,12 +287,11 @@ class IssuanceEncryptedResponsesTest {
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
-            val (offer, authorizedRequest, issuer) =
-                initIssuerWithOfferAndAuthorize(
-                    mockedKtorHttpClientFactory,
-                    AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS,
-                    issuanceResponseEncryptionSpec,
-                )
+            val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
+            )
 
             with(issuer) {
                 when (authorizedRequest) {
@@ -348,30 +338,6 @@ class IssuanceEncryptedResponsesTest {
         .keyID(UUID.randomUUID().toString())
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
-
-    private suspend fun initIssuerWithOfferAndAuthorize(
-        ktorHttpClientFactory: KtorHttpClientFactory,
-        credentialOfferStr: String,
-        issuanceResponseEncryptionSpec: IssuanceResponseEncryptionSpec,
-    ): Triple<CredentialOffer, AuthorizedRequest, Issuer> {
-        val offer = CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
-            .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
-            .getOrThrow()
-
-        val issuer = Issuer.make(
-            config = vciWalletConfiguration,
-            credentialOffer = offer,
-            ktorHttpClientFactory = ktorHttpClientFactory,
-            responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
-        )
-
-        val flowState = with(issuer) {
-            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
-            val authorizationCode = UUID.randomUUID().toString()
-            authRequestPrepared.authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode)).getOrThrow()
-        }
-        return Triple(offer, flowState, issuer)
-    }
 
     private fun encryptedResponse(jwk: JWK, alg: JWEAlgorithm, enc: EncryptionMethod): Result<String> {
         val jsonObject =

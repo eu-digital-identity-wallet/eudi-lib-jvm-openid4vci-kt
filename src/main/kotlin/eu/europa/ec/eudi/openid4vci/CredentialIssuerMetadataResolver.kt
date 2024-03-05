@@ -46,6 +46,7 @@ data class CredentialIssuerMetadata(
     val credentialEndpoint: CredentialIssuerEndpoint,
     val batchCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
+    val notificationEndpoint: CredentialIssuerEndpoint? = null,
     val credentialResponseEncryption: CredentialResponseEncryption = NotRequired,
     val credentialIdentifiersSupported: Boolean = false,
     val credentialsSupported: Map<CredentialConfigurationIdentifier, CredentialSupported>,
@@ -139,6 +140,11 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
      * The URL of the Deferred Credential Endpoint is not valid.
      */
     class InvalidDeferredCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+
+    /**
+     * The URL of the Notification Endpoint is not valid.
+     */
+    class InvalidNotificationEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * Credential Encryption Algorithms are required.

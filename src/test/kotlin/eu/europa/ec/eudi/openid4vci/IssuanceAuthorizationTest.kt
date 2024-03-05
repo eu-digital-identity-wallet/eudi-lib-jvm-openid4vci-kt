@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponse
 import eu.europa.ec.eudi.openid4vci.internal.PushedAuthorizationRequestResponse
 import eu.europa.ec.eudi.openid4vci.internal.TokenEndpointForm
@@ -25,7 +24,6 @@ import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.net.URI
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -34,11 +32,9 @@ import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail as NimbusAuthorizationDet
 
 class IssuanceAuthorizationTest {
 
-    private val CredentialIssuer_URL = "https://credential-issuer.example.com"
-
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
         {
-          "credential_issuer": "$CredentialIssuer_URL",
+          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
           "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
           "grants": {
             "authorization_code": {
@@ -48,16 +44,9 @@ class IssuanceAuthorizationTest {
         }
     """.trimIndent()
 
-    private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS = """
-        {
-          "credential_issuer": "$CredentialIssuer_URL",
-          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"]          
-        }
-    """.trimIndent()
-
     private val PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
         {
-          "credential_issuer": "$CredentialIssuer_URL",
+          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
           "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
           "grants": {
             "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
@@ -69,12 +58,6 @@ class IssuanceAuthorizationTest {
           }
         }
     """.trimIndent()
-
-    val vciWalletConfiguration = OpenId4VCIConfig(
-        clientId = "MyWallet_ClientId",
-        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-    )
 
     @Test
     fun `successful authorization with authorization code flow (wallet initiated)`() =
@@ -143,9 +126,9 @@ class IssuanceAuthorizationTest {
                 },
             )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -226,9 +209,9 @@ class IssuanceAuthorizationTest {
                 },
             )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -284,7 +267,7 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -303,7 +286,7 @@ class IssuanceAuthorizationTest {
 
             val preAuthGrantOffer = """
                 {
-                  "credential_issuer": "$CredentialIssuer_URL",
+                  "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
                   "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
                   "grants": {
                     "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
@@ -319,7 +302,7 @@ class IssuanceAuthorizationTest {
 
             val offer = credentialOffer(mockedKtorHttpClientFactory, preAuthGrantOffer)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -349,7 +332,7 @@ class IssuanceAuthorizationTest {
 
             val preAuthGrantOffer = """
                 {
-                  "credential_issuer": "$CredentialIssuer_URL",
+                  "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
                   "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
                   "grants": {
                     "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
@@ -364,7 +347,7 @@ class IssuanceAuthorizationTest {
 
             val offer = credentialOffer(mockedKtorHttpClientFactory, preAuthGrantOffer)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -413,7 +396,7 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -468,7 +451,7 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -514,7 +497,7 @@ class IssuanceAuthorizationTest {
 
             val noProofRequiredOffer = """
             {
-              "credential_issuer": "$CredentialIssuer_URL",
+              "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
               "credential_configuration_ids": ["MobileDrivingLicense_msoMdoc"],
               "grants": {
                 "authorization_code": {
@@ -526,7 +509,7 @@ class IssuanceAuthorizationTest {
 
             val offer = credentialOffer(mockedKtorHttpClientFactory, noProofRequiredOffer)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -570,7 +553,7 @@ class IssuanceAuthorizationTest {
 
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -612,7 +595,7 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -657,7 +640,7 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -706,7 +689,7 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -764,7 +747,7 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -777,7 +760,7 @@ class IssuanceAuthorizationTest {
         credentialOfferStr: String,
     ): CredentialOffer {
         return CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
-            .resolve("https://$CredentialIssuer_URL/credentialoffer?credential_offer=$credentialOfferStr")
+            .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
             .getOrThrow()
     }
 }

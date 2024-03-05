@@ -301,6 +301,7 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
     CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials").getOrThrow(),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/batch").getOrThrow(),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/deferred").getOrThrow(),
+    CredentialIssuerEndpoint("https://credential-issuer.example.com/notification").getOrThrow(),
     CredentialResponseEncryption.Required(
         listOf(
             JWEAlgorithm.ECDH_ES,

@@ -24,7 +24,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
-interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredential {
+interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredential, NotifyIssuer {
 
     companion object {
 
