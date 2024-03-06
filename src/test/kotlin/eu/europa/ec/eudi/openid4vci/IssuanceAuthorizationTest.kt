@@ -272,7 +272,7 @@ class IssuanceAuthorizationTest {
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
             with(issuer) {
-                authorizeWithPreAuthorizationCode("pin").getOrThrow()
+                authorizeWithPreAuthorizationCode("123456").getOrThrow()
             }
         }
 
