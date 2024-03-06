@@ -118,7 +118,7 @@ internal data class CredentialResponseEncryptionSpecTO(
 @Serializable
 internal data class IdentifierBasedIssuanceRequestTO(
     @SerialName("proof") override val proof: Proof? = null,
-    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO?,
+    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO? = null,
     @SerialName("credential_identifier") val configurationId: String,
 ) : CredentialIssuanceRequestTO.SingleCredentialTO
 
@@ -127,7 +127,7 @@ internal data class IdentifierBasedIssuanceRequestTO(
 internal data class MsoMdocIssuanceRequestTO(
     @SerialName("doctype") val docType: String,
     @SerialName("proof") override val proof: Proof? = null,
-    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO?,
+    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO? = null,
     @SerialName("claims") val claims: JsonObject?,
 ) : CredentialIssuanceRequestTO.SingleCredentialTO
 
@@ -136,7 +136,7 @@ internal data class MsoMdocIssuanceRequestTO(
 internal data class SdJwtVcIssuanceRequestTO(
     @SerialName("vct") val vct: String,
     @SerialName("proof") override val proof: Proof? = null,
-    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO?,
+    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO? = null,
     @SerialName("claims") val claims: JsonObject? = null,
 ) : CredentialIssuanceRequestTO.SingleCredentialTO
 
