@@ -21,12 +21,6 @@ import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
 
-internal const val FORMAT_MSO_MDOC = "mso_mdoc"
-internal const val FORMAT_SD_JWT_VC = "vc+sd-jwt"
-internal const val FORMAT_W3C_JSONLD_DATA_INTEGRITY = "ldp_vc"
-internal const val FORMAT_W3C_JSONLD_SIGNED_JWT = "jwt_vc_json-ld"
-internal const val FORMAT_W3C_SIGNED_JWT = "jwt_vc_json"
-
 internal sealed interface CredentialType {
     data class MsoMdocDocType(val doctype: String, val claimSet: MsoMdocClaimSet?) : CredentialType
 
@@ -50,21 +44,38 @@ internal sealed interface CredentialIssuanceRequest {
     ) : CredentialIssuanceRequest
 
     /**
-     * Sealed hierarchy of credential issuance requests based on the format of the requested credential.
+     * Sealed hierarchy of credential issuance requests.
      */
-    data class SingleRequest(
-        val proof: Proof?,
-        val encryption: IssuanceResponseEncryptionSpec?,
+    sealed interface SingleRequest : CredentialIssuanceRequest {
+        val proof: Proof?
+        val encryption: IssuanceResponseEncryptionSpec?
+    }
+
+    /**
+     * Based on pre-agreed credential identifier.
+     */
+    data class IdentifierBased(
+        val credentialId: CredentialIdentifier,
+        override val proof: Proof?,
+        override val encryption: IssuanceResponseEncryptionSpec?,
+    ) : SingleRequest
+
+    /**
+     * Based on the format of the requested credential.
+     */
+    data class FormatBased(
+        override val proof: Proof?,
+        override val encryption: IssuanceResponseEncryptionSpec?,
         val credential: CredentialType,
-    ) : CredentialIssuanceRequest
+    ) : SingleRequest
 
     companion object {
-        internal fun singleRequest(
+        internal fun formatBased(
             supportedCredential: CredentialSupported,
             claimSet: ClaimSet?,
             proof: Proof?,
             responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-        ): SingleRequest {
+        ): FormatBased {
             val cd = when (supportedCredential) {
                 is MsoMdocCredential -> msoMdoc(supportedCredential, claimSet.ensureClaimSet())
                 is SdJwtVcCredential -> sdJwtVc(supportedCredential, claimSet.ensureClaimSet())
@@ -72,7 +83,7 @@ internal sealed interface CredentialIssuanceRequest {
                 is W3CJsonLdSignedJwtCredential -> error("Format $FORMAT_W3C_JSONLD_SIGNED_JWT not supported")
                 is W3CJsonLdDataIntegrityCredential -> error("Format $FORMAT_W3C_JSONLD_DATA_INTEGRITY not supported")
             }
-            return SingleRequest(proof, responseEncryptionSpec, cd)
+            return FormatBased(proof, responseEncryptionSpec, cd)
         }
     }
 }
@@ -118,11 +129,11 @@ private fun sdJwtVc(
 ): CredentialType.SdJwtVcType {
     fun GenericClaimSet.validate() {
         if (claims.isNotEmpty()) {
-            val supportedClaims = supportedCredential.credentialDefinition.claims
+            val supportedClaims = supportedCredential.claims
             ensure(!supportedClaims.isNullOrEmpty()) {
                 InvalidIssuanceRequest(
                     "Issuer does not support claims for credential " +
-                        "[$FORMAT_SD_JWT_VC-${supportedCredential.credentialDefinition.type}]",
+                        "[$FORMAT_SD_JWT_VC-${supportedCredential.type}]",
                 )
             }
             ensure(supportedClaims.keys.containsAll(claims)) {
@@ -133,7 +144,7 @@ private fun sdJwtVc(
 
     val validClaimSet = claimSet?.apply { validate() }
     return CredentialType.SdJwtVcType(
-        type = supportedCredential.credentialDefinition.type,
+        type = supportedCredential.type,
         claims = validClaimSet,
     )
 }

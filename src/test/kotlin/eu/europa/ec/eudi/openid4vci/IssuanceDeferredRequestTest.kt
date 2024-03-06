@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.DeferredIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVcIssuanceRequestTO
@@ -25,28 +24,9 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import java.net.URI
-import java.util.*
 import kotlin.test.*
 
 class IssuanceDeferredRequestTest {
-
-    val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
-
-    val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-
-    private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["$PID_SdJwtVC_SCOPE"]          
-        }
-    """.trimIndent()
-
-    val vciWalletConfiguration = OpenId4VCIConfig(
-        clientId = "MyWallet_ClientId",
-        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-    )
 
     @Test
     fun `when issuer responds with invalid_transaction_id, response should be of type Errored`() = runTest {
@@ -71,21 +51,21 @@ class IssuanceDeferredRequestTest {
         val (_, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
+                CredentialOfferWithSdJwtVc_NO_GRANTS,
             )
 
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
+                    val credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC) to null
                     val submittedRequest =
-                        authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
+                        authorizedRequest.requestSingle(credentialConfigurationId, null).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val secondSubmittedRequest =
-                                proofRequired.requestSingle(credentialMetadata, null, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                                proofRequired.requestSingle(credentialConfigurationId, null, CryptoGenerator.rsaProofSigner()).getOrThrow()
 
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
@@ -146,21 +126,26 @@ class IssuanceDeferredRequestTest {
         val (_, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
+                CredentialOfferWithSdJwtVc_NO_GRANTS,
             )
 
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
+                    val credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC)
+                    val requestCredentialIdentifier = credentialConfigurationId to null
                     val submittedRequest =
-                        authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
+                        authorizedRequest.requestSingle(requestCredentialIdentifier, null).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val secondSubmittedRequest =
-                                proofRequired.requestSingle(credentialMetadata, null, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                                proofRequired.requestSingle(
+                                    requestCredentialIdentifier,
+                                    null,
+                                    CryptoGenerator.rsaProofSigner(),
+                                ).getOrThrow()
 
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
@@ -234,21 +219,26 @@ class IssuanceDeferredRequestTest {
         val (_, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS_vc_sd_jwt,
+                CredentialOfferWithSdJwtVc_NO_GRANTS,
             )
 
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
+                    val credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC)
+                    val requestCredentialIdentifier = credentialConfigurationId to null
                     val submittedRequest =
-                        authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
+                        authorizedRequest.requestSingle(requestCredentialIdentifier, null).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val secondSubmittedRequest =
-                                proofRequired.requestSingle(credentialMetadata, null, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                                proofRequired.requestSingle(
+                                    requestCredentialIdentifier,
+                                    null,
+                                    CryptoGenerator.rsaProofSigner(),
+                                ).getOrThrow()
 
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
@@ -376,26 +366,4 @@ class IssuanceDeferredRequestTest {
         } catch (ex: Exception) {
             null
         }
-
-    private suspend fun authorizeRequestForCredentialOffer(
-        ktorHttpClientFactory: KtorHttpClientFactory,
-        credentialOfferStr: String,
-    ): Triple<CredentialOffer, AuthorizedRequest, Issuer> {
-        val offer = CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
-            .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
-            .getOrThrow()
-
-        val issuer = Issuer.make(
-            config = vciWalletConfiguration,
-            credentialOffer = offer,
-            ktorHttpClientFactory = ktorHttpClientFactory,
-        )
-
-        val authorizedRequest = with(issuer) {
-            val parRequested = prepareAuthorizationRequest().getOrThrow()
-            val authorizationCode = UUID.randomUUID().toString()
-            parRequested.authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode)).getOrThrow()
-        }
-        return Triple(offer, authorizedRequest, issuer)
-    }
 }

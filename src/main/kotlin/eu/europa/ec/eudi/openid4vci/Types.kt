@@ -21,9 +21,16 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
+import kotlinx.serialization.Serializable
 import java.net.URI
 import java.net.URL
 import java.security.cert.X509Certificate
+
+const val FORMAT_MSO_MDOC = "mso_mdoc"
+const val FORMAT_SD_JWT_VC = "vc+sd-jwt"
+const val FORMAT_W3C_JSONLD_DATA_INTEGRITY = "ldp_vc"
+const val FORMAT_W3C_JSONLD_SIGNED_JWT = "jwt_vc_json-ld"
+const val FORMAT_W3C_SIGNED_JWT = "jwt_vc_json"
 
 /**
  * A [URI] that strictly uses the 'https' protocol.
@@ -47,6 +54,15 @@ value class HttpsUrl private constructor(val value: URL) {
 }
 
 @JvmInline
+@Serializable
+value class CredentialConfigurationIdentifier(val value: String) {
+    init {
+        require(value.isNotEmpty()) { "value cannot be empty" }
+    }
+}
+
+@JvmInline
+@Serializable
 value class CredentialIdentifier(val value: String) {
     init {
         require(value.isNotEmpty()) { "value cannot be empty" }
@@ -87,18 +103,6 @@ value class AuthorizationCode(val code: String) {
 }
 
 /**
- * Pre-Authorization code to be exchanged with an access token
- */
-data class PreAuthorizationCode(
-    val preAuthorizedCode: String,
-    val pin: String?,
-) {
-    init {
-        require(preAuthorizedCode.isNotEmpty()) { "Pre-Authorization code must not be empty" }
-    }
-}
-
-/**
  * A c_nonce related information as provided from issuance server.
  *
  * @param value The c_nonce value
@@ -120,6 +124,18 @@ data class CNonce(
  */
 @JvmInline
 value class TransactionId(val value: String) {
+    init {
+        require(value.isNotEmpty()) { "Value cannot be empty" }
+    }
+}
+
+/**
+ * An identifier to be used in notification endpoint of issuer.
+ *
+ * @param value The identifier's value
+ */
+@JvmInline
+value class NotificationId(val value: String) {
     init {
         require(value.isNotEmpty()) { "Value cannot be empty" }
     }
@@ -192,3 +208,4 @@ value class Scope(val value: String) {
 }
 
 typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata
+typealias IssuanceRequestCredentialIdentifier = Pair<CredentialConfigurationIdentifier, CredentialIdentifier?>

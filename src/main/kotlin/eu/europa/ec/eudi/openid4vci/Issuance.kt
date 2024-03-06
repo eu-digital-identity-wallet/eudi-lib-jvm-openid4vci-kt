@@ -39,6 +39,7 @@ sealed interface AuthorizedRequest {
      * Access token authorizing the request(s) to issue credential(s)
      */
     val accessToken: AccessToken
+    val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?
 
     /**
      * Issuer authorized issuance
@@ -47,6 +48,7 @@ sealed interface AuthorizedRequest {
      */
     data class NoProofRequired(
         override val accessToken: AccessToken,
+        override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
     ) : AuthorizedRequest
 
     /**
@@ -59,13 +61,8 @@ sealed interface AuthorizedRequest {
     data class ProofRequired(
         override val accessToken: AccessToken,
         val cNonce: CNonce,
+        override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
     ) : AuthorizedRequest
-
-    companion object {
-        operator fun invoke(accessToken: AccessToken, cNonce: CNonce?): AuthorizedRequest =
-            if (cNonce != null) ProofRequired(accessToken, cNonce)
-            else NoProofRequired(accessToken)
-    }
 }
 
 /**
@@ -76,12 +73,12 @@ sealed interface IssuedCredential {
     /**
      * Credential was issued from server and the result is returned inline.
      *
-     * @param format The format of the issued credential
-     * @param credential The issued credential
+     * @param credential The issued credential.
+     * @param notificationId The identifier to be used in issuer's notification endpoint.
      */
     data class Issued(
-        val format: String,
         val credential: String,
+        val notificationId: NotificationId? = null,
     ) : IssuedCredential
 
     /**
@@ -169,10 +166,10 @@ interface AuthorizeIssuance {
     /**
      * Action to authorize an issuance request using Pre-Authorized Code Flow.
      *
-     * @param pin   Optional parameter in case the credential offer specifies that a user provided pin is required for authorization
+     * @param txCode   Optional parameter in case the credential offer specifies that a user provided pin is required for authorization
      * @return an issuance request in authorized state
      */
-    suspend fun authorizeWithPreAuthorizationCode(pin: String?): Result<AuthorizedRequest>
+    suspend fun authorizeWithPreAuthorizationCode(txCode: String?): Result<AuthorizedRequest>
 }
 
 /**
@@ -198,13 +195,13 @@ interface RequestIssuance {
     /**
      *  Requests the issuance of a single credential having an [AuthorizedRequest.NoProofRequired] authorization.
      *
-     *  @param credentialId   The identifier of the credential that will be requested.
+     *  @param requestCredentialIdentifier   The identifier of the credential that will be requested.
      *  @param claimSet Optional parameter to specify the specific set of claims that are requested to be included in the
      *          credential to be issued.
      *  @return The new state of the request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
-        credentialId: CredentialIdentifier,
+        requestCredentialIdentifier: IssuanceRequestCredentialIdentifier,
         claimSet: ClaimSet?,
     ): Result<SubmittedRequest>
 
@@ -212,14 +209,14 @@ interface RequestIssuance {
      *  Requests the issuance of a single credential having an [AuthorizedRequest.ProofRequired] authorization. In this
      *  case caller must provide a binding key that will be used for generating a Proof of Possession that issuer expects.
      *
-     *  @param credentialId   The identifier of the credential that will be requested.
+     *  @param requestCredentialIdentifier   The identifier of the credential that will be requested.
      *  @param claimSet     Optional parameter to specify the specific set of claims that are requested to be included in the
      *          credential to be issued.
      *  @param proofSigner  Signer component of the proof to be sent.
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-        credentialId: CredentialIdentifier,
+        requestCredentialIdentifier: IssuanceRequestCredentialIdentifier,
         claimSet: ClaimSet?,
         proofSigner: ProofSigner,
     ): Result<SubmittedRequest>
@@ -232,7 +229,7 @@ interface RequestIssuance {
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<CredentialIdentifier, ClaimSet?>>,
+        credentialsMetadata: List<Pair<IssuanceRequestCredentialIdentifier, ClaimSet?>>,
     ): Result<SubmittedRequest>
 
     /**
@@ -242,7 +239,7 @@ interface RequestIssuance {
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<CredentialIdentifier, ClaimSet?, ProofSigner>>,
+        credentialsMetadata: List<Triple<IssuanceRequestCredentialIdentifier, ClaimSet?, ProofSigner>>,
     ): Result<SubmittedRequest>
 
     /**
@@ -285,6 +282,25 @@ fun interface QueryForDeferredCredential {
     suspend fun AuthorizedRequest.queryForDeferredCredential(
         deferredCredential: IssuedCredential.Deferred,
     ): Result<DeferredCredentialQueryOutcome>
+}
+
+data class Notification(
+    val id: NotificationId,
+    val event: NotifiedEvent,
+    val eventDescription: String? = null,
+)
+
+enum class NotifiedEvent {
+    CREDENTIAL_ACCEPTED,
+    CREDENTIAL_FAILURE,
+    CREDENTIAL_DELETED,
+}
+
+fun interface NotifyIssuer {
+
+    suspend fun AuthorizedRequest.notify(
+        notification: Notification,
+    ): Result<Unit>
 }
 
 /**
@@ -397,12 +413,26 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     }
 
     /**
+     * Issuance server does not support notifications
+     */
+    data object IssuerDoesNotSupportNotifications : CredentialIssuanceError("IssuerDoesNotSupportNotifications") {
+        private fun readResolve(): Any = IssuerDoesNotSupportNotifications
+    }
+
+    /**
      * Generic failure during issuance request
      */
     data class IssuanceRequestFailed(
         val error: String,
         val errorDescription: String? = null,
     ) : CredentialIssuanceError("$error+${errorDescription?.let { " description=$it" }}")
+
+    /**
+     * Generic failure during notification
+     */
+    data class NotificationFailed(
+        val error: String,
+    ) : CredentialIssuanceError(error)
 
     /**
      * Issuance server response is un-parsable

@@ -22,6 +22,7 @@ import com.nimbusds.oauth2.sdk.id.ClientID
 import com.nimbusds.oauth2.sdk.id.State
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import com.nimbusds.oauth2.sdk.pkce.CodeVerifier
+import com.nimbusds.oauth2.sdk.rar.AuthorizationType
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
@@ -31,6 +32,7 @@ import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
+import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail as NimbusAuthorizationDetail
 
 /**
  * Sealed hierarchy of possible responses to a Pushed Authorization Request.
@@ -81,6 +83,9 @@ internal sealed interface AccessTokenRequestResponse {
         @SerialName("expires_in") val expiresIn: Long,
         @SerialName("c_nonce") val cNonce: String? = null,
         @SerialName("c_nonce_expires_in") val cNonceExpiresIn: Long? = null,
+        @SerialName(
+            "authorization_details",
+        ) val authorizationDetails: List<OidCredentialAuthorizationDetail.ByCredentialConfiguration>? = null,
     ) : AccessTokenRequestResponse
 
     /**
@@ -96,9 +101,6 @@ internal sealed interface AccessTokenRequestResponse {
     ) : AccessTokenRequestResponse
 }
 
-/**
- * Default implementation of [IssuanceAuthorizer] interface.
- */
 internal class IssuanceAuthorizer(
     private val authorizationServerMetadata: CIAuthorizationServerMetadata,
     private val config: OpenId4VCIConfig,
@@ -108,7 +110,7 @@ internal class IssuanceAuthorizer(
     /**
      * Submit Pushed Authorization Request for authorizing an issuance request.
      *
-     * @param scopes    The scopes of the authorization request.
+     * @param credentialsScopes    The scopes of the authorization request.
      * @param state     The oauth2 specific 'state' request parameter.
      * @param issuerState   The state passed from credential issuer during the negotiation phase of the issuance.
      * @return The result of the request as a pair of the PKCE verifier used during request and the authorization code
@@ -118,11 +120,14 @@ internal class IssuanceAuthorizer(
      * @see <a href="https://www.rfc-editor.org/rfc/rfc9126.html">RFC9126</a>
      */
     suspend fun submitPushedAuthorizationRequest(
-        scopes: List<Scope>,
+        credentialsScopes: List<Scope>,
+        credentialsAuthorizationDetails: List<OidCredentialAuthorizationDetail>,
         state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, HttpsUrl>> = runCatching {
-        require(scopes.isNotEmpty()) { "No scopes provided. Cannot submit par with no scopes." }
+        require(credentialsScopes.isNotEmpty() || credentialsAuthorizationDetails.isNotEmpty()) {
+            "No scopes or authorization details provided. Cannot submit par."
+        }
 
         val parEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
         val clientID = ClientID(config.clientId)
@@ -131,9 +136,16 @@ internal class IssuanceAuthorizer(
             val request = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
                 redirectionURI(config.authFlowRedirectionURI)
                 codeChallenge(codeVerifier, CodeChallengeMethod.S256)
-                scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray() + "openid"))
                 state(State(state))
                 issuerState?.let { customParameter("issuer_state", issuerState) }
+                credentialsScopes.takeIf { credentialsScopes.isNotEmpty() }?.let {
+                    scope(com.nimbusds.oauth2.sdk.Scope(*credentialsScopes.map { it.value }.toTypedArray() + "openid"))
+                }
+                credentialsAuthorizationDetails.takeIf { credentialsAuthorizationDetails.isNotEmpty() }?.let {
+                    authorizationDetails(
+                        credentialsAuthorizationDetails.toNimbusAuthorizationDetails(),
+                    )
+                }
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
         }
@@ -143,11 +155,14 @@ internal class IssuanceAuthorizer(
     }
 
     fun authorizationRequestUrl(
-        scopes: List<Scope>,
+        credentialsScopes: List<Scope>,
+        credentialsAuthorizationDetails: List<OidCredentialAuthorizationDetail>,
         state: String,
         issuerState: String?,
     ): Result<Pair<PKCEVerifier, HttpsUrl>> = runCatching {
-        require(scopes.isNotEmpty()) { "No scopes provided. Cannot submit par with no scopes." }
+        require(credentialsScopes.isNotEmpty() || credentialsAuthorizationDetails.isNotEmpty()) {
+            "No scopes or authorization details provided. Cannot prepare authorization request."
+        }
 
         val clientID = ClientID(config.clientId)
         val codeVerifier = CodeVerifier()
@@ -155,9 +170,16 @@ internal class IssuanceAuthorizer(
             endpointURI(authorizationServerMetadata.authorizationEndpointURI)
             redirectionURI(config.authFlowRedirectionURI)
             codeChallenge(codeVerifier, CodeChallengeMethod.S256)
-            scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray() + "openid"))
             state(State(state))
             issuerState?.let { customParameter("issuer_state", issuerState) }
+            credentialsScopes.takeIf { credentialsScopes.isNotEmpty() }?.let {
+                scope(com.nimbusds.oauth2.sdk.Scope(*credentialsScopes.map { it.value }.toTypedArray() + "openid"))
+            }
+            credentialsAuthorizationDetails.takeIf { credentialsAuthorizationDetails.isNotEmpty() }?.let {
+                authorizationDetails(
+                    credentialsAuthorizationDetails.toNimbusAuthorizationDetails(),
+                )
+            }
         }.build()
 
         val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())
@@ -198,7 +220,7 @@ internal class IssuanceAuthorizer(
     suspend fun requestAccessTokenAuthFlow(
         authorizationCode: String,
         codeVerifier: String,
-    ): Result<Pair<AccessToken, CNonce?>> = runCatching {
+    ): Result<Triple<AccessToken, CNonce?, List<OidCredentialAuthorizationDetail.ByCredentialConfiguration>?>> = runCatching {
         val params = TokenEndpointForm.AuthCodeFlow.of(
             authorizationCode,
             config.authFlowRedirectionURI,
@@ -213,26 +235,32 @@ internal class IssuanceAuthorizer(
      * pre-authorization code flow
      *
      * @param preAuthorizedCode The pre-authorization code.
-     * @param pin  Extra pin code to be passed if specified as required in the credential offer.
+     * @param txCode  Extra transaction code to be passed if specified as required in the credential offer.
      * @return The result of the request as a pair of the access token and the optional c_nonce information returned
      *      from token endpoint.
      */
     suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: String,
-        pin: String?,
+        txCode: String?,
     ): Result<Pair<AccessToken, CNonce?>> = runCatching {
-        val params = TokenEndpointForm.PreAuthCodeFlow.of(config.clientId, preAuthorizedCode, pin)
-        requestAccessToken(params).accessTokenOrFail()
+        val params = TokenEndpointForm.PreAuthCodeFlow.of(config.clientId, preAuthorizedCode, txCode)
+        val result = requestAccessToken(params).accessTokenOrFail()
+        result.first to result.second
     }
 
-    private fun AccessTokenRequestResponse.accessTokenOrFail(): Pair<AccessToken, CNonce?> = when (this) {
-        is AccessTokenRequestResponse.Success -> {
-            val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
-            AccessToken(accessToken) to cNonce
+    private fun AccessTokenRequestResponse.accessTokenOrFail(): Triple<
+        AccessToken,
+        CNonce?,
+        List<OidCredentialAuthorizationDetail.ByCredentialConfiguration>?,
+        > =
+
+        when (this) {
+            is AccessTokenRequestResponse.Success -> {
+                val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
+                Triple(AccessToken(accessToken), cNonce, authorizationDetails)
+            }
+            is AccessTokenRequestResponse.Failure -> throw AccessTokenRequestFailed(error, errorDescription)
         }
-
-        is AccessTokenRequestResponse.Failure -> throw AccessTokenRequestFailed(error, errorDescription)
-    }
 
     private suspend fun requestAccessToken(params: Map<String, String>): AccessTokenRequestResponse =
         ktorHttpClientFactory().use { client ->
@@ -267,6 +295,28 @@ internal class IssuanceAuthorizer(
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =
         authorizationRequest.toParameters().mapValues { (_, value) -> value[0] }.toMap()
 }
+
+private fun List<OidCredentialAuthorizationDetail>.toNimbusAuthorizationDetails(): MutableList<NimbusAuthorizationDetail> =
+    map {
+        when (it) {
+            is OidCredentialAuthorizationDetail.ByCredentialConfiguration ->
+                NimbusAuthorizationDetail.Builder(AuthorizationType("openid_credential"))
+                    .field("credential_configuration_id", it.credentialConfigurationId.value)
+                    .build()
+
+            is MsoMdocAuthorizationDetails ->
+                NimbusAuthorizationDetail.Builder(AuthorizationType("openid_credential"))
+                    .field("format", it.format)
+                    .field("doctype", it.doctype)
+                    .build()
+
+            is SdJwtVcAuthorizationDetails ->
+                NimbusAuthorizationDetail.Builder(AuthorizationType("openid_credential"))
+                    .field("format", it.format)
+                    .field("vct", it.vct)
+                    .build()
+        }
+    }.toMutableList()
 
 private object AuthorizationEndpointParams {
     const val PARAM_CLIENT_ID = "client_id"
@@ -303,14 +353,14 @@ internal sealed interface TokenEndpointForm {
         const val CLIENT_ID_PARAM = "client_id"
         private const val GRANT_TYPE_PARAM = "grant_type"
         const val GRANT_TYPE_PARAM_VALUE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
-        const val USER_PIN_PARAM = "user_pin"
+        const val TX_CODE_PARAM = "tx_code"
         const val PRE_AUTHORIZED_CODE_PARAM = "pre-authorized_code"
 
         fun of(
             clientId: String,
             preAuthorizedCode: String,
-            userPin: String?,
-        ): Map<String, String> = when (userPin) {
+            txCode: String?,
+        ): Map<String, String> = when (txCode) {
             null -> {
                 mapOf(
                     CLIENT_ID_PARAM to clientId,
@@ -324,7 +374,7 @@ internal sealed interface TokenEndpointForm {
                     CLIENT_ID_PARAM to clientId,
                     GRANT_TYPE_PARAM to GRANT_TYPE_PARAM_VALUE,
                     PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
-                    USER_PIN_PARAM to userPin,
+                    TX_CODE_PARAM to txCode,
                 )
             }
         }

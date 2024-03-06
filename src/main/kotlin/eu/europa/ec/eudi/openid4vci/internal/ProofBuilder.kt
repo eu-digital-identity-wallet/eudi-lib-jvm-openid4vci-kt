@@ -67,7 +67,8 @@ internal sealed interface ProofBuilder {
             val spec = checkNotNull(credentialSpec) {
                 "No credential specification provided"
             }
-            ensure(ProofType.JWT in spec.proofTypesSupported) {
+            val proofTypesSupported = spec.proofTypesSupported
+            ensure(proofTypesSupported != null && ProofType.JWT in proofTypesSupported.keys) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
             }
             val header = run {
@@ -106,6 +107,7 @@ internal sealed interface ProofBuilder {
                 }
 
                 ProofType.CWT -> TODO("CWT proofs not supported yet")
+                ProofType.LDP_VP -> TODO("LDP_VP proofs not supported yet")
             }
         }
     }
