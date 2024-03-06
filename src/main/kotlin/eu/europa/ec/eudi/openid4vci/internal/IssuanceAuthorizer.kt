@@ -31,7 +31,6 @@ import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
-import java.net.URLEncoder
 
 /**
  * Sealed hierarchy of possible responses to a Pushed Authorization Request.
@@ -315,7 +314,7 @@ internal sealed interface TokenEndpointForm {
             null -> {
                 mapOf(
                     CLIENT_ID_PARAM to clientId,
-                    GRANT_TYPE_PARAM to URLEncoder.encode(GRANT_TYPE_PARAM_VALUE, "UTF-8"),
+                    GRANT_TYPE_PARAM to GRANT_TYPE_PARAM_VALUE,
                     PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
                 )
             }
@@ -323,7 +322,7 @@ internal sealed interface TokenEndpointForm {
             else -> {
                 mapOf(
                     CLIENT_ID_PARAM to clientId,
-                    GRANT_TYPE_PARAM to URLEncoder.encode(GRANT_TYPE_PARAM_VALUE, "UTF-8"),
+                    GRANT_TYPE_PARAM to GRANT_TYPE_PARAM_VALUE,
                     PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
                     USER_PIN_PARAM to userPin,
                 )
