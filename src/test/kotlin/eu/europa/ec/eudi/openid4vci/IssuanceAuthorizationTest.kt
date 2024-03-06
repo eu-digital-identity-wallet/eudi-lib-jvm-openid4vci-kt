@@ -26,7 +26,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.URI
-import java.net.URLEncoder
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -279,7 +278,7 @@ class IssuanceAuthorizationTest {
                     val form = request.body as FormDataContent
 
                     assertTrue("PKCE code verifier was not expected but sent.") {
-                        form.formData["code_verifier"] != null
+                        form.formData["code_verifier"] == null
                     }
                     assertTrue("Parameter ${TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM} was expected but not sent.") {
                         form.formData[TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM] != null
@@ -292,13 +291,10 @@ class IssuanceAuthorizationTest {
                     assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM} was expected but not sent.") {
                         grantType != null
                     }
-
-                    val grantTypeParamValueUrlEncoded =
-                        URLEncoder.encode(TokenEndpointForm.PreAuthCodeFlow.GRANT_TYPE_PARAM_VALUE, "UTF-8")
                     assertTrue(
                         "Expected grant_type is ${TokenEndpointForm.PreAuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but got $grantType.",
                     ) {
-                        grantTypeParamValueUrlEncoded == grantType
+                        grantType == TokenEndpointForm.PreAuthCodeFlow.GRANT_TYPE_PARAM_VALUE
                     }
                 },
             )
@@ -315,7 +311,7 @@ class IssuanceAuthorizationTest {
                         CredentialIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
                     ),
                     PreAuthorizationCode("eyJhbGciOiJSU0EtFYUaBy", "pin"),
-                )
+                ).getOrThrow()
             }
         }
 
