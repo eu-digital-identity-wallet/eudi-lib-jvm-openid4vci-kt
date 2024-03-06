@@ -32,18 +32,24 @@ import java.util.*
 import kotlin.test.*
 
 private const val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
-private const val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-private const val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
-private val AuthCodeGrantCredentialOfferWithNoGrantsMsoMdoc = """
+private const val PID_SdJwtVC_ID = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
+private const val PID_MsoMdoc_ID = "eu.europa.ec.eudiw.pid_mso_mdoc"
+private val CredentialOffer = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["$PID_MsoMdoc_SCOPE"]          
+          "credentials": ["$PID_SdJwtVC_ID", "$PID_MsoMdoc_ID"]          
         }
 """.trimIndent()
-private val AuthCodeGrantCredentialOfferWithNogGrantsVcSdJwt = """
+private val CredentialOfferMsoMdoc = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["$PID_SdJwtVC_SCOPE"]          
+          "credentials": ["$PID_MsoMdoc_ID"]          
+        }
+""".trimIndent()
+private val CredentialOfferWithSdJwtVc = """
+        {
+          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+          "credentials": ["$PID_SdJwtVC_ID"]          
         }
 """.trimIndent()
 
@@ -101,7 +107,7 @@ class IssuanceSingleRequestTest {
         val (offer, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AuthCodeGrantCredentialOfferWithNoGrantsMsoMdoc,
+                CredentialOfferMsoMdoc,
             )
 
         val claimSet = MsoMdocClaimSet(
@@ -155,7 +161,7 @@ class IssuanceSingleRequestTest {
             val (offer, authorizedRequest, issuer) =
                 authorizeRequestForCredentialOffer(
                     mockedKtorHttpClientFactory,
-                    AuthCodeGrantCredentialOfferWithNoGrantsMsoMdoc,
+                    CredentialOfferMsoMdoc,
                 )
 
             val claimSet = MsoMdocClaimSet(
@@ -183,7 +189,7 @@ class IssuanceSingleRequestTest {
         }
 
     @Test
-    fun `when issuer request contains unsupported claims exception CredentialIssuanceException is thrown`() = runTest {
+    fun `when issuance request contains unsupported claims exception CredentialIssuanceException is thrown`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
             oidcWellKnownMocker(),
             authServerWellKnownMocker(),
@@ -193,22 +199,51 @@ class IssuanceSingleRequestTest {
         val (_, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AuthCodeGrantCredentialOfferWithNoGrantsMsoMdoc,
+                CredentialOffer,
             )
 
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val claimSetMsoMdoc = MsoMdocClaimSet(listOf("org.iso.18013.5.1" to "degree"))
-                    var credentialMetadata = CredentialIdentifier(PID_MsoMdoc_SCOPE)
+                    var credentialMetadata = CredentialIdentifier(PID_MsoMdoc_ID)
                     assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
                         authorizedRequest.requestSingle(credentialMetadata, claimSetMsoMdoc).getOrThrow()
                     }
 
                     val claimSetSdJwtVc = GenericClaimSet(listOf("degree"))
-                    credentialMetadata = CredentialIdentifier(PID_SdJwtVC_SCOPE)
+                    credentialMetadata = CredentialIdentifier(PID_SdJwtVC_ID)
                     assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
                         authorizedRequest.requestSingle(credentialMetadata, claimSetSdJwtVc).getOrThrow()
+                    }
+                }
+
+                is AuthorizedRequest.ProofRequired ->
+                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+            }
+        }
+    }
+
+    @Test
+    fun `when issuer used to request credential not included in offer an IllegalArgumentException is thrown`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+        )
+        val (_, authorizedRequest, issuer) =
+            authorizeRequestForCredentialOffer(
+                mockedKtorHttpClientFactory,
+                CredentialOffer,
+            )
+
+        with(issuer) {
+            when (authorizedRequest) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    val credentialMetadata = CredentialIdentifier("UniversityDegree")
+                    assertFailsWith<IllegalArgumentException> {
+                        authorizedRequest.requestSingle(credentialMetadata, null).getOrThrow()
                     }
                 }
 
@@ -276,7 +311,7 @@ class IssuanceSingleRequestTest {
         val (offer, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AuthCodeGrantCredentialOfferWithNoGrantsMsoMdoc,
+                CredentialOfferMsoMdoc,
             )
 
         val claimSet = MsoMdocClaimSet(
@@ -323,7 +358,7 @@ class IssuanceSingleRequestTest {
 
     @Test
     fun `successful issuance of credential in vc+sd-jwt format`() = runTest {
-        val credential = "issued_credential_content_mso_mdoc"
+        val credential = "issued_credential_content_sd_jwt_vc"
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
             oidcWellKnownMocker(),
             authServerWellKnownMocker(),
@@ -371,7 +406,7 @@ class IssuanceSingleRequestTest {
         val (offer, authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
-                AuthCodeGrantCredentialOfferWithNogGrantsVcSdJwt,
+                CredentialOfferWithSdJwtVc,
             )
 
         val claimSet = GenericClaimSet(
@@ -422,18 +457,15 @@ class IssuanceSingleRequestTest {
             .getOrThrow()
 
         val issuer = Issuer.make(
-            authorizationServerMetadata = offer.authorizationServerMetadata,
             config = vciWalletConfiguration,
+            credentialOffer = offer,
             ktorHttpClientFactory = ktorHttpClientFactory,
-            issuerMetadata = offer.credentialIssuerMetadata,
         )
 
         val authorizedRequest = with(issuer) {
-            val parRequested = issuer.pushAuthorizationCodeRequest(offer.credentials, null).getOrThrow()
+            val parRequested = prepareAuthorizationRequest().getOrThrow()
             val authorizationCode = UUID.randomUUID().toString()
-            parRequested
-                .handleAuthorizationCode(AuthorizationCode(authorizationCode))
-                .requestAccessToken().getOrThrow()
+            parRequested.authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode)).getOrThrow()
         }
         return Triple(offer, authorizedRequest, issuer)
     }

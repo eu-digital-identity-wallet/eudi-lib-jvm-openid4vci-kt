@@ -40,6 +40,10 @@ sealed interface CryptographicBindingMethod : Serializable {
         private fun readResolve(): Any = COSE
     }
 
+    data object MSO : CryptographicBindingMethod {
+        private fun readResolve(): Any = MSO
+    }
+
     /**
      * DID method.
      */

@@ -21,53 +21,13 @@ import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
 
 /**
- * Holds a https [java.net.URL] to be used at the second step of PAR flow for retrieving the authorization code.
- * Contains the 'request_uri' retrieved from the post to PAR endpoint of authorization server and the client_id.
+ * State holding the authorization request as a URL to be passed to front-channel for retrieving an authorization code in an oAuth2
+ * authorization code grant type flow.
  */
-class AuthorizationUrl private constructor(val url: HttpsUrl) {
-
-    override fun toString(): String = url.toString()
-
-    companion object {
-        const val PARAM_CLIENT_ID = "client_id"
-        const val PARAM_REQUEST_URI = "request_uri"
-        const val PARAM_STATE = "state"
-        operator fun invoke(url: String): AuthorizationUrl {
-            val httpsUrl = HttpsUrl(url).getOrThrow()
-            val query = requireNotNull(httpsUrl.value.query) { "URL must contain query parameter" }
-            require(query.contains("$PARAM_CLIENT_ID=")) { "URL must contain client_id query parameter" }
-            require(query.contains("$PARAM_REQUEST_URI=")) { "URL must contain request_uri query parameter" }
-            return AuthorizationUrl(httpsUrl)
-        }
-    }
-}
-
-/**
- * Sealed hierarchy of states that denote the individual steps that need to be taken to authorize a request for issuance
- * using the Authorized Code Flow, utilizing Pushed Authorization Request and PKCE.
- *
- * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
- * @see <a href="https://www.rfc-editor.org/rfc/rfc9126.html">RFC9126</a>
- */
-sealed interface UnauthorizedRequest {
-
-    /**
-     * State denoting that the pushed authorization request has been placed successfully and response processed
-     */
-    data class ParRequested(
-        val getAuthorizationCodeURL: AuthorizationUrl,
-        val pkceVerifier: PKCEVerifier,
-    )
-
-    /**
-     * State denoting that caller has followed the [ParRequested.getAuthorizationCodeURL] URL and response received
-     * from authorization server and processed successfully.
-     */
-    data class AuthorizationCodeRetrieved(
-        val authorizationCode: AuthorizationCode,
-        val pkceVerifier: PKCEVerifier,
-    )
-}
+data class AuthorizationRequestPrepared(
+    val authorizationCodeURL: HttpsUrl,
+    val pkceVerifier: PKCEVerifier,
+)
 
 /**
  * Sealed hierarchy of states describing an authorized issuance request. These states hold an access token issued by the
@@ -179,59 +139,40 @@ sealed interface SubmittedRequest {
     ) : Errored
 }
 
-/**
- * An interface for authorizing a credential issuance request. Contains all the operation available to transition an [UnauthorizedRequest]
- * to an [AuthorizedRequest]
- */
 interface AuthorizeIssuance {
 
     /**
-     * Initial step to authorize an issuance request using Authorized Code Flow (utilizing PAR).
-     * Pushes the authorization request to authorization server's 'par endpoint'. Result of this transition is the
-     * [UnauthorizedRequest.ParRequested] state
+     * Initial step to authorize an issuance request using Authorized Code Flow.
+     * If the specified authorization server supports PAR then this method executes the first step of PAR by pushing the authorization
+     * request to authorization server's 'par endpoint'.
+     * If PAR is not supported then this method prepares the authorization request as a typical authorization code flow authorization
+     * request with the request's elements as query parameters.
      *
-     * @param credentials   List of credentials whose issuance needs to be authorized.
-     * @param issuerState   Credential issuer state passed via a credential offer grant of type [Grants.AuthorizationCode].
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
-     * @see <a href="https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-authorization-code-flow">OpenId4VCI</a>
-     * @return The new state of the request or error.
+     * @return an HTTPS URL of the authorization request to be placed
      */
-    suspend fun pushAuthorizationCodeRequest(
-        credentials: List<CredentialIdentifier>,
-        issuerState: String?,
-    ): Result<UnauthorizedRequest.ParRequested>
+    suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared>
 
     /**
-     * Second step to authorize an issuance request using Authorized Code Flow (utilizing PAR).
-     * After authorization code is retrieved from front-channel, the authorization code is passed
-     * to transition request from [UnauthorizedRequest.ParRequested] state to state [UnauthorizedRequest.AuthorizationCodeRetrieved]
+     * Using the access code retrieved after performing the authorization request prepared from a call to
+     * [AuthorizeOfferIssuance.prepareAuthorizationRequest()], it posts a request to authorization server's token endpoint to
+     * retrieve an access token. This step transitions state from [AuthorizationRequestPrepared] to an
+     * [AuthorizedRequest] state
      *
      * @param authorizationCode The authorization code returned from authorization server via front-channel
-     * @return The new state of the request.
+     * @return an issuance request in authorized state
      */
-    suspend fun UnauthorizedRequest.ParRequested.handleAuthorizationCode(
+    suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
         authorizationCode: AuthorizationCode,
-    ): UnauthorizedRequest.AuthorizationCodeRetrieved
-
-    /**
-     * Last step to authorize an issuance request using Authorized Code Flow (utilizing PAR).
-     * Using the access code retrieved from a previous step, posts a request to authorization server's token endpoint to
-     * retrieve an access token. This step transitions state from [UnauthorizedRequest.AuthorizationCodeRetrieved] to an
-     * [AuthorizedRequest] state
-     */
-    suspend fun UnauthorizedRequest.AuthorizationCodeRetrieved.requestAccessToken(): Result<AuthorizedRequest>
+    ): Result<AuthorizedRequest>
 
     /**
      * Action to authorize an issuance request using Pre-Authorized Code Flow.
      *
-     * @param credentials   Metadata of the credentials whose issuance needs to be authorized.
-     * @param preAuthorizationCode  The pre-authorization code retrieved from a [CredentialOffer]
-     * @return The new state of the request or error.
+     * @param pin   Optional parameter in case the credential offer specifies that a user provided pin is required for authorization
+     * @return an issuance request in authorized state
      */
-    suspend fun authorizeWithPreAuthorizationCode(
-        credentials: List<CredentialIdentifier>,
-        preAuthorizationCode: PreAuthorizationCode,
-    ): Result<AuthorizedRequest>
+    suspend fun authorizeWithPreAuthorizationCode(pin: String?): Result<AuthorizedRequest>
 }
 
 /**
@@ -356,4 +297,173 @@ interface ProofSigner : JWSSigner {
     fun getBindingKey(): BindingKey
 
     fun getAlgorithm(): JWSAlgorithm
+}
+
+typealias ResponseEncryptionSpecFactory =
+    (CredentialResponseEncryption.Required, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec
+
+/**
+ * Errors that can happen in the process of issuance process
+ */
+sealed class CredentialIssuanceError(message: String) : Throwable(message) {
+
+    /**
+     * Failure when placing Pushed Authorization Request to Authorization Server
+     */
+    data class PushedAuthorizationRequestFailed(
+        val error: String,
+        val errorDescription: String?,
+    ) : CredentialIssuanceError("$error+${errorDescription?.let { " description=$it" }}")
+
+    /**
+     * Failure when requesting access token from Authorization Server
+     */
+    data class AccessTokenRequestFailed(
+        val error: String,
+        val errorDescription: String?,
+    ) : CredentialIssuanceError("$error+${errorDescription?.let { " description=$it" }}")
+
+    /**
+     * Failure when creating an issuance request
+     */
+    class InvalidIssuanceRequest(
+        message: String,
+    ) : CredentialIssuanceError(message)
+
+    /**
+     * Issuer rejected the issuance request because no c_nonce was provided along with the proof.
+     * A fresh c_nonce is provided by the issuer.
+     */
+    data class InvalidProof(
+        val cNonce: String,
+        val cNonceExpiresIn: Long? = 5,
+        val errorDescription: String? = null,
+    ) : CredentialIssuanceError("Invalid Proof")
+
+    /**
+     * Issuer has not issued yet deferred credential. Retry interval (in seconds) is provided to caller
+     */
+    data class DeferredCredentialIssuancePending(
+        val retryInterval: Long = 5,
+    ) : CredentialIssuanceError("DeferredCredentialIssuancePending")
+
+    /**
+     * Invalid access token passed to issuance server
+     */
+    data object InvalidToken : CredentialIssuanceError("InvalidToken") {
+        private fun readResolve(): Any = InvalidToken
+    }
+
+    /**
+     * Invalid transaction id passed to issuance server in the context of deferred credential requests
+     */
+    data object InvalidTransactionId : CredentialIssuanceError("InvalidTransactionId") {
+        private fun readResolve(): Any = InvalidTransactionId
+    }
+
+    /**
+     * Invalid credential type requested to issuance server
+     */
+    data object UnsupportedCredentialType : CredentialIssuanceError("UnsupportedCredentialType") {
+        private fun readResolve(): Any = UnsupportedCredentialType
+    }
+
+    /**
+     * Un-supported credential type requested to issuance server
+     */
+    data object UnsupportedCredentialFormat : CredentialIssuanceError("UnsupportedCredentialFormat") {
+        private fun readResolve(): Any = UnsupportedCredentialFormat
+    }
+
+    /**
+     * Invalid encryption parameters passed to issuance server
+     */
+    data object InvalidEncryptionParameters : CredentialIssuanceError("InvalidEncryptionParameters") {
+        private fun readResolve(): Any = InvalidEncryptionParameters
+    }
+
+    /**
+     * Issuance server does not support batch credential requests
+     */
+    data object IssuerDoesNotSupportBatchIssuance : CredentialIssuanceError("IssuerDoesNotSupportBatchIssuance") {
+        private fun readResolve(): Any = IssuerDoesNotSupportBatchIssuance
+    }
+
+    /**
+     * Issuance server does not support deferred credential issuance
+     */
+    data object IssuerDoesNotSupportDeferredIssuance : CredentialIssuanceError("IssuerDoesNotSupportDeferredIssuance") {
+        private fun readResolve(): Any = IssuerDoesNotSupportDeferredIssuance
+    }
+
+    /**
+     * Generic failure during issuance request
+     */
+    data class IssuanceRequestFailed(
+        val error: String,
+        val errorDescription: String? = null,
+    ) : CredentialIssuanceError("$error+${errorDescription?.let { " description=$it" }}")
+
+    /**
+     * Issuance server response is un-parsable
+     */
+    data class ResponseUnparsable(val error: String) : CredentialIssuanceError("ResponseUnparsable")
+
+    /**
+     * Sealed hierarchy of errors related to proof generation
+     */
+    sealed class ProofGenerationError(message: String) : CredentialIssuanceError(message) {
+
+        /**
+         * Binding method specified is not supported from issuer server
+         */
+        data object CryptographicSuiteNotSupported : ProofGenerationError("BindingMethodNotSupported") {
+            private fun readResolve(): Any = CryptographicSuiteNotSupported
+        }
+
+        /**
+         * Cryptographic binding method is not supported from the issuance server for a specific credential
+         */
+        data object CryptographicBindingMethodNotSupported :
+            ProofGenerationError("CryptographicBindingMethodNotSupported") {
+            private fun readResolve(): Any = CryptographicBindingMethodNotSupported
+        }
+
+        /**
+         * Proof type provided for specific credential is not supported from issuance server
+         */
+        data object ProofTypeNotSupported : ProofGenerationError("ProofTypeNotSupported") {
+            private fun readResolve(): Any = ProofTypeNotSupported
+        }
+    }
+
+    /**
+     * Sealed hierarchy of errors related to validation of encryption parameters passed along with the issuance request.
+     */
+    sealed class ResponseEncryptionError(message: String) : CredentialIssuanceError(message) {
+
+        /**
+         * Response encryption algorithm specified in request is not supported from issuance server
+         */
+        data object ResponseEncryptionAlgorithmNotSupportedByIssuer :
+            ProofGenerationError("ResponseEncryptionAlgorithmNotSupportedByIssuer") {
+            private fun readResolve(): Any = ResponseEncryptionAlgorithmNotSupportedByIssuer
+        }
+
+        /**
+         * Response encryption method specified in request is not supported from issuance server
+         */
+        data object ResponseEncryptionMethodNotSupportedByIssuer :
+            ProofGenerationError("ResponseEncryptionMethodNotSupportedByIssuer") {
+            private fun readResolve(): Any = ResponseEncryptionMethodNotSupportedByIssuer
+        }
+
+        /**
+         * Issuer enforces encrypted responses but encryption parameters not provided in request
+         */
+        data object IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided :
+            ProofGenerationError("IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided") {
+            private fun readResolve(): Any = IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+        }
+    }
 }
