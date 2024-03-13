@@ -27,7 +27,7 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.apache.http.conn.ssl.NoopHostnameVerifier
 import org.apache.http.conn.ssl.TrustSelfSignedStrategy
@@ -54,7 +54,7 @@ val credentialOffer = """
     }
 """.trimIndent()
 
-fun main(): Unit = runTest {
+fun main(): Unit = runBlocking {
     val proofSigners = mapOf(
         PID_SdJwtVC_config_id to CryptoGenerator.rsaProofSigner(),
         PID_MsoMdoc_config_id to CryptoGenerator.ecProofSigner(),
@@ -75,10 +75,10 @@ fun main(): Unit = runTest {
 }
 
 private suspend fun walletInitiatedIssuanceWithOffer(wallet: Wallet) {
-    println("[[Scenario: Offer passed to wallet via url]] ")
+    println("[[Scenario: Offer passed to wallet via URI]] ")
 
-    val offerUrl = "https://issuer-backend.eudiw.dev/credentialoffer?credential_offer=$credentialOffer"
-    val credentials = wallet.issueByCredentialOfferUrl(offerUrl)
+    val offerUri = "openid-credential-offer://?credential_offer=$credentialOffer"
+    val credentials = wallet.issueByCredentialOfferUri(offerUri)
 
     println("--> Issued credentials :")
     credentials.onEach { (credentialId, credential) ->
@@ -146,9 +146,9 @@ private class Wallet(
         return outcome
     }
 
-    suspend fun issueByCredentialOfferUrl(coUrl: String): List<Pair<String, String>> {
+    suspend fun issueByCredentialOfferUri(offerUri: String): List<Pair<String, String>> {
         val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory = ::httpClientFactory)
-        val offer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
+        val offer = credentialOfferRequestResolver.resolve(offerUri).getOrThrow()
         return issueByCredentialOffer(offer)
     }
 
