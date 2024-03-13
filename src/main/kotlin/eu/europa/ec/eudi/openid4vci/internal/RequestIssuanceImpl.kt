@@ -154,7 +154,7 @@ internal class RequestIssuanceImpl(
             is Proof.Cwt -> ProofType.CWT
             is Proof.LdpVp -> ProofType.LDP_VP
         }
-        require(proofType in credentialSupported.proofTypesSupported!!.keys) {
+        require(proofType in credentialSupported.proofTypesSupported.keys) {
             "Provided proof type $proofType is not one of supported [${credentialSupported.proofTypesSupported}]."
         }
     }
