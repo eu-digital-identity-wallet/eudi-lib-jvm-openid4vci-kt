@@ -119,7 +119,7 @@ private class Wallet(
         }
 
         val credentialIdentifier = CredentialConfigurationIdentifier(identifier)
-        ensure(issuerMetadata.credentialsSupported.get(credentialIdentifier) != null) {
+        ensure(issuerMetadata.credentialConfigurationsSupported.get(credentialIdentifier) != null) {
             error("Credential identifier $identifier not supported by issuer")
         }
 

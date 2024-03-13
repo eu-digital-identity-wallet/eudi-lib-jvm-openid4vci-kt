@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialOfferRequestResolver
+import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.http.*
 import java.io.Serializable
 import kotlin.time.Duration
@@ -106,20 +107,23 @@ data class TxCode(
     val inputMode: TxCodeInputMode = TxCodeInputMode.NUMERIC,
     val length: Int? = null,
     val description: String? = null,
-)
-
-enum class TxCodeInputMode {
-    NUMERIC,
-    TEXT,
-    ;
-
-    companion object {
-        fun of(str: String): TxCodeInputMode = when (str) {
-            "numeric" -> NUMERIC
-            "text" -> TEXT
-            else -> error("Unsupported tx_code input method")
+) {
+    init {
+        description?.let {
+            ensure(it.length <= DescriptionMaxSize) {
+                val er = IllegalArgumentException("Transaction code description over $DescriptionMaxSize characters")
+                CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
+            }
         }
     }
+
+    companion object {
+        private const val DescriptionMaxSize = 300
+    }
+}
+
+enum class TxCodeInputMode {
+    NUMERIC, TEXT
 }
 
 /**

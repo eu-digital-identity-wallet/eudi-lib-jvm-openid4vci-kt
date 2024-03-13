@@ -87,7 +87,7 @@ internal fun universityDegreeJwt() = W3CSignedJwtCredential(
             "University Credential",
             Locale.forLanguageTag("en-US"),
             Display.Logo(
-                HttpsUrl("https://exampleuniversity.com/public/logo.png").getOrThrow(),
+                URI.create("https://exampleuniversity.com/public/logo.png"),
                 "a square logo of a university",
             ),
             null,
@@ -138,7 +138,7 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
             "University Credential",
             Locale.forLanguageTag("en-US"),
             Display.Logo(
-                HttpsUrl("https://exampleuniversity.com/public/logo.png").getOrThrow(),
+                URI.create("https://exampleuniversity.com/public/logo.png"),
                 "a square logo of a university",
             ),
             null,
@@ -198,7 +198,7 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
             "University Credential",
             Locale.forLanguageTag("en-US"),
             Display.Logo(
-                HttpsUrl("https://exampleuniversity.com/public/logo.png").getOrThrow(),
+                URI.create("https://exampleuniversity.com/public/logo.png"),
                 "a square logo of a university",
             ),
             null,
@@ -257,7 +257,7 @@ internal fun mobileDrivingLicense() = MsoMdocCredential(
             "Mobile Driving License",
             Locale.forLanguageTag("en-US"),
             Display.Logo(
-                HttpsUrl("https://examplestate.com/public/mdl.png").getOrThrow(),
+                URI.create("https://examplestate.com/public/mdl.png"),
                 "a square figure of a mobile driving license",
             ),
             null,

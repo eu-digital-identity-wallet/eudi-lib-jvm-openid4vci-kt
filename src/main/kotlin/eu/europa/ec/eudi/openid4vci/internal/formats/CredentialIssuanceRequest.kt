@@ -71,7 +71,7 @@ internal sealed interface CredentialIssuanceRequest {
 
     companion object {
         internal fun formatBased(
-            supportedCredential: CredentialSupported,
+            supportedCredential: CredentialConfiguration,
             claimSet: ClaimSet?,
             proof: Proof?,
             responseEncryptionSpec: IssuanceResponseEncryptionSpec?,

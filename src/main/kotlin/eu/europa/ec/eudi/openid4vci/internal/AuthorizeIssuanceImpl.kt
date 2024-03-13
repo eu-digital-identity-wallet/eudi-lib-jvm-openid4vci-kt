@@ -74,8 +74,8 @@ internal class AuthorizeIssuanceImpl(
         AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier)
     }
 
-    private fun credentialSupportedById(credentialConfigurationId: CredentialConfigurationIdentifier): CredentialSupported {
-        val credentialSupported = credentialOffer.credentialIssuerMetadata.credentialsSupported[credentialConfigurationId]
+    private fun credentialSupportedById(credentialConfigurationId: CredentialConfigurationIdentifier): CredentialConfiguration {
+        val credentialSupported = credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credentialConfigurationId]
         return requireNotNull(credentialSupported) {
             "$credentialConfigurationId was not found within issuer metadata"
         }
@@ -134,5 +134,7 @@ internal class AuthorizeIssuanceImpl(
     }
 
     private fun CredentialOffer.requiresProofs(): Boolean =
-        credentialConfigurationIdentifiers.any { !credentialIssuerMetadata.credentialsSupported[it]?.proofTypesSupported.isNullOrEmpty() }
+        credentialConfigurationIdentifiers.any {
+            !credentialIssuerMetadata.credentialConfigurationsSupported[it]?.proofTypesSupported.isNullOrEmpty()
+        }
 }

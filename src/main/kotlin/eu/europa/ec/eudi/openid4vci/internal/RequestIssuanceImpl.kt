@@ -52,7 +52,7 @@ internal class RequestIssuanceImpl(
         claimSet: ClaimSet?,
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
-            singleRequest(requestCredentialIdentifier, claimSet, null)
+            singleRequest(requestCredentialIdentifier, claimSet, null, credentialIdentifiers)
         }
     }
 
@@ -62,7 +62,7 @@ internal class RequestIssuanceImpl(
         proofSigner: ProofSigner,
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
-            singleRequest(requestCredentialIdentifier, claimSet, proofFactory(proofSigner, cNonce))
+            singleRequest(requestCredentialIdentifier, claimSet, proofFactory(proofSigner, cNonce), credentialIdentifiers)
         }
     }
 
@@ -71,7 +71,7 @@ internal class RequestIssuanceImpl(
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (credentialId, claimSet) ->
-                singleRequest(credentialId, claimSet, null)
+                singleRequest(credentialId, claimSet, null, credentialIdentifiers)
             }
             CredentialIssuanceRequest.BatchRequest(credentialRequests)
         }
@@ -82,14 +82,14 @@ internal class RequestIssuanceImpl(
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (credentialId, claimSet, proofSigner) ->
-                singleRequest(credentialId, claimSet, proofFactory(proofSigner, cNonce))
+                singleRequest(credentialId, claimSet, proofFactory(proofSigner, cNonce), credentialIdentifiers)
             }
             CredentialIssuanceRequest.BatchRequest(credentialRequests)
         }
     }
 
-    private fun credentialSupportedById(credentialId: CredentialConfigurationIdentifier): CredentialSupported {
-        val credentialSupported = issuerMetadata.credentialsSupported[credentialId]
+    private fun credentialSupportedById(credentialId: CredentialConfigurationIdentifier): CredentialConfiguration {
+        val credentialSupported = issuerMetadata.credentialConfigurationsSupported[credentialId]
         return requireNotNull(credentialSupported) {
             "$credentialId was not found within issuer metadata"
         }
@@ -109,9 +109,13 @@ internal class RequestIssuanceImpl(
         requestCredentialIdentifier: IssuanceRequestCredentialIdentifier,
         claimSet: ClaimSet?,
         proofFactory: ProofFactory?,
+        credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
     ): CredentialIssuanceRequest.SingleRequest {
         val (credentialConfigurationId, credentialId) = requestCredentialIdentifier
         return credentialId?.let {
+            require(credentialIdentifiers != null && credentialIdentifiers[credentialConfigurationId]?.contains(credentialId) ?: false) {
+                "The credential identifier passed is not valid or unknown"
+            }
             identifierBasedRequest(credentialConfigurationId to credentialId, proofFactory)
         }
             ?: formatBasedRequest(requestCredentialIdentifier.first, claimSet, proofFactory)
@@ -144,7 +148,7 @@ internal class RequestIssuanceImpl(
         return CredentialIssuanceRequest.IdentifierBased(credentialId, proof, responseEncryptionSpec)
     }
 
-    private fun assertProofSupported(p: Proof, credentialSupported: CredentialSupported) {
+    private fun assertProofSupported(p: Proof, credentialSupported: CredentialConfiguration) {
         val proofType = when (p) {
             is Proof.Jwt -> ProofType.JWT
             is Proof.Cwt -> ProofType.CWT

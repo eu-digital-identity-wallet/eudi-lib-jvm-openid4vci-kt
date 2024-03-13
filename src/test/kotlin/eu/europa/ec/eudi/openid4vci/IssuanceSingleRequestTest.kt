@@ -26,6 +26,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.hamcrest.MatcherAssert.assertThat
 import org.junit.jupiter.api.assertDoesNotThrow
+import org.junit.jupiter.api.assertThrows
 import kotlin.test.*
 
 class IssuanceSingleRequestTest {
@@ -377,6 +378,88 @@ class IssuanceSingleRequestTest {
                         it.entries.first().key to it.entries.first().value[0]
                     } ?: error("No credential identifier")
                     authorizedRequest.requestSingle(credentialIdentifier, null).getOrThrow()
+                }
+
+                is AuthorizedRequest.ProofRequired ->
+                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+            }
+        }
+    }
+
+    @Test
+    fun `when request is by credential id, this id must be in the list of identifiers returned from token endpoint`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMockerWithAuthDetails(
+                listOf(CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
+            ),
+            singleIssuanceRequestMocker(
+                credential = "credential",
+                requestValidator = {
+                    val textContent = it.body as TextContent
+                    val issuanceRequestTO = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text)
+                    assertThat(
+                        "Wrong credential request type",
+                        issuanceRequestTO is IdentifierBasedIssuanceRequestTO,
+                    )
+                },
+            ),
+        )
+        val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            mockedKtorHttpClientFactory,
+            CREDENTIAL_OFFER_NO_GRANTS,
+        )
+
+        with(issuer) {
+            when (authorizedRequest) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    val credentialIdentifier =
+                        CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt") to CredentialIdentifier("DUMMY")
+                    assertThrows<IllegalArgumentException> {
+                        authorizedRequest.requestSingle(credentialIdentifier, null).getOrThrow()
+                    }
+                }
+
+                is AuthorizedRequest.ProofRequired ->
+                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+            }
+        }
+    }
+
+    @Test
+    fun `issuance request by credential id, is allowed only when token endpoint has returned credential identifiers`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            singleIssuanceRequestMocker(
+                credential = "credential",
+                requestValidator = {
+                    val textContent = it.body as TextContent
+                    val issuanceRequestTO = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text)
+                    assertThat(
+                        "Wrong credential request type",
+                        issuanceRequestTO is IdentifierBasedIssuanceRequestTO,
+                    )
+                },
+            ),
+        )
+        val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            mockedKtorHttpClientFactory,
+            CREDENTIAL_OFFER_NO_GRANTS,
+        )
+
+        with(issuer) {
+            when (authorizedRequest) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    val credentialIdentifier =
+                        CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt") to CredentialIdentifier("id")
+                    assertThrows<IllegalArgumentException> {
+                        authorizedRequest.requestSingle(credentialIdentifier, null).getOrThrow()
+                    }
                 }
 
                 is AuthorizedRequest.ProofRequired ->

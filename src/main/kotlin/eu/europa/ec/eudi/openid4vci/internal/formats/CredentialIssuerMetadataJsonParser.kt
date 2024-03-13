@@ -28,6 +28,7 @@ import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import java.net.URI
 import java.net.URL
 import java.util.*
 
@@ -206,7 +207,8 @@ private data class CredentialIssuerMetadataTO(
     @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionTO? = null,
     @SerialName("credential_identifiers_supported") val credentialIdentifiersSupported: Boolean = false,
     @SerialName("signed_metadata") val signedMetadata: String? = null,
-    @SerialName("credential_configurations_supported") val credentialsSupported: Map<String, CredentialSupportedTO> = emptyMap(),
+    @SerialName("credential_configurations_supported") val credentialConfigurationsSupported: Map<String, CredentialSupportedTO> =
+        emptyMap(),
     @SerialName("display") val display: List<DisplayTO>? = null,
 )
 
@@ -288,8 +290,8 @@ private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
             .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
     }
 
-    ensure(credentialsSupported.isNotEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired }
-    val credentialsSupported = credentialsSupported.map { (id, credentialSupportedTO) ->
+    ensure(credentialConfigurationsSupported.isNotEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired }
+    val credentialsSupported = credentialConfigurationsSupported.map { (id, credentialSupportedTO) ->
         val credentialId = CredentialConfigurationIdentifier(id)
         val credential = credentialSupportedTO.toDomain()
             .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
@@ -312,7 +314,7 @@ private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
     )
 }
 
-private fun CredentialSupportedTO.toDomain(): Result<CredentialSupported> = runCatching {
+private fun CredentialSupportedTO.toDomain(): Result<CredentialConfiguration> = runCatching {
     when (this) {
         is MsdMdocCredentialTO -> credentialSupportedFromTransferObject(this)
         is SdJwtVcCredentialTO -> credentialSupportedFromTransferObject(this)
@@ -523,7 +525,7 @@ private fun DisplayTO.toDomain(): CredentialIssuerMetadata.Display =
 private fun CredentialSupportedDisplayTO.toDomain(): Display {
     fun LogoObject.toLogo(): Display.Logo =
         Display.Logo(
-            uri?.let { HttpsUrl(it).getOrThrow() },
+            uri?.let { URI.create(it) },
             alternativeText,
         )
 

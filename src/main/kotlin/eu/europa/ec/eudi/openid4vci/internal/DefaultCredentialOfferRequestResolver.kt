@@ -68,10 +68,19 @@ private data class PreAuthorizedCodeTO(
 
 @Serializable
 private data class TxCodeTO(
-    @SerialName("input_mode") val inputMode: String? = null,
+    @SerialName("input_mode") val inputMode: InputModeTO? = InputModeTO.NUMERIC,
     @SerialName("length") val length: Int? = null,
     @SerialName("description") val description: String? = null,
 )
+
+@Serializable
+private enum class InputModeTO {
+    @SerialName("text")
+    TEXT,
+
+    @SerialName("numeric")
+    NUMERIC,
+}
 
 internal class DefaultCredentialOfferRequestResolver(
     private val httpClient: HttpClient,
@@ -88,7 +97,7 @@ internal class DefaultCredentialOfferRequestResolver(
 
         val credentialIssuerMetadata = fetchIssuerMetaData(credentialIssuerId)
         val credentials = credentialOffer.credentialConfigurationIds.map { CredentialConfigurationIdentifier(it) }
-        ensure(credentialIssuerMetadata.credentialsSupported.keys.containsAll(credentials)) {
+        ensure(credentialIssuerMetadata.credentialConfigurationsSupported.keys.containsAll(credentials)) {
             val er = IllegalArgumentException("Credential offer contains unknown credential ids")
             CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
         }
@@ -147,17 +156,21 @@ private fun Grants.authServer(): HttpsUrl? = when (this) {
  */
 private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata): Grants? = runCatching {
     fun TxCodeTO.toTxCode(): TxCode {
-        description?.let {
-            ensure(it.length <= 300) {
-                val er = IllegalArgumentException("Transaction code description over 300 characters")
-                CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
-            }
+        return when (inputMode) {
+            InputModeTO.TEXT ->
+                TxCode(
+                    inputMode = TxCodeInputMode.TEXT,
+                    length = length,
+                    description = description,
+                )
+
+            else ->
+                TxCode(
+                    inputMode = TxCodeInputMode.NUMERIC,
+                    length = length,
+                    description = description,
+                )
         }
-        return TxCode(
-            inputMode = inputMode?.let { TxCodeInputMode.of(it) } ?: TxCodeInputMode.NUMERIC,
-            length = length,
-            description = description,
-        )
     }
 
     val maybeAuthorizationCodeGrant =

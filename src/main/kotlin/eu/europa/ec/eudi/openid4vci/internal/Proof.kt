@@ -16,10 +16,10 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jwt.JWT
-import eu.europa.ec.eudi.openid4vci.CredentialSupported
+import eu.europa.ec.eudi.openid4vci.CredentialConfiguration
 import kotlinx.serialization.Serializable
 
-internal typealias ProofFactory = (CredentialSupported) -> Proof
+internal typealias ProofFactory = (CredentialConfiguration) -> Proof
 
 /**
  * Sealed hierarchy of the proofs of possession that can be included in a credential issuance request. Proofs are used

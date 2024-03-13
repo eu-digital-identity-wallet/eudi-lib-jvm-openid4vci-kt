@@ -49,16 +49,16 @@ data class CredentialIssuerMetadata(
     val notificationEndpoint: CredentialIssuerEndpoint? = null,
     val credentialResponseEncryption: CredentialResponseEncryption = NotRequired,
     val credentialIdentifiersSupported: Boolean = false,
-    val credentialsSupported: Map<CredentialConfigurationIdentifier, CredentialSupported>,
+    val credentialConfigurationsSupported: Map<CredentialConfigurationIdentifier, CredentialConfiguration>,
     val display: List<Display> = emptyList(),
 ) : Serializable {
 
     init {
-        require(credentialsSupported.isNotEmpty()) { "credentialsSupported must not be empty" }
+        require(credentialConfigurationsSupported.isNotEmpty()) { "credentialConfigurationsSupported must not be empty" }
     }
 
-    inline fun <reified T : CredentialSupported> findByFormat(predicate: (T) -> Boolean): Map<CredentialConfigurationIdentifier, T> {
-        return credentialsSupported.mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }.toMap()
+    inline fun <reified T : CredentialConfiguration> findByFormat(predicate: (T) -> Boolean): Map<CredentialConfigurationIdentifier, T> {
+        return credentialConfigurationsSupported.mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }.toMap()
     }
 
     /**
