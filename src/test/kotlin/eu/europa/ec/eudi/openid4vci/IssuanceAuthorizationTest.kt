@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponse
+import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponseTO
 import eu.europa.ec.eudi.openid4vci.internal.PushedAuthorizationRequestResponse
 import eu.europa.ec.eudi.openid4vci.internal.TokenEndpointForm
 import io.ktor.client.engine.mock.*
@@ -379,7 +379,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponse.Success(
+                                AccessTokenRequestResponseTO.Success(
                                     accessToken = UUID.randomUUID().toString(),
                                     expiresIn = 3600,
                                     cNonce = "dfghhj34wpCJp",
@@ -434,7 +434,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponse.Success(
+                                AccessTokenRequestResponseTO.Success(
                                     accessToken = UUID.randomUUID().toString(),
                                     expiresIn = 3600,
                                     cNonce = "dfghhj34wpCJp",
@@ -479,7 +479,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponse.Success(
+                                AccessTokenRequestResponseTO.Success(
                                     accessToken = UUID.randomUUID().toString(),
                                     expiresIn = 3600,
                                     cNonce = "dfghhj34wpCJp",
@@ -537,7 +537,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponse.Success(
+                                AccessTokenRequestResponseTO.Success(
                                     accessToken = UUID.randomUUID().toString(),
                                     expiresIn = 3600,
                                 ),
@@ -626,7 +626,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponse.Failure(
+                                AccessTokenRequestResponseTO.Failure(
                                     error = "unauthorized_client",
                                 ),
                             ),
@@ -675,7 +675,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponse.Failure(
+                                AccessTokenRequestResponseTO.Failure(
                                     error = "unauthorized_client",
                                 ),
                             ),

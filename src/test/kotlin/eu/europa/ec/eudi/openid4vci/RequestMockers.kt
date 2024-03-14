@@ -15,8 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponse
-import eu.europa.ec.eudi.openid4vci.internal.OidCredentialAuthorizationDetail
+import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponseTO
 import eu.europa.ec.eudi.openid4vci.internal.PushedAuthorizationRequestResponse
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
@@ -94,7 +93,7 @@ internal fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit = {})
         responseBuilder = {
             respond(
                 content = Json.encodeToString(
-                    AccessTokenRequestResponse.Success(
+                    AccessTokenRequestResponseTO.Success(
                         accessToken = UUID.randomUUID().toString(),
                         expiresIn = 3600,
                     ),
@@ -117,7 +116,7 @@ internal fun tokenPostMockerWithAuthDetails(
         responseBuilder = {
             respond(
                 content = Json.encodeToString(
-                    AccessTokenRequestResponse.Success(
+                    AccessTokenRequestResponseTO.Success(
                         accessToken = UUID.randomUUID().toString(),
                         expiresIn = 3600,
                         authorizationDetails = authorizationDetails(configurationIds),
@@ -134,16 +133,13 @@ internal fun tokenPostMockerWithAuthDetails(
 
 private fun authorizationDetails(
     configurationIds: List<CredentialConfigurationIdentifier>,
-): List<OidCredentialAuthorizationDetail.ByCredentialConfiguration> =
+): Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> =
     configurationIds.map {
-        OidCredentialAuthorizationDetail.ByCredentialConfiguration(
-            credentialConfigurationId = it,
-            credentialIdentifiers = listOf(
-                CredentialIdentifier("${it.value}_1"),
-                CredentialIdentifier("${it.value}_2"),
-            ),
+        it to listOf(
+            CredentialIdentifier("${it.value}_1"),
+            CredentialIdentifier("${it.value}_2"),
         )
-    }
+    }.toMap()
 
 internal fun singleIssuanceRequestMocker(
     credential: String = "",

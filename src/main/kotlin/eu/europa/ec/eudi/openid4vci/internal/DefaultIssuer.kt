@@ -34,11 +34,13 @@ internal class DefaultIssuer private constructor(
                 config: OpenId4VCIConfig,
                 ktorHttpClientFactory: KtorHttpClientFactory,
                 responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
+                preference: AuthorizeIssuancePreference = AuthorizeIssuancePreference.USE_SCOPES_FALLBACK_TO_AUTHORIZATION_DETAIL_BY_CFG_ID,
             ): DefaultIssuer = DefaultIssuer(
                 authorizeIssuanceImpl = AuthorizeIssuanceImpl(
                     credentialOffer = credentialOffer,
                     config = config,
                     ktorHttpClientFactory = ktorHttpClientFactory,
+                    preference = preference,
                 ),
                 requestIssuanceImpl = RequestIssuanceImpl(
                     credentialOffer = credentialOffer,
