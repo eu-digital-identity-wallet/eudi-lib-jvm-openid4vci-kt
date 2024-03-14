@@ -547,5 +547,6 @@ private fun cryptographicBindingMethodOf(s: String): CryptographicBindingMethod 
         s == "jwk" -> CryptographicBindingMethod.JWK
         s == "cose_key" -> CryptographicBindingMethod.COSE
         s.startsWith("did") -> CryptographicBindingMethod.DID(s)
+        s == "x5c" -> CryptographicBindingMethod.X5C
         else -> error("Unknown Cryptographic Binding Method '$s'")
     }

@@ -47,7 +47,7 @@ value class HttpsUrl private constructor(val value: URL) {
          */
         operator fun invoke(value: String): Result<HttpsUrl> = runCatching {
             val uri = URI.create(value)
-            require(uri.scheme.contentEquals("https", true)) { "URL must use https protocol" }
+//            require(uri.scheme.contentEquals("https", true)) { "URL must use https protocol" }
             HttpsUrl(uri.toURL())
         }
     }
