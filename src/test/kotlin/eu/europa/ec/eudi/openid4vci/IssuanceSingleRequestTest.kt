@@ -92,7 +92,8 @@ class IssuanceSingleRequestTest {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
                     val submittedRequest = assertDoesNotThrow {
-                        authorizedRequest.requestSingle(credentialConfigurationId to null, claimSet).getOrThrow()
+                        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
+                        authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     }
                     assertIs<SubmittedRequest.InvalidProof>(submittedRequest)
                 }
@@ -144,7 +145,8 @@ class IssuanceSingleRequestTest {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
                     val request = assertDoesNotThrow {
-                        authorizedRequest.requestSingle(credentialConfigurationId to null, claimSet).getOrThrow()
+                        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
+                        authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     }
                     assertIs<SubmittedRequest.Failed>(request)
                     assertIs<CredentialIssuanceError.ResponseUnparsable>(request.error)
@@ -176,13 +178,15 @@ class IssuanceSingleRequestTest {
                     val claimSetMsoMdoc = MsoMdocClaimSet(listOf("org.iso.18013.5.1" to "degree"))
                     var credentialConfigurationId = CredentialConfigurationIdentifier(PID_MsoMdoc)
                     assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
-                        authorizedRequest.requestSingle(credentialConfigurationId to null, claimSetMsoMdoc).getOrThrow()
+                        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSetMsoMdoc)
+                        authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     }
 
                     val claimSetSdJwtVc = GenericClaimSet(listOf("degree"))
                     credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC)
                     assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
-                        authorizedRequest.requestSingle(credentialConfigurationId to null, claimSetSdJwtVc).getOrThrow()
+                        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSetSdJwtVc)
+                        authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     }
                 }
 
@@ -211,7 +215,8 @@ class IssuanceSingleRequestTest {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = CredentialConfigurationIdentifier("UniversityDegree")
                     assertFailsWith<IllegalArgumentException> {
-                        authorizedRequest.requestSingle(credentialConfigurationId to null, null).getOrThrow()
+                        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+                        authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     }
                 }
 
@@ -259,17 +264,13 @@ class IssuanceSingleRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
-                    val requestCredentialIdentifier = credentialConfigurationId to null
-                    val submittedRequest = authorizedRequest.requestSingle(requestCredentialIdentifier, claimSet).getOrThrow()
+                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
+                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val response = assertDoesNotThrow {
-                                proofRequired.requestSingle(
-                                    requestCredentialIdentifier,
-                                    claimSet,
-                                    CryptoGenerator.rsaProofSigner(),
-                                ).getOrThrow()
+                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
                             }
                             assertIs<SubmittedRequest.Success>(response)
                         }
@@ -319,17 +320,13 @@ class IssuanceSingleRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
-                    val configurationBasedIdentifier = credentialConfigurationId to null
-                    val submittedRequest = authorizedRequest.requestSingle(configurationBasedIdentifier, claimSet).getOrThrow()
+                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
+                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val response = assertDoesNotThrow {
-                                proofRequired.requestSingle(
-                                    configurationBasedIdentifier,
-                                    claimSet,
-                                    CryptoGenerator.rsaProofSigner(),
-                                ).getOrThrow()
+                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
                             }
                             assertIs<SubmittedRequest.Success>(response)
                         }
@@ -374,10 +371,10 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialIdentifier = authorizedRequest.credentialIdentifiers?.let {
-                        it.entries.first().key to it.entries.first().value[0]
+                    val requestPayload = authorizedRequest.credentialIdentifiers?.let {
+                        IssuanceRequestPayload.IdentifierBased(it.entries.first().key, it.entries.first().value[0])
                     } ?: error("No credential identifier")
-                    authorizedRequest.requestSingle(credentialIdentifier, null).getOrThrow()
+                    authorizedRequest.requestSingle(requestPayload).getOrThrow()
                 }
 
                 is AuthorizedRequest.ProofRequired ->
@@ -415,10 +412,12 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialIdentifier =
-                        CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt") to CredentialIdentifier("DUMMY")
+                    val requestPayload = IssuanceRequestPayload.IdentifierBased(
+                        CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
+                        CredentialIdentifier("DUMMY"),
+                    )
                     assertThrows<IllegalArgumentException> {
-                        authorizedRequest.requestSingle(credentialIdentifier, null).getOrThrow()
+                        authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     }
                 }
 
@@ -455,10 +454,12 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialIdentifier =
-                        CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt") to CredentialIdentifier("id")
+                    val requestPayload = IssuanceRequestPayload.IdentifierBased(
+                        CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
+                        CredentialIdentifier("id"),
+                    )
                     assertThrows<IllegalArgumentException> {
-                        authorizedRequest.requestSingle(credentialIdentifier, null).getOrThrow()
+                        authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     }
                 }
 

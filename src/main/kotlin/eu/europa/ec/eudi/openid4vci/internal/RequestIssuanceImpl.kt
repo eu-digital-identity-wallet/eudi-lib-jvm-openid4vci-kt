@@ -48,41 +48,39 @@ internal class RequestIssuanceImpl(
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
-        requestCredentialIdentifier: IssuanceRequestCredentialIdentifier,
-        claimSet: ClaimSet?,
+        requestPayload: IssuanceRequestPayload,
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
-            singleRequest(requestCredentialIdentifier, claimSet, null, credentialIdentifiers)
+            singleRequest(requestPayload, null, credentialIdentifiers)
         }
     }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-        requestCredentialIdentifier: IssuanceRequestCredentialIdentifier,
-        claimSet: ClaimSet?,
+        requestPayload: IssuanceRequestPayload,
         proofSigner: ProofSigner,
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
-            singleRequest(requestCredentialIdentifier, claimSet, proofFactory(proofSigner, cNonce), credentialIdentifiers)
+            singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
         }
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<IssuanceRequestCredentialIdentifier, ClaimSet?>>,
+        credentialsMetadata: List<IssuanceRequestPayload>,
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
-            val credentialRequests = credentialsMetadata.map { (credentialId, claimSet) ->
-                singleRequest(credentialId, claimSet, null, credentialIdentifiers)
+            val credentialRequests = credentialsMetadata.map {
+                singleRequest(it, null, credentialIdentifiers)
             }
             CredentialIssuanceRequest.BatchRequest(credentialRequests)
         }
     }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Triple<IssuanceRequestCredentialIdentifier, ClaimSet?, ProofSigner>>,
+        credentialsMetadata: List<Pair<IssuanceRequestPayload, ProofSigner>>,
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
-            val credentialRequests = credentialsMetadata.map { (credentialId, claimSet, proofSigner) ->
-                singleRequest(credentialId, claimSet, proofFactory(proofSigner, cNonce), credentialIdentifiers)
+            val credentialRequests = credentialsMetadata.map { (requestPayload, proofSigner) ->
+                singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
             }
             CredentialIssuanceRequest.BatchRequest(credentialRequests)
         }
@@ -106,20 +104,26 @@ internal class RequestIssuanceImpl(
     }
 
     private fun singleRequest(
-        requestCredentialIdentifier: IssuanceRequestCredentialIdentifier,
-        claimSet: ClaimSet?,
+        requestPayload: IssuanceRequestPayload,
         proofFactory: ProofFactory?,
         credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
-    ): CredentialIssuanceRequest.SingleRequest {
-        val (credentialConfigurationId, credentialId) = requestCredentialIdentifier
-        return credentialId?.let {
-            require(credentialIdentifiers != null && credentialIdentifiers[credentialConfigurationId]?.contains(credentialId) ?: false) {
-                "The credential identifier passed is not valid or unknown"
+    ): CredentialIssuanceRequest.SingleRequest =
+        when (requestPayload) {
+            is IssuanceRequestPayload.ConfigurationBased -> {
+                formatBasedRequest(requestPayload.credentialConfigurationIdentifier, requestPayload.claimSet, proofFactory)
             }
-            identifierBasedRequest(credentialConfigurationId to credentialId, proofFactory)
+
+            is IssuanceRequestPayload.IdentifierBased -> {
+                val (credentialConfigurationId, credentialId) = requestPayload
+                require(
+                    credentialIdentifiers != null &&
+                        credentialIdentifiers[credentialConfigurationId]?.contains(credentialId) ?: false,
+                ) {
+                    "The credential identifier passed is not valid or unknown"
+                }
+                identifierBasedRequest(credentialConfigurationId, credentialId, proofFactory)
+            }
         }
-            ?: formatBasedRequest(requestCredentialIdentifier.first, claimSet, proofFactory)
-    }
 
     private fun formatBasedRequest(
         credentialConfigurationId: CredentialConfigurationIdentifier,
@@ -135,14 +139,13 @@ internal class RequestIssuanceImpl(
     }
 
     private fun identifierBasedRequest(
-        requestCredentialIdentifier: Pair<CredentialConfigurationIdentifier, CredentialIdentifier>,
+        credentialConfigurationId: CredentialConfigurationIdentifier,
+        credentialId: CredentialIdentifier,
         proofFactory: ProofFactory?,
     ): CredentialIssuanceRequest.IdentifierBased {
-        val (credentialConfigurationId, credentialId) = requestCredentialIdentifier
         require(credentialOffer.credentialConfigurationIdentifiers.contains(credentialConfigurationId)) {
             "The requested credential is not authorized for issuance"
         }
-        // TODO: Check if credentialId is in the list of identifiers retrieved from token endpoint ??? Maybe too strict
         val credentialSupported = credentialSupportedById(credentialConfigurationId)
         val proof = proofFactory?.invoke(credentialSupported)?.also { assertProofSupported(it, credentialSupported) }
         return CredentialIssuanceRequest.IdentifierBased(credentialId, proof, responseEncryptionSpec)

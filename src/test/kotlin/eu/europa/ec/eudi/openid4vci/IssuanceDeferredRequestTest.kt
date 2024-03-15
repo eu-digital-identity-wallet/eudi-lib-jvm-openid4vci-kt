@@ -57,15 +57,16 @@ class IssuanceDeferredRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC) to null
-                    val submittedRequest =
-                        authorizedRequest.requestSingle(credentialConfigurationId, null).getOrThrow()
+                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                        CredentialConfigurationIdentifier(PID_SdJwtVC),
+                        null,
+                    )
+                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
-                            val proofRequired =
-                                authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val secondSubmittedRequest =
-                                proofRequired.requestSingle(credentialConfigurationId, null, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
 
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
@@ -132,20 +133,17 @@ class IssuanceDeferredRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC)
-                    val requestCredentialIdentifier = credentialConfigurationId to null
-                    val submittedRequest =
-                        authorizedRequest.requestSingle(requestCredentialIdentifier, null).getOrThrow()
+                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                        CredentialConfigurationIdentifier(PID_SdJwtVC),
+                        null,
+                    )
+                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired =
                                 authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val secondSubmittedRequest =
-                                proofRequired.requestSingle(
-                                    requestCredentialIdentifier,
-                                    null,
-                                    CryptoGenerator.rsaProofSigner(),
-                                ).getOrThrow()
+                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
 
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
@@ -225,20 +223,16 @@ class IssuanceDeferredRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = CredentialConfigurationIdentifier(PID_SdJwtVC)
-                    val requestCredentialIdentifier = credentialConfigurationId to null
-                    val submittedRequest =
-                        authorizedRequest.requestSingle(requestCredentialIdentifier, null).getOrThrow()
+                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                        CredentialConfigurationIdentifier(PID_SdJwtVC),
+                        null,
+                    )
+                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
-                            val proofRequired =
-                                authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                             val secondSubmittedRequest =
-                                proofRequired.requestSingle(
-                                    requestCredentialIdentifier,
-                                    null,
-                                    CryptoGenerator.rsaProofSigner(),
-                                ).getOrThrow()
+                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
 
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {

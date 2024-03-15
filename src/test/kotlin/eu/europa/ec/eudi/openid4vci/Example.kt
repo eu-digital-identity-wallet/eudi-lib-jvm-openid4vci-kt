@@ -209,8 +209,8 @@ private class Wallet(
             val proofSigner = proofSigners[credentialConfigurationId.value]
                 ?: error("No signer found for credential $credentialConfigurationId")
 
-            val submittedRequest =
-                authorized.requestSingle(credentialConfigurationId to null, null, proofSigner).getOrThrow()
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+            val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
 
             return when (submittedRequest) {
                 is SubmittedRequest.Success -> {
@@ -257,7 +257,8 @@ private class Wallet(
         credentialConfigurationId: CredentialConfigurationIdentifier,
     ): String {
         with(issuer) {
-            val submittedRequest = noProofRequiredState.requestSingle(credentialConfigurationId to null, null).getOrThrow()
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+            val submittedRequest = noProofRequiredState.requestSingle(requestPayload).getOrThrow()
 
             return when (submittedRequest) {
                 is SubmittedRequest.Success -> {

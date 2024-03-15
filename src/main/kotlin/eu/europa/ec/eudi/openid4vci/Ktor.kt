@@ -15,10 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.Json
 
 typealias KtorHttpClientFactory = () -> HttpClient
 
@@ -33,7 +33,7 @@ val DefaultHttpClientFactory: KtorHttpClientFactory = {
     HttpClient {
         install(ContentNegotiation) {
             json(
-                json = Json { ignoreUnknownKeys = true },
+                json = JsonSupport,
             )
         }
     }

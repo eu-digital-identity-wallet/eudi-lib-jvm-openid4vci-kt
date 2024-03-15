@@ -208,4 +208,3 @@ value class Scope(val value: String) {
 }
 
 typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata
-typealias IssuanceRequestCredentialIdentifier = Pair<CredentialConfigurationIdentifier, CredentialIdentifier?>

@@ -84,7 +84,8 @@ class IssuanceEncryptedResponsesTest {
                 block = {
                     with(issuer) {
                         val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
-                        noProofRequired.requestSingle(credentialConfigurationId to null, null).getOrThrow()
+                        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+                        noProofRequired.requestSingle(requestPayload).getOrThrow()
                     }
                 },
             )
@@ -125,7 +126,8 @@ class IssuanceEncryptedResponsesTest {
                 block = {
                     with(issuer) {
                         val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
-                        noProofRequired.requestSingle(credentialConfigurationId to null, null).getOrThrow()
+                        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+                        noProofRequired.requestSingle(requestPayload).getOrThrow()
                     }
                 },
             )
@@ -188,8 +190,8 @@ class IssuanceEncryptedResponsesTest {
             with(issuer) {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
                 val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
-                noProofRequired
-                    .requestSingle(credentialConfigurationId to null, null).getOrThrow()
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+                noProofRequired.requestSingle(requestPayload).getOrThrow()
             }
         }
 
@@ -297,19 +299,13 @@ class IssuanceEncryptedResponsesTest {
                 when (authorizedRequest) {
                     is AuthorizedRequest.NoProofRequired -> {
                         val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
-                        val requestCredentialIdentifier = credentialConfigurationId to null
-                        val submittedRequest =
-                            authorizedRequest.requestSingle(requestCredentialIdentifier, claimSet).getOrThrow()
+                        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
+                        val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                         when (submittedRequest) {
                             is SubmittedRequest.InvalidProof -> {
-                                val proofRequired =
-                                    authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                                val response =
-                                    proofRequired.requestSingle(
-                                        requestCredentialIdentifier,
-                                        claimSet,
-                                        CryptoGenerator.rsaProofSigner(),
-                                    )
+                                val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                                val response = proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
+
                                 assertThat(
                                     "Second attempt should be successful",
                                     response.getOrThrow() is SubmittedRequest.Success,

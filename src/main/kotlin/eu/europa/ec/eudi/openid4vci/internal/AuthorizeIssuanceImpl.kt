@@ -19,8 +19,8 @@ import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vci.*
 
 internal enum class AuthorizeIssuancePreference {
-    USE_SCOPES_FALLBACK_TO_AUTHORIZATION_DETAIL_BY_CFG_ID,
-    USE_AUTHORIZATION_DETAILS_BY_CFG_ID,
+    FAVOR_SCOPES,
+    AUTHORIZATION_DETAILS,
 }
 
 internal class AuthorizeIssuanceImpl(
@@ -49,8 +49,8 @@ internal class AuthorizeIssuanceImpl(
             fun addScope(): Boolean = configuration.scope?.let { scopes.add(Scope(it)) } ?: false
 
             when (preference) {
-                AuthorizeIssuancePreference.USE_AUTHORIZATION_DETAILS_BY_CFG_ID -> authDetailsByCfgId()
-                AuthorizeIssuancePreference.USE_SCOPES_FALLBACK_TO_AUTHORIZATION_DETAIL_BY_CFG_ID -> {
+                AuthorizeIssuancePreference.AUTHORIZATION_DETAILS -> authDetailsByCfgId()
+                AuthorizeIssuancePreference.FAVOR_SCOPES -> {
                     if (!addScope()) authDetailsByCfgId()
                     else Unit
                 }

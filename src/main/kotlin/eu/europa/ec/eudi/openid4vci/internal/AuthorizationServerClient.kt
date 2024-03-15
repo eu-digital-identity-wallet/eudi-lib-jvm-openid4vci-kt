@@ -195,11 +195,6 @@ internal class AuthorizationServerClient(
         pkceVerifier to url
     }
 
-    private fun toNimbusAuthorizationDetails(it: CredentialConfigurationIdentifier): AuthorizationDetail? =
-        NimbusAuthorizationDetail.Builder(AuthorizationType("openid_credential"))
-            .field("credential_configuration_id", it.value)
-            .build()
-
     private fun PushedAuthorizationRequestResponse.authorizationCodeUrlOrFail(
         clientID: ClientID,
         codeVerifier: CodeVerifier,
@@ -366,3 +361,8 @@ internal sealed interface TokenEndpointForm {
         }
     }
 }
+
+private fun toNimbusAuthorizationDetails(it: CredentialConfigurationIdentifier): AuthorizationDetail? =
+    NimbusAuthorizationDetail.Builder(AuthorizationType("openid_credential"))
+        .field("credential_configuration_id", it.value)
+        .build()

@@ -132,6 +132,7 @@ internal object GrantedAuthorizationDetailsSerializer : KSerializer<Map<Credenti
     @Serializable
     data class AuthorizationDetailJson(
         @SerialName("type") val type: String,
+        @SerialName("format") val format: String? = null,
         @SerialName("credential_configuration_id") val credentialConfigurationId: String,
         @SerialName("credential_identifiers") val credentialIdentifiers: List<String>,
     )

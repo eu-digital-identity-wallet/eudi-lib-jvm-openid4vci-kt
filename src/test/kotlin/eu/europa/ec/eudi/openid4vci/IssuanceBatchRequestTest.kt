@@ -101,28 +101,35 @@ class IssuanceBatchRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = listOf(
-                        (CredentialConfigurationIdentifier(PID_MsoMdoc) to null) to claimSet_mso_mdoc,
-                        (CredentialConfigurationIdentifier(PID_SdJwtVC) to null) to claimSet_sd_jwt_vc,
+                    val batchRequestPayload = listOf(
+                        IssuanceRequestPayload.ConfigurationBased(
+                            CredentialConfigurationIdentifier(PID_MsoMdoc),
+                            claimSet_mso_mdoc,
+                        ),
+                        IssuanceRequestPayload.ConfigurationBased(
+                            CredentialConfigurationIdentifier(PID_SdJwtVC),
+                            claimSet_sd_jwt_vc,
+                        ),
                     )
-
-                    val submittedRequest =
-                        authorizedRequest.requestBatch(credentialMetadata).getOrThrow()
-
+                    val submittedRequest = authorizedRequest.requestBatch(batchRequestPayload).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
 
                             val proofSigner = CryptoGenerator.rsaProofSigner()
                             val credentialMetadataTriples = listOf(
-                                Triple(
-                                    CredentialConfigurationIdentifier(PID_MsoMdoc) to null,
-                                    claimSet_mso_mdoc,
+                                Pair(
+                                    IssuanceRequestPayload.ConfigurationBased(
+                                        CredentialConfigurationIdentifier(PID_MsoMdoc),
+                                        claimSet_mso_mdoc,
+                                    ),
                                     proofSigner,
                                 ),
-                                Triple(
-                                    CredentialConfigurationIdentifier(PID_SdJwtVC) to null,
-                                    claimSet_sd_jwt_vc,
+                                Pair(
+                                    IssuanceRequestPayload.ConfigurationBased(
+                                        CredentialConfigurationIdentifier(PID_SdJwtVC),
+                                        claimSet_sd_jwt_vc,
+                                    ),
                                     proofSigner,
                                 ),
                             )
