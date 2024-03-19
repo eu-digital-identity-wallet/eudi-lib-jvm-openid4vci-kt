@@ -18,14 +18,11 @@ package eu.europa.ec.eudi.openid4vci.internal
 import eu.europa.ec.eudi.openid4vci.*
 
 internal class QueryForDeferredCredentialImpl(
-    issuerMetadata: CredentialIssuerMetadata,
-    ktorHttpClientFactory: KtorHttpClientFactory,
+    private val issuanceServerClient: IssuanceServerClient,
 ) : QueryForDeferredCredential {
 
-    private val issuanceRequester: IssuanceRequester =
-        IssuanceRequester(issuerMetadata, ktorHttpClientFactory)
     override suspend fun AuthorizedRequest.queryForDeferredCredential(
         deferredCredential: IssuedCredential.Deferred,
     ): Result<DeferredCredentialQueryOutcome> =
-        issuanceRequester.placeDeferredCredentialRequest(accessToken, deferredCredential.transactionId)
+        issuanceServerClient.placeDeferredCredentialRequest(accessToken, deferredCredential.transactionId)
 }

@@ -26,7 +26,6 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 import eu.europa.ec.eudi.openid4vci.internal.formats.IssuanceRequestJsonMapper
-import eu.europa.ec.eudi.openid4vci.internal.formats.NotificationTO
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -76,6 +75,25 @@ private data class DeferredIssuanceSuccessResponse(
     @SerialName("credential") val credential: String,
 )
 
+@Serializable
+internal class NotificationTO(
+    @SerialName("notification_id") val id: String,
+    @SerialName("event") val event: NotifiedEvent,
+    @SerialName("event_description") val description: String? = null,
+)
+
+@Serializable
+internal enum class NotifiedEvent {
+    @SerialName("credential_accepted")
+    CREDENTIAL_ACCEPTED,
+
+    @SerialName("credential_failure")
+    CREDENTIAL_FAILURE,
+
+    @SerialName("credential_deleted")
+    CREDENTIAL_DELETED,
+}
+
 /**
  * Models a response of the issuer to a successful issuance request.
  *
@@ -90,7 +108,7 @@ internal data class CredentialIssuanceResponse(
     val cNonce: CNonce?,
 )
 
-internal class IssuanceRequester(
+internal class IssuanceServerClient(
     private val issuerMetadata: CredentialIssuerMetadata,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
@@ -227,16 +245,12 @@ internal class IssuanceRequester(
 
     suspend fun notifyIssuer(
         accessToken: AccessToken,
-        notification: Notification,
+        event: CredentialIssuanceEvent,
     ): Result<Unit> = runCatching {
         ensureNotNull(issuerMetadata.notificationEndpoint) { IssuerDoesNotSupportNotifications }
         ktorHttpClientFactory().use { client ->
             val url = issuerMetadata.notificationEndpoint.value.value
-            val payload = NotificationTO(
-                notificationId = notification.id.value,
-                event = notification.event.name.lowercase(),
-                eventDescription = notification.eventDescription,
-            )
+            val payload = event.toTransferObject()
             val response = client.post(url) {
                 bearerAuth(accessToken.accessToken)
                 contentType(ContentType.Application.Json)
@@ -332,3 +346,22 @@ internal class IssuanceRequester(
         else -> IssuanceRequestFailed(error, errorDescription)
     }
 }
+
+private fun CredentialIssuanceEvent.toTransferObject(): NotificationTO =
+    when (this) {
+        is CredentialIssuanceEvent.Accepted -> NotificationTO(
+            id = id.value,
+            event = NotifiedEvent.CREDENTIAL_ACCEPTED,
+            description = this.description,
+        )
+        is CredentialIssuanceEvent.Deleted -> NotificationTO(
+            id = id.value,
+            event = NotifiedEvent.CREDENTIAL_DELETED,
+            description = this.description,
+        )
+        is CredentialIssuanceEvent.Failed -> NotificationTO(
+            id = id.value,
+            event = NotifiedEvent.CREDENTIAL_FAILURE,
+            description = this.description,
+        )
+    }

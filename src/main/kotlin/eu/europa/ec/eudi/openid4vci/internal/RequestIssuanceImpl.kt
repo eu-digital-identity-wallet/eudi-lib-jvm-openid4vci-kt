@@ -22,12 +22,9 @@ internal class RequestIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     private val issuerMetadata: CredentialIssuerMetadata,
     private val config: OpenId4VCIConfig,
-    ktorHttpClientFactory: KtorHttpClientFactory,
+    private val issuanceServerClient: IssuanceServerClient,
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
 ) : RequestIssuance {
-
-    private val issuanceRequester: IssuanceRequester =
-        IssuanceRequester(issuerMetadata, ktorHttpClientFactory)
 
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec? by lazy {
         fun IssuanceResponseEncryptionSpec.validate(meta: CredentialResponseEncryption.Required) {
@@ -174,14 +171,14 @@ internal class RequestIssuanceImpl(
             submitRequestFromError(error) ?: throw error
         return when (val credentialRequest = issuanceRequestSupplier()) {
             is CredentialIssuanceRequest.SingleRequest -> {
-                issuanceRequester.placeIssuanceRequest(token, credentialRequest).fold(
+                issuanceServerClient.placeIssuanceRequest(token, credentialRequest).fold(
                     onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
                 )
             }
 
             is CredentialIssuanceRequest.BatchRequest -> {
-                issuanceRequester.placeBatchIssuanceRequest(token, credentialRequest).fold(
+                issuanceServerClient.placeBatchIssuanceRequest(token, credentialRequest).fold(
                     onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
                 )

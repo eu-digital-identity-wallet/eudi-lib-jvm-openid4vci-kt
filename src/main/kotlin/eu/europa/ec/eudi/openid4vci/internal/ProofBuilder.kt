@@ -68,7 +68,7 @@ internal sealed interface ProofBuilder {
                 "No credential specification provided"
             }
             val proofTypesSupported = spec.proofTypesSupported
-            ensure(proofTypesSupported != null && ProofType.JWT in proofTypesSupported.keys) {
+            ensure(ProofType.JWT in proofTypesSupported.keys) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
             }
             val header = run {

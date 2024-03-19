@@ -17,15 +17,11 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
 
-class NotifyIssuerImpl(
-    issuerMetadata: CredentialIssuerMetadata,
-    ktorHttpClientFactory: KtorHttpClientFactory,
+internal class NotifyIssuerImpl(
+    private val issuanceServerClient: IssuanceServerClient,
 ) : NotifyIssuer {
 
-    private val issuanceRequester: IssuanceRequester =
-        IssuanceRequester(issuerMetadata, ktorHttpClientFactory)
-
     override suspend fun AuthorizedRequest.notify(
-        notification: Notification,
-    ): Result<Unit> = issuanceRequester.notifyIssuer(accessToken, notification)
+        event: CredentialIssuanceEvent,
+    ): Result<Unit> = issuanceServerClient.notifyIssuer(accessToken, event)
 }

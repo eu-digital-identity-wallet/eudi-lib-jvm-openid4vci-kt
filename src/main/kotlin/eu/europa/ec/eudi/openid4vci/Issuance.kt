@@ -308,22 +308,31 @@ fun interface QueryForDeferredCredential {
     ): Result<DeferredCredentialQueryOutcome>
 }
 
-data class Notification(
-    val id: NotificationId,
-    val event: NotifiedEvent,
-    val eventDescription: String? = null,
-)
+sealed interface CredentialIssuanceEvent {
 
-enum class NotifiedEvent {
-    CREDENTIAL_ACCEPTED,
-    CREDENTIAL_FAILURE,
-    CREDENTIAL_DELETED,
+    val id: NotificationId
+    val description: String?
+
+    data class Accepted(
+        override val id: NotificationId,
+        override val description: String?,
+    ) : CredentialIssuanceEvent
+
+    data class Failed(
+        override val id: NotificationId,
+        override val description: String?,
+    ) : CredentialIssuanceEvent
+
+    data class Deleted(
+        override val id: NotificationId,
+        override val description: String?,
+    ) : CredentialIssuanceEvent
 }
 
 fun interface NotifyIssuer {
 
     suspend fun AuthorizedRequest.notify(
-        notification: Notification,
+        event: CredentialIssuanceEvent,
     ): Result<Unit>
 }
 

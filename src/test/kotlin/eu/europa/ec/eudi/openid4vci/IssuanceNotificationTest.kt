@@ -15,7 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.formats.NotificationTO
+import eu.europa.ec.eudi.openid4vci.internal.NotificationTO
+import eu.europa.ec.eudi.openid4vci.internal.NotifiedEvent
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -57,8 +58,8 @@ class IssuanceNotificationTest {
 
                     val textContent = it.body as TextContent
                     val notificationTO = Json.decodeFromString<NotificationTO>(textContent.text)
-                    assertTrue("") {
-                        notificationTO.event == NotifiedEvent.CREDENTIAL_ACCEPTED.name.lowercase()
+                    assertTrue("Not expected event type") {
+                        notificationTO.event == NotifiedEvent.CREDENTIAL_ACCEPTED
                     }
                 },
             ),
@@ -84,10 +85,9 @@ class IssuanceNotificationTest {
                             assertNotNull(issuedCredential.notificationId, "No notification id found")
 
                             authorizedRequest.notify(
-                                Notification(
+                                CredentialIssuanceEvent.Accepted(
                                     id = issuedCredential.notificationId!!,
-                                    event = NotifiedEvent.CREDENTIAL_ACCEPTED,
-                                    eventDescription = "Credential received and validated",
+                                    description = "Credential received and validated",
                                 ),
                             )
                         }
@@ -129,10 +129,9 @@ class IssuanceNotificationTest {
         )
         with(issuer) {
             val result = authorizedRequest.notify(
-                Notification(
+                CredentialIssuanceEvent.Accepted(
                     id = NotificationId("123456"),
-                    event = NotifiedEvent.CREDENTIAL_ACCEPTED,
-                    eventDescription = "Credential received and validated",
+                    description = "Credential received and validated",
                 ),
             )
 
