@@ -49,18 +49,18 @@ private data class GenericErrorResponse(
 
 @Serializable
 private data class SingleIssuanceSuccessResponse(
-    @SerialName("format") val format: String,
     @SerialName("credential") val credential: String? = null,
     @SerialName("transaction_id") val transactionId: String? = null,
+    @SerialName("notification_id") val notificationId: String? = null,
     @SerialName("c_nonce") val cNonce: String? = null,
     @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
 )
 
 @Serializable
 internal data class CertificateIssuanceResponse(
-    @SerialName("format") val format: String,
     @SerialName("credential") val credential: String? = null,
     @SerialName("transaction_id") val transactionId: String? = null,
+    @SerialName("notification_id") val notificationId: String? = null,
 )
 
 @Serializable
@@ -72,9 +72,27 @@ internal data class BatchIssuanceSuccessResponse(
 
 @Serializable
 private data class DeferredIssuanceSuccessResponse(
-    @SerialName("format") val format: String,
     @SerialName("credential") val credential: String,
 )
+
+@Serializable
+internal class NotificationTO(
+    @SerialName("notification_id") val id: String,
+    @SerialName("event") val event: NotifiedEvent,
+    @SerialName("event_description") val description: String? = null,
+)
+
+@Serializable
+internal enum class NotifiedEvent {
+    @SerialName("credential_accepted")
+    CREDENTIAL_ACCEPTED,
+
+    @SerialName("credential_failure")
+    CREDENTIAL_FAILURE,
+
+    @SerialName("credential_deleted")
+    CREDENTIAL_DELETED,
+}
 
 /**
  * Models a response of the issuer to a successful issuance request.
@@ -90,10 +108,7 @@ internal data class CredentialIssuanceResponse(
     val cNonce: CNonce?,
 )
 
-/**
- * Default implementation of [IssuanceRequester] interface.
- */
-internal class IssuanceRequester(
+internal class IssuanceServerClient(
     private val issuerMetadata: CredentialIssuerMetadata,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
@@ -181,9 +196,9 @@ internal class IssuanceRequester(
 
     private fun JWTClaimsSet.toSingleIssuanceSuccessResponse(): SingleIssuanceSuccessResponse =
         SingleIssuanceSuccessResponse(
-            format = getStringClaim("format"),
             credential = getStringClaim("credential"),
             transactionId = getStringClaim("transaction_id"),
+            notificationId = getStringClaim("notification_id"),
             cNonce = getStringClaim("c_nonce"),
             cNonceExpiresInSeconds = getLongClaim("c_nonce_expires_in"),
         )
@@ -228,6 +243,28 @@ internal class IssuanceRequester(
         }
     }
 
+    suspend fun notifyIssuer(
+        accessToken: AccessToken,
+        event: CredentialIssuanceEvent,
+    ): Result<Unit> = runCatching {
+        ensureNotNull(issuerMetadata.notificationEndpoint) { IssuerDoesNotSupportNotifications }
+        ktorHttpClientFactory().use { client ->
+            val url = issuerMetadata.notificationEndpoint.value.value
+            val payload = event.toTransferObject()
+            val response = client.post(url) {
+                bearerAuth(accessToken.accessToken)
+                contentType(ContentType.Application.Json)
+                setBody(payload)
+            }
+            if (response.status.isSuccess()) {
+                Unit
+            } else {
+                val errorResponse = response.body<GenericErrorResponse>()
+                throw NotificationFailed(errorResponse.error)
+            }
+        }
+    }
+
     private fun TransactionId.toDeferredRequestTO(): DeferredIssuanceRequestTO =
         DeferredIssuanceRequestTO(value)
 
@@ -239,7 +276,6 @@ internal class IssuanceRequester(
             val success = response.body<DeferredIssuanceSuccessResponse>()
             DeferredCredentialQueryOutcome.Issued(
                 IssuedCredential.Issued(
-                    format = success.format,
                     credential = success.credential,
                 ),
             )
@@ -256,7 +292,7 @@ internal class IssuanceRequester(
 
     private fun SingleIssuanceSuccessResponse.toDomain(): CredentialIssuanceResponse {
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
-        val issuedCredential = issuedCredentialOf(transactionId, credential, format)
+        val issuedCredential = issuedCredentialOf(transactionId, notificationId, credential)
         return CredentialIssuanceResponse(
             cNonce = cNonce,
             credentials = listOf(issuedCredential),
@@ -265,8 +301,8 @@ internal class IssuanceRequester(
 
     private fun issuedCredentialOf(
         transactionId: String?,
+        notificationId: String?,
         credential: String?,
-        format: String,
     ): IssuedCredential {
         ensure(!(transactionId == null && credential == null)) {
             val error =
@@ -275,7 +311,10 @@ internal class IssuanceRequester(
         }
         return when {
             transactionId != null -> IssuedCredential.Deferred(TransactionId(transactionId))
-            credential != null -> IssuedCredential.Issued(format, credential)
+            credential != null -> {
+                val notificationIdentifier = notificationId?.let { NotificationId(notificationId) }
+                IssuedCredential.Issued(credential, notificationIdentifier)
+            }
             else -> error("Cannot happen")
         }
     }
@@ -284,7 +323,7 @@ internal class IssuanceRequester(
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
         return CredentialIssuanceResponse(
             cNonce = cNonce,
-            credentials = credentialResponses.map { issuedCredentialOf(it.transactionId, it.credential, it.format) },
+            credentials = credentialResponses.map { issuedCredentialOf(it.transactionId, it.notificationId, it.credential) },
         )
     }
 
@@ -307,3 +346,22 @@ internal class IssuanceRequester(
         else -> IssuanceRequestFailed(error, errorDescription)
     }
 }
+
+private fun CredentialIssuanceEvent.toTransferObject(): NotificationTO =
+    when (this) {
+        is CredentialIssuanceEvent.Accepted -> NotificationTO(
+            id = id.value,
+            event = NotifiedEvent.CREDENTIAL_ACCEPTED,
+            description = this.description,
+        )
+        is CredentialIssuanceEvent.Deleted -> NotificationTO(
+            id = id.value,
+            event = NotifiedEvent.CREDENTIAL_DELETED,
+            description = this.description,
+        )
+        is CredentialIssuanceEvent.Failed -> NotificationTO(
+            id = id.value,
+            event = NotifiedEvent.CREDENTIAL_FAILURE,
+            description = this.description,
+        )
+    }

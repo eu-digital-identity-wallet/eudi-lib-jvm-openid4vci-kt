@@ -40,14 +40,14 @@ internal class DefaultCredentialOfferRequestResolverTest {
             credentialIssuerMetadata(),
             oidcAuthorizationServerMetadata(),
             listOf(
-                CredentialIdentifier("UniversityDegree_JWT"),
-                CredentialIdentifier("MobileDrivingLicense_msoMdoc"),
-                CredentialIdentifier("UniversityDegree_LDP_VC"),
-                CredentialIdentifier("UniversityDegree_JWT_VC_JSON-LD"),
+                CredentialConfigurationIdentifier("UniversityDegree_JWT"),
+                CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc"),
+                CredentialConfigurationIdentifier("UniversityDegree_LDP_VC"),
+                CredentialConfigurationIdentifier("UniversityDegree_JWT_VC_JSON-LD"),
             ),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
+                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", TxCode(), 5.seconds),
             ),
         )
 
@@ -127,6 +127,29 @@ internal class DefaultCredentialOfferRequestResolverTest {
     }
 
     @Test
+    internal fun `resolve failure with over-sized tx_code description in pre-authorized_code grant`() = runTest {
+        val resolver = resolver(
+            RequestMocker(
+                match(SampleIssuer.WellKnownUrl.value.toURI()),
+                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
+            ),
+
+            oidcMetadataHandler,
+        )
+        val credentialOffer =
+            getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_offer_over_sized_tx_code_description.json")
+
+        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer", credentialOffer)
+            .build()
+
+        val exception = assertFailsWith<CredentialOfferRequestException> {
+            resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+        }
+        assertIs<CredentialOfferRequestValidationError.InvalidGrants>(exception.error)
+    }
+
+    @Test
     internal fun `resolve success with credential_offer_uri`() = runTest {
         val credentialOfferUri = HttpsUrl("https://credential_offer/1").getOrThrow()
 
@@ -150,14 +173,14 @@ internal class DefaultCredentialOfferRequestResolverTest {
             credentialIssuerMetadata(),
             oidcAuthorizationServerMetadata(),
             listOf(
-                CredentialIdentifier("UniversityDegree_JWT"),
-                CredentialIdentifier("MobileDrivingLicense_msoMdoc"),
-                CredentialIdentifier("UniversityDegree_LDP_VC"),
-                CredentialIdentifier("UniversityDegree_JWT_VC_JSON-LD"),
+                CredentialConfigurationIdentifier("UniversityDegree_JWT"),
+                CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc"),
+                CredentialConfigurationIdentifier("UniversityDegree_LDP_VC"),
+                CredentialConfigurationIdentifier("UniversityDegree_JWT_VC_JSON-LD"),
             ),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", true, 5.seconds),
+                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", TxCode(), 5.seconds),
             ),
         )
 
@@ -174,7 +197,7 @@ private fun assertEquals(expected: CredentialOffer, offer: CredentialOffer) {
         expected.authorizationServerMetadata.toJSONObject(),
         offer.authorizationServerMetadata.toJSONObject(),
     )
-    assertEquals(expected.credentials, offer.credentials)
+    assertEquals(expected.credentialConfigurationIdentifiers, offer.credentialConfigurationIdentifiers)
     assertEquals(expected.grants, offer.grants)
 }
 

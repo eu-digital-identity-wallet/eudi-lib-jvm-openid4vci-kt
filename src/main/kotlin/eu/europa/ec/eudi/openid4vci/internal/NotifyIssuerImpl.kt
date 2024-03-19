@@ -17,12 +17,11 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
 
-internal class QueryForDeferredCredentialImpl(
+internal class NotifyIssuerImpl(
     private val issuanceServerClient: IssuanceServerClient,
-) : QueryForDeferredCredential {
+) : NotifyIssuer {
 
-    override suspend fun AuthorizedRequest.queryForDeferredCredential(
-        deferredCredential: IssuedCredential.Deferred,
-    ): Result<DeferredCredentialQueryOutcome> =
-        issuanceServerClient.placeDeferredCredentialRequest(accessToken, deferredCredential.transactionId)
+    override suspend fun AuthorizedRequest.notify(
+        event: CredentialIssuanceEvent,
+    ): Result<Unit> = issuanceServerClient.notifyIssuer(accessToken, event)
 }

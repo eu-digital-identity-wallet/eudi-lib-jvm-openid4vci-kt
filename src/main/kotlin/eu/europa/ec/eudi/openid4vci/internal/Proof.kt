@@ -16,10 +16,10 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jwt.JWT
-import eu.europa.ec.eudi.openid4vci.CredentialSupported
+import eu.europa.ec.eudi.openid4vci.CredentialConfiguration
 import kotlinx.serialization.Serializable
 
-internal typealias ProofFactory = (CredentialSupported) -> Proof
+internal typealias ProofFactory = (CredentialConfiguration) -> Proof
 
 /**
  * Sealed hierarchy of the proofs of possession that can be included in a credential issuance request. Proofs are used
@@ -44,4 +44,12 @@ internal sealed interface Proof {
      */
     @JvmInline
     value class Cwt(val cwt: String) : Proof
+
+    /**
+     * Proof of possession is structured as a LDP_VP
+     *
+     * @param ldpVp The proof LDP_VP
+     */
+    @JvmInline
+    value class LdpVp(val ldpVp: String) : Proof
 }

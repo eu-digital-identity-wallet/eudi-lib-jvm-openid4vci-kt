@@ -33,7 +33,7 @@ import kotlin.time.Duration.Companion.seconds
 @Serializable
 private data class CredentialOfferRequestTO(
     @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
-    @SerialName("credentials") @Required val credentials: List<String>,
+    @SerialName("credential_configuration_ids") @Required val credentialConfigurationIds: List<String>,
     @SerialName("grants") val grants: GrantsTO? = null,
 )
 
@@ -61,10 +61,26 @@ private data class AuthorizationCodeTO(
 @Serializable
 private data class PreAuthorizedCodeTO(
     @SerialName("pre-authorized_code") @Required val preAuthorizedCode: String,
-    @SerialName("user_pin_required") val pinRequired: Boolean? = null,
+    @SerialName("tx_code") @Required val txCode: TxCodeTO? = null,
     @SerialName("interval") val interval: Long? = null,
     @SerialName("authorization_server") val authorizationServer: String? = null,
 )
+
+@Serializable
+private data class TxCodeTO(
+    @SerialName("input_mode") val inputMode: InputModeTO? = InputModeTO.NUMERIC,
+    @SerialName("length") val length: Int? = null,
+    @SerialName("description") val description: String? = null,
+)
+
+@Serializable
+private enum class InputModeTO {
+    @SerialName("text")
+    TEXT,
+
+    @SerialName("numeric")
+    NUMERIC,
+}
 
 internal class DefaultCredentialOfferRequestResolver(
     private val httpClient: HttpClient,
@@ -74,14 +90,14 @@ internal class DefaultCredentialOfferRequestResolver(
         val credentialIssuerId = CredentialIssuerId(credentialOffer.credentialIssuerIdentifier)
             .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).raise() }
 
-        ensure(credentialOffer.credentials.isNotEmpty()) {
+        ensure(credentialOffer.credentialConfigurationIds.isNotEmpty()) {
             val er = IllegalArgumentException("credentials are required")
             CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
         }
 
         val credentialIssuerMetadata = fetchIssuerMetaData(credentialIssuerId)
-        val credentials = credentialOffer.credentials.map { CredentialIdentifier(it) }
-        ensure(credentialIssuerMetadata.credentialsSupported.keys.containsAll(credentials)) {
+        val credentials = credentialOffer.credentialConfigurationIds.map { CredentialConfigurationIdentifier(it) }
+        ensure(credentialIssuerMetadata.credentialConfigurationsSupported.keys.containsAll(credentials)) {
             val er = IllegalArgumentException("Credential offer contains unknown credential ids")
             CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
         }
@@ -139,6 +155,24 @@ private fun Grants.authServer(): HttpsUrl? = when (this) {
  * Tries to parse a [GrantsTO] to a [Grants] instance.
  */
 private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata): Grants? = runCatching {
+    fun TxCodeTO.toTxCode(): TxCode {
+        return when (inputMode) {
+            InputModeTO.TEXT ->
+                TxCode(
+                    inputMode = TxCodeInputMode.TEXT,
+                    length = length,
+                    description = description,
+                )
+
+            else ->
+                TxCode(
+                    inputMode = TxCodeInputMode.NUMERIC,
+                    length = length,
+                    description = description,
+                )
+        }
+    }
+
     val maybeAuthorizationCodeGrant =
         authorizationCode?.let {
             val authorizationServer = it.authorizationServer?.let { url ->
@@ -157,7 +191,7 @@ private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata
             }
             Grants.PreAuthorizedCode(
                 it.preAuthorizedCode,
-                it.pinRequired ?: false,
+                it.txCode?.toTxCode(),
                 it.interval?.seconds ?: 5.seconds,
                 authorizationServer,
             )

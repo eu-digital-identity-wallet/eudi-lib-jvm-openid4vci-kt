@@ -21,10 +21,12 @@ internal class DefaultIssuer private constructor(
     private val authorizeIssuanceImpl: AuthorizeIssuanceImpl,
     private val requestIssuanceImpl: RequestIssuanceImpl,
     private val queryForDeferredCredentialImpl: QueryForDeferredCredentialImpl,
+    private val notifyIssuerImpl: NotifyIssuerImpl,
 ) : Issuer,
     AuthorizeIssuance by authorizeIssuanceImpl,
     RequestIssuance by requestIssuanceImpl,
-    QueryForDeferredCredential by queryForDeferredCredentialImpl {
+    QueryForDeferredCredential by queryForDeferredCredentialImpl,
+    NotifyIssuer by notifyIssuerImpl {
 
         companion object {
             operator fun invoke(
@@ -32,23 +34,34 @@ internal class DefaultIssuer private constructor(
                 config: OpenId4VCIConfig,
                 ktorHttpClientFactory: KtorHttpClientFactory,
                 responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
-            ): DefaultIssuer = DefaultIssuer(
-                authorizeIssuanceImpl = AuthorizeIssuanceImpl(
-                    credentialOffer = credentialOffer,
-                    config = config,
-                    ktorHttpClientFactory = ktorHttpClientFactory,
-                ),
-                requestIssuanceImpl = RequestIssuanceImpl(
-                    credentialOffer = credentialOffer,
-                    issuerMetadata = credentialOffer.credentialIssuerMetadata,
-                    config = config,
-                    ktorHttpClientFactory = ktorHttpClientFactory,
-                    responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-                ),
-                queryForDeferredCredentialImpl = QueryForDeferredCredentialImpl(
+                preference: AuthorizeIssuancePreference = AuthorizeIssuancePreference.FAVOR_SCOPES,
+            ): DefaultIssuer {
+                val issuanceServerClient = IssuanceServerClient(
                     credentialOffer.credentialIssuerMetadata,
                     ktorHttpClientFactory,
-                ),
-            )
+                )
+
+                return DefaultIssuer(
+                    authorizeIssuanceImpl = AuthorizeIssuanceImpl(
+                        credentialOffer = credentialOffer,
+                        config = config,
+                        ktorHttpClientFactory = ktorHttpClientFactory,
+                        preference = preference,
+                    ),
+                    requestIssuanceImpl = RequestIssuanceImpl(
+                        credentialOffer = credentialOffer,
+                        issuerMetadata = credentialOffer.credentialIssuerMetadata,
+                        config = config,
+                        issuanceServerClient = issuanceServerClient,
+                        responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+                    ),
+                    queryForDeferredCredentialImpl = QueryForDeferredCredentialImpl(
+                        issuanceServerClient = issuanceServerClient,
+                    ),
+                    notifyIssuerImpl = NotifyIssuerImpl(
+                        issuanceServerClient = issuanceServerClient,
+                    ),
+                )
+            }
         }
     }

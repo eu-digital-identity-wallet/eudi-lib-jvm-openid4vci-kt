@@ -46,18 +46,19 @@ data class CredentialIssuerMetadata(
     val credentialEndpoint: CredentialIssuerEndpoint,
     val batchCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
+    val notificationEndpoint: CredentialIssuerEndpoint? = null,
     val credentialResponseEncryption: CredentialResponseEncryption = NotRequired,
     val credentialIdentifiersSupported: Boolean = false,
-    val credentialsSupported: Map<CredentialIdentifier, CredentialSupported>,
+    val credentialConfigurationsSupported: Map<CredentialConfigurationIdentifier, CredentialConfiguration>,
     val display: List<Display> = emptyList(),
 ) : Serializable {
 
     init {
-        require(credentialsSupported.isNotEmpty()) { "credentialsSupported must not be empty" }
+        require(credentialConfigurationsSupported.isNotEmpty()) { "credentialConfigurationsSupported must not be empty" }
     }
 
-    inline fun <reified T : CredentialSupported> findByFormat(predicate: (T) -> Boolean): Map<CredentialIdentifier, T> {
-        return credentialsSupported.mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }.toMap()
+    inline fun <reified T : CredentialConfiguration> findByFormat(predicate: (T) -> Boolean): Map<CredentialConfigurationIdentifier, T> {
+        return credentialConfigurationsSupported.mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }.toMap()
     }
 
     /**
@@ -139,6 +140,11 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
      * The URL of the Deferred Credential Endpoint is not valid.
      */
     class InvalidDeferredCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+
+    /**
+     * The URL of the Notification Endpoint is not valid.
+     */
+    class InvalidNotificationEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * Credential Encryption Algorithms are required.

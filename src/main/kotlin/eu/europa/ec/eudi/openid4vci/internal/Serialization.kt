@@ -16,10 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.ClaimName
-import eu.europa.ec.eudi.openid4vci.MsoMdocClaimSet
-import eu.europa.ec.eudi.openid4vci.Namespace
-import eu.europa.ec.eudi.openid4vci.ProofType
+import eu.europa.ec.eudi.openid4vci.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -53,13 +50,14 @@ internal object ProofSerializer : KSerializer<Proof> {
         @SerialName("proof_type") val proofType: String,
         @SerialName("jwt") val jwt: String? = null,
         @SerialName("cwt") val cwt: String? = null,
+        @SerialName("ldp_vp") val ldpVp: String? = null,
     )
 
-    private val proofSerializer = serializer<ProofJson>()
-    override val descriptor: SerialDescriptor = SerialDescriptor("Proof", proofSerializer.descriptor)
+    private val internal = serializer<ProofJson>()
+    override val descriptor: SerialDescriptor = SerialDescriptor("Proof", internal.descriptor)
 
     override fun deserialize(decoder: Decoder): Proof {
-        val deserialized = proofSerializer.deserialize(decoder)
+        val deserialized = internal.deserialize(decoder)
         return when (deserialized.proofType) {
             ProofType.JWT.toString().lowercase() -> {
                 deserialized.jwt?.let {
@@ -79,7 +77,7 @@ internal object ProofSerializer : KSerializer<Proof> {
 
     override fun serialize(encoder: Encoder, value: Proof) {
         when (value) {
-            is Proof.Cwt -> proofSerializer.serialize(
+            is Proof.Cwt -> internal.serialize(
                 encoder,
                 ProofJson(
                     proofType = ProofType.CWT.toString().lowercase(),
@@ -87,11 +85,19 @@ internal object ProofSerializer : KSerializer<Proof> {
                 ),
             )
 
-            is Proof.Jwt -> proofSerializer.serialize(
+            is Proof.Jwt -> internal.serialize(
                 encoder,
                 ProofJson(
                     proofType = ProofType.JWT.toString().lowercase(),
                     jwt = value.jwt.serialize(),
+                ),
+            )
+
+            is Proof.LdpVp -> internal.serialize(
+                encoder,
+                ProofJson(
+                    proofType = ProofType.LDP_VP.toString().lowercase(),
+                    jwt = value.ldpVp,
                 ),
             )
         }
@@ -101,11 +107,9 @@ internal object ProofSerializer : KSerializer<Proof> {
 internal object ClaimSetSerializer : KSerializer<MsoMdocClaimSet> {
 
     val internal = serializer<Map<Namespace, Map<ClaimName, JsonObject>>>()
-    override val descriptor: SerialDescriptor =
-        internal.descriptor
+    override val descriptor: SerialDescriptor = internal.descriptor
 
-    override fun deserialize(decoder: Decoder): MsoMdocClaimSet =
-        internal.deserialize(decoder).asMsoMdocClaimSet()
+    override fun deserialize(decoder: Decoder): MsoMdocClaimSet = internal.deserialize(decoder).asMsoMdocClaimSet()
 
     override fun serialize(encoder: Encoder, value: MsoMdocClaimSet) {
         internal.serialize(encoder, value.toJson())
@@ -120,4 +124,39 @@ internal object ClaimSetSerializer : KSerializer<MsoMdocClaimSet> {
             .mapValues { (_, vs) -> vs.associate { (_, claimName) -> claimName to emptyJsonObject } }
 
     private val emptyJsonObject = JsonObject(emptyMap())
+}
+
+@OptIn(ExperimentalSerializationApi::class)
+internal object GrantedAuthorizationDetailsSerializer : KSerializer<Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>> {
+
+    @Serializable
+    data class AuthorizationDetailJson(
+        @SerialName("type") val type: String,
+        @SerialName("format") val format: String? = null,
+        @SerialName("credential_configuration_id") val credentialConfigurationId: String,
+        @SerialName("credential_identifiers") val credentialIdentifiers: List<String>,
+    )
+
+    private val internal = serializer<List<AuthorizationDetailJson>>()
+    override val descriptor: SerialDescriptor = SerialDescriptor("GrantedAuthorizationDetails", internal.descriptor)
+
+    override fun deserialize(decoder: Decoder): Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> {
+        val deserialized = internal.deserialize(decoder)
+        return deserialized.map {
+            CredentialConfigurationIdentifier(it.credentialConfigurationId) to it.credentialIdentifiers.map { CredentialIdentifier(it) }
+        }.toMap()
+    }
+
+    override fun serialize(encoder: Encoder, value: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>) {
+        internal.serialize(
+            encoder,
+            value.entries.map {
+                AuthorizationDetailJson(
+                    type = "openid_credential",
+                    credentialConfigurationId = it.key.value,
+                    credentialIdentifiers = it.value.map(CredentialIdentifier::value),
+                )
+            },
+        )
+    }
 }

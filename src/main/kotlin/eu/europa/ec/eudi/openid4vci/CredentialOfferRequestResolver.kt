@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialOfferRequestResolver
+import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.http.*
 import java.io.Serializable
 import kotlin.time.Duration
@@ -27,11 +28,11 @@ data class CredentialOffer(
     val credentialIssuerIdentifier: CredentialIssuerId,
     val credentialIssuerMetadata: CredentialIssuerMetadata,
     val authorizationServerMetadata: CIAuthorizationServerMetadata,
-    val credentials: List<CredentialIdentifier>,
+    val credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
     val grants: Grants? = null,
 ) : Serializable {
     init {
-        require(credentials.isNotEmpty()) { "credentials must not be empty" }
+        require(credentialConfigurationIdentifiers.isNotEmpty()) { "credentials must not be empty" }
     }
 }
 
@@ -83,7 +84,7 @@ sealed interface Grants : Serializable {
      */
     data class PreAuthorizedCode(
         val preAuthorizedCode: String,
-        val pinRequired: Boolean = false,
+        val txCode: TxCode? = null,
         val interval: Duration,
         val authorizationServer: HttpsUrl? = null,
     ) : Grants {
@@ -100,6 +101,29 @@ sealed interface Grants : Serializable {
         val authorizationCode: AuthorizationCode,
         val preAuthorizedCode: PreAuthorizedCode,
     ) : Grants
+}
+
+data class TxCode(
+    val inputMode: TxCodeInputMode = TxCodeInputMode.NUMERIC,
+    val length: Int? = null,
+    val description: String? = null,
+) {
+    init {
+        description?.let {
+            ensure(it.length <= DescriptionMaxSize) {
+                val er = IllegalArgumentException("Transaction code description over $DescriptionMaxSize characters")
+                CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
+            }
+        }
+    }
+
+    companion object {
+        private const val DescriptionMaxSize = 300
+    }
+}
+
+enum class TxCodeInputMode {
+    NUMERIC, TEXT
 }
 
 /**

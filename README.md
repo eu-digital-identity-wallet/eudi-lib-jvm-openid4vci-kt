@@ -18,7 +18,7 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
 ## Overview
 
 This is a Kotlin library, targeting JVM, that supports 
-the [OpenId4VCI (draft 12)](https://openid.bitbucket.io/connect/openid-4-verifiable-credential-issuance-1_0.html) protocol.
+the [OpenId4VCI (draft 13)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html) protocol.
 In particular, the library focuses on the wallet's role in the protocol to:
 - Resolve credential issuer metadata 
 - Resolve metadata of the authorization server protecting issuance services
@@ -169,8 +169,8 @@ Given an `authorizedRequest` and in the context of an `issuer` a single credenti
 import eu.europa.ec.eudi.openid4vci.*
 
 with(issuer) {
-    val submittedRequest =
-        authorizedRequest.requestSingle(credentialIdentifiers, claimSet, bindingKey).getOrThrow()
+    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+    val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
 
     when (submittedRequest) {
         is SubmittedRequest.Success -> {
@@ -262,24 +262,27 @@ val (issuerMetadata, authServersMetadata) = Issuer.metaData(httpClient, credenti
 
 ## Features supported
 
-### Authorization Endpoint
-Specification defines ([section 5.1.1](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-5.1.1)) that a credential's issuance can be requested using authorization_details parameter when using authorization code flow.
-Current version of the library does not support that. It only supports requesting issuance using `scope` parameter in the authorization endpoint. 
+### Issuer metadata 
+In [section 11.2.3](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#section-11.2.3) specification details the metadata an issuer advertises through its metadata endpoint.
+Current version of the library supports all metadata specified there except `signed_metadata` attribute.
 
-### Token Endpoint
-Specification defines ([section 6.2](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-6.2)) that upon a successful token response `authorization_details` is included in response,
-if `authorization_details` parameter is used in authorization endpoint. Current version of library is not parsing/utilizing this response attribute.
+### Authorization
+Specification defines ([section 5.1.1](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#section-5.1.1)) that a credential's issuance 
+can be requested using `authorization_details` or `scope` parameter when using authorization code flow. Current version of the library supports usage of both parameters.
+Though for `authorization_details` we don't yet support the `format` attribute and its specializations per profile as specified in [Appendix A](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#appendix-A).
+Only `credential_configuration_id` attribute is supported.
+
+The same stands for the **token endpoint** when (as specified in [section 6.2](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#section-6.2)) server response includes 
+`authorization_details`. In this case too library does not support authorization details that include `format` attribute. 
 
 ### Credential Request
-Current version of the library implements integrations with issuer's [Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-credential-endpoint),
-[Batch Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-batch-credential-endpoint) and
-[Deferred Crednetial Endpoint](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#name-deferred-credential-endpoin)
-endpoints.
-
-**NOTE:** Attribute `credential_identifier` of a credential request (single or batch) is not yet supported.
+Current version of the library implements integrations with issuer's [Crednetial Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-credential-endpoint),
+[Batch Crednetial Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-batch-credential-endpoint),
+[Deferred Crednetial Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-deferred-credential-endpoin) and
+[Notification Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-notification-endpoint).
 
 #### Credential Format Profiles
-OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library fully supports **ISO mDL** profile and gives some initial support for **IETF SD-JWT VC** profile.  
+OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library fully supports **ISO mDL** and **IETF SD-JWT VC** profiles.  
 
 #### Proof Types
 OpenId4VCI specification (draft 12) defines two types of proofs that can be included in a credential issuance request, JWT proof type and CWT proof type. Current version of the library supports only JWT proof types

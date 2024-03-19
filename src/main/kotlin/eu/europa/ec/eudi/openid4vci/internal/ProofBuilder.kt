@@ -32,7 +32,7 @@ internal sealed interface ProofBuilder {
     fun aud(aud: String)
     fun nonce(nonce: String)
     fun publicKey(publicKey: BindingKey)
-    fun credentialSpec(credentialSpec: CredentialSupported)
+    fun credentialSpec(credentialSpec: CredentialConfiguration)
 
     fun build(proofSigner: ProofSigner): Proof
 
@@ -41,7 +41,7 @@ internal sealed interface ProofBuilder {
         private val headerType = "openid4vci-proof+jwt"
         val claimsSet = JWTClaimsSet.Builder()
         var publicKey: BindingKey? = null
-        var credentialSpec: CredentialSupported? = null
+        var credentialSpec: CredentialConfiguration? = null
 
         override fun iss(iss: String) {
             claimsSet.issuer(iss)
@@ -59,7 +59,7 @@ internal sealed interface ProofBuilder {
             this.publicKey = publicKey
         }
 
-        override fun credentialSpec(credentialSpec: CredentialSupported) {
+        override fun credentialSpec(credentialSpec: CredentialConfiguration) {
             this.credentialSpec = credentialSpec
         }
 
@@ -67,7 +67,8 @@ internal sealed interface ProofBuilder {
             val spec = checkNotNull(credentialSpec) {
                 "No credential specification provided"
             }
-            ensure(ProofType.JWT in spec.proofTypesSupported) {
+            val proofTypesSupported = spec.proofTypesSupported
+            ensure(ProofType.JWT in proofTypesSupported.keys) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
             }
             val header = run {
@@ -106,6 +107,7 @@ internal sealed interface ProofBuilder {
                 }
 
                 ProofType.CWT -> TODO("CWT proofs not supported yet")
+                ProofType.LDP_VP -> TODO("LDP_VP proofs not supported yet")
             }
         }
     }

@@ -15,42 +15,19 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.BatchIssuanceSuccessResponse
 import eu.europa.ec.eudi.openid4vci.internal.CertificateIssuanceResponse
-import eu.europa.ec.eudi.openid4vci.internal.formats.FORMAT_MSO_MDOC
-import eu.europa.ec.eudi.openid4vci.internal.formats.FORMAT_SD_JWT_VC
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.net.URI
-import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
 class IssuanceBatchRequestTest {
-
-    val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
-
-    val PID_SdJwtVC_SCOPE = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-    val PID_MsoMdoc_SCOPE = "eu.europa.ec.eudiw.pid_mso_mdoc"
-
-    private val CREDENTIAL_OFFER_NO_GRANTS = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credentials": ["$PID_MsoMdoc_SCOPE", "$PID_SdJwtVC_SCOPE"]          
-        }
-    """.trimIndent()
-
-    val vciWalletConfiguration = OpenId4VCIConfig(
-        clientId = "MyWallet_ClientId",
-        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-    )
 
     @Test
     fun `successful batch issuance`() = runTest {
@@ -68,11 +45,9 @@ class IssuanceBatchRequestTest {
                                 BatchIssuanceSuccessResponse(
                                     credentialResponses = listOf(
                                         CertificateIssuanceResponse(
-                                            format = FORMAT_MSO_MDOC,
                                             credential = "issued_credential_content_mso_mdoc",
                                         ),
                                         CertificateIssuanceResponse(
-                                            format = FORMAT_SD_JWT_VC,
                                             credential = "issued_credential_content_sd_jwt_vc",
                                         ),
                                     ),
@@ -104,7 +79,7 @@ class IssuanceBatchRequestTest {
             ) {},
         )
         val (_, authorizedRequest, issuer) =
-            initIssuerWithOfferAndAuthorize(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
+            authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
 
         val claimSet_mso_mdoc = MsoMdocClaimSet(
             claims = listOf(
@@ -126,28 +101,35 @@ class IssuanceBatchRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialMetadata = listOf(
-                        CredentialIdentifier(PID_MsoMdoc_SCOPE) to claimSet_mso_mdoc,
-                        CredentialIdentifier(PID_SdJwtVC_SCOPE) to claimSet_sd_jwt_vc,
+                    val batchRequestPayload = listOf(
+                        IssuanceRequestPayload.ConfigurationBased(
+                            CredentialConfigurationIdentifier(PID_MsoMdoc),
+                            claimSet_mso_mdoc,
+                        ),
+                        IssuanceRequestPayload.ConfigurationBased(
+                            CredentialConfigurationIdentifier(PID_SdJwtVC),
+                            claimSet_sd_jwt_vc,
+                        ),
                     )
-
-                    val submittedRequest =
-                        authorizedRequest.requestBatch(credentialMetadata).getOrThrow()
-
+                    val submittedRequest = authorizedRequest.requestBatch(batchRequestPayload).getOrThrow()
                     when (submittedRequest) {
                         is SubmittedRequest.InvalidProof -> {
                             val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
 
                             val proofSigner = CryptoGenerator.rsaProofSigner()
                             val credentialMetadataTriples = listOf(
-                                Triple(
-                                    CredentialIdentifier(PID_MsoMdoc_SCOPE),
-                                    claimSet_mso_mdoc,
+                                Pair(
+                                    IssuanceRequestPayload.ConfigurationBased(
+                                        CredentialConfigurationIdentifier(PID_MsoMdoc),
+                                        claimSet_mso_mdoc,
+                                    ),
                                     proofSigner,
                                 ),
-                                Triple(
-                                    CredentialIdentifier(PID_SdJwtVC_SCOPE),
-                                    claimSet_sd_jwt_vc,
+                                Pair(
+                                    IssuanceRequestPayload.ConfigurationBased(
+                                        CredentialConfigurationIdentifier(PID_SdJwtVC),
+                                        claimSet_sd_jwt_vc,
+                                    ),
                                     proofSigner,
                                 ),
                             )
@@ -160,8 +142,7 @@ class IssuanceBatchRequestTest {
 
                             assertTrue("Second attempt should be successful") {
                                 (response as SubmittedRequest.Success).credentials.all {
-                                    it is IssuedCredential.Issued &&
-                                        it.format in listOf(FORMAT_MSO_MDOC, FORMAT_SD_JWT_VC)
+                                    it is IssuedCredential.Issued
                                 }
                             }
                         }
@@ -180,27 +161,5 @@ class IssuanceBatchRequestTest {
                     fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
             }
         }
-    }
-
-    private suspend fun initIssuerWithOfferAndAuthorize(
-        ktorHttpClientFactory: KtorHttpClientFactory,
-        credentialOfferStr: String,
-    ): Triple<CredentialOffer, AuthorizedRequest, Issuer> {
-        val offer = CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
-            .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
-            .getOrThrow()
-
-        val issuer = Issuer.make(
-            config = vciWalletConfiguration,
-            credentialOffer = offer,
-            ktorHttpClientFactory = ktorHttpClientFactory,
-        )
-
-        val authorizedRequest = with(issuer) {
-            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
-            val authorizationCode = UUID.randomUUID().toString()
-            authRequestPrepared.authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode)).getOrThrow()
-        }
-        return Triple(offer, authorizedRequest, issuer)
     }
 }

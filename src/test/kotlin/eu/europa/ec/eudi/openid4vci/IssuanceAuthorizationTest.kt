@@ -15,8 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponse
+import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponseTO
 import eu.europa.ec.eudi.openid4vci.internal.PushedAuthorizationRequestResponse
 import eu.europa.ec.eudi.openid4vci.internal.TokenEndpointForm
 import io.ktor.client.engine.mock.*
@@ -25,20 +24,18 @@ import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.net.URI
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.fail
+import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail as NimbusAuthorizationDetail
 
 class IssuanceAuthorizationTest {
 
-    private val CredentialIssuer_URL = "https://credential-issuer.example.com"
-
     private val AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
         {
-          "credential_issuer": "$CredentialIssuer_URL",
-          "credentials": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
           "grants": {
             "authorization_code": {
               "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
@@ -47,31 +44,20 @@ class IssuanceAuthorizationTest {
         }
     """.trimIndent()
 
-    private val AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS = """
-        {
-          "credential_issuer": "$CredentialIssuer_URL",
-          "credentials": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"]          
-        }
-    """.trimIndent()
-
     private val PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
         {
-          "credential_issuer": "$CredentialIssuer_URL",
-          "credentials": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
           "grants": {
             "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
               "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
-              "user_pin_required": true
+              "tx_code": {
+                "input_mode": "numeric"
+              }
             }
           }
         }
     """.trimIndent()
-
-    val vciWalletConfiguration = OpenId4VCIConfig(
-        clientId = "MyWallet_ClientId",
-        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-    )
 
     @Test
     fun `successful authorization with authorization code flow (wallet initiated)`() =
@@ -140,9 +126,9 @@ class IssuanceAuthorizationTest {
                 },
             )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -223,9 +209,9 @@ class IssuanceAuthorizationTest {
                 },
             )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER_NO_GRANTS)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -264,8 +250,8 @@ class IssuanceAuthorizationTest {
                     assertTrue("Parameter ${TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM} was expected but not sent.") {
                         form.formData[TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM] != null
                     }
-                    assertTrue("Parameter ${TokenEndpointForm.PreAuthCodeFlow.USER_PIN_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.PreAuthCodeFlow.USER_PIN_PARAM] != null
+                    assertTrue("Parameter ${TokenEndpointForm.PreAuthCodeFlow.TX_CODE_PARAM} was expected but not sent.") {
+                        form.formData[TokenEndpointForm.PreAuthCodeFlow.TX_CODE_PARAM] != null
                     }
 
                     val grantType = form.formData[TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM]
@@ -281,17 +267,108 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
             with(issuer) {
-                authorizeWithPreAuthorizationCode("pin").getOrThrow()
+                authorizeWithPreAuthorizationCode("123456").getOrThrow()
             }
         }
 
     @Test
-    fun `(pre-auth code flow) when access token endpoint return nonce then authorized request must be ProofRequired`() =
+    fun `(pre-auth flow) when pre-authorized grant's tx_code is of wrong length exception is raised`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                oidcWellKnownMocker(),
+            )
+
+            val preAuthGrantOffer = """
+                {
+                  "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+                  "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+                  "grants": {
+                    "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+                      "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
+                      "tx_code": {
+                        "input_mode": "text",
+                        "length": 4
+                      }
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            val offer = credentialOffer(mockedKtorHttpClientFactory, preAuthGrantOffer)
+            val issuer = Issuer.make(
+                config = OpenId4VCIConfiguration,
+                credentialOffer = offer,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            )
+
+            with(issuer) {
+                authorizeWithPreAuthorizationCode("123456")
+                    .fold(
+                        onSuccess = {
+                            fail("Exception expected to be thrown")
+                        },
+                        onFailure = {
+                            assertTrue("Expected an IllegalArgumentException to be thrown but was not") {
+                                it is IllegalArgumentException
+                            }
+                        },
+                    )
+            }
+        }
+
+    @Test
+    fun `(pre-auth flow) when pre-authorized grant's tx_code is of wrong input mode exception is raised`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                oidcWellKnownMocker(),
+            )
+
+            val preAuthGrantOffer = """
+                {
+                  "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+                  "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+                  "grants": {
+                    "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+                      "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
+                      "tx_code": {
+                        "input_mode": "numeric"
+                      }
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            val offer = credentialOffer(mockedKtorHttpClientFactory, preAuthGrantOffer)
+            val issuer = Issuer.make(
+                config = OpenId4VCIConfiguration,
+                credentialOffer = offer,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            )
+
+            with(issuer) {
+                authorizeWithPreAuthorizationCode("AbdSS2356")
+                    .fold(
+                        onSuccess = {
+                            fail("Exception expected to be thrown")
+                        },
+                        onFailure = {
+                            assertTrue("Expected an IllegalArgumentException to be thrown but was not") {
+                                it is IllegalArgumentException
+                            }
+                        },
+                    )
+            }
+        }
+
+    @Test
+    fun `(pre-auth flow) when token endpoint returns nonce and offer requires proofs then authorized request must be ProofRequired`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
@@ -302,7 +379,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponse.Success(
+                                AccessTokenRequestResponseTO.Success(
                                     accessToken = UUID.randomUUID().toString(),
                                     expiresIn = 3600,
                                     cNonce = "dfghhj34wpCJp",
@@ -319,7 +396,7 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -332,13 +409,13 @@ class IssuanceAuthorizationTest {
                             fail("Exception expected to be thrown")
                         },
                         onFailure = {
-                            assertTrue("Expected PushedAuthorizationRequestFailed to be thrown but was not") {
-                                it is IllegalStateException
+                            assertTrue("Expected IllegalStateException to be thrown but was not") {
+                                it is IllegalArgumentException
                             }
                         },
                     )
 
-                val authorizedRequest = authorizeWithPreAuthorizationCode("pin").getOrThrow()
+                val authorizedRequest = authorizeWithPreAuthorizationCode("123456").getOrThrow()
                 assertTrue("Token endpoint provides c_nonce but authorized request is not ProofRequired") {
                     authorizedRequest is AuthorizedRequest.ProofRequired
                 }
@@ -346,7 +423,7 @@ class IssuanceAuthorizationTest {
         }
 
     @Test
-    fun `(auth code flow) when access token endpoint return nonce then authorized request must be ProofRequired`() =
+    fun `(auth code flow) when token endpoint returns nonce and offer requires proofs then authorized request must be ProofRequired`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
@@ -357,7 +434,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponse.Success(
+                                AccessTokenRequestResponseTO.Success(
                                     accessToken = UUID.randomUUID().toString(),
                                     expiresIn = 3600,
                                     cNonce = "dfghhj34wpCJp",
@@ -374,7 +451,7 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -386,6 +463,108 @@ class IssuanceAuthorizationTest {
 
                 assertTrue("Token endpoint provides c_nonce but authorized request is not ProofRequired") {
                     authorizedRequest is AuthorizedRequest.ProofRequired
+                }
+            }
+        }
+
+    @Test
+    fun `when token endpoint returns nonce and offer does not require proofs then authorized request must be NoProofRequired`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                oidcWellKnownMocker(),
+                parPostMocker(),
+                RequestMocker(
+                    requestMatcher = endsWith("/token", HttpMethod.Post),
+                    responseBuilder = {
+                        respond(
+                            content = Json.encodeToString(
+                                AccessTokenRequestResponseTO.Success(
+                                    accessToken = UUID.randomUUID().toString(),
+                                    expiresIn = 3600,
+                                    cNonce = "dfghhj34wpCJp",
+                                    cNonceExpiresIn = 86400,
+                                ),
+                            ),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(
+                                HttpHeaders.ContentType to listOf("application/json"),
+                            ),
+                        )
+                    },
+                ),
+            )
+
+            val noProofRequiredOffer = """
+            {
+              "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+              "credential_configuration_ids": ["MobileDrivingLicense_msoMdoc"],
+              "grants": {
+                "authorization_code": {
+                  "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
+                }
+              }
+            }
+            """.trimIndent()
+
+            val offer = credentialOffer(mockedKtorHttpClientFactory, noProofRequiredOffer)
+            val issuer = Issuer.make(
+                config = OpenId4VCIConfiguration,
+                credentialOffer = offer,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            )
+
+            with(issuer) {
+                val authorizedRequest = prepareAuthorizationRequest().getOrThrow()
+                    .authorizeWithAuthorizationCode(AuthorizationCode("auth-code"))
+                    .getOrThrow()
+
+                assertTrue("Offer does not require proofs but authorized request is ProofRequired instead of NoProofRequired") {
+                    authorizedRequest is AuthorizedRequest.NoProofRequired
+                }
+            }
+        }
+
+    @Test
+    fun `when token endpoint does not return nonce and offer require proofs then authorized request must be NoProofRequired`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                oidcWellKnownMocker(),
+                parPostMocker(),
+                RequestMocker(
+                    requestMatcher = endsWith("/token", HttpMethod.Post),
+                    responseBuilder = {
+                        respond(
+                            content = Json.encodeToString(
+                                AccessTokenRequestResponseTO.Success(
+                                    accessToken = UUID.randomUUID().toString(),
+                                    expiresIn = 3600,
+                                ),
+                            ),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(
+                                HttpHeaders.ContentType to listOf("application/json"),
+                            ),
+                        )
+                    },
+                ),
+            )
+
+            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+            val issuer = Issuer.make(
+                config = OpenId4VCIConfiguration,
+                credentialOffer = offer,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            )
+
+            with(issuer) {
+                val authorizedRequest = prepareAuthorizationRequest().getOrThrow()
+                    .authorizeWithAuthorizationCode(AuthorizationCode("auth-code"))
+                    .getOrThrow()
+
+                assertTrue("Expected authorized request to be of type NoProofRequired but is ProofRequired") {
+                    authorizedRequest is AuthorizedRequest.NoProofRequired
                 }
             }
         }
@@ -416,7 +595,7 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -436,7 +615,7 @@ class IssuanceAuthorizationTest {
         }
 
     @Test
-    fun `when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown (auth code flow)`() =
+    fun `(auth code flow) when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
@@ -447,7 +626,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponse.Failure(
+                                AccessTokenRequestResponseTO.Failure(
                                     error = "unauthorized_client",
                                 ),
                             ),
@@ -461,7 +640,7 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -485,7 +664,7 @@ class IssuanceAuthorizationTest {
         }
 
     @Test
-    fun `when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown (pre-auth code flow)`() =
+    fun `(pre-auth code flow) when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
@@ -496,7 +675,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponse.Failure(
+                                AccessTokenRequestResponseTO.Failure(
                                     error = "unauthorized_client",
                                 ),
                             ),
@@ -510,13 +689,13 @@ class IssuanceAuthorizationTest {
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
             val issuer = Issuer.make(
-                config = vciWalletConfiguration,
+                config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
-                authorizeWithPreAuthorizationCode("pin")
+                authorizeWithPreAuthorizationCode("123456")
                     .fold(
                         onSuccess = {
                             fail("Exception expected to be thrown")
@@ -530,12 +709,58 @@ class IssuanceAuthorizationTest {
             }
         }
 
+    @Test
+    fun `when offer has a credential with no 'scope' in its configuration, then authorization_details attribute is included in request`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                parPostMocker { request ->
+                    val form = request.body as FormDataContent
+                    assertTrue("Missing authorization_details request attribute") {
+                        form.formData["authorization_details"] != null
+                    }
+                    val authDetails = NimbusAuthorizationDetail.parseList(form.formData["authorization_details"])
+                    assertTrue("Missing authorization_details eu.europa.ec.eudiw.pid_mso_mdoc") {
+                        authDetails.any {
+                            it.getField("credential_configuration_id") != null &&
+                                it.getField("credential_configuration_id").equals("eu.europa.ec.eudiw.pid_mso_mdoc")
+                        }
+                    }
+
+                    assertTrue("Missing scope attribute") {
+                        form.formData["scope"] != null
+                    }
+                    assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
+                        form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
+                    }
+                },
+                RequestMocker(
+                    requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
+                    responseBuilder = {
+                        respond(
+                            content = getResourceAsText("well-known/openid-credential-issuer_no_scopes.json"),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType to listOf("application/json")),
+                        )
+                    },
+                ),
+            )
+            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+            val issuer = Issuer.make(
+                config = OpenId4VCIConfiguration,
+                credentialOffer = offer,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            )
+
+            issuer.prepareAuthorizationRequest()
+        }
+
     private suspend fun credentialOffer(
         ktorHttpClientFactory: KtorHttpClientFactory,
         credentialOfferStr: String,
     ): CredentialOffer {
         return CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
-            .resolve("https://$CredentialIssuer_URL/credentialoffer?credential_offer=$credentialOfferStr")
+            .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
             .getOrThrow()
     }
 }

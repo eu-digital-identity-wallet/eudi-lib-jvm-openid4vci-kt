@@ -15,19 +15,22 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponse
+import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponseTO
 import eu.europa.ec.eudi.openid4vci.internal.PushedAuthorizationRequestResponse
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.http.content.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import java.util.*
 
 internal fun credentialIssuerMetaDataHandler(id: CredentialIssuerId, resource: String): RequestMocker = RequestMocker(
     match(id.metaDataUrl().value.toURI()),
     jsonResponse(resource),
 )
+
 internal fun oidcMetaDataHandler(oidcServerUrl: HttpsUrl, oidcMetaDataResource: String): RequestMocker = RequestMocker(
     match(oidcAuthorizationServerMetadataUrl(oidcServerUrl).value.toURI()),
     jsonResponse(oidcMetaDataResource),
@@ -90,7 +93,7 @@ internal fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit = {})
         responseBuilder = {
             respond(
                 content = Json.encodeToString(
-                    AccessTokenRequestResponse.Success(
+                    AccessTokenRequestResponseTO.Success(
                         accessToken = UUID.randomUUID().toString(),
                         expiresIn = 3600,
                     ),
@@ -104,8 +107,43 @@ internal fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit = {})
         requestValidator = validator,
     )
 
+internal fun tokenPostMockerWithAuthDetails(
+    configurationIds: List<CredentialConfigurationIdentifier>,
+    validator: (request: HttpRequestData) -> Unit = {},
+): RequestMocker =
+    RequestMocker(
+        requestMatcher = endsWith("/token", HttpMethod.Post),
+        responseBuilder = {
+            respond(
+                content = Json.encodeToString(
+                    AccessTokenRequestResponseTO.Success(
+                        accessToken = UUID.randomUUID().toString(),
+                        expiresIn = 3600,
+                        authorizationDetails = authorizationDetails(configurationIds),
+                    ),
+                ),
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("application/json"),
+                ),
+            )
+        },
+        requestValidator = validator,
+    )
+
+private fun authorizationDetails(
+    configurationIds: List<CredentialConfigurationIdentifier>,
+): Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> =
+    configurationIds.map {
+        it to listOf(
+            CredentialIdentifier("${it.value}_1"),
+            CredentialIdentifier("${it.value}_2"),
+        )
+    }.toMap()
+
 internal fun singleIssuanceRequestMocker(
-    responseBuilder: HttpResponseDataBuilder,
+    credential: String = "",
+    responseBuilder: HttpResponseDataBuilder = { defaultIssuanceResponseDataBuilder(it, credential) },
     requestValidator: (request: HttpRequestData) -> Unit = {},
 ): RequestMocker =
     RequestMocker(
@@ -133,3 +171,38 @@ internal fun deferredIssuanceRequestMocker(
         responseBuilder = responseBuilder,
         requestValidator = requestValidator,
     )
+
+private fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(request: HttpRequestData?, credential: String): HttpResponseData {
+    val textContent = request?.body as TextContent
+    val issuanceRequest = Json.decodeFromString<JsonObject>(textContent.text)
+    return if (issuanceRequest.get("proof") != null) {
+        respond(
+            content = """
+                    {                                  
+                      "credential": "$credential",
+                      "notification_id": "valbQc6p55LS",
+                      "c_nonce": "wlbQc6pCJp",
+                      "c_nonce_expires_in": 86400
+                    }
+            """.trimIndent(),
+            status = HttpStatusCode.OK,
+            headers = headersOf(
+                HttpHeaders.ContentType to listOf("application/json"),
+            ),
+        )
+    } else {
+        respond(
+            content = """
+                    {
+                        "error": "invalid_proof",
+                        "c_nonce": "ERE%@^TGWYEYWEY",
+                        "c_nonce_expires_in": 34
+                    } 
+            """.trimIndent(),
+            status = HttpStatusCode.BadRequest,
+            headers = headersOf(
+                HttpHeaders.ContentType to listOf("application/json"),
+            ),
+        )
+    }
+}
