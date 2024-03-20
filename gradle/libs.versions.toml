@@ -10,7 +10,7 @@ jsoup = "1.17.2"
 cbor = "0.9"
 java = "17"
 ktlint = "0.50.0"
-dokka = "1.9.10"
+dokka = "1.9.20"
 maven-publish = "0.28.0"
 
 [libraries]
