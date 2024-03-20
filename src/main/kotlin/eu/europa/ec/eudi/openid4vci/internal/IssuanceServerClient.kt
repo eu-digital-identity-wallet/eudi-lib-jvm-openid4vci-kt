@@ -23,7 +23,6 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 import eu.europa.ec.eudi.openid4vci.internal.formats.IssuanceRequestJsonMapper
 import io.ktor.client.call.*
@@ -166,18 +165,14 @@ internal class IssuanceServerClient(
         request: CredentialIssuanceRequest.SingleRequest,
     ): CredentialIssuanceResponse =
         if (response.status.isSuccess()) {
-            when (issuerMetadata.credentialResponseEncryption) {
-                is CredentialResponseEncryption.NotRequired -> {
+            when (val encryptionSpec = request.encryption) {
+                null -> {
                     val success = response.body<SingleIssuanceSuccessResponse>()
                     success.toDomain()
                 }
 
-                is CredentialResponseEncryption.Required -> {
+                else -> {
                     val jwt = response.body<String>()
-                    val encryptionSpec = ensureNotNull(request.encryption) {
-                        IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
-                    }
-
                     DefaultJWTProcessor<SecurityContext>().apply {
                         jweKeySelector = JWEDecryptionKeySelector(
                             encryptionSpec.algorithm,
@@ -206,12 +201,12 @@ internal class IssuanceServerClient(
     private suspend inline fun handleResponseBatch(response: HttpResponse): CredentialIssuanceResponse =
         if (response.status.isSuccess()) {
             when (issuerMetadata.credentialResponseEncryption) {
-                is CredentialResponseEncryption.NotRequired -> {
+                is CredentialResponseEncryption.NotSupported -> {
                     val success = response.body<BatchIssuanceSuccessResponse>()
                     success.toDomain()
                 }
 
-                is CredentialResponseEncryption.Required -> {
+                else -> {
                     TODO("ENCRYPTED RESPONSES OF BATCH ISSUANCE NOT YET SUPPORTED")
                 }
             }

@@ -348,8 +348,7 @@ interface ProofSigner : JWSSigner {
     fun getAlgorithm(): JWSAlgorithm
 }
 
-typealias ResponseEncryptionSpecFactory =
-    (CredentialResponseEncryption.Required, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec
+typealias ResponseEncryptionSpecFactory = (CredentialResponseEncryption, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec?
 
 /**
  * Errors that can happen in the process of issuance process

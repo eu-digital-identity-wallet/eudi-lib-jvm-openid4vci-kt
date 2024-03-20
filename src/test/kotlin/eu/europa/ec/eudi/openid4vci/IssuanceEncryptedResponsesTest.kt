@@ -55,16 +55,7 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                RequestMocker(
-                    requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
-                    responseBuilder = {
-                        respond(
-                            content = getResourceAsText("well-known/openid-credential-issuer_encrypted_responses.json"),
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType to listOf("application/json")),
-                        )
-                    },
-                ),
+                oidcWellKnownMocker(EncryptedResponses.REQUIRED),
             )
             val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
@@ -98,16 +89,7 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                RequestMocker(
-                    requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
-                    responseBuilder = {
-                        respond(
-                            content = getResourceAsText("well-known/openid-credential-issuer_encrypted_responses.json"),
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType to listOf("application/json")),
-                        )
-                    },
-                ),
+                oidcWellKnownMocker(EncryptedResponses.REQUIRED),
             )
             val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
@@ -140,32 +122,8 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                RequestMocker(
-                    requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
-                    responseBuilder = {
-                        respond(
-                            content = getResourceAsText("well-known/openid-credential-issuer_no_encryption.json"),
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType to listOf("application/json")),
-                        )
-                    },
-                ),
+                oidcWellKnownMocker(EncryptedResponses.NOT_SUPPORTED),
                 singleIssuanceRequestMocker(
-                    responseBuilder = {
-                        respond(
-                            content = """
-                                {
-                                    "error": "invalid_proof",
-                                    "c_nonce": "ERE%@^TGWYEYWEY",
-                                    "c_nonce_expires_in": 34
-                                }
-                            """.trimIndent(),
-                            status = HttpStatusCode.BadRequest,
-                            headers = headersOf(
-                                HttpHeaders.ContentType to listOf("application/json"),
-                            ),
-                        )
-                    },
                     requestValidator = {
                         val textContent = it.body as TextContent
                         val issuanceRequestTO = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text)
@@ -196,22 +154,84 @@ class IssuanceEncryptedResponsesTest {
         }
 
     @Test
-    fun `when issuer forces encrypted responses, request must include response encryption material`() =
+    fun `when issuer supports but not mandates encrypted responses, client can request encrypted responses`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                RequestMocker(
-                    requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
-                    responseBuilder = {
-                        respond(
-                            content = getResourceAsText("well-known/openid-credential-issuer_encrypted_responses.json"),
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType to listOf("application/json")),
-                        )
+                oidcWellKnownMocker(EncryptedResponses.SUPPORTED_NOT_REQUIRED),
+                singleIssuanceRequestMocker(
+                    requestValidator = {
+                        val textContent = it.body as TextContent
+                        val issuanceRequestTO = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text)
+                        assertTrue("Encryption parameters were expected to be sent but was not.") {
+                            issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
+                                issuanceRequestTO.credentialResponseEncryptionSpec != null
+                        }
                     },
                 ),
+            )
+            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
+                jwk = randomRSAEncryptionKey(2048),
+                algorithm = JWEAlgorithm.RSA_OAEP_256,
+                encryptionMethod = EncryptionMethod.A128CBC_HS256,
+            )
+            val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
+            )
+
+            with(issuer) {
+                val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
+                val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+                noProofRequired.requestSingle(requestPayload).getOrThrow()
+            }
+        }
+
+    @Test
+    fun `when issuer supports but not mandates encrypted responses, client can request NON encrypted responses`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                oidcWellKnownMocker(EncryptedResponses.SUPPORTED_NOT_REQUIRED),
+                singleIssuanceRequestMocker(
+                    requestValidator = {
+                        val textContent = it.body as TextContent
+                        val issuanceRequestTO = Json.decodeFromString<CredentialIssuanceRequestTO>(textContent.text)
+                        assertTrue("Encryption parameters were expected to be sent but was not.") {
+                            issuanceRequestTO is CredentialIssuanceRequestTO.SingleCredentialTO &&
+                                issuanceRequestTO.credentialResponseEncryptionSpec == null
+                        }
+                    },
+                ),
+            )
+            val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                responseEncryptionSpecFactory = { e, c -> null },
+            )
+
+            with(issuer) {
+                val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
+                val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+                noProofRequired.requestSingle(requestPayload).getOrThrow()
+            }
+        }
+
+    @Test
+    fun `when issuer mandates encrypted responses, request must include response encryption material`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                oidcWellKnownMocker(EncryptedResponses.REQUIRED),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
                         val textContent = it?.body as TextContent

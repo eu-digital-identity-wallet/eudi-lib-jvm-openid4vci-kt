@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.internal.DefaultAuthorizationServerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer
@@ -64,13 +66,31 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
         }
 
         val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =
-            { requiredEncryption, keyGenerationConfig ->
-                val method = requiredEncryption.encryptionMethodsSupported[0]
-                requiredEncryption.algorithmsSupported.firstNotNullOfOrNull { alg ->
-                    KeyGenerator.genKeyIfSupported(keyGenerationConfig, alg)?.let { jwk ->
-                        IssuanceResponseEncryptionSpec(jwk, alg, method)
+            { responseEncryption, keyGenerationConfig ->
+                when (responseEncryption) {
+                    is CredentialResponseEncryption.SupportedNotRequired -> {
+                        spec(responseEncryption.encryptionMethodsSupported, responseEncryption.algorithmsSupported, keyGenerationConfig)
                     }
-                } ?: error("Could not create encryption spec")
+
+                    is CredentialResponseEncryption.Required -> {
+                        spec(responseEncryption.encryptionMethodsSupported, responseEncryption.algorithmsSupported, keyGenerationConfig)
+                            ?: error("Could not create responseEncryption spec")
+                    }
+                    CredentialResponseEncryption.NotSupported -> null
+                }
             }
+
+        private fun spec(
+            encryptionMethodsSupported: List<EncryptionMethod>,
+            algorithmsSupported: List<JWEAlgorithm>,
+            keyGenerationConfig: KeyGenerationConfig,
+        ): IssuanceResponseEncryptionSpec? {
+            val method = encryptionMethodsSupported[0]
+            return algorithmsSupported.firstNotNullOfOrNull { alg ->
+                KeyGenerator.genKeyIfSupported(keyGenerationConfig, alg)?.let { jwk ->
+                    IssuanceResponseEncryptionSpec(jwk, alg, method)
+                }
+            }
+        }
     }
 }

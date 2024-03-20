@@ -485,31 +485,32 @@ private fun credentialSupportedFromTransferObject(csJson: W3CSignedJwtCredential
 }
 
 private fun CredentialIssuerMetadataTO.credentialResponseEncryption(): CredentialResponseEncryption {
-    val requireEncryption = credentialResponseEncryption?.encryptionRequired ?: false
-    val encryptionAlgorithms = credentialResponseEncryption?.algorithmsSupported
-        ?.map { JWEAlgorithm.parse(it) }
-        ?: emptyList()
-    val encryptionMethods = credentialResponseEncryption?.methodsSupported
-        ?.map { EncryptionMethod.parse(it) }
-        ?: emptyList()
+    if (credentialResponseEncryption == null) {
+        return CredentialResponseEncryption.NotSupported
+    }
 
-    return if (requireEncryption) {
-        if (encryptionAlgorithms.isEmpty()) {
-            throw CredentialIssuerMetadataValidationError.CredentialResponseEncryptionAlgorithmsRequired
-        }
-        val allAreAsymmetricAlgorithms = encryptionAlgorithms.all {
-            JWEAlgorithm.Family.ASYMMETRIC.contains(it)
-        }
-        if (!allAreAsymmetricAlgorithms) {
-            throw CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired
-        }
+    val encryptionAlgorithms = credentialResponseEncryption.algorithmsSupported.map { JWEAlgorithm.parse(it) }
+    val encryptionMethods = credentialResponseEncryption.methodsSupported.map { EncryptionMethod.parse(it) }
 
+    if (encryptionAlgorithms.isEmpty()) {
+        throw CredentialIssuerMetadataValidationError.CredentialResponseEncryptionAlgorithmsRequired
+    }
+    val allAreAsymmetricAlgorithms = encryptionAlgorithms.all {
+        JWEAlgorithm.Family.ASYMMETRIC.contains(it)
+    }
+    if (!allAreAsymmetricAlgorithms) {
+        throw CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired
+    }
+    return if (credentialResponseEncryption.encryptionRequired) {
         CredentialResponseEncryption.Required(
             encryptionAlgorithms,
             encryptionMethods,
         )
     } else {
-        CredentialResponseEncryption.NotRequired
+        CredentialResponseEncryption.SupportedNotRequired(
+            encryptionAlgorithms,
+            encryptionMethods,
+        )
     }
 }
 
