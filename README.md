@@ -263,6 +263,8 @@ val (issuerMetadata, authServersMetadata) = Issuer.metaData(httpClient, credenti
 ## Features supported
 
 ### Issuer metadata 
+In [section 11.2.2](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#section-11.2.2) specification recommends the use of header `Accept-Language` to indicate the language(s) preferred for display.
+Current version of the library does not support this. 
 In [section 11.2.3](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#section-11.2.3) specification details the metadata an issuer advertises through its metadata endpoint.
 Current version of the library supports all metadata specified there except `signed_metadata` attribute.
 
