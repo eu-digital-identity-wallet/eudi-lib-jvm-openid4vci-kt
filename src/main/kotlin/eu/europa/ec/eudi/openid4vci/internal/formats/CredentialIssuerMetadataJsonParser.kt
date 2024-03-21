@@ -485,17 +485,16 @@ private fun credentialSupportedFromTransferObject(csJson: W3CSignedJwtCredential
 }
 
 private fun CredentialIssuerMetadataTO.credentialResponseEncryption(): CredentialResponseEncryption {
-    if (credentialResponseEncryption == null) {
-        return CredentialResponseEncryption.NotSupported
+    fun algsAndMethods(): SupportedEncryptionAlgorithmsAndMethods {
+        requireNotNull(credentialResponseEncryption)
+        val encryptionAlgorithms = credentialResponseEncryption.algorithmsSupported.map { JWEAlgorithm.parse(it) }
+        val encryptionMethods = credentialResponseEncryption.methodsSupported.map { EncryptionMethod.parse(it) }
+        return SupportedEncryptionAlgorithmsAndMethods(encryptionAlgorithms, encryptionMethods)
     }
-    val encryptionAlgorithms = credentialResponseEncryption.algorithmsSupported.map { JWEAlgorithm.parse(it) }
-    val encryptionMethods = credentialResponseEncryption.methodsSupported.map { EncryptionMethod.parse(it) }
-    val encryptionAlgorithmsAndMethods = SupportedEncryptionAlgorithmsAndMethods(encryptionAlgorithms, encryptionMethods)
-
-    return if (credentialResponseEncryption.encryptionRequired) {
-        CredentialResponseEncryption.Required(encryptionAlgorithmsAndMethods)
-    } else {
-        CredentialResponseEncryption.SupportedNotRequired(encryptionAlgorithmsAndMethods)
+    return when {
+        credentialResponseEncryption == null -> CredentialResponseEncryption.NotSupported
+        credentialResponseEncryption.encryptionRequired -> CredentialResponseEncryption.Required(algsAndMethods())
+        else -> CredentialResponseEncryption.SupportedNotRequired(algsAndMethods())
     }
 }
 
