@@ -15,8 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
@@ -31,13 +29,12 @@ internal class RequestIssuanceImpl(
 
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec? by lazy {
         fun IssuanceResponseEncryptionSpec.validate(
-            algorithmsSupported: List<JWEAlgorithm>,
-            encryptionMethodsSupported: List<EncryptionMethod>,
+            supportedAlgorithmsAndMethods: SupportedEncryptionAlgorithmsAndMethods,
         ) {
-            ensure(algorithm in algorithmsSupported) {
+            ensure(algorithm in supportedAlgorithmsAndMethods.algorithms) {
                 CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
             }
-            ensure(encryptionMethod in encryptionMethodsSupported) {
+            ensure(encryptionMethod in supportedAlgorithmsAndMethods.encryptionMethods) {
                 CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer
             }
         }
@@ -46,14 +43,19 @@ internal class RequestIssuanceImpl(
             CredentialResponseEncryption.NotSupported -> null
 
             is CredentialResponseEncryption.SupportedNotRequired ->
-                responseEncryptionSpecFactory(encryption, config.keyGenerationConfig)?.apply {
-                    validate(encryption.algorithmsSupported, encryption.encryptionMethodsSupported)
-                }
+                if (config.preferEncryptedResponsesWhenSupported) {
+                    val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
+                    responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)?.apply {
+                        validate(supportedAlgorithmsAndMethods)
+                    }
+                } else null
 
-            is CredentialResponseEncryption.Required ->
-                responseEncryptionSpecFactory(encryption, config.keyGenerationConfig)?.apply {
-                    validate(encryption.algorithmsSupported, encryption.encryptionMethodsSupported)
+            is CredentialResponseEncryption.Required -> {
+                val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
+                responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)?.apply {
+                    validate(supportedAlgorithmsAndMethods)
                 } ?: throw IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+            }
         }
     }
 

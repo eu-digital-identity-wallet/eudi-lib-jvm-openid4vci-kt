@@ -27,22 +27,29 @@ sealed interface CredentialResponseEncryption : Serializable {
     }
 
     data class SupportedNotRequired(
-        val algorithmsSupported: List<JWEAlgorithm>,
-        val encryptionMethodsSupported: List<EncryptionMethod>,
-    ) : CredentialResponseEncryption {
-        init {
-            require(algorithmsSupported.isNotEmpty()) { "algorithmsSupported cannot be empty" }
-            require(encryptionMethodsSupported.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
-        }
-    }
+        val encryptionAlgorithmsAndMethods: SupportedEncryptionAlgorithmsAndMethods,
+    ) : CredentialResponseEncryption
 
     data class Required(
-        val algorithmsSupported: List<JWEAlgorithm>,
-        val encryptionMethodsSupported: List<EncryptionMethod>,
-    ) : CredentialResponseEncryption {
-        init {
-            require(algorithmsSupported.isNotEmpty()) { "algorithmsSupported cannot be empty" }
-            require(encryptionMethodsSupported.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
+        val encryptionAlgorithmsAndMethods: SupportedEncryptionAlgorithmsAndMethods,
+    ) : CredentialResponseEncryption
+}
+
+data class SupportedEncryptionAlgorithmsAndMethods(
+    val algorithms: List<JWEAlgorithm>,
+    val encryptionMethods: List<EncryptionMethod>,
+) {
+    init {
+        require(encryptionMethods.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
+
+        if (algorithms.isEmpty()) {
+            throw CredentialIssuerMetadataValidationError.CredentialResponseEncryptionAlgorithmsRequired
+        }
+        val allAreAsymmetricAlgorithms = algorithms.all {
+            JWEAlgorithm.Family.ASYMMETRIC.contains(it)
+        }
+        if (!allAreAsymmetricAlgorithms) {
+            throw CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired
         }
     }
 }

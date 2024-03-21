@@ -488,29 +488,14 @@ private fun CredentialIssuerMetadataTO.credentialResponseEncryption(): Credentia
     if (credentialResponseEncryption == null) {
         return CredentialResponseEncryption.NotSupported
     }
-
     val encryptionAlgorithms = credentialResponseEncryption.algorithmsSupported.map { JWEAlgorithm.parse(it) }
     val encryptionMethods = credentialResponseEncryption.methodsSupported.map { EncryptionMethod.parse(it) }
+    val encryptionAlgorithmsAndMethods = SupportedEncryptionAlgorithmsAndMethods(encryptionAlgorithms, encryptionMethods)
 
-    if (encryptionAlgorithms.isEmpty()) {
-        throw CredentialIssuerMetadataValidationError.CredentialResponseEncryptionAlgorithmsRequired
-    }
-    val allAreAsymmetricAlgorithms = encryptionAlgorithms.all {
-        JWEAlgorithm.Family.ASYMMETRIC.contains(it)
-    }
-    if (!allAreAsymmetricAlgorithms) {
-        throw CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired
-    }
     return if (credentialResponseEncryption.encryptionRequired) {
-        CredentialResponseEncryption.Required(
-            encryptionAlgorithms,
-            encryptionMethods,
-        )
+        CredentialResponseEncryption.Required(encryptionAlgorithmsAndMethods)
     } else {
-        CredentialResponseEncryption.SupportedNotRequired(
-            encryptionAlgorithms,
-            encryptionMethods,
-        )
+        CredentialResponseEncryption.SupportedNotRequired(encryptionAlgorithmsAndMethods)
     }
 }
 
