@@ -349,7 +349,7 @@ interface ProofSigner : JWSSigner {
 }
 
 typealias ResponseEncryptionSpecFactory =
-    (CredentialResponseEncryption.Required, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec
+    (SupportedEncryptionAlgorithmsAndMethods, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec?
 
 /**
  * Errors that can happen in the process of issuance process

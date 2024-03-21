@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 
 internal class RequestIssuanceImpl(
@@ -27,20 +28,34 @@ internal class RequestIssuanceImpl(
 ) : RequestIssuance {
 
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec? by lazy {
-        fun IssuanceResponseEncryptionSpec.validate(meta: CredentialResponseEncryption.Required) {
-            ensure(algorithm in meta.algorithmsSupported) {
+        fun IssuanceResponseEncryptionSpec.validate(
+            supportedAlgorithmsAndMethods: SupportedEncryptionAlgorithmsAndMethods,
+        ) {
+            ensure(algorithm in supportedAlgorithmsAndMethods.algorithms) {
                 CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
             }
-            ensure(encryptionMethod in meta.encryptionMethodsSupported) {
+            ensure(encryptionMethod in supportedAlgorithmsAndMethods.encryptionMethods) {
                 CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer
             }
         }
+
         when (val encryption = issuerMetadata.credentialResponseEncryption) {
-            is CredentialResponseEncryption.NotRequired -> null
-            is CredentialResponseEncryption.Required ->
-                responseEncryptionSpecFactory(encryption, config.keyGenerationConfig).apply {
-                    validate(encryption)
-                }
+            CredentialResponseEncryption.NotSupported -> null
+
+            is CredentialResponseEncryption.SupportedNotRequired ->
+                if (config.preferEncryptedResponsesWhenSupported) {
+                    val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
+                    responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)?.apply {
+                        validate(supportedAlgorithmsAndMethods)
+                    }
+                } else null
+
+            is CredentialResponseEncryption.Required -> {
+                val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
+                responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)?.apply {
+                    validate(supportedAlgorithmsAndMethods)
+                } ?: throw IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+            }
         }
     }
 

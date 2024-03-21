@@ -485,31 +485,16 @@ private fun credentialSupportedFromTransferObject(csJson: W3CSignedJwtCredential
 }
 
 private fun CredentialIssuerMetadataTO.credentialResponseEncryption(): CredentialResponseEncryption {
-    val requireEncryption = credentialResponseEncryption?.encryptionRequired ?: false
-    val encryptionAlgorithms = credentialResponseEncryption?.algorithmsSupported
-        ?.map { JWEAlgorithm.parse(it) }
-        ?: emptyList()
-    val encryptionMethods = credentialResponseEncryption?.methodsSupported
-        ?.map { EncryptionMethod.parse(it) }
-        ?: emptyList()
-
-    return if (requireEncryption) {
-        if (encryptionAlgorithms.isEmpty()) {
-            throw CredentialIssuerMetadataValidationError.CredentialResponseEncryptionAlgorithmsRequired
-        }
-        val allAreAsymmetricAlgorithms = encryptionAlgorithms.all {
-            JWEAlgorithm.Family.ASYMMETRIC.contains(it)
-        }
-        if (!allAreAsymmetricAlgorithms) {
-            throw CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired
-        }
-
-        CredentialResponseEncryption.Required(
-            encryptionAlgorithms,
-            encryptionMethods,
-        )
-    } else {
-        CredentialResponseEncryption.NotRequired
+    fun algsAndMethods(): SupportedEncryptionAlgorithmsAndMethods {
+        requireNotNull(credentialResponseEncryption)
+        val encryptionAlgorithms = credentialResponseEncryption.algorithmsSupported.map { JWEAlgorithm.parse(it) }
+        val encryptionMethods = credentialResponseEncryption.methodsSupported.map { EncryptionMethod.parse(it) }
+        return SupportedEncryptionAlgorithmsAndMethods(encryptionAlgorithms, encryptionMethods)
+    }
+    return when {
+        credentialResponseEncryption == null -> CredentialResponseEncryption.NotSupported
+        credentialResponseEncryption.encryptionRequired -> CredentialResponseEncryption.Required(algsAndMethods())
+        else -> CredentialResponseEncryption.SupportedNotRequired(algsAndMethods())
     }
 }
 

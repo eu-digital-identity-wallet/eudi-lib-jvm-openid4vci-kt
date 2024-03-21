@@ -40,7 +40,7 @@ private fun toTransferObject(request: CredentialIssuanceRequest): CredentialIssu
 private fun transferObjectOfSingle(
     request: CredentialIssuanceRequest.SingleRequest,
 ): CredentialIssuanceRequestTO.SingleCredentialTO {
-    val credentialResponseEncryptionSpecTO = request.encryption.transferObject()
+    val credentialResponseEncryptionSpecTO = request.encryption?.run { transferObject() }
 
     return when (request) {
         is CredentialIssuanceRequest.FormatBased ->
@@ -76,18 +76,15 @@ private fun transferObjectOfSingle(
     }
 }
 
-private fun IssuanceResponseEncryptionSpec?.transferObject(): CredentialResponseEncryptionSpecTO? {
-    return when (this) {
-        null -> null
-        else -> {
-            val credentialEncryptionJwk = Json.parseToJsonElement(
-                jwk.toPublicJWK().toString(),
-            ).jsonObject
-            val credentialResponseEncryptionAlg = algorithm.toString()
-            val credentialResponseEncryptionMethod = encryptionMethod.toString()
-            CredentialResponseEncryptionSpecTO(credentialEncryptionJwk, credentialResponseEncryptionAlg, credentialResponseEncryptionMethod)
-        }
-    }
+private fun IssuanceResponseEncryptionSpec.transferObject(): CredentialResponseEncryptionSpecTO {
+    val credentialEncryptionJwk = Json.parseToJsonElement(jwk.toPublicJWK().toString()).jsonObject
+    val credentialResponseEncryptionAlg = algorithm.toString()
+    val credentialResponseEncryptionMethod = encryptionMethod.toString()
+    return CredentialResponseEncryptionSpecTO(
+        credentialEncryptionJwk,
+        credentialResponseEncryptionAlg,
+        credentialResponseEncryptionMethod,
+    )
 }
 
 @Serializable

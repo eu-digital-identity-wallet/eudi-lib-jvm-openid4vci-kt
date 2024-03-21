@@ -24,13 +24,17 @@ typealias ClientId = String
 /**
  * Configuration object to pass configuration properties to the issuance components.
  *
- * @param clientId  The authorization client's identifier
+ * @param clientId  The authorization client's identifier.
  * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
+ * @param keyGenerationConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
+ * @param preferEncryptedResponsesWhenSupported Flag to express preference to encrypted responses from issuer in cases encrypted responses
+ *              are supported from issuer but not mandated.
  */
 data class OpenId4VCIConfig(
     val clientId: ClientId,
     val authFlowRedirectionURI: URI,
     val keyGenerationConfig: KeyGenerationConfig,
+    val preferEncryptedResponsesWhenSupported: Boolean,
 )
 
 data class KeyGenerationConfig(

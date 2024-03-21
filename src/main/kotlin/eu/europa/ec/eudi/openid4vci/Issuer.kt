@@ -64,13 +64,13 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
         }
 
         val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =
-            { requiredEncryption, keyGenerationConfig ->
-                val method = requiredEncryption.encryptionMethodsSupported[0]
-                requiredEncryption.algorithmsSupported.firstNotNullOfOrNull { alg ->
+            { supportedAlgorithmsAndMethods, keyGenerationConfig ->
+                val method = supportedAlgorithmsAndMethods.encryptionMethods[0]
+                supportedAlgorithmsAndMethods.algorithms.firstNotNullOfOrNull { alg ->
                     KeyGenerator.genKeyIfSupported(keyGenerationConfig, alg)?.let { jwk ->
                         IssuanceResponseEncryptionSpec(jwk, alg, method)
                     }
-                } ?: error("Could not create encryption spec")
+                }
             }
     }
 }

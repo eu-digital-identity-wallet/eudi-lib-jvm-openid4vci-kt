@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.EncryptedResponses.*
 import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponseTO
 import eu.europa.ec.eudi.openid4vci.internal.PushedAuthorizationRequestResponse
 import io.ktor.client.engine.mock.*
@@ -41,11 +42,16 @@ internal fun oauthMetaDataHandler(oauth2ServerUrl: HttpsUrl, oauth2MetaDataResou
     jsonResponse(oauth2MetaDataResource),
 )
 
-internal fun oidcWellKnownMocker(): RequestMocker = RequestMocker(
+internal fun oidcWellKnownMocker(encryptedResponses: EncryptedResponses = NOT_SUPPORTED): RequestMocker = RequestMocker(
     requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
     responseBuilder = {
+        val content = when (encryptedResponses) {
+            REQUIRED -> getResourceAsText("well-known/openid-credential-issuer_encrypted_responses.json")
+            NOT_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_encryption_not_supported.json")
+            SUPPORTED_NOT_REQUIRED -> getResourceAsText("well-known/openid-credential-issuer_encryption_not_required.json")
+        }
         respond(
-            content = getResourceAsText("well-known/openid-credential-issuer_no_encryption.json"),
+            content = content,
             status = HttpStatusCode.OK,
             headers = headersOf(
                 HttpHeaders.ContentType to listOf("application/json"),
@@ -53,6 +59,10 @@ internal fun oidcWellKnownMocker(): RequestMocker = RequestMocker(
         )
     },
 )
+
+enum class EncryptedResponses {
+    REQUIRED, NOT_SUPPORTED, SUPPORTED_NOT_REQUIRED
+}
 
 internal fun authServerWellKnownMocker(): RequestMocker = RequestMocker(
     requestMatcher = endsWith("/.well-known/openid-configuration", HttpMethod.Get),

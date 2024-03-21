@@ -17,22 +17,39 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
-import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotRequired
+import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotSupported
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import java.io.Serializable
 
 sealed interface CredentialResponseEncryption : Serializable {
-    data object NotRequired : CredentialResponseEncryption {
-        private fun readResolve(): Any = NotRequired
+    data object NotSupported : CredentialResponseEncryption {
+        private fun readResolve(): Any = NotSupported
     }
 
+    data class SupportedNotRequired(
+        val encryptionAlgorithmsAndMethods: SupportedEncryptionAlgorithmsAndMethods,
+    ) : CredentialResponseEncryption
+
     data class Required(
-        val algorithmsSupported: List<JWEAlgorithm>,
-        val encryptionMethodsSupported: List<EncryptionMethod>,
-    ) : CredentialResponseEncryption {
-        init {
-            require(algorithmsSupported.isNotEmpty()) { "algorithmsSupported cannot be empty" }
-            require(encryptionMethodsSupported.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
+        val encryptionAlgorithmsAndMethods: SupportedEncryptionAlgorithmsAndMethods,
+    ) : CredentialResponseEncryption
+}
+
+data class SupportedEncryptionAlgorithmsAndMethods(
+    val algorithms: List<JWEAlgorithm>,
+    val encryptionMethods: List<EncryptionMethod>,
+) {
+    init {
+        require(encryptionMethods.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
+
+        if (algorithms.isEmpty()) {
+            throw CredentialIssuerMetadataValidationError.CredentialResponseEncryptionAlgorithmsRequired
+        }
+        val allAreAsymmetricAlgorithms = algorithms.all {
+            JWEAlgorithm.Family.ASYMMETRIC.contains(it)
+        }
+        if (!allAreAsymmetricAlgorithms) {
+            throw CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired
         }
     }
 }
@@ -47,7 +64,7 @@ data class CredentialIssuerMetadata(
     val batchCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val notificationEndpoint: CredentialIssuerEndpoint? = null,
-    val credentialResponseEncryption: CredentialResponseEncryption = NotRequired,
+    val credentialResponseEncryption: CredentialResponseEncryption = NotSupported,
     val credentialIdentifiersSupported: Boolean = false,
     val credentialConfigurationsSupported: Map<CredentialConfigurationIdentifier, CredentialConfiguration>,
     val display: List<Display> = emptyList(),
