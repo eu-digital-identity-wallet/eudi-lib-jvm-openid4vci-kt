@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 
 internal class RequestIssuanceImpl(
@@ -32,29 +32,61 @@ internal class RequestIssuanceImpl(
             supportedAlgorithmsAndMethods: SupportedEncryptionAlgorithmsAndMethods,
         ) {
             ensure(algorithm in supportedAlgorithmsAndMethods.algorithms) {
-                CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
+                ResponseEncryptionAlgorithmNotSupportedByIssuer
             }
             ensure(encryptionMethod in supportedAlgorithmsAndMethods.encryptionMethods) {
-                CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer
+                ResponseEncryptionMethodNotSupportedByIssuer
             }
         }
 
         when (val encryption = issuerMetadata.credentialResponseEncryption) {
-            CredentialResponseEncryption.NotSupported -> null
+            CredentialResponseEncryption.NotSupported ->
+                // Issuance server does not support Credential Response encryption.
+                // In case Wallet requires Credential Response encryption, fail.
+                when (config.credentialResponseEncryptionPolicy) {
+                    CredentialResponseEncryptionPolicy.SUPPORTED -> null
+                    CredentialResponseEncryptionPolicy.REQUIRED -> throw ResponseEncryptionRequiredByWalletButNotSupportedByIssuer
+                }
 
-            is CredentialResponseEncryption.SupportedNotRequired ->
-                if (config.preferEncryptedResponsesWhenSupported) {
-                    val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
-                    responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)?.apply {
+            is CredentialResponseEncryption.SupportedNotRequired -> {
+                // Issuance server supports but does not require Credential Response encryption.
+                // Fail in case Wallet requires Credential Response encryption but no crypto material can be generated,
+                // or in case algorithm/method supported by Wallet is not supported by issuance server.
+                val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
+                val maybeSpec = responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)
+                    ?.apply {
                         validate(supportedAlgorithmsAndMethods)
                     }
-                } else null
+                when (config.credentialResponseEncryptionPolicy) {
+                    CredentialResponseEncryptionPolicy.SUPPORTED -> maybeSpec
+
+                    CredentialResponseEncryptionPolicy.REQUIRED -> {
+                        ensureNotNull(maybeSpec) {
+                            WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated
+                        }
+                    }
+                }
+            }
 
             is CredentialResponseEncryption.Required -> {
-                val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
-                responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)?.apply {
-                    validate(supportedAlgorithmsAndMethods)
-                } ?: throw IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+                // Issuance server requires Credential Response encryption.
+                // Fail in case Wallet does not support Credential Response encryption or,
+                // algorithms/methods supported by Wallet are not supported by issuance server.
+                when (config.credentialResponseEncryptionPolicy) {
+                    CredentialResponseEncryptionPolicy.SUPPORTED,
+                    CredentialResponseEncryptionPolicy.REQUIRED,
+                    -> {
+                        val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
+                        val maybeSpec =
+                            responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)
+                                ?.apply {
+                                    validate(supportedAlgorithmsAndMethods)
+                                }
+                        ensureNotNull(maybeSpec) {
+                            IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+                        }
+                    }
+                }
             }
         }
     }
@@ -122,7 +154,11 @@ internal class RequestIssuanceImpl(
     ): CredentialIssuanceRequest.SingleRequest =
         when (requestPayload) {
             is IssuanceRequestPayload.ConfigurationBased -> {
-                formatBasedRequest(requestPayload.credentialConfigurationIdentifier, requestPayload.claimSet, proofFactory)
+                formatBasedRequest(
+                    requestPayload.credentialConfigurationIdentifier,
+                    requestPayload.claimSet,
+                    proofFactory,
+                )
             }
 
             is IssuanceRequestPayload.IdentifierBased -> {

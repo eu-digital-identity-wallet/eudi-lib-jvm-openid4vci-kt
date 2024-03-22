@@ -65,7 +65,7 @@ fun main(): Unit = runBlocking {
         clientId = "wallet-dev",
         authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
         keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-        preferEncryptedResponsesWhenSupported = true,
+        credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
     )
 
     val user = ActingUser("tneal", "password")

@@ -506,10 +506,18 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     sealed class ResponseEncryptionError(message: String) : CredentialIssuanceError(message) {
 
         /**
+         * Wallet requires Credential Response encryption, but it is not supported by the issuance server.
+         */
+        data object ResponseEncryptionRequiredByWalletButNotSupportedByIssuer :
+            ResponseEncryptionError("ResponseEncryptionRequiredByWalletButNotSupportedByIssuer") {
+            private fun readResolve(): Any = ResponseEncryptionRequiredByWalletButNotSupportedByIssuer
+        }
+
+        /**
          * Response encryption algorithm specified in request is not supported from issuance server
          */
         data object ResponseEncryptionAlgorithmNotSupportedByIssuer :
-            ProofGenerationError("ResponseEncryptionAlgorithmNotSupportedByIssuer") {
+            ResponseEncryptionError("ResponseEncryptionAlgorithmNotSupportedByIssuer") {
             private fun readResolve(): Any = ResponseEncryptionAlgorithmNotSupportedByIssuer
         }
 
@@ -517,7 +525,7 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
          * Response encryption method specified in request is not supported from issuance server
          */
         data object ResponseEncryptionMethodNotSupportedByIssuer :
-            ProofGenerationError("ResponseEncryptionMethodNotSupportedByIssuer") {
+            ResponseEncryptionError("ResponseEncryptionMethodNotSupportedByIssuer") {
             private fun readResolve(): Any = ResponseEncryptionMethodNotSupportedByIssuer
         }
 
@@ -525,8 +533,16 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
          * Issuer enforces encrypted responses but encryption parameters not provided in request
          */
         data object IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided :
-            ProofGenerationError("IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided") {
+            ResponseEncryptionError("IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided") {
             private fun readResolve(): Any = IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
+        }
+
+        /**
+         * Wallet requires Credential Response encryption, but no crypto material can be generated for the issuance server.
+         */
+        data object WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated :
+            ResponseEncryptionError("WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated") {
+            private fun readResolve(): Any = WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated
         }
     }
 }
