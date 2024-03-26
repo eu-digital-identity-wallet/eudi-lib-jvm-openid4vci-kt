@@ -53,10 +53,13 @@ internal class RequestIssuanceImpl(
                 // Fail in case Wallet requires Credential Response encryption but no crypto material can be generated,
                 // or in case algorithm/method supported by Wallet is not supported by issuance server.
                 val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
-                val maybeSpec = responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)
-                    ?.apply {
-                        validate(supportedAlgorithmsAndMethods)
-                    }
+                val maybeSpec = runCatching {
+                    responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)
+                        ?.apply {
+                            validate(supportedAlgorithmsAndMethods)
+                        }
+                }.getOrNull()
+
                 when (config.credentialResponseEncryptionPolicy) {
                     CredentialResponseEncryptionPolicy.SUPPORTED -> maybeSpec
 
@@ -72,21 +75,12 @@ internal class RequestIssuanceImpl(
                 // Issuance server requires Credential Response encryption.
                 // Fail in case Wallet does not support Credential Response encryption or,
                 // algorithms/methods supported by Wallet are not supported by issuance server.
-                when (config.credentialResponseEncryptionPolicy) {
-                    CredentialResponseEncryptionPolicy.SUPPORTED,
-                    CredentialResponseEncryptionPolicy.REQUIRED,
-                    -> {
-                        val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
-                        val maybeSpec =
-                            responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)
-                                ?.apply {
-                                    validate(supportedAlgorithmsAndMethods)
-                                }
-                        ensureNotNull(maybeSpec) {
-                            IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
-                        }
+                val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
+                val maybeSpec = responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)
+                    ?.apply {
+                        validate(supportedAlgorithmsAndMethods)
                     }
-                }
+                ensureNotNull(maybeSpec) { IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided }
             }
         }
     }
