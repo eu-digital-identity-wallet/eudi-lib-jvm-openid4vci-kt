@@ -1,5 +1,5 @@
 [versions]
-coroutines = "1.7.3"
+coroutines = "1.8.0"
 dependency-check = "9.0.10"
 sonarqube = "4.4.1.3373"
 kotlin = "1.9.21"
