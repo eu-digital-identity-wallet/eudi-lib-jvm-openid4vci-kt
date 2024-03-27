@@ -1,6 +1,6 @@
 [versions]
 coroutines = "1.7.3"
-dependency-check = "9.0.9"
+dependency-check = "9.0.10"
 sonarqube = "4.4.1.3373"
 kotlin = "1.9.21"
 spotless = "6.25.0"
