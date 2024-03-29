@@ -28,8 +28,7 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionAlgorithmNotSupportedByIssuer
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.ResponseEncryptionMethodNotSupportedByIssuer
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -63,21 +62,13 @@ class IssuanceEncryptedResponsesTest {
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
-            val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
-                credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-                responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
-            )
-
-            val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
-
             assertFailsWith<ResponseEncryptionAlgorithmNotSupportedByIssuer>(
                 block = {
-                    with(issuer) {
-                        val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
-                        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-                        noProofRequired.requestSingle(requestPayload).getOrThrow()
-                    }
+                    authorizeRequestForCredentialOffer(
+                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                        credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                        responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
+                    )
                 },
             )
         }
@@ -97,20 +88,13 @@ class IssuanceEncryptedResponsesTest {
                 encryptionMethod = EncryptionMethod.A256GCM,
             )
 
-            val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
-                credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-                responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
-            )
-            val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
-
             assertFailsWith<ResponseEncryptionMethodNotSupportedByIssuer>(
                 block = {
-                    with(issuer) {
-                        val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
-                        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-                        noProofRequired.requestSingle(requestPayload).getOrThrow()
-                    }
+                    authorizeRequestForCredentialOffer(
+                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                        credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                        responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
+                    )
                 },
             )
         }

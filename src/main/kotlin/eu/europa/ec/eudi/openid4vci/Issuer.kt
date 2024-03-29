@@ -54,14 +54,13 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             credentialOffer: CredentialOffer,
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
-        ): Issuer {
-            return DefaultIssuer(
+        ): Result<Issuer> =
+            DefaultIssuer(
                 credentialOffer,
                 config,
                 ktorHttpClientFactory,
                 responseEncryptionSpecFactory,
             )
-        }
 
         val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =
             { supportedAlgorithmsAndMethods, keyGenerationConfig ->

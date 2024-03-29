@@ -19,7 +19,7 @@ import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 
-internal class RequestIssuanceImpl(
+internal class RequestIssuanceImpl private constructor(
     private val credentialOffer: CredentialOffer,
     private val issuerMetadata: CredentialIssuerMetadata,
     private val config: OpenId4VCIConfig,
@@ -27,7 +27,7 @@ internal class RequestIssuanceImpl(
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
 ) : RequestIssuance {
 
-    private val responseEncryptionSpec: IssuanceResponseEncryptionSpec? by lazy {
+    private val responseEncryptionSpec: IssuanceResponseEncryptionSpec? = run {
         fun IssuanceResponseEncryptionSpec.validate(
             supportedAlgorithmsAndMethods: SupportedEncryptionAlgorithmsAndMethods,
         ) {
@@ -228,6 +228,24 @@ internal class RequestIssuanceImpl(
                     onFailure = { handleIssuanceFailure(it) },
                 )
             }
+        }
+    }
+
+    companion object {
+        operator fun invoke(
+            credentialOffer: CredentialOffer,
+            issuerMetadata: CredentialIssuerMetadata,
+            config: OpenId4VCIConfig,
+            issuanceServerClient: IssuanceServerClient,
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
+        ): Result<RequestIssuanceImpl> = runCatching {
+            RequestIssuanceImpl(
+                credentialOffer,
+                issuerMetadata,
+                config,
+                issuanceServerClient,
+                responseEncryptionSpecFactory,
+            )
         }
     }
 }

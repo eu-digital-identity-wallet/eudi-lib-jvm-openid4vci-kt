@@ -134,7 +134,7 @@ private class Wallet(
         val issuer = Issuer.make(
             config = config,
             credentialOffer = offer,
-        )
+        ).getOrThrow()
 
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer)
@@ -157,7 +157,7 @@ private class Wallet(
         val issuer = Issuer.make(
             config = config,
             credentialOffer = offer,
-        )
+        ).getOrThrow()
 
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer)

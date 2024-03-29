@@ -67,12 +67,12 @@ suspend fun authorizeRequestForCredentialOffer(
             credentialOffer = offer,
             ktorHttpClientFactory = ktorHttpClientFactory,
             responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-        )
+        ).getOrThrow()
     } ?: Issuer.make(
         config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
         credentialOffer = offer,
         ktorHttpClientFactory = ktorHttpClientFactory,
-    )
+    ).getOrThrow()
 
     val authorizedRequest = with(issuer) {
         val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()

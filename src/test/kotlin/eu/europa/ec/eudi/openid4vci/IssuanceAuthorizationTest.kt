@@ -131,7 +131,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
             with(issuer) {
                 val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
@@ -214,7 +214,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
             with(issuer) {
                 val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
@@ -270,7 +270,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
             with(issuer) {
                 authorizeWithPreAuthorizationCode("123456").getOrThrow()
             }
@@ -305,7 +305,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
 
             with(issuer) {
                 authorizeWithPreAuthorizationCode("123456")
@@ -350,7 +350,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
 
             with(issuer) {
                 authorizeWithPreAuthorizationCode("AbdSS2356")
@@ -399,7 +399,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
 
             with(issuer) {
                 // Validate error is thrown when pin not provided although required
@@ -454,7 +454,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
 
             with(issuer) {
                 val authorizedRequest = prepareAuthorizationRequest().getOrThrow()
@@ -512,7 +512,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
 
             with(issuer) {
                 val authorizedRequest = prepareAuthorizationRequest().getOrThrow()
@@ -556,7 +556,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
 
             with(issuer) {
                 val authorizedRequest = prepareAuthorizationRequest().getOrThrow()
@@ -598,7 +598,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
             with(issuer) {
                 prepareAuthorizationRequest()
                     .fold(
@@ -643,7 +643,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
 
             with(issuer) {
                 val parPlaced = prepareAuthorizationRequest().getOrThrow()
@@ -692,7 +692,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
 
             with(issuer) {
                 authorizeWithPreAuthorizationCode("123456")
@@ -750,7 +750,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            )
+            ).getOrThrow()
 
             issuer.prepareAuthorizationRequest()
         }
