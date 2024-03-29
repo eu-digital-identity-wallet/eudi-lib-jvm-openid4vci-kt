@@ -15,10 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.DefaultAuthorizationServerMetadataResolver
-import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
-import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer
-import eu.europa.ec.eudi.openid4vci.internal.KeyGenerator
+import eu.europa.ec.eudi.openid4vci.internal.*
+import eu.europa.ec.eudi.openid4vci.internal.RequestIssuanceImpl
 import io.ktor.client.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -28,6 +26,16 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
 
     companion object {
 
+        /**
+         * Fetches & validates the issuer's [CredentialIssuerMetadata] and list
+         * of [CIAuthorizationServerMetadata][OAUTH2 server(s) metadata] used by the issuer
+         *
+         * @param httpClient The client to fetch the metadata
+         * @param credentialIssuerId The id of the credential issuer.
+         *
+         * @return the issuer's [CredentialIssuerMetadata] and list
+         *  of [CIAuthorizationServerMetadata][OAUTH2 server(s) metadata] used by the issuer
+         */
         suspend fun metaData(
             httpClient: HttpClient,
             credentialIssuerId: CredentialIssuerId,
@@ -49,18 +57,53 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             }
         }
 
+        /**
+         * Factory method for creating an instance of [Issuer]
+         *
+         * @param config wallet's configuration options
+         * @param credentialOffer the offer for which the issuer is being
+         * @param ktorHttpClientFactory a factory for obtaining http clients, used while interacting with issuer
+         * @param responseEncryptionSpecFactory
+         *
+         * @return if wallet's [config] can satisfy the requirements of [credentialOffer] an [Issuer] will be
+         * created. Otherwise, there would be a failed result
+         */
         fun make(
             config: OpenId4VCIConfig,
             credentialOffer: CredentialOffer,
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
-        ): Result<Issuer> =
-            DefaultIssuer(
-                credentialOffer,
-                config,
+        ): Result<Issuer> = runCatching {
+            val issuanceServerClient = IssuanceServerClient(
+                credentialOffer.credentialIssuerMetadata,
                 ktorHttpClientFactory,
-                responseEncryptionSpecFactory,
             )
+
+            val requestIssuance = RequestIssuanceImpl(
+                credentialOffer = credentialOffer,
+                config = config,
+                issuanceServerClient = issuanceServerClient,
+                responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+            ).getOrThrow()
+
+            val authorizeIssuance = AuthorizeIssuanceImpl(
+                credentialOffer = credentialOffer,
+                config = config,
+                ktorHttpClientFactory = ktorHttpClientFactory,
+            )
+            val queryForDeferredCredential = QueryForDeferredCredentialImpl(
+                issuanceServerClient = issuanceServerClient,
+            )
+            val notifyIssuer = NotifyIssuerImpl(
+                issuanceServerClient = issuanceServerClient,
+            )
+            object :
+                Issuer,
+                AuthorizeIssuance by authorizeIssuance,
+                RequestIssuance by requestIssuance,
+                QueryForDeferredCredential by queryForDeferredCredential,
+                NotifyIssuer by notifyIssuer {}
+        }
 
         val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =
             { supportedAlgorithmsAndMethods, keyGenerationConfig ->

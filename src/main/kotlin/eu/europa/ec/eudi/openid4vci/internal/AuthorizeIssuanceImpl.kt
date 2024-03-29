@@ -18,16 +18,10 @@ package eu.europa.ec.eudi.openid4vci.internal
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vci.*
 
-internal enum class AuthorizeIssuancePreference {
-    FAVOR_SCOPES,
-    AUTHORIZATION_DETAILS,
-}
-
 internal class AuthorizeIssuanceImpl(
     private val credentialOffer: CredentialOffer,
-    config: OpenId4VCIConfig,
+    private val config: OpenId4VCIConfig,
     ktorHttpClientFactory: KtorHttpClientFactory,
-    private val preference: AuthorizeIssuancePreference,
 ) : AuthorizeIssuance {
 
     private val authServerClient: AuthorizationServerClient =
@@ -42,15 +36,15 @@ internal class AuthorizeIssuanceImpl(
         val scopes = mutableListOf<Scope>()
         val configurationIdentifiers = mutableListOf<CredentialConfigurationIdentifier>()
         credentialOffer.credentialConfigurationIdentifiers.map { credentialConfigurationId ->
-            val configuration = credentialConfigurationSupportedById(credentialConfigurationId)
+            val credentialConfiguration = credentialConfigurationSupportedById(credentialConfigurationId)
 
             fun authDetailsByCfgId() = configurationIdentifiers.add(credentialConfigurationId)
 
-            fun addScope(): Boolean = configuration.scope?.let { scopes.add(Scope(it)) } ?: false
+            fun addScope(): Boolean = credentialConfiguration.scope?.let { scopes.add(Scope(it)) } ?: false
 
-            when (preference) {
-                AuthorizeIssuancePreference.AUTHORIZATION_DETAILS -> authDetailsByCfgId()
-                AuthorizeIssuancePreference.FAVOR_SCOPES -> {
+            when (config.authorizeIssuanceConfig) {
+                AuthorizeIssuanceConfig.AUTHORIZATION_DETAILS -> authDetailsByCfgId()
+                AuthorizeIssuanceConfig.FAVOR_SCOPES -> {
                     if (!addScope()) authDetailsByCfgId()
                     else Unit
                 }

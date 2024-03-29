@@ -34,6 +34,7 @@ data class OpenId4VCIConfig(
     val authFlowRedirectionURI: URI,
     val keyGenerationConfig: KeyGenerationConfig,
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+    val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
 )
 
 /**
@@ -90,4 +91,9 @@ data class EcConfig(
             "Provided algorithms that are not part of ECDH_ES family"
         }
     }
+}
+
+enum class AuthorizeIssuanceConfig {
+    FAVOR_SCOPES,
+    AUTHORIZATION_DETAILS,
 }
