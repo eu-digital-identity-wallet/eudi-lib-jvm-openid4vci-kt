@@ -67,7 +67,7 @@ class IssuanceEncryptedResponsesTest {
                     authorizeRequestForCredentialOffer(
                         ktorHttpClientFactory = mockedKtorHttpClientFactory,
                         credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-                        responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
+                        responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
                     )
                 },
             )
@@ -93,7 +93,7 @@ class IssuanceEncryptedResponsesTest {
                     authorizeRequestForCredentialOffer(
                         ktorHttpClientFactory = mockedKtorHttpClientFactory,
                         credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-                        responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
+                        responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
                     )
                 },
             )
@@ -119,7 +119,7 @@ class IssuanceEncryptedResponsesTest {
                     authorizeRequestForCredentialOffer(
                         ktorHttpClientFactory = mockedKtorHttpClientFactory,
                         credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-                        responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
+                        responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
                         config = OpenId4VCIConfiguration.copy(
                             credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.REQUIRED,
                         ),
@@ -143,7 +143,7 @@ class IssuanceEncryptedResponsesTest {
                     authorizeRequestForCredentialOffer(
                         ktorHttpClientFactory = mockedKtorHttpClientFactory,
                         credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-                        responseEncryptionSpecFactory = { e, c -> null },
+                        responseEncryptionSpecFactory = { _, _ -> null },
                         config = OpenId4VCIConfiguration.copy(
                             credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.REQUIRED,
                         ),
@@ -179,7 +179,7 @@ class IssuanceEncryptedResponsesTest {
             val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-                responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
+                responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
             )
 
             with(issuer) {
@@ -217,7 +217,7 @@ class IssuanceEncryptedResponsesTest {
             val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-                responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
+                responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
             )
 
             with(issuer) {
@@ -250,7 +250,7 @@ class IssuanceEncryptedResponsesTest {
             val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-                responseEncryptionSpecFactory = { e, c -> null },
+                responseEncryptionSpecFactory = { _, _ -> null },
             )
 
             with(issuer) {
@@ -349,7 +349,7 @@ class IssuanceEncryptedResponsesTest {
             val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-                responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
+                responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
             )
 
             with(issuer) {
