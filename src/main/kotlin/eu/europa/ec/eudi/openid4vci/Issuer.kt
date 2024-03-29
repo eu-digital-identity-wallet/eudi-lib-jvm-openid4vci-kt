@@ -78,25 +78,20 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 credentialOffer.credentialIssuerMetadata,
                 ktorHttpClientFactory,
             )
-
-            val requestIssuance = RequestIssuanceImpl(
-                credentialOffer = credentialOffer,
-                config = config,
-                issuanceServerClient = issuanceServerClient,
-                responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-            ).getOrThrow()
-
             val authorizeIssuance = AuthorizeIssuanceImpl(
-                credentialOffer = credentialOffer,
-                config = config,
-                ktorHttpClientFactory = ktorHttpClientFactory,
+                credentialOffer,
+                config,
+                ktorHttpClientFactory,
             )
-            val queryForDeferredCredential = QueryForDeferredCredentialImpl(
-                issuanceServerClient = issuanceServerClient,
-            )
-            val notifyIssuer = NotifyIssuerImpl(
-                issuanceServerClient = issuanceServerClient,
-            )
+            val requestIssuance = RequestIssuanceImpl(
+                credentialOffer,
+                config,
+                issuanceServerClient,
+                responseEncryptionSpecFactory,
+            ).getOrThrow()
+            val queryForDeferredCredential = QueryForDeferredCredentialImpl(issuanceServerClient)
+            val notifyIssuer = NotifyIssuerImpl(issuanceServerClient)
+
             object :
                 Issuer,
                 AuthorizeIssuance by authorizeIssuance,
