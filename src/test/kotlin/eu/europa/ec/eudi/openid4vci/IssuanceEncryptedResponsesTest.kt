@@ -100,6 +100,59 @@ class IssuanceEncryptedResponsesTest {
         }
 
     @Test
+    fun `response encryption unsupported by issuer, required by wallet, then ResponseEncryptionRequiredByWalletButNotSupportedByIssuer`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                oidcWellKnownMocker(EncryptedResponses.NOT_SUPPORTED),
+            )
+            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
+                jwk = randomRSAEncryptionKey(2048),
+                algorithm = JWEAlgorithm.RSA_OAEP_256,
+                encryptionMethod = EncryptionMethod.A256GCM,
+            )
+
+            assertFailsWith<ResponseEncryptionRequiredByWalletButNotSupportedByIssuer>(
+                block = {
+                    authorizeRequestForCredentialOffer(
+                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                        credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                        responseEncryptionSpecFactory = { e, c -> issuanceResponseEncryptionSpec },
+                        config = OpenId4VCIConfiguration.copy(
+                            credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.REQUIRED,
+                        ),
+                    )
+                },
+            )
+        }
+
+    @Test
+    fun `no crypto material generated when required, then WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                oidcWellKnownMocker(EncryptedResponses.SUPPORTED_NOT_REQUIRED),
+            )
+
+            assertFailsWith<WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated>(
+                block = {
+                    authorizeRequestForCredentialOffer(
+                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                        credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                        responseEncryptionSpecFactory = { e, c -> null },
+                        config = OpenId4VCIConfiguration.copy(
+                            credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.REQUIRED,
+                        ),
+                    )
+                },
+            )
+        }
+
+    @Test
     fun `when issuer does not support encrypted responses encryption spec is ignored in submitted request`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
