@@ -48,7 +48,7 @@ val OpenId4VCIConfiguration = OpenId4VCIConfig(
     clientId = "MyWallet_ClientId",
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-    preferEncryptedResponsesWhenSupported = true,
+    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
 )
 
 suspend fun authorizeRequestForCredentialOffer(
@@ -67,12 +67,12 @@ suspend fun authorizeRequestForCredentialOffer(
             credentialOffer = offer,
             ktorHttpClientFactory = ktorHttpClientFactory,
             responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-        )
+        ).getOrThrow()
     } ?: Issuer.make(
         config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
         credentialOffer = offer,
         ktorHttpClientFactory = ktorHttpClientFactory,
-    )
+    ).getOrThrow()
 
     val authorizedRequest = with(issuer) {
         val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()

@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -65,7 +64,7 @@ fun main(): Unit = runBlocking {
         clientId = "wallet-dev",
         authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
         keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-        preferEncryptedResponsesWhenSupported = true,
+        credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
     )
 
     val user = ActingUser("tneal", "password")
@@ -134,7 +133,7 @@ private class Wallet(
         val issuer = Issuer.make(
             config = config,
             credentialOffer = offer,
-        )
+        ).getOrThrow()
 
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer)
@@ -157,7 +156,7 @@ private class Wallet(
         val issuer = Issuer.make(
             config = config,
             credentialOffer = offer,
-        )
+        ).getOrThrow()
 
         // Authorize with auth code flow
         val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer)
@@ -178,7 +177,6 @@ private class Wallet(
     }
 
     private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer): AuthorizedRequest = with(issuer) {
-        check(issuer is DefaultIssuer)
         authorizationLog("Preparing authorization code request")
 
         val prepareAuthorizationCodeRequest = issuer.prepareAuthorizationRequest().getOrThrow()
