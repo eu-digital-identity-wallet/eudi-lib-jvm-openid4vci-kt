@@ -16,8 +16,6 @@
 package eu.europa.ec.eudi.openid4vci.examples
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.DefaultIssuer
-import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -27,53 +25,25 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.FormElement
 import java.net.URL
 
-//private val CredentialIssuer_URL = "https://dev.issuer-backend.eudiw.dev"
-private const val CredentialIssuer_URL = "http://localhost:8080"
 private val actingUser = ActingUser("tneal", "password")
 
 fun main(): Unit = runBlocking {
+    val credentialOfferUrl = "eudi-openid4ci://credentialsOffer?credential_offer=%7B%22" +
+        "credential_issuer%22:%22https://dev.issuer-backend.eudiw.dev%22,%22" +
+        "credential_configuration_ids%22:[%22eu.europa.ec.eudiw.pid_mso_mdoc%22," +
+        "%22eu.europa.ec.eudiw.pid_vc_sd_jwt%22,%22org.iso.18013.5.1.mDL%22]," +
+        "%22grants%22:%7B%22authorization_code%22:%7B%22" +
+        "authorization_server%22:%22https://dev.auth.eudiw.dev/realms/pid-issuer-realm%22%7D%7D%7D"
 
-    offerBasedIssuance(
-        credentialOfferUrl = "eudi-openid4vci://?credential_offer=${
-            createCredentialOfferStr(
-                CredentialIssuer_URL,
-                listOf(PID_SdJwtVC_config_id, PID_MsoMdoc_config_id, MDL_config_id)
-            )
-        }",
-        actingUser = actingUser,
-    )
-
-    credentialConfigurationBasedIssuance(
-        credentialConfigurationId = PID_SdJwtVC_config_id,
-        credentialIssuerIdentifier = CredentialIssuer_URL,
-        actingUser = actingUser,
-    )
-    credentialConfigurationBasedIssuance(
-        credentialConfigurationId = PID_MsoMdoc_config_id,
-        credentialIssuerIdentifier = CredentialIssuer_URL,
-        actingUser = actingUser,
-    )
-    credentialConfigurationBasedIssuance(
-        credentialConfigurationId = MDL_config_id,
-        credentialIssuerIdentifier = CredentialIssuer_URL,
-        actingUser = actingUser,
-    )
-}
-
-private suspend fun offerBasedIssuance(
-    credentialOfferUrl: String,
-    actingUser: ActingUser,
-    vciConfig: OpenId4VCIConfig = DefaultOpenId4VCIConfig,
-) {
     println("[[Scenario: Issuance based on credential offer url: $credentialOfferUrl]] ")
 
     val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory = ::httpClientFactory)
     val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUrl).getOrThrow()
 
     val issuer = Issuer.make(
-        config = vciConfig,
+        config = DefaultOpenId4VCIConfig,
         credentialOffer = credentialOffer,
-    )
+    ).getOrThrow()
 
     authorizationLog("Using authorized code flow to authorize")
     val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, actingUser)
@@ -82,13 +52,13 @@ private suspend fun offerBasedIssuance(
     val credentials = when (authorizedRequest) {
         is AuthorizedRequest.NoProofRequired -> credentialOffer.credentialConfigurationIdentifiers.map { credentialId ->
             issuanceLog("Requesting issuance of '$credentialId'")
-            val credential = noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId)
+            val credential = submitProvidingNoProofs(issuer, authorizedRequest, credentialId)
             credentialId.value to credential
         }
 
         is AuthorizedRequest.ProofRequired -> credentialOffer.credentialConfigurationIdentifiers.map { credentialId ->
             issuanceLog("Requesting issuance of '$credentialId'")
-            val credential = proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialId)
+            val credential = submitProvidingProofs(issuer, authorizedRequest, credentialId)
             credentialId.value to credential
         }
     }
@@ -97,56 +67,10 @@ private suspend fun offerBasedIssuance(
     credentials.onEach { (credentialId, credential) ->
         println("\t [$credentialId] : $credential")
     }
-    println()
-}
-
-
-private suspend fun credentialConfigurationBasedIssuance(
-    credentialIssuerIdentifier: String,
-    credentialConfigurationId: String,
-    actingUser: ActingUser,
-    vciConfig: OpenId4VCIConfig = DefaultOpenId4VCIConfig,
-) {
-    println("[[Scenario: Issuance based on credential configuration: $credentialConfigurationId]] ")
-    val credentialIssuerId = CredentialIssuerId(credentialIssuerIdentifier).getOrThrow()
-
-    val (issuerMetadata, authorizationServersMetadata) = httpClientFactory().use { client ->
-        Issuer.metaData(client, credentialIssuerId)
-    }
-
-    val credentialIdentifier = CredentialConfigurationIdentifier(credentialConfigurationId)
-    ensure(issuerMetadata.credentialConfigurationsSupported.get(credentialIdentifier) != null) {
-        error("Credential identifier $credentialConfigurationId not supported by issuer")
-    }
-
-    val credentialOffer = CredentialOffer(
-        credentialIssuerIdentifier = credentialIssuerId,
-        credentialIssuerMetadata = issuerMetadata,
-        authorizationServerMetadata = authorizationServersMetadata[0],
-        credentialConfigurationIdentifiers = listOf(credentialIdentifier),
-    )
-
-    val issuer = Issuer.make(
-        config = vciConfig,
-        credentialOffer = credentialOffer,
-    )
-
-    authorizationLog("Using authorized code flow to authorize")
-    val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, actingUser)
-    authorizationLog("Authorization retrieved: $authorizedRequest")
-
-    issuanceLog("Requesting issuance of '$credentialIssuerIdentifier'")
-    val outcome = when (authorizedRequest) {
-        is AuthorizedRequest.NoProofRequired -> noProofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialIdentifier)
-        is AuthorizedRequest.ProofRequired -> proofRequiredSubmissionUseCase(issuer, authorizedRequest, credentialIdentifier)
-    }
-
-    println("--> Issued credential: $outcome \n")
 }
 
 private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer, actingUser: ActingUser): AuthorizedRequest =
     with(issuer) {
-        check(issuer is DefaultIssuer)
         authorizationLog("Preparing authorization code request")
 
         val prepareAuthorizationCodeRequest = issuer.prepareAuthorizationRequest().getOrThrow()
@@ -194,38 +118,30 @@ private fun String.extractASLoginUrl(): URL {
     return URL(action)
 }
 
-private suspend fun noProofRequiredSubmissionUseCase(
+private suspend fun submitProvidingNoProofs(
     issuer: Issuer,
-    noProofRequiredState: AuthorizedRequest.NoProofRequired,
+    authorized: AuthorizedRequest.NoProofRequired,
     credentialConfigurationId: CredentialConfigurationIdentifier,
 ): String {
     with(issuer) {
-        val submittedRequest = noProofRequiredState.requestSingle(credentialConfigurationId to null, null).getOrThrow()
+        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+        val submittedRequest = authorized.requestSingle(requestPayload).getOrThrow()
 
         return when (submittedRequest) {
-            is SubmittedRequest.Success -> {
-                when (val issuedCredential = submittedRequest.credentials[0]) {
-                    is IssuedCredential.Issued -> issuedCredential.credential
-                    is IssuedCredential.Deferred -> {
-                        deferredCredentialUseCase(issuer, noProofRequiredState, issuedCredential)
-                    }
-                }
-            }
-
+            is SubmittedRequest.Success -> handleSuccess(submittedRequest, issuer, authorized)
+            is SubmittedRequest.Failed -> throw submittedRequest.error
             is SubmittedRequest.InvalidProof -> {
-                proofRequiredSubmissionUseCase(
+                submitProvidingProofs(
                     issuer,
-                    noProofRequiredState.handleInvalidProof(submittedRequest.cNonce),
+                    authorized.handleInvalidProof(submittedRequest.cNonce),
                     credentialConfigurationId,
                 )
             }
-
-            is SubmittedRequest.Failed -> throw submittedRequest.error
         }
     }
 }
 
-private suspend fun proofRequiredSubmissionUseCase(
+private suspend fun submitProvidingProofs(
     issuer: Issuer,
     authorized: AuthorizedRequest.ProofRequired,
     credentialConfigurationId: CredentialConfigurationIdentifier,
@@ -234,21 +150,12 @@ private suspend fun proofRequiredSubmissionUseCase(
         val proofSigner = DefaultProofSignersMap[credentialConfigurationId.value]
             ?: error("No signer found for credential $credentialConfigurationId")
 
-        val submittedRequest =
-            authorized.requestSingle(credentialConfigurationId to null, null, proofSigner).getOrThrow()
+        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+        val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
 
         return when (submittedRequest) {
-            is SubmittedRequest.Success -> {
-                when (val issuedCredential = submittedRequest.credentials[0]) {
-                    is IssuedCredential.Issued -> issuedCredential.credential
-                    is IssuedCredential.Deferred -> {
-                        deferredCredentialUseCase(issuer, authorized, issuedCredential)
-                    }
-                }
-            }
-
+            is SubmittedRequest.Success -> handleSuccess(submittedRequest, issuer, authorized)
             is SubmittedRequest.Failed -> throw submittedRequest.error
-
             is SubmittedRequest.InvalidProof -> throw IllegalStateException(
                 "Although providing a proof with c_nonce the proof is still invalid",
             )
@@ -256,7 +163,18 @@ private suspend fun proofRequiredSubmissionUseCase(
     }
 }
 
-private suspend fun deferredCredentialUseCase(
+private suspend fun handleSuccess(
+    submittedRequest: SubmittedRequest.Success,
+    issuer: Issuer,
+    authorized: AuthorizedRequest,
+) = when (val issuedCredential = submittedRequest.credentials[0]) {
+    is IssuedCredential.Issued -> issuedCredential.credential
+    is IssuedCredential.Deferred -> {
+        handleDeferred(issuer, authorized, issuedCredential)
+    }
+}
+
+private suspend fun handleDeferred(
     issuer: Issuer,
     authorized: AuthorizedRequest,
     deferred: IssuedCredential.Deferred,
@@ -275,6 +193,3 @@ private suspend fun deferredCredentialUseCase(
         }
     }
 }
-
-
-

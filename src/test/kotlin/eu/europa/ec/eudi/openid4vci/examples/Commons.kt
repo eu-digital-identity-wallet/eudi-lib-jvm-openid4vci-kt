@@ -1,6 +1,22 @@
+/*
+ * Copyright (c) 2023 European Commission
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package eu.europa.ec.eudi.openid4vci.examples
 
 import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryptionPolicy
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator
 import eu.europa.ec.eudi.openid4vci.KeyGenerationConfig
 import eu.europa.ec.eudi.openid4vci.OpenId4VCIConfig
@@ -30,26 +46,12 @@ val DefaultProofSignersMap = mapOf(
     MDL_config_id to CryptoGenerator.ecProofSigner(),
 )
 
-
 val DefaultOpenId4VCIConfig = OpenId4VCIConfig(
     clientId = "wallet-dev",
     authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
     keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
+    CredentialResponseEncryptionPolicy.SUPPORTED,
 )
-
-internal fun createCredentialOfferStr(credentialIssuerURL: String, configurationIds: List<String>): String {
-    val confIds = configurationIds.joinToString(transform = { "\"$it\"" })
-    return """
-        {
-          "credential_issuer": "$credentialIssuerURL",
-          "credential_configuration_ids": [ $confIds ],
-          "grants": {
-            "authorization_code": {}
-          }
-        }
-    """.trimIndent()
-}
-
 
 internal fun httpClientFactory(): HttpClient = HttpClient(Apache) {
     install(ContentNegotiation) {
@@ -75,4 +77,3 @@ internal fun authorizationLog(message: String) {
 internal fun issuanceLog(message: String) {
     println("--> [ISSUANCE] $message")
 }
-
