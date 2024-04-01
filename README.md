@@ -116,15 +116,18 @@ The [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) interface p
 import eu.europa.ec.eudi.openid4vci.*
 
 val openId4VCIConfig = OpenId4VCIConfig(
-    clientId = "wallet-dev", // The client id of wallet (acting as an OAUTH2 client)
-    authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // Where the Credential Issuer should redirect after 
-                                                              // Authorization code flow succeeds
-    keyGenerationConfig = KeyGenerationConfig.ecOnly(Curve.P_256) // What kind of ephemeral keys could be generated
-                                                                  // to encrypt credential issuance response 
+    clientId = "wallet-dev", // the client id of wallet (acting as an OAUTH2 client)
+    authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
+    keyGenerationConfig = KeyGenerationConfig.ecOnly(Curve.P_256), // what kind of ephemeral keys could be generated to encrypt credential issuance response
+    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED // policy concerning the wallet's requirements for encryption of credential responses 
 )
 val credentialOffer: CredentialOffer = CredentialOfferRequestResolver().resolve(coUrl).getOrThrow()
-val issuer = Issuer.make(openId4VCIConfig, credentialOffer)
+val issuer = Issuer.make(openId4VCIConfig, credentialOffer).getOrThrow()
 ```
+Construction of an Issuer might fail in case there is some incompatibility between credential issuer service's metadata and
+the configuration OpenId4VCIConfig. Such an incompatibility can exist between the wallet's encryption requirements regarding credential 
+responses and the encryption capabilities/requirements of the credential issuer service.
+
 A resolved [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) object contains the mandatory elements required for issuance.
 - The issuer's identifier 
 - The selected authorization server that will authorize the issuance
