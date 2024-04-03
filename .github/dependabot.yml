@@ -5,10 +5,21 @@ updates:
     schedule:
       interval: "weekly"
     groups:
+      core-libs:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.kotlinx*"
+          - "io.ktor*"
+          - "com.nimbusds*"
       libs:
         patterns:
           - "*"
-    open-pull-requests-limit: 1
+        exclude-patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.kotlinx*"
+          - "io.ktor*"
+          - "com.nimbusds*"
+    open-pull-requests-limit: 2
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
