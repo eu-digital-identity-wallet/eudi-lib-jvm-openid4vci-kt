@@ -102,6 +102,8 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
 
         /**
          * Factory method for creating an instance of [Issuer] based on a credential offer URI.
+         * Method will try to first resolve the [credentialOfferUri] into a [CredentialOffer]
+         * proceed with the creation of the [Issuer]
          *
          * @param config wallet's configuration options
          * @param credentialOfferUri the credential offer uri to be resolved
@@ -119,31 +121,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
         ): Result<Issuer> = runCatching {
             val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory)
             val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUri).getOrThrow()
-
-            val issuanceServerClient = IssuanceServerClient(
-                credentialOffer.credentialIssuerMetadata,
-                ktorHttpClientFactory,
-            )
-            val authorizeIssuance = AuthorizeIssuanceImpl(
-                credentialOffer,
-                config,
-                ktorHttpClientFactory,
-            )
-            val requestIssuance = RequestIssuanceImpl(
-                credentialOffer,
-                config,
-                issuanceServerClient,
-                responseEncryptionSpecFactory,
-            ).getOrThrow()
-            val queryForDeferredCredential = QueryForDeferredCredentialImpl(issuanceServerClient)
-            val notifyIssuer = NotifyIssuerImpl(issuanceServerClient)
-
-            object :
-                Issuer,
-                AuthorizeIssuance by authorizeIssuance,
-                RequestIssuance by requestIssuance,
-                QueryForDeferredCredential by queryForDeferredCredential,
-                NotifyIssuer by notifyIssuer {}
+            make(config, credentialOffer, ktorHttpClientFactory, responseEncryptionSpecFactory).getOrThrow()
         }
 
         val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =
