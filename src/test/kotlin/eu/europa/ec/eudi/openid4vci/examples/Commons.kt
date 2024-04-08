@@ -53,7 +53,7 @@ val DefaultOpenId4VCIConfig = OpenId4VCIConfig(
     CredentialResponseEncryptionPolicy.SUPPORTED,
 )
 
-internal fun httpClientFactory(): HttpClient = HttpClient(Apache) {
+internal fun createHttpClient(): HttpClient = HttpClient(Apache) {
     install(ContentNegotiation) {
         json(
             json = Json { ignoreUnknownKeys = true },

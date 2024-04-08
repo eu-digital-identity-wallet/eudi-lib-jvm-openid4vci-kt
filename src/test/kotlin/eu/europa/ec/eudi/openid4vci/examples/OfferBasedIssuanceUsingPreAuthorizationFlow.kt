@@ -35,7 +35,7 @@ fun main(): Unit = runBlocking {
 
     println("[[Scenario: Issuance based on credential offer url: $credentialOfferUrl]] ")
 
-    val resolver = CredentialOfferRequestResolver(ktorHttpClientFactory = ::httpClientFactory)
+    val resolver = CredentialOfferRequestResolver(ktorHttpClientFactory = ::createHttpClient)
     val credentialOffer = resolver.resolve(credentialOfferUrl).getOrThrow()
 
     ensure(credentialOffer.grants is Grants.PreAuthorizedCode || credentialOffer.grants is Grants.Both) {

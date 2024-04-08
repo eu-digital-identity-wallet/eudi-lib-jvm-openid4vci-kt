@@ -95,7 +95,7 @@ private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer, actingUs
     }
 
 private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
-    return httpClientFactory().use { client ->
+    return createHttpClient().use { client ->
         val loginUrl = client.get(getAuthorizationCodeUrl).body<String>().extractASLoginUrl()
 
         val formParameters = mapOf(

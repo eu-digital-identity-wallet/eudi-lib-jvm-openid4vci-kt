@@ -39,7 +39,7 @@ fun main(): Unit = runBlocking {
 fun runUseCase(credentialIssuerId: CredentialIssuerId, credentialConfigurationIds: List<String>): Unit = runBlocking {
     println("[[Scenario: Issuance based on credential configuration ids: $credentialConfigurationIds]] ")
 
-    val (issuerMetadata, authorizationServersMetadata) = httpClientFactory().use { client ->
+    val (issuerMetadata, authorizationServersMetadata) = createHttpClient().use { client ->
         Issuer.metaData(client, credentialIssuerId)
     }
 
@@ -102,7 +102,7 @@ private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer, actingUs
     }
 
 private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
-    return httpClientFactory().use { client ->
+    return createHttpClient().use { client ->
         val loginUrl = client.get(getAuthorizationCodeUrl).body<String>().extractASLoginUrl()
 
         val formParameters = mapOf(
