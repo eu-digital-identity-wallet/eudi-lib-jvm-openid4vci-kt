@@ -29,13 +29,6 @@ import java.util.*
 sealed interface CryptographicBindingMethod : Serializable {
 
     /**
-     * X5C format.
-     */
-    data object X5C : CryptographicBindingMethod {
-        private fun readResolve(): Any = X5C
-    }
-
-    /**
      * JWK format.
      */
     data object JWK : CryptographicBindingMethod {

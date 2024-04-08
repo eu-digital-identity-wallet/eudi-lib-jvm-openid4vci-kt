@@ -28,7 +28,7 @@ import java.net.URL
 private val actingUser = ActingUser("tneal", "password")
 
 fun main(): Unit = runBlocking {
-    val credentialOfferUrl = "eudi-openid4ci://credentialsOffer?credential_offer=%7B%22" +
+    val credentialOfferUrl = "eudi-openid4ci://?credential_offer=%7B%22" +
         "credential_issuer%22:%22https://dev.issuer-backend.eudiw.dev%22,%22" +
         "credential_configuration_ids%22:[%22eu.europa.ec.eudiw.pid_mso_mdoc%22," +
         "%22eu.europa.ec.eudiw.pid_vc_sd_jwt%22,%22org.iso.18013.5.1.mDL%22]," +
@@ -37,7 +37,7 @@ fun main(): Unit = runBlocking {
 
     println("[[Scenario: Issuance based on credential offer url: $credentialOfferUrl]] ")
 
-    val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory = ::httpClientFactory)
+    val credentialOfferRequestResolver = CredentialOfferRequestResolver()
     val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUrl).getOrThrow()
 
     val issuer = Issuer.make(
