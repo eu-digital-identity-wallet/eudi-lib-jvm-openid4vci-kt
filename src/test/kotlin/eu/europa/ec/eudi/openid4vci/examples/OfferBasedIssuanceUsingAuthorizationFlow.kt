@@ -30,33 +30,34 @@ private val actingUser = ActingUser("tneal", "password")
 fun main(): Unit = runBlocking {
     val credentialOfferUrl = "eudi-openid4ci://?credential_offer=%7B%22" +
         "credential_issuer%22:%22https://dev.issuer-backend.eudiw.dev%22,%22" +
-        "credential_configuration_ids%22:[%22eu.europa.ec.eudiw.pid_mso_mdoc%22," +
-        "%22eu.europa.ec.eudiw.pid_vc_sd_jwt%22,%22org.iso.18013.5.1.mDL%22]," +
+        "credential_configuration_ids%22:[%22$PID_MsoMdoc_config_id%22," +
+        "%22$PID_SdJwtVC_config_id%22,%22$MDL_config_id%22]," +
         "%22grants%22:%7B%22authorization_code%22:%7B%22" +
         "authorization_server%22:%22https://dev.auth.eudiw.dev/realms/pid-issuer-realm%22%7D%7D%7D"
 
     println("[[Scenario: Issuance based on credential offer url: $credentialOfferUrl]] ")
 
-    val credentialOfferRequestResolver = CredentialOfferRequestResolver()
-    val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUrl).getOrThrow()
-
     val issuer = Issuer.make(
         config = DefaultOpenId4VCIConfig,
-        credentialOffer = credentialOffer,
+        credentialOfferUri = credentialOfferUrl,
     ).getOrThrow()
 
     authorizationLog("Using authorized code flow to authorize")
     val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, actingUser)
     authorizationLog("Authorization retrieved: $authorizedRequest")
 
+    val offerCredentialConfIds = listOf(PID_SdJwtVC_config_id, PID_MsoMdoc_config_id, MDL_config_id).map {
+        CredentialConfigurationIdentifier(it)
+    }
+
     val credentials = when (authorizedRequest) {
-        is AuthorizedRequest.NoProofRequired -> credentialOffer.credentialConfigurationIdentifiers.map { credentialId ->
+        is AuthorizedRequest.NoProofRequired -> offerCredentialConfIds.map { credentialId ->
             issuanceLog("Requesting issuance of '$credentialId'")
             val credential = submitProvidingNoProofs(issuer, authorizedRequest, credentialId)
             credentialId.value to credential
         }
 
-        is AuthorizedRequest.ProofRequired -> credentialOffer.credentialConfigurationIdentifiers.map { credentialId ->
+        is AuthorizedRequest.ProofRequired -> offerCredentialConfIds.map { credentialId ->
             issuanceLog("Requesting issuance of '$credentialId'")
             val credential = submitProvidingProofs(issuer, authorizedRequest, credentialId)
             credentialId.value to credential

@@ -348,6 +348,10 @@ interface ProofSigner : JWSSigner {
     fun getAlgorithm(): JWSAlgorithm
 }
 
+/**
+ * A factory method that based on the issuer's supported encryption and the wallet's configuration creates the encryption specification
+ * that the wallet expects in the response of its issuance request.
+ */
 typealias ResponseEncryptionSpecFactory =
     (SupportedEncryptionAlgorithmsAndMethods, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec?
 

@@ -58,12 +58,12 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
         }
 
         /**
-         * Factory method for creating an instance of [Issuer]
+         * Factory method for creating an instance of [Issuer] based on a resolved and validated credential offer.
          *
          * @param config wallet's configuration options
-         * @param credentialOffer the offer for which the issuer is being
+         * @param credentialOffer the offer for which the issuer is being created
          * @param ktorHttpClientFactory a factory for obtaining http clients, used while interacting with issuer
-         * @param responseEncryptionSpecFactory
+         * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
          *
          * @return if wallet's [config] can satisfy the requirements of [credentialOffer] an [Issuer] will be
          * created. Otherwise, there would be a failed result
@@ -74,6 +74,52 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Result<Issuer> = runCatching {
+            val issuanceServerClient = IssuanceServerClient(
+                credentialOffer.credentialIssuerMetadata,
+                ktorHttpClientFactory,
+            )
+            val authorizeIssuance = AuthorizeIssuanceImpl(
+                credentialOffer,
+                config,
+                ktorHttpClientFactory,
+            )
+            val requestIssuance = RequestIssuanceImpl(
+                credentialOffer,
+                config,
+                issuanceServerClient,
+                responseEncryptionSpecFactory,
+            ).getOrThrow()
+            val queryForDeferredCredential = QueryForDeferredCredentialImpl(issuanceServerClient)
+            val notifyIssuer = NotifyIssuerImpl(issuanceServerClient)
+
+            object :
+                Issuer,
+                AuthorizeIssuance by authorizeIssuance,
+                RequestIssuance by requestIssuance,
+                QueryForDeferredCredential by queryForDeferredCredential,
+                NotifyIssuer by notifyIssuer {}
+        }
+
+        /**
+         * Factory method for creating an instance of [Issuer] based on a credential offer URI.
+         *
+         * @param config wallet's configuration options
+         * @param credentialOfferUri the credential offer uri to be resolved
+         * @param ktorHttpClientFactory a factory for obtaining http clients, used while interacting with issuer
+         * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
+         *
+         * @return if wallet's [config] can satisfy the requirements of the resolved credentialOffer an [Issuer] will be
+         * created. Otherwise, there would be a failed result
+         */
+        suspend fun make(
+            config: OpenId4VCIConfig,
+            credentialOfferUri: String,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+        ): Result<Issuer> = runCatching {
+            val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory)
+            val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUri).getOrThrow()
+
             val issuanceServerClient = IssuanceServerClient(
                 credentialOffer.credentialIssuerMetadata,
                 ktorHttpClientFactory,

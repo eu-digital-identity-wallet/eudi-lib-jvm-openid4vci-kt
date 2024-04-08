@@ -30,7 +30,6 @@ private val CredentialIssuer_URL = "https://dev.issuer-backend.eudiw.dev"
 private val actingUser = ActingUser("tneal", "password")
 
 fun main(): Unit = runBlocking {
-
     val credentialIssuerId = CredentialIssuerId(CredentialIssuer_URL).getOrThrow()
     val credentialConfigurationIds = listOf(PID_SdJwtVC_config_id, PID_MsoMdoc_config_id, MDL_config_id)
 
@@ -38,7 +37,6 @@ fun main(): Unit = runBlocking {
 }
 
 fun runUseCase(credentialIssuerId: CredentialIssuerId, credentialConfigurationIds: List<String>): Unit = runBlocking {
-
     println("[[Scenario: Issuance based on credential configuration ids: $credentialConfigurationIds]] ")
 
     val (issuerMetadata, authorizationServersMetadata) = httpClientFactory().use { client ->
