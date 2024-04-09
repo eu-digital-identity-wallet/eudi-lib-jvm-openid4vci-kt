@@ -103,9 +103,7 @@ stateDiagram-v2
 
 
 [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) is the component that facilitates the authorization and submission of a credential issuance request (batch or single).
-It is the main entry point for the functionality provided from the library, and it is consisted of two sub-components:
-- **IssuanceAuthorizer**: A component responsible for all interactions with an authorization server to authorize a request for credential(s) issuance.
-- **IssuerRequester**: A component responsible for all interactions with credential issuer for submitting credential issuance requests.
+It is the main entry point for the functionality provided from the library
 
 #### Initialize an Issuer
 
@@ -290,7 +288,7 @@ Current version of the library implements integrations with issuer's [Crednetial
 OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library fully supports **ISO mDL** and **IETF SD-JWT VC** profiles.  
 
 #### Proof Types
-OpenId4VCI specification (draft 12) defines two types of proofs that can be included in a credential issuance request, JWT proof type and CWT proof type. Current version of the library supports only JWT proof types
+OpenId4VCI specification (draft 13) defines two types of proofs that can be included in a credential issuance request, JWT proof type and CWT proof type. Current version of the library supports only JWT proof types
 
 ## How to contribute
 
