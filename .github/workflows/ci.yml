@@ -18,9 +18,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       - name: Validate Gradle Wrapper
-        uses: gradle/wrapper-validation-action@v2
+        uses: gradle/wrapper-validation-action@v3
       - name: Build with Gradle Wrapper
-        uses: gradle/gradle-build-action@v3.2.0
+        uses: gradle/gradle-build-action@v3.3.0
         with:
           gradle-version: wrapper
           arguments: build
@@ -46,9 +46,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       - name: Validate Gradle Wrapper
-        uses: gradle/wrapper-validation-action@v2
+        uses: gradle/wrapper-validation-action@v3
       - name: Publish with Gradle Wrapper
-        uses: gradle/gradle-build-action@v3.2.0
+        uses: gradle/gradle-build-action@v3.3.0
         with:
           arguments: publishAllPublicationsToMavenCentral --full-stacktrace
         env:
