@@ -63,7 +63,7 @@ internal class AuthorizeIssuanceImpl(
         credentialConfigurationIds: List<CredentialConfigurationIdentifier>,
     ): Result<AuthorizationRequestPrepared> = runCatching {
         require(scopes.isNotEmpty() || credentialConfigurationIds.isNotEmpty()) {
-            "Either scopes or crednetial configuration ids must be provided"
+            "Either scopes or credential configuration ids must be provided"
         }
         val state = State().value
         val issuerState = when (credentialOffer.grants) {
