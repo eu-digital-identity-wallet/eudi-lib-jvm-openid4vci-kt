@@ -50,6 +50,9 @@ class IssuanceBatchRequestTest {
                                         CertificateIssuanceResponse(
                                             credential = "issued_credential_content_sd_jwt_vc",
                                         ),
+                                        CertificateIssuanceResponse(
+                                            credential = "issued_credential_content_jwt_vc_json",
+                                        ),
                                     ),
                                     cNonce = "wlbQc6pCJp",
                                     cNonceExpiresInSeconds = 86400,
@@ -98,6 +101,14 @@ class IssuanceBatchRequestTest {
             ),
         )
 
+        val claimSet_w3c_signed_jwt = GenericClaimSet(
+            claims = listOf(
+                "given_name",
+                "family_name",
+                "degree",
+            ),
+        )
+
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
@@ -109,6 +120,10 @@ class IssuanceBatchRequestTest {
                         IssuanceRequestPayload.ConfigurationBased(
                             CredentialConfigurationIdentifier(PID_SdJwtVC),
                             claimSet_sd_jwt_vc,
+                        ),
+                        IssuanceRequestPayload.ConfigurationBased(
+                            CredentialConfigurationIdentifier(DEGREE_JwtVcJson),
+                            claimSet_w3c_signed_jwt,
                         ),
                     )
                     val submittedRequest = authorizedRequest.requestBatch(batchRequestPayload).getOrThrow()
@@ -129,6 +144,13 @@ class IssuanceBatchRequestTest {
                                     IssuanceRequestPayload.ConfigurationBased(
                                         CredentialConfigurationIdentifier(PID_SdJwtVC),
                                         claimSet_sd_jwt_vc,
+                                    ),
+                                    proofSigner,
+                                ),
+                                Pair(
+                                    IssuanceRequestPayload.ConfigurationBased(
+                                        CredentialConfigurationIdentifier(DEGREE_JwtVcJson),
+                                        claimSet_w3c_signed_jwt,
                                     ),
                                     proofSigner,
                                 ),

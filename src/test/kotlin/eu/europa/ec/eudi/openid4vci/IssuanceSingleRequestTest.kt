@@ -343,6 +343,58 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
+    fun `successful issuance of credential in jwt_vc_json format`() = runTest {
+        val credential = "issued_credential_content_jwt_vc_json"
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            singleIssuanceRequestMocker(
+                credential = credential,
+            ),
+        )
+
+        val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            mockedKtorHttpClientFactory,
+            CredentialOfferWithJwtVcJson_NO_GRANTS,
+        )
+
+        val claimSet = GenericClaimSet(
+            claims = listOf(
+                "given_name",
+                "family_name",
+                "degree",
+            ),
+        )
+
+        with(issuer) {
+            when (authorizedRequest) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
+                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
+                    when (submittedRequest) {
+                        is SubmittedRequest.InvalidProof -> {
+                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                            val response = assertDoesNotThrow {
+                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                            }
+                            assertIs<SubmittedRequest.Success>(response)
+                        }
+
+                        is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
+                        is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
+                    }
+                }
+
+                is AuthorizedRequest.ProofRequired ->
+                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+            }
+        }
+    }
+
+    @Test
     fun `when token endpoint returns credential identifiers, issuance request must be IdentifierBasedIssuanceRequestTO`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
             oidcWellKnownMocker(),

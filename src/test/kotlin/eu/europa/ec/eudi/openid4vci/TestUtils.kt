@@ -22,11 +22,13 @@ import java.util.*
 const val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
 const val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
 const val PID_MsoMdoc = "eu.europa.ec.eudiw.pid_mso_mdoc"
+const val DEGREE_JwtVcJson = "UniversityDegree_jwt_vc_json"
+const val MDL_MsoMdoc = "MobileDrivingLicense_msoMdoc"
 
 val CREDENTIAL_OFFER_NO_GRANTS = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_SdJwtVC", "$PID_MsoMdoc"]          
+          "credential_configuration_ids": ["$PID_SdJwtVC", "$PID_MsoMdoc", "$DEGREE_JwtVcJson"]          
         }
 """.trimIndent()
 
@@ -41,6 +43,13 @@ val CredentialOfferWithSdJwtVc_NO_GRANTS = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
           "credential_configuration_ids": ["$PID_SdJwtVC"]          
+        }
+""".trimIndent()
+
+val CredentialOfferWithJwtVcJson_NO_GRANTS = """
+        {
+          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+          "credential_configuration_ids": ["$DEGREE_JwtVcJson"]
         }
 """.trimIndent()
 
