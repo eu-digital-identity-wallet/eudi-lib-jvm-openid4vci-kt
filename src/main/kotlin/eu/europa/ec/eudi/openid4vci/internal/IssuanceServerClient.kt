@@ -110,6 +110,7 @@ internal data class CredentialIssuanceResponse(
 internal class IssuanceServerClient(
     private val issuerMetadata: CredentialIssuerMetadata,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
+    private val dPoPProofSigner: ProofSigner?,
 ) {
 
     /**
@@ -127,7 +128,7 @@ internal class IssuanceServerClient(
             ktorHttpClientFactory().use { client ->
                 val url = issuerMetadata.credentialEndpoint.value.value
                 val response = client.post(url) {
-                    bearerAuth(accessToken.accessToken)
+                    bearerAuthOrDPoP(dPoPProofSigner, url, Htm.POST, accessToken)
                     contentType(ContentType.Application.Json)
                     setBody(IssuanceRequestJsonMapper.asJson(request))
                 }
@@ -152,7 +153,7 @@ internal class IssuanceServerClient(
             val url = issuerMetadata.batchCredentialEndpoint.value.value
             val payload = IssuanceRequestJsonMapper.asJson(request)
             val response = client.post(url) {
-                bearerAuth(accessToken.accessToken)
+                bearerAuthOrDPoP(dPoPProofSigner, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
                 setBody(payload)
             }
@@ -230,7 +231,7 @@ internal class IssuanceServerClient(
         ktorHttpClientFactory().use { client ->
             val url = issuerMetadata.deferredCredentialEndpoint.value.value
             val response = client.post(url) {
-                bearerAuth(accessToken.accessToken)
+                bearerAuthOrDPoP(dPoPProofSigner, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
                 setBody(transactionId.toDeferredRequestTO())
             }
@@ -247,7 +248,7 @@ internal class IssuanceServerClient(
             val url = issuerMetadata.notificationEndpoint.value.value
             val payload = event.toTransferObject()
             val response = client.post(url) {
-                bearerAuth(accessToken.accessToken)
+                bearerAuthOrDPoP(dPoPProofSigner, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
                 setBody(payload)
             }
@@ -310,6 +311,7 @@ internal class IssuanceServerClient(
                 val notificationIdentifier = notificationId?.let { NotificationId(notificationId) }
                 IssuedCredential.Issued(credential, notificationIdentifier)
             }
+
             else -> error("Cannot happen")
         }
     }
@@ -318,7 +320,13 @@ internal class IssuanceServerClient(
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
         return CredentialIssuanceResponse(
             cNonce = cNonce,
-            credentials = credentialResponses.map { issuedCredentialOf(it.transactionId, it.notificationId, it.credential) },
+            credentials = credentialResponses.map {
+                issuedCredentialOf(
+                    it.transactionId,
+                    it.notificationId,
+                    it.credential,
+                )
+            },
         )
     }
 
@@ -349,11 +357,13 @@ private fun CredentialIssuanceEvent.toTransferObject(): NotificationTO =
             event = NotifiedEvent.CREDENTIAL_ACCEPTED,
             description = this.description,
         )
+
         is CredentialIssuanceEvent.Deleted -> NotificationTO(
             id = id.value,
             event = NotifiedEvent.CREDENTIAL_DELETED,
             description = this.description,
         )
+
         is CredentialIssuanceEvent.Failed -> NotificationTO(
             id = id.value,
             event = NotifiedEvent.CREDENTIAL_FAILURE,

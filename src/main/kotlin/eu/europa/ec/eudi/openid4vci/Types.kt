@@ -84,9 +84,10 @@ data class PKCEVerifier(
 
 /**
  * Domain object to describe a valid issuance access token
+ * @param accessToken the access token
+ * @param useDPoP indicates whether access token must be used with a DPoP JWT or not
  */
-@JvmInline
-value class AccessToken(val accessToken: String) {
+data class AccessToken(val accessToken: String, val useDPoP: Boolean) {
     init {
         require(accessToken.isNotEmpty()) { "Access Token must not be empty" }
     }

@@ -77,6 +77,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             val issuanceServerClient = IssuanceServerClient(
                 credentialOffer.credentialIssuerMetadata,
                 ktorHttpClientFactory,
+                config.dPoPProofSigner,
             )
             val authorizeIssuance = AuthorizeIssuanceImpl(
                 credentialOffer,

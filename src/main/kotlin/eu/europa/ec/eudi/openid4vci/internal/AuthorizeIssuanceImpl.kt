@@ -72,10 +72,18 @@ internal class AuthorizeIssuanceImpl(
             else -> null
         }
 
-        val authorizationServerSupportsPar = credentialOffer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI != null
+        val authorizationServerSupportsPar =
+            credentialOffer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI != null
         val (codeVerifier, authorizationCodeUrl) = when (authorizationServerSupportsPar) {
-            true -> authServerClient.submitPushedAuthorizationRequest(scopes, credentialConfigurationIds, state, issuerState).getOrThrow()
-            false -> authServerClient.authorizationRequestUrl(scopes, credentialConfigurationIds, state, issuerState).getOrThrow()
+            true -> authServerClient.submitPushedAuthorizationRequest(
+                scopes,
+                credentialConfigurationIds,
+                state,
+                issuerState,
+            ).getOrThrow()
+
+            false -> authServerClient.authorizationRequestUrl(scopes, credentialConfigurationIds, state, issuerState)
+                .getOrThrow()
         }
         AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier)
     }
@@ -83,7 +91,8 @@ internal class AuthorizeIssuanceImpl(
     private fun credentialConfigurationSupportedById(
         credentialConfigurationId: CredentialConfigurationIdentifier,
     ): CredentialConfiguration {
-        val credentialSupported = credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credentialConfigurationId]
+        val credentialSupported =
+            credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credentialConfigurationId]
         return requireNotNull(credentialSupported) {
             "$credentialConfigurationId was not found within issuer metadata"
         }
@@ -97,8 +106,11 @@ internal class AuthorizeIssuanceImpl(
             authServerClient.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier).getOrThrow()
 
         when {
-            cNonce != null && offerRequiresProofs -> AuthorizedRequest.ProofRequired(accessToken, cNonce, authDetails)
-            else -> AuthorizedRequest.NoProofRequired(accessToken, authDetails)
+            cNonce != null && offerRequiresProofs ->
+                AuthorizedRequest.ProofRequired(accessToken, cNonce, authDetails)
+
+            else ->
+                AuthorizedRequest.NoProofRequired(accessToken, authDetails)
         }
     }
 
@@ -126,11 +138,16 @@ internal class AuthorizeIssuanceImpl(
             }
         }
         val offerRequiresProofs = credentialOffer.requiresProofs()
-        val (accessToken, cNonce) = authServerClient.requestAccessTokenPreAuthFlow(preAuthorizedCode.preAuthorizedCode, txCode).getOrThrow()
+        val (accessToken, cNonce, _) = authServerClient.requestAccessTokenPreAuthFlow(
+            preAuthorizedCode.preAuthorizedCode,
+            txCode,
+        ).getOrThrow()
 
         when {
-            cNonce != null && offerRequiresProofs -> AuthorizedRequest.ProofRequired(accessToken, cNonce, emptyMap())
-            else -> AuthorizedRequest.NoProofRequired(accessToken, emptyMap())
+            cNonce != null && offerRequiresProofs ->
+                AuthorizedRequest.ProofRequired(accessToken, cNonce, emptyMap())
+            else ->
+                AuthorizedRequest.NoProofRequired(accessToken, emptyMap())
         }
     }
 

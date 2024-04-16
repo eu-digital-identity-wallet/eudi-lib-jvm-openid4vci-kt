@@ -81,6 +81,7 @@ internal sealed interface AccessTokenRequestResponseTO {
      */
     @Serializable
     data class Success(
+        @SerialName("token_type") val tokenType: String? = null,
         @SerialName("access_token") val accessToken: String,
         @SerialName("expires_in") val expiresIn: Long? = null,
         @SerialName("c_nonce") val cNonce: String? = null,
@@ -257,21 +258,24 @@ internal class AuthorizationServerClient(
         when (this) {
             is AccessTokenRequestResponseTO.Success -> {
                 val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
-                TokenResponse(AccessToken(accessToken), cNonce, authorizationDetails ?: emptyMap())
+                val useDPoP = "DPoP".equals(other = tokenType, ignoreCase = true)
+                TokenResponse(AccessToken(accessToken, useDPoP), cNonce, authorizationDetails ?: emptyMap())
             }
 
             is AccessTokenRequestResponseTO.Failure -> throw AccessTokenRequestFailed(error, errorDescription)
         }
 
-    private suspend fun requestAccessToken(params: Map<String, String>): AccessTokenRequestResponseTO =
+    private suspend fun requestAccessToken(
+        params: Map<String, String>,
+    ): AccessTokenRequestResponseTO =
         ktorHttpClientFactory().use { client ->
             val url = authorizationServerMetadata.tokenEndpointURI.toURL()
-            val response = client.submitForm(
-                url = url.toString(),
-                formParameters = Parameters.build {
-                    params.entries.forEach { (k, v) -> append(k, v) }
-                },
-            )
+            val formParameters = Parameters.build {
+                params.entries.forEach { (k, v) -> append(k, v) }
+            }
+            val response = client.submitForm(url.toString(), formParameters) {
+                config.dPoPProofSigner?.let { dpop(it, url, Htm.POST) }
+            }
             if (response.status.isSuccess()) response.body<AccessTokenRequestResponseTO.Success>()
             else response.body<AccessTokenRequestResponseTO.Failure>()
         }
@@ -342,7 +346,7 @@ internal sealed interface TokenEndpointForm {
     }
 
     data object PreAuthCodeFlow : TokenEndpointForm {
-        const val CLIENT_ID_PARAM = "client_id"
+        private const val CLIENT_ID_PARAM = "client_id"
         private const val GRANT_TYPE_PARAM = "grant_type"
         const val GRANT_TYPE_PARAM_VALUE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
         const val TX_CODE_PARAM = "tx_code"

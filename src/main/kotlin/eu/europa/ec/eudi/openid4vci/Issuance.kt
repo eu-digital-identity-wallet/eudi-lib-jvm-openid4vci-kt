@@ -127,7 +127,7 @@ sealed interface SubmittedRequest {
      * State denoting a special case of request failure. Issuer has responded that the proof of possession provided in
      * the request was invalid. Along with the error, issuer responds with a new c_nonce to be used in the request retry.
      *
-     * @param cNonce The c_nonce provided from issuer along with the error
+     * @param cNonce The c_nonce provided from issuer along the error
      * @param errorDescription Description of the error that caused the failure
      */
     class InvalidProof(
@@ -142,7 +142,7 @@ interface AuthorizeIssuance {
      * Initial step to authorize an issuance request using Authorized Code Flow.
      * If the specified authorization server supports PAR then this method executes the first step of PAR by pushing the authorization
      * request to authorization server's 'par endpoint'.
-     * If PAR is not supported then this method prepares the authorization request as a typical authorization code flow authorization
+     * If PAR is not supported, then this method prepares the authorization request as a typical authorization code flow authorization
      * request with the request's elements as query parameters.
      *
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>

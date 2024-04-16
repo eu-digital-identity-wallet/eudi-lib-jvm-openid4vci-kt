@@ -21,13 +21,17 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.dpop.DPoPProofFactory
 import com.nimbusds.oauth2.sdk.dpop.DPoPUtils
 import com.nimbusds.oauth2.sdk.id.JWTID
-import com.nimbusds.oauth2.sdk.token.AccessToken
 import com.nimbusds.openid.connect.sdk.Nonce
+import eu.europa.ec.eudi.openid4vci.AccessToken
 import eu.europa.ec.eudi.openid4vci.BindingKey
 import eu.europa.ec.eudi.openid4vci.ProofSigner
+import io.ktor.client.request.*
+import io.ktor.http.*
 import java.net.URI
+import java.net.URL
 import java.time.Clock
 import java.util.*
+import com.nimbusds.oauth2.sdk.token.AccessToken as NimbusAccessToken
 
 internal enum class Htm {
     GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE
@@ -78,6 +82,30 @@ internal class DPoPJwtFactory(
     private fun jti(): JWTID = JWTID(jtiByteLength)
 }
 
+internal fun HttpRequestBuilder.bearerAuthOrDPoP(
+    dPoPProofSigner: ProofSigner?,
+    htu: URL,
+    htm: Htm,
+    accessToken: AccessToken,
+) {
+    if (dPoPProofSigner != null && accessToken.useDPoP) {
+        dpop(dPoPProofSigner, htu, htm)
+        header(HttpHeaders.Authorization, "DPoP ${accessToken.accessToken}")
+    } else {
+        bearerAuth(accessToken.accessToken)
+    }
+}
+
+internal fun HttpRequestBuilder.dpop(
+    dPoPProofSigner: ProofSigner,
+    htu: URL,
+    htm: Htm
+) {
+    val factory = DPoPJwtFactory(dPoPProofSigner, clock = Clock.systemDefaultZone())
+    val jwt = factory.createDPoPJwt(htm, Htu(htu.toExternalForm()).getOrThrow()).getOrThrow().serialize()
+    header("DPoP", jwt)
+}
+
 internal fun factory(signer: ProofSigner): DPoPProofFactory = object : DPoPProofFactory {
 
     private val publicJwk = run {
@@ -103,14 +131,14 @@ internal fun factory(signer: ProofSigner): DPoPProofFactory = object : DPoPProof
     override fun createDPoPJWT(
         htm: String?,
         htu: URI?,
-        accessToken: AccessToken?,
+        accessToken: NimbusAccessToken?,
     ): SignedJWT = createDPoPJWT(htm, htu, accessToken, null)
 
     @Throws(JOSEException::class)
     override fun createDPoPJWT(
         htm: String?,
         htu: URI?,
-        accessToken: AccessToken?,
+        accessToken: NimbusAccessToken?,
         nonce: Nonce?,
     ): SignedJWT =
         createDPoPJWT(JWTID(DPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH), htm, htu, Date(), accessToken, nonce)
@@ -125,7 +153,7 @@ internal fun factory(signer: ProofSigner): DPoPProofFactory = object : DPoPProof
         htm: String?,
         htu: URI?,
         iat: Date?,
-        accessToken: AccessToken?,
+        accessToken: NimbusAccessToken?,
     ): SignedJWT = createDPoPJWT(jti, htm, htu, iat, accessToken, null)
 
     @Throws(JOSEException::class)
@@ -134,7 +162,7 @@ internal fun factory(signer: ProofSigner): DPoPProofFactory = object : DPoPProof
         htm: String?,
         htu: URI?,
         iat: Date?,
-        accessToken: AccessToken?,
+        accessToken: NimbusAccessToken?,
         nonce: Nonce?,
     ): SignedJWT {
         val jwsHeader: JWSHeader = JWSHeader.Builder(signer.getAlgorithm())
