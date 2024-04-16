@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vci.internal
 import com.nimbusds.jose.JOSEException
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jwt.SignedJWT
-import com.nimbusds.oauth2.sdk.dpop.DPoPProofFactory as NimbusDPoPProofFactory
 import com.nimbusds.oauth2.sdk.dpop.DPoPUtils
 import com.nimbusds.oauth2.sdk.id.JWTID
 import com.nimbusds.openid.connect.sdk.Nonce
@@ -31,6 +30,7 @@ import java.net.URI
 import java.net.URL
 import java.time.Clock
 import java.util.*
+import com.nimbusds.oauth2.sdk.dpop.DPoPProofFactory as NimbusDPoPProofFactory
 import com.nimbusds.oauth2.sdk.token.AccessToken as NimbusAccessToken
 
 internal enum class Htm {
