@@ -259,7 +259,7 @@ internal class AuthorizationServerClient(
         when (this) {
             is AccessTokenRequestResponseTO.Success -> {
                 val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
-                val useDPoP = "DPoP".equals(other = tokenType, ignoreCase = true)
+                val useDPoP = DPoP.equals(other = tokenType, ignoreCase = true)
                 TokenResponse(AccessToken(accessToken, useDPoP), cNonce, authorizationDetails ?: emptyMap())
             }
 
@@ -275,7 +275,9 @@ internal class AuthorizationServerClient(
                 params.entries.forEach { (k, v) -> append(k, v) }
             }
             val response = client.submitForm(url.toString(), formParameters) {
-                dPoPJwtFactory?.let { dpop(it, url, Htm.POST) }
+                dPoPJwtFactory?.let { factory ->
+                    dpop(factory, url, Htm.POST, accessToken = null, nonce = null)
+                }
             }
             if (response.status.isSuccess()) response.body<AccessTokenRequestResponseTO.Success>()
             else response.body<AccessTokenRequestResponseTO.Failure>()

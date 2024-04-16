@@ -32,6 +32,7 @@ import java.time.Clock
 import java.util.*
 import com.nimbusds.oauth2.sdk.dpop.DPoPProofFactory as NimbusDPoPProofFactory
 import com.nimbusds.oauth2.sdk.token.AccessToken as NimbusAccessToken
+import com.nimbusds.oauth2.sdk.token.DPoPAccessToken as NimbusDPoPAccessToken
 
 internal enum class Htm {
     GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE
@@ -54,6 +55,7 @@ internal class DPoPJwtFactory(
     fun createDPoPJwt(
         htm: Htm,
         htu: URL,
+        accessToken: AccessToken.DPoP? = null,
         nonce: String? = null,
     ): Result<SignedJWT> = runCatching {
         delegate.createDPoPJWT(
@@ -61,7 +63,9 @@ internal class DPoPJwtFactory(
             htm.name,
             htu.toURI(),
             now(),
-            null,
+            accessToken?.let {
+                NimbusDPoPAccessToken(it.accessToken)
+            },
             nonce?.let { Nonce(it) },
         )
     }
@@ -80,9 +84,10 @@ internal fun HttpRequestBuilder.bearerOrDPoPAuth(
         is AccessToken.Bearer -> {
             bearerAuth(accessToken)
         }
+
         is AccessToken.DPoP -> {
             if (factory != null) {
-                dpop(factory, htu, htm)
+                dpop(factory, htu, htm, accessToken, nonce = null)
                 dpopAuth(accessToken)
             } else {
                 bearerAuth(AccessToken.Bearer(accessToken.accessToken))
@@ -95,8 +100,10 @@ internal fun HttpRequestBuilder.dpop(
     factory: DPoPJwtFactory,
     htu: URL,
     htm: Htm,
+    accessToken: AccessToken.DPoP?,
+    nonce: String?,
 ) {
-    val jwt = factory.createDPoPJwt(htm, htu).getOrThrow().serialize()
+    val jwt = factory.createDPoPJwt(htm, htu, accessToken, nonce).getOrThrow().serialize()
     header(DPoP, jwt)
 }
 
