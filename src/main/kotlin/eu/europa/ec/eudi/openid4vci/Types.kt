@@ -21,6 +21,8 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
+import eu.europa.ec.eudi.openid4vci.AccessToken.Bearer
+import eu.europa.ec.eudi.openid4vci.AccessToken.DPoP
 import kotlinx.serialization.Serializable
 import java.net.URI
 import java.net.URL
@@ -84,12 +86,38 @@ data class PKCEVerifier(
 
 /**
  * Domain object to describe a valid issuance access token
- * @param accessToken the access token
- * @param useDPoP indicates whether access token must be used with a DPoP JWT or not
+ *
+ * [Bearer] is the usual bearer access token
+ * [DPoP] is an access token that must be used with a DPoP JWT
  */
-data class AccessToken(val accessToken: String, val useDPoP: Boolean) {
-    init {
-        require(accessToken.isNotEmpty()) { "Access Token must not be empty" }
+sealed interface AccessToken {
+
+    val accessToken: String
+
+    @JvmInline
+    value class Bearer(override val accessToken: String) : AccessToken {
+        init {
+            requireNotEmpty(accessToken)
+        }
+    }
+
+    @JvmInline
+    value class DPoP(override val accessToken: String) : AccessToken {
+        init {
+            requireNotEmpty(accessToken)
+        }
+    }
+
+    companion object {
+        operator fun invoke(accessToken: String, useDPoP: Boolean): AccessToken {
+            requireNotEmpty(accessToken)
+            return if (useDPoP) DPoP(accessToken)
+            else Bearer(accessToken)
+        }
+
+        private fun requireNotEmpty(accessToken: String) {
+            require(accessToken.isNotEmpty()) { "Access Token must not be empty" }
+        }
     }
 }
 

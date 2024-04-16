@@ -22,6 +22,7 @@ internal class AuthorizeIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     private val config: OpenId4VCIConfig,
     ktorHttpClientFactory: KtorHttpClientFactory,
+    dPoPJwtFactory: DPoPJwtFactory?,
 ) : AuthorizeIssuance {
 
     private val authServerClient: AuthorizationServerClient =
@@ -29,7 +30,8 @@ internal class AuthorizeIssuanceImpl(
             credentialOffer.credentialIssuerIdentifier,
             credentialOffer.authorizationServerMetadata,
             config,
-            ktorHttpClientFactory,
+            dPoPJwtFactory,
+            ktorHttpClientFactory
         )
 
     override suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared> = runCatching {

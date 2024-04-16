@@ -115,6 +115,7 @@ internal class AuthorizationServerClient(
     private val credentialIssuerId: CredentialIssuerId,
     private val authorizationServerMetadata: CIAuthorizationServerMetadata,
     private val config: OpenId4VCIConfig,
+    private val dPoPJwtFactory: DPoPJwtFactory?,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
 
@@ -274,7 +275,7 @@ internal class AuthorizationServerClient(
                 params.entries.forEach { (k, v) -> append(k, v) }
             }
             val response = client.submitForm(url.toString(), formParameters) {
-                config.dPoPProofSigner?.let { dpop(it, url, Htm.POST) }
+                dPoPJwtFactory?.let { dpop(it, url, Htm.POST) }
             }
             if (response.status.isSuccess()) response.body<AccessTokenRequestResponseTO.Success>()
             else response.body<AccessTokenRequestResponseTO.Failure>()

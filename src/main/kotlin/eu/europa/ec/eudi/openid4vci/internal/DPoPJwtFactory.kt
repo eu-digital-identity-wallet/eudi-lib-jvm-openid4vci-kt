@@ -18,7 +18,7 @@ package eu.europa.ec.eudi.openid4vci.internal
 import com.nimbusds.jose.JOSEException
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jwt.SignedJWT
-import com.nimbusds.oauth2.sdk.dpop.DPoPProofFactory
+import com.nimbusds.oauth2.sdk.dpop.DPoPProofFactory as NimbusDPoPProofFactory
 import com.nimbusds.oauth2.sdk.dpop.DPoPUtils
 import com.nimbusds.oauth2.sdk.id.JWTID
 import com.nimbusds.openid.connect.sdk.Nonce
@@ -37,41 +37,29 @@ internal enum class Htm {
     GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE
 }
 
-@JvmInline
-internal value class Htu private constructor(val value: URI) {
-    companion object {
-        operator fun invoke(uri: String): Result<Htu> = runCatching {
-            val htu = URI.create(uri)
-            require(htu.query == null) { "htu cannot have query part" }
-            require(htu.fragment == null) { "htu cannot have fragment part" }
-            Htu(htu)
-        }
-    }
-}
-
 /**
  * https://datatracker.ietf.org/doc/rfc9449/
  */
 internal class DPoPJwtFactory(
-    private val signer: ProofSigner,
-    private val jtiByteLength: Int = DPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
+    signer: ProofSigner,
+    private val jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
     private val clock: Clock,
 ) {
     init {
         require(jtiByteLength > 0) { "jtiByteLength must be greater than zero" }
     }
 
-    private val factory: DPoPProofFactory = factory(signer)
+    private val delegate: NimbusDPoPProofFactory = createNimbusFactory(signer)
 
     fun createDPoPJwt(
         htm: Htm,
-        htu: Htu,
+        htu: URL,
         nonce: String? = null,
     ): Result<SignedJWT> = runCatching {
-        factory.createDPoPJWT(
+        delegate.createDPoPJWT(
             jti(),
             htm.name,
-            htu.value,
+            htu.toURI(),
             now(),
             null,
             nonce?.let { Nonce(it) },
@@ -82,31 +70,47 @@ internal class DPoPJwtFactory(
     private fun jti(): JWTID = JWTID(jtiByteLength)
 }
 
-internal fun HttpRequestBuilder.bearerAuthOrDPoP(
-    dPoPProofSigner: ProofSigner?,
+internal fun HttpRequestBuilder.bearerOrDPoPAuth(
+    factory: DPoPJwtFactory?,
     htu: URL,
     htm: Htm,
     accessToken: AccessToken,
 ) {
-    if (dPoPProofSigner != null && accessToken.useDPoP) {
-        dpop(dPoPProofSigner, htu, htm)
-        header(HttpHeaders.Authorization, "DPoP ${accessToken.accessToken}")
-    } else {
-        bearerAuth(accessToken.accessToken)
+    when (accessToken) {
+        is AccessToken.Bearer -> {
+            bearerAuth(accessToken)
+        }
+        is AccessToken.DPoP -> {
+            if (factory != null) {
+                dpop(factory, htu, htm)
+                dpopAuth(accessToken)
+            } else {
+                bearerAuth(AccessToken.Bearer(accessToken.accessToken))
+            }
+        }
     }
 }
 
 internal fun HttpRequestBuilder.dpop(
-    dPoPProofSigner: ProofSigner,
+    factory: DPoPJwtFactory,
     htu: URL,
-    htm: Htm
+    htm: Htm,
 ) {
-    val factory = DPoPJwtFactory(dPoPProofSigner, clock = Clock.systemDefaultZone())
-    val jwt = factory.createDPoPJwt(htm, Htu(htu.toExternalForm()).getOrThrow()).getOrThrow().serialize()
-    header("DPoP", jwt)
+    val jwt = factory.createDPoPJwt(htm, htu).getOrThrow().serialize()
+    header(DPoP, jwt)
 }
 
-internal fun factory(signer: ProofSigner): DPoPProofFactory = object : DPoPProofFactory {
+private fun HttpRequestBuilder.dpopAuth(accessToken: AccessToken.DPoP) {
+    header(HttpHeaders.Authorization, "$DPoP ${accessToken.accessToken}")
+}
+
+private fun HttpRequestBuilder.bearerAuth(accessToken: AccessToken.Bearer) {
+    bearerAuth(accessToken.accessToken)
+}
+
+internal const val DPoP = "DPoP"
+
+internal fun createNimbusFactory(signer: ProofSigner): NimbusDPoPProofFactory = object : NimbusDPoPProofFactory {
 
     private val publicJwk = run {
         val bk = signer.getBindingKey()
@@ -141,7 +145,7 @@ internal fun factory(signer: ProofSigner): DPoPProofFactory = object : DPoPProof
         accessToken: NimbusAccessToken?,
         nonce: Nonce?,
     ): SignedJWT =
-        createDPoPJWT(JWTID(DPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH), htm, htu, Date(), accessToken, nonce)
+        createDPoPJWT(JWTID(NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH), htm, htu, Date(), accessToken, nonce)
 
     @Deprecated(
         message = "Deprecated in Java",
@@ -166,7 +170,7 @@ internal fun factory(signer: ProofSigner): DPoPProofFactory = object : DPoPProof
         nonce: Nonce?,
     ): SignedJWT {
         val jwsHeader: JWSHeader = JWSHeader.Builder(signer.getAlgorithm())
-            .type(DPoPProofFactory.TYPE)
+            .type(NimbusDPoPProofFactory.TYPE)
             .jwk(publicJwk)
             .build()
 

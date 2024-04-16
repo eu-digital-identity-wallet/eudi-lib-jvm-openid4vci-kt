@@ -110,7 +110,7 @@ internal data class CredentialIssuanceResponse(
 internal class IssuanceServerClient(
     private val issuerMetadata: CredentialIssuerMetadata,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
-    private val dPoPProofSigner: ProofSigner?,
+    private val dPoPJwtFactory: DPoPJwtFactory?,
 ) {
 
     /**
@@ -128,7 +128,7 @@ internal class IssuanceServerClient(
             ktorHttpClientFactory().use { client ->
                 val url = issuerMetadata.credentialEndpoint.value.value
                 val response = client.post(url) {
-                    bearerAuthOrDPoP(dPoPProofSigner, url, Htm.POST, accessToken)
+                    bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                     contentType(ContentType.Application.Json)
                     setBody(IssuanceRequestJsonMapper.asJson(request))
                 }
@@ -153,7 +153,7 @@ internal class IssuanceServerClient(
             val url = issuerMetadata.batchCredentialEndpoint.value.value
             val payload = IssuanceRequestJsonMapper.asJson(request)
             val response = client.post(url) {
-                bearerAuthOrDPoP(dPoPProofSigner, url, Htm.POST, accessToken)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
                 setBody(payload)
             }
@@ -231,7 +231,7 @@ internal class IssuanceServerClient(
         ktorHttpClientFactory().use { client ->
             val url = issuerMetadata.deferredCredentialEndpoint.value.value
             val response = client.post(url) {
-                bearerAuthOrDPoP(dPoPProofSigner, url, Htm.POST, accessToken)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
                 setBody(transactionId.toDeferredRequestTO())
             }
@@ -248,7 +248,7 @@ internal class IssuanceServerClient(
             val url = issuerMetadata.notificationEndpoint.value.value
             val payload = event.toTransferObject()
             val response = client.post(url) {
-                bearerAuthOrDPoP(dPoPProofSigner, url, Htm.POST, accessToken)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
                 setBody(payload)
             }
