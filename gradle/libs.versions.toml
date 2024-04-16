@@ -12,6 +12,7 @@ java = "17"
 ktlint = "0.50.0"
 dokka = "1.9.20"
 maven-publish = "0.28.0"
+logback = "1.2.3"
 
 [libraries]
 nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
@@ -25,8 +26,10 @@ ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "kto
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
+ktor-client-logging = {module ="io.ktor:ktor-client-logging", version.ref="ktor"}
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 cbor = { module = "co.nstant.in:cbor", version.ref = "cbor" }
+logback-classic = {module="ch.qos.logback:logback-classic", version.ref="logback"}
 
 [plugins]
 dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependency-check" }
