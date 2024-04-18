@@ -23,6 +23,7 @@ import com.nimbusds.oauth2.sdk.id.JWTID
 import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vci.AccessToken
 import eu.europa.ec.eudi.openid4vci.BindingKey
+import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.ProofSigner
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -72,6 +73,38 @@ internal class DPoPJwtFactory(
 
     private fun now(): Date = Date.from(clock.instant())
     private fun jti(): JWTID = JWTID(jtiByteLength)
+
+    companion object {
+
+        /**
+         * Tries to create a [DPoPJwtFactory] given a [signer] and the [oauthServerMetadata]
+         * of the OAUTH2 or OIDC server.
+         *
+         * The factory will be created in case the server supports DPoP (this is indicated by a not empty array
+         * ` dpop_signing_alg_values_supported` and in addition if the [signer] uses a supported algorithm
+         *
+         * @return
+         * if the OAUTH2 server doesn't support DPoP result would be `Result.Success(null)`
+         * if the OAUTH2 server supports DPoP and Signer uses a supported algorithm result would be success
+         * Otherwise a failure will be returned
+         *
+         */
+        fun createForServer(
+            signer: ProofSigner,
+            jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
+            clock: Clock,
+            oauthServerMetadata: CIAuthorizationServerMetadata,
+        ): Result<DPoPJwtFactory?> = runCatching {
+            val supportDPoPAlgs = oauthServerMetadata.dPoPJWSAlgs.orEmpty()
+            val signerAlg = signer.getAlgorithm()
+            if (supportDPoPAlgs.isNotEmpty()) {
+                require(signerAlg in supportDPoPAlgs) {
+                    "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportDPoPAlgs"
+                }
+                DPoPJwtFactory(signer, jtiByteLength, clock)
+            } else null
+        }
+    }
 }
 
 internal fun HttpRequestBuilder.bearerOrDPoPAuth(

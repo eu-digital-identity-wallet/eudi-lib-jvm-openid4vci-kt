@@ -21,7 +21,6 @@ import io.ktor.client.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import java.time.Clock
 
 interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredential, NotifyIssuer {
 
@@ -75,7 +74,13 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Result<Issuer> = runCatching {
-            val dPoPJwtFactory = config.dPoPProofSigner?.let { DPoPJwtFactory(it, clock = Clock.systemDefaultZone()) }
+            val dPoPJwtFactory = config.dPoPProofSigner?.let { signer ->
+                DPoPJwtFactory.createForServer(
+                    signer = signer,
+                    clock = config.clock,
+                    oauthServerMetadata = credentialOffer.authorizationServerMetadata,
+                ).getOrThrow()
+            }
             val issuanceServerClient = IssuanceServerClient(
                 credentialOffer.credentialIssuerMetadata,
                 ktorHttpClientFactory,
