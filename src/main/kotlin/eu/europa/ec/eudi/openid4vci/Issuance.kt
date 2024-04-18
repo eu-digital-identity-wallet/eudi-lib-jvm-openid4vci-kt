@@ -39,6 +39,7 @@ sealed interface AuthorizedRequest {
      * Access token authorizing the request(s) to issue credential(s)
      */
     val accessToken: AccessToken
+    val refreshToken: RefreshToken?
     val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?
 
     /**
@@ -48,6 +49,7 @@ sealed interface AuthorizedRequest {
      */
     data class NoProofRequired(
         override val accessToken: AccessToken,
+        override val refreshToken: RefreshToken?,
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
     ) : AuthorizedRequest
 
@@ -60,6 +62,7 @@ sealed interface AuthorizedRequest {
      */
     data class ProofRequired(
         override val accessToken: AccessToken,
+        override val refreshToken: RefreshToken?,
         val cNonce: CNonce,
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
     ) : AuthorizedRequest

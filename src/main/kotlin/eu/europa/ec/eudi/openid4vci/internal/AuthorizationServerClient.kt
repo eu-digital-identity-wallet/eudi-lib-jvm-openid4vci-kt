@@ -83,6 +83,7 @@ internal sealed interface AccessTokenRequestResponseTO {
     data class Success(
         @SerialName("token_type") val tokenType: String? = null,
         @SerialName("access_token") val accessToken: String,
+        @SerialName("refresh_token") val refreshToken: String? = null,
         @SerialName("expires_in") val expiresIn: Long? = null,
         @SerialName("c_nonce") val cNonce: String? = null,
         @SerialName("c_nonce_expires_in") val cNonceExpiresIn: Long? = null,
@@ -107,6 +108,7 @@ internal sealed interface AccessTokenRequestResponseTO {
 
 internal data class TokenResponse(
     val accessToken: AccessToken,
+    val refreshToken: RefreshToken?,
     val cNonce: CNonce?,
     val authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> = emptyMap(),
 )
@@ -235,7 +237,7 @@ internal class AuthorizationServerClient(
             config.clientId,
             codeVerifier,
         )
-        requestAccessToken(params).accessTokenOrFail()
+        requestAccessToken(params).tokensOrFail()
     }
 
     /**
@@ -252,15 +254,18 @@ internal class AuthorizationServerClient(
         txCode: String?,
     ): Result<TokenResponse> = runCatching {
         val params = TokenEndpointForm.PreAuthCodeFlow.of(config.clientId, preAuthorizedCode, txCode)
-        requestAccessToken(params).accessTokenOrFail()
+        requestAccessToken(params).tokensOrFail()
     }
 
-    private fun AccessTokenRequestResponseTO.accessTokenOrFail(): TokenResponse =
+    private fun AccessTokenRequestResponseTO.tokensOrFail(): TokenResponse =
         when (this) {
             is AccessTokenRequestResponseTO.Success -> {
-                val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
-                val useDPoP = DPoP.equals(other = tokenType, ignoreCase = true)
-                TokenResponse(AccessToken(accessToken, useDPoP), cNonce, authorizationDetails ?: emptyMap())
+                TokenResponse(
+                    accessToken = AccessToken(accessToken, DPoP.equals(other = tokenType, ignoreCase = true)),
+                    refreshToken = refreshToken?.let { RefreshToken(it) },
+                    cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) },
+                    authorizationDetails = authorizationDetails ?: emptyMap(),
+                )
             }
 
             is AccessTokenRequestResponseTO.Failure -> throw AccessTokenRequestFailed(error, errorDescription)

@@ -104,15 +104,15 @@ internal class AuthorizeIssuanceImpl(
         authorizationCode: AuthorizationCode,
     ): Result<AuthorizedRequest> = kotlin.runCatching {
         val offerRequiresProofs = credentialOffer.requiresProofs()
-        val (accessToken, cNonce, authDetails) =
+        val (accessToken, refreshToken, cNonce, authDetails) =
             authServerClient.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier).getOrThrow()
 
         when {
             cNonce != null && offerRequiresProofs ->
-                AuthorizedRequest.ProofRequired(accessToken, cNonce, authDetails)
+                AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, authDetails)
 
             else ->
-                AuthorizedRequest.NoProofRequired(accessToken, authDetails)
+                AuthorizedRequest.NoProofRequired(accessToken, refreshToken, authDetails)
         }
     }
 
@@ -140,16 +140,16 @@ internal class AuthorizeIssuanceImpl(
             }
         }
         val offerRequiresProofs = credentialOffer.requiresProofs()
-        val (accessToken, cNonce, _) = authServerClient.requestAccessTokenPreAuthFlow(
+        val (accessToken, refreshToken, cNonce, _) = authServerClient.requestAccessTokenPreAuthFlow(
             preAuthorizedCode.preAuthorizedCode,
             txCode,
         ).getOrThrow()
 
         when {
             cNonce != null && offerRequiresProofs ->
-                AuthorizedRequest.ProofRequired(accessToken, cNonce, emptyMap())
+                AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, emptyMap())
             else ->
-                AuthorizedRequest.NoProofRequired(accessToken, emptyMap())
+                AuthorizedRequest.NoProofRequired(accessToken, refreshToken, emptyMap())
         }
     }
 

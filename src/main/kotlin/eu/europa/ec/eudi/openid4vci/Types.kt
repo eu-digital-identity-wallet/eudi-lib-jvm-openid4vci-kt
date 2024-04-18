@@ -22,6 +22,7 @@ import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.AccessToken.Bearer
+import eu.europa.ec.eudi.openid4vci.AccessToken.Companion.requireNotEmpty
 import eu.europa.ec.eudi.openid4vci.AccessToken.DPoP
 import kotlinx.serialization.Serializable
 import java.net.URI
@@ -118,6 +119,13 @@ sealed interface AccessToken {
         private fun requireNotEmpty(accessToken: String) {
             require(accessToken.isNotEmpty()) { "Access Token must not be empty" }
         }
+    }
+}
+
+@JvmInline
+value class RefreshToken(val refreshToken: String) {
+    init {
+        require(refreshToken.isNotEmpty()) { "Refresh Token must not be empty" }
     }
 }
 
