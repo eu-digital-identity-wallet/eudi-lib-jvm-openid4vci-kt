@@ -91,7 +91,7 @@ data class PKCEVerifier(
  * [Bearer] is the usual bearer access token
  * [DPoP] is an access token that must be used with a DPoP JWT
  */
-sealed interface AccessToken {
+sealed interface AccessToken : java.io.Serializable {
 
     val accessToken: String
 
@@ -148,7 +148,7 @@ value class AuthorizationCode(val code: String) {
 data class CNonce(
     val value: String,
     val expiresInSeconds: Long? = 5,
-) {
+) : java.io.Serializable{
     init {
         require(value.isNotEmpty()) { "Value cannot be empty" }
     }
