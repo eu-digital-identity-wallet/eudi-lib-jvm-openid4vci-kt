@@ -56,7 +56,7 @@ internal class DefaultAuthorizationServerMetadataResolver(
 
     /**
      * Tries to fetch the [CIAuthorizationServerMetadata] for the provided [OAuth2 Authorization Server][issuer].
-     * The well known location __/.well-known/oauth-authorization-server__ is used.
+     * The well-known location __/.well-known/oauth-authorization-server__ is used.
      */
     private suspend fun fetchOauthServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
         runCatching {
