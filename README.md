@@ -279,9 +279,9 @@ The same stands for the **token endpoint** when (as specified in [section 6.2](h
 `authorization_details`. In this case too library does not support authorization details that include `format` attribute. 
 
 ### Credential Request
-Current version of the library implements integrations with issuer's [Crednetial Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-credential-endpoint),
-[Batch Crednetial Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-batch-credential-endpoint),
-[Deferred Crednetial Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-deferred-credential-endpoin) and
+Current version of the library implements integrations with issuer's [Credential Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-credential-endpoint),
+[Batch Credential Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-batch-credential-endpoint),
+[Deferred Credential Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-deferred-credential-endpoin) and
 [Notification Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-notification-endpoint).
 
 #### Credential Format Profiles
