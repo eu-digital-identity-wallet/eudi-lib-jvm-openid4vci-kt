@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import java.net.URI
+import java.time.Clock
 
 typealias ClientId = String
 
@@ -40,6 +41,7 @@ data class OpenId4VCIConfig(
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPProofSigner: ProofSigner? = null,
+    val clock: Clock = Clock.systemDefaultZone(),
 ) {
     init {
         if (null != dPoPProofSigner) {
