@@ -17,6 +17,8 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
+import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
+import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
 
@@ -349,6 +351,22 @@ interface ProofSigner : JWSSigner {
     fun getBindingKey(): BindingKey
 
     fun getAlgorithm(): JWSAlgorithm
+
+    companion object {
+
+        fun make(
+            privateKey: JWK,
+            publicKey: BindingKey,
+            algorithm: JWSAlgorithm,
+        ): ProofSigner {
+            require(privateKey.isPrivate) { "A private key is required" }
+            val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
+            return object : ProofSigner, JWSSigner by signer {
+                override fun getBindingKey(): BindingKey = publicKey
+                override fun getAlgorithm(): JWSAlgorithm = algorithm
+            }
+        }
+    }
 }
 
 /**
