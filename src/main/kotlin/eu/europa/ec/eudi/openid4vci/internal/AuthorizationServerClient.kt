@@ -81,7 +81,7 @@ internal sealed interface AccessTokenRequestResponseTO {
     @Serializable
     data class Success(
         @SerialName("access_token") val accessToken: String,
-        @SerialName("expires_in") val expiresIn: Long,
+        @SerialName("expires_in") val expiresIn: Long? = null,
         @SerialName("c_nonce") val cNonce: String? = null,
         @SerialName("c_nonce_expires_in") val cNonceExpiresIn: Long? = null,
         @Serializable(with = GrantedAuthorizationDetailsSerializer::class)
