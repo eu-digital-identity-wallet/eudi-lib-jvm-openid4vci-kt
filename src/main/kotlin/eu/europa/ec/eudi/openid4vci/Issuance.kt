@@ -29,13 +29,13 @@ import kotlinx.serialization.Serializable
 data class AuthorizationRequestPrepared(
     val authorizationCodeURL: HttpsUrl,
     val pkceVerifier: PKCEVerifier,
-)
+) : java.io.Serializable
 
 /**
  * Sealed hierarchy of states describing an authorized issuance request. These states hold an access token issued by the
  * authorization server that protects the credential issuer.
  */
-sealed interface AuthorizedRequest {
+sealed interface AuthorizedRequest : java.io.Serializable {
 
     /**
      * Access token authorizing the request(s) to issue credential(s)
@@ -73,7 +73,7 @@ sealed interface AuthorizedRequest {
 /**
  * The result of a request for issuance
  */
-sealed interface IssuedCredential {
+sealed interface IssuedCredential : java.io.Serializable {
 
     /**
      * Credential was issued from server and the result is returned inline.
@@ -100,7 +100,7 @@ sealed interface IssuedCredential {
 /**
  * Sealed hierarchy of states describing the state of an issuance request submitted to a credential issuer.
  */
-sealed interface SubmittedRequest {
+sealed interface SubmittedRequest : java.io.Serializable {
 
     /**
      * State that denotes the successful submission of an issuance request

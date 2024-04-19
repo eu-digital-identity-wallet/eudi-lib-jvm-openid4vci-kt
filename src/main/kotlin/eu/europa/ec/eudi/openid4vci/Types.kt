@@ -78,7 +78,7 @@ value class CredentialIdentifier(val value: String) {
 data class PKCEVerifier(
     val codeVerifier: String,
     val codeVerifierMethod: String,
-) {
+) : java.io.Serializable {
     init {
         require(codeVerifier.isNotEmpty()) { "Code verifier must not be empty" }
         require(codeVerifierMethod.isNotEmpty()) { "Code verifier method must not be empty" }
