@@ -148,7 +148,7 @@ value class AuthorizationCode(val code: String) {
 data class CNonce(
     val value: String,
     val expiresInSeconds: Long? = 5,
-) : java.io.Serializable{
+) : java.io.Serializable {
     init {
         require(value.isNotEmpty()) { "Value cannot be empty" }
     }
