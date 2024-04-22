@@ -287,7 +287,7 @@ class IssuanceAuthorizationTest {
             val preAuthGrantOffer = """
                 {
                   "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-                  "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+                  "credential_configuration_ids": ["$PID_MsoMdoc", "$PID_SdJwtVC"],
                   "grants": {
                     "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
                       "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
@@ -333,7 +333,7 @@ class IssuanceAuthorizationTest {
             val preAuthGrantOffer = """
                 {
                   "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-                  "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+                  "credential_configuration_ids": ["$PID_MsoMdoc", "$PID_SdJwtVC"],
                   "grants": {
                     "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
                       "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
@@ -498,7 +498,7 @@ class IssuanceAuthorizationTest {
             val noProofRequiredOffer = """
             {
               "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-              "credential_configuration_ids": ["MobileDrivingLicense_msoMdoc"],
+              "credential_configuration_ids": ["$MDL_MsoMdoc"],
               "grants": {
                 "authorization_code": {
                   "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"

@@ -16,8 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.DeferredIssuanceRequestTO
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequestTO
-import eu.europa.ec.eudi.openid4vci.internal.formats.SdJwtVcIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.SingleCredentialTO
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -302,7 +301,7 @@ class IssuanceDeferredRequestTest {
 
     private fun respondToCredentialIssuanceRequest(
         call: MockRequestHandleScope,
-        issuanceRequest: SdJwtVcIssuanceRequestTO?,
+        issuanceRequest: SingleCredentialTO?,
     ): HttpResponseData =
         if (issuanceRequest == null) {
             call.respond(
@@ -354,9 +353,9 @@ class IssuanceDeferredRequestTest {
             null
         }
 
-    private fun asIssuanceRequest(bodyStr: String): SdJwtVcIssuanceRequestTO? =
+    private fun asIssuanceRequest(bodyStr: String): SingleCredentialTO? =
         try {
-            Json.decodeFromString<CredentialIssuanceRequestTO>(bodyStr) as SdJwtVcIssuanceRequestTO
+            Json.decodeFromString<SingleCredentialTO>(bodyStr)
         } catch (ex: Exception) {
             null
         }
