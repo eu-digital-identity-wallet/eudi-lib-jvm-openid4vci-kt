@@ -127,36 +127,49 @@ internal object ClaimSetSerializer : KSerializer<MsoMdocClaimSet> {
 }
 
 @OptIn(ExperimentalSerializationApi::class)
-internal object GrantedAuthorizationDetailsSerializer : KSerializer<Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>> {
+internal object GrantedAuthorizationDetailsSerializer :
+    KSerializer<Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>> {
+
+    private const val OPENID_CREDENTIAL: String = "openid_credential"
 
     @Serializable
     data class AuthorizationDetailJson(
-        @SerialName("type") val type: String,
+        @SerialName("type") @Required val type: String,
         @SerialName("format") val format: String? = null,
         @SerialName("credential_configuration_id") val credentialConfigurationId: String,
-        @SerialName("credential_identifiers") val credentialIdentifiers: List<String>,
-    )
+        @SerialName("credential_identifiers") val credentialIdentifiers: List<String> = emptyList(),
+    ) {
+        init {
+            require(type == OPENID_CREDENTIAL) { "type must be $OPENID_CREDENTIAL" }
+        }
+    }
+    private fun authDetails(
+        credentialConfigurationId: CredentialConfigurationIdentifier,
+        credentialIdentifiers: List<CredentialIdentifier>,
+    ): AuthorizationDetailJson =
+        AuthorizationDetailJson(
+            type = OPENID_CREDENTIAL,
+            credentialConfigurationId = credentialConfigurationId.value,
+            credentialIdentifiers = credentialIdentifiers.map(CredentialIdentifier::value),
+        )
 
     private val internal = serializer<List<AuthorizationDetailJson>>()
     override val descriptor: SerialDescriptor = SerialDescriptor("GrantedAuthorizationDetails", internal.descriptor)
 
     override fun deserialize(decoder: Decoder): Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> {
         val deserialized = internal.deserialize(decoder)
-        return deserialized.map {
-            CredentialConfigurationIdentifier(it.credentialConfigurationId) to it.credentialIdentifiers.map { CredentialIdentifier(it) }
-        }.toMap()
+        return deserialized.associate { authDetails ->
+            val credentialConfigurationId = CredentialConfigurationIdentifier(authDetails.credentialConfigurationId)
+            val credentialIdentifiers = authDetails.credentialIdentifiers.map { CredentialIdentifier(it) }
+            credentialConfigurationId to credentialIdentifiers
+        }
     }
 
-    override fun serialize(encoder: Encoder, value: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>) {
-        internal.serialize(
-            encoder,
-            value.entries.map {
-                AuthorizationDetailJson(
-                    type = "openid_credential",
-                    credentialConfigurationId = it.key.value,
-                    credentialIdentifiers = it.value.map(CredentialIdentifier::value),
-                )
-            },
-        )
+    override fun serialize(
+        encoder: Encoder,
+        value: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
+    ) {
+        val authorizationDetailsList = value.entries.map { (cfgId, credIds) -> authDetails(cfgId, credIds) }
+        internal.serialize(encoder, authorizationDetailsList)
     }
 }
