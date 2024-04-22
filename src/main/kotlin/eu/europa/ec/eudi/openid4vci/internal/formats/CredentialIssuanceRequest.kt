@@ -73,15 +73,15 @@ internal sealed interface CredentialIssuanceRequest {
 
     companion object {
         internal fun formatBased(
-            supportedCredential: CredentialConfiguration,
+            credentialConfiguration: CredentialConfiguration,
             claimSet: ClaimSet?,
             proof: Proof?,
             responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
         ): FormatBased {
-            val cd = when (supportedCredential) {
-                is MsoMdocCredential -> msoMdoc(supportedCredential, claimSet.ensureClaimSet())
-                is SdJwtVcCredential -> sdJwtVc(supportedCredential, claimSet.ensureClaimSet())
-                is W3CSignedJwtCredential -> w3cSignedJwt(supportedCredential, claimSet.ensureClaimSet())
+            val cd = when (credentialConfiguration) {
+                is MsoMdocCredential -> msoMdoc(credentialConfiguration, claimSet.ensureClaimSet())
+                is SdJwtVcCredential -> sdJwtVc(credentialConfiguration, claimSet.ensureClaimSet())
+                is W3CSignedJwtCredential -> w3cSignedJwt(credentialConfiguration, claimSet.ensureClaimSet())
                 is W3CJsonLdSignedJwtCredential -> error("Format $FORMAT_W3C_JSONLD_SIGNED_JWT not supported")
                 is W3CJsonLdDataIntegrityCredential -> error("Format $FORMAT_W3C_JSONLD_DATA_INTEGRITY not supported")
             }
@@ -96,13 +96,16 @@ private inline fun <reified C : ClaimSet> ClaimSet?.ensureClaimSet(): C? =
         this
     } else null
 
-private fun msoMdoc(supportedCredential: MsoMdocCredential, claimSet: MsoMdocClaimSet?): CredentialType.MsoMdocDocType {
+private fun msoMdoc(
+    credentialConfiguration: MsoMdocCredential,
+    claimSet: MsoMdocClaimSet?,
+): CredentialType.MsoMdocDocType {
     fun MsoMdocClaimSet.validate() {
         if (isNotEmpty()) {
-            val supportedClaims = supportedCredential.claims
+            val supportedClaims = credentialConfiguration.claims
             ensure(supportedClaims.isNotEmpty()) {
                 InvalidIssuanceRequest(
-                    "Issuer does not support claims for credential [MsoMdoc-${supportedCredential.docType}]",
+                    "Issuer does not support claims for credential [MsoMdoc-${credentialConfiguration.docType}]",
                 )
             }
 
@@ -120,22 +123,22 @@ private fun msoMdoc(supportedCredential: MsoMdocCredential, claimSet: MsoMdocCla
 
     val validClaimSet = claimSet?.apply { validate() }
     return CredentialType.MsoMdocDocType(
-        doctype = supportedCredential.docType,
+        doctype = credentialConfiguration.docType,
         claimSet = validClaimSet,
     )
 }
 
 private fun sdJwtVc(
-    supportedCredential: SdJwtVcCredential,
+    credentialConfiguration: SdJwtVcCredential,
     claimSet: GenericClaimSet?,
 ): CredentialType.SdJwtVcType {
     fun GenericClaimSet.validate() {
         if (claims.isNotEmpty()) {
-            val supportedClaims = supportedCredential.claims
+            val supportedClaims = credentialConfiguration.claims
             ensure(!supportedClaims.isNullOrEmpty()) {
                 InvalidIssuanceRequest(
                     "Issuer does not support claims for credential " +
-                        "[$FORMAT_SD_JWT_VC-${supportedCredential.type}]",
+                        "[$FORMAT_SD_JWT_VC-${credentialConfiguration.type}]",
                 )
             }
             ensure(supportedClaims.keys.containsAll(claims)) {
@@ -146,22 +149,22 @@ private fun sdJwtVc(
 
     val validClaimSet = claimSet?.apply { validate() }
     return CredentialType.SdJwtVcType(
-        type = supportedCredential.type,
+        type = credentialConfiguration.type,
         claims = validClaimSet,
     )
 }
 
 private fun w3cSignedJwt(
-    supportedCredential: W3CSignedJwtCredential,
+    credentialConfiguration: W3CSignedJwtCredential,
     claimSet: GenericClaimSet?,
 ): CredentialType.W3CSignedJwtType {
     fun GenericClaimSet.validate() {
         if (claims.isNotEmpty()) {
-            val supportedClaims = supportedCredential.credentialDefinition.credentialSubject
+            val supportedClaims = credentialConfiguration.credentialDefinition.credentialSubject
             ensure(!supportedClaims.isNullOrEmpty()) {
                 InvalidIssuanceRequest(
                     "Issuer does not support claims for credential " +
-                        "[$FORMAT_W3C_SIGNED_JWT-${supportedCredential.credentialDefinition.type}]",
+                        "[$FORMAT_W3C_SIGNED_JWT-${credentialConfiguration.credentialDefinition.type}]",
                 )
             }
             ensure(supportedClaims.keys.containsAll(claims)) {
@@ -172,7 +175,7 @@ private fun w3cSignedJwt(
 
     val validClaimSet = claimSet?.apply { validate() }
     return CredentialType.W3CSignedJwtType(
-        type = supportedCredential.credentialDefinition.type,
+        type = credentialConfiguration.credentialDefinition.type,
         claims = validClaimSet,
     )
 }

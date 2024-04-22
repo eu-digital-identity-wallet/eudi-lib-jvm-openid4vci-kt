@@ -20,34 +20,30 @@ import eu.europa.ec.eudi.openid4vci.FORMAT_SD_JWT_VC
 import eu.europa.ec.eudi.openid4vci.FORMAT_W3C_SIGNED_JWT
 import eu.europa.ec.eudi.openid4vci.IssuanceResponseEncryptionSpec
 import eu.europa.ec.eudi.openid4vci.internal.Proof
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
 internal object IssuanceRequestJsonMapper {
-    fun asJson(request: CredentialIssuanceRequest): CredentialIssuanceRequestTO = toTransferObject(request)
+    fun asJson(request: CredentialIssuanceRequest.SingleRequest): SingleCredentialTO = transferObjectOfSingle(request)
+    fun asJson(request: CredentialIssuanceRequest.BatchRequest): BatchCredentialsTO = toTransferObject(request)
 }
 
-private fun toTransferObject(request: CredentialIssuanceRequest): CredentialIssuanceRequestTO = when (request) {
-    is CredentialIssuanceRequest.BatchRequest ->
-        request.credentialRequests
-            .map { transferObjectOfSingle(it) }
-            .let { CredentialIssuanceRequestTO.BatchCredentialsTO(it) }
-
-    is CredentialIssuanceRequest.SingleRequest -> transferObjectOfSingle(request)
-}
+private fun toTransferObject(request: CredentialIssuanceRequest.BatchRequest): BatchCredentialsTO =
+    request.credentialRequests
+        .map { transferObjectOfSingle(it) }
+        .let { BatchCredentialsTO(it) }
 
 private fun transferObjectOfSingle(
     request: CredentialIssuanceRequest.SingleRequest,
-): CredentialIssuanceRequestTO.SingleCredentialTO {
+): SingleCredentialTO {
     val credentialResponseEncryptionSpecTO = request.encryption?.run { transferObject() }
 
     return when (request) {
         is CredentialIssuanceRequest.FormatBased ->
             when (val credential = request.credential) {
-                is CredentialType.MsoMdocDocType -> MsoMdocIssuanceRequestTO(
+                is CredentialType.MsoMdocDocType -> SingleCredentialTO(
+                    format = FORMAT_MSO_MDOC,
                     proof = request.proof,
                     credentialResponseEncryptionSpec = credentialResponseEncryptionSpecTO,
                     docType = credential.doctype,
@@ -56,7 +52,8 @@ private fun transferObjectOfSingle(
                     },
                 )
 
-                is CredentialType.SdJwtVcType -> SdJwtVcIssuanceRequestTO(
+                is CredentialType.SdJwtVcType -> SingleCredentialTO(
+                    format = FORMAT_SD_JWT_VC,
                     proof = request.proof,
                     credentialResponseEncryptionSpec = credentialResponseEncryptionSpecTO,
                     vct = credential.type,
@@ -69,7 +66,8 @@ private fun transferObjectOfSingle(
                     },
                 )
 
-                is CredentialType.W3CSignedJwtType -> W3CSignedJwtVcIssuanceRequestTO(
+                is CredentialType.W3CSignedJwtType -> SingleCredentialTO(
+                    format = FORMAT_W3C_SIGNED_JWT,
                     proof = request.proof,
                     credentialResponseEncryptionSpec = credentialResponseEncryptionSpecTO,
                     credentialDefinition = CredentialDefinitionTO(
@@ -85,10 +83,10 @@ private fun transferObjectOfSingle(
                 )
             }
 
-        is CredentialIssuanceRequest.IdentifierBased -> IdentifierBasedIssuanceRequestTO(
+        is CredentialIssuanceRequest.IdentifierBased -> SingleCredentialTO(
+            credentialIdentifier = request.credentialId.value,
             proof = request.proof,
             credentialResponseEncryptionSpec = credentialResponseEncryptionSpecTO,
-            configurationId = request.credentialId.value,
         )
     }
 }
@@ -105,33 +103,9 @@ private fun IssuanceResponseEncryptionSpec.transferObject(): CredentialResponseE
 }
 
 @Serializable
-@OptIn(ExperimentalSerializationApi::class)
-@JsonClassDiscriminator("_type_")
-internal sealed interface CredentialIssuanceRequestTO {
-
-    @Serializable
-    @SerialName("batch-credential-request")
-    data class BatchCredentialsTO(
-        @SerialName("credential_requests") val credentialRequests: List<SingleCredentialTO>,
-    ) : CredentialIssuanceRequestTO
-
-    @Serializable
-    sealed interface SingleCredentialTO : CredentialIssuanceRequestTO {
-        val proof: Proof?
-        val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO?
-    }
-}
-
-@Serializable
-internal sealed interface FormatBasedIssuanceRequestTO : CredentialIssuanceRequestTO.SingleCredentialTO
-
-@Serializable
-@SerialName("identifier-based-request")
-internal data class IdentifierBasedIssuanceRequestTO(
-    @SerialName("proof") override val proof: Proof? = null,
-    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO? = null,
-    @SerialName("credential_identifier") val configurationId: String,
-) : CredentialIssuanceRequestTO.SingleCredentialTO
+internal data class BatchCredentialsTO(
+    @SerialName("credential_requests") val credentialRequests: List<SingleCredentialTO>,
+)
 
 @Serializable
 internal data class CredentialResponseEncryptionSpecTO(
@@ -141,39 +115,23 @@ internal data class CredentialResponseEncryptionSpecTO(
 )
 
 @Serializable
-@OptIn(ExperimentalSerializationApi::class)
-@SerialName("MsoMdocIssuanceRequestTO")
-internal data class MsoMdocIssuanceRequestTO(
-    @EncodeDefault @SerialName("format") private val format: String = FORMAT_MSO_MDOC,
-    @SerialName("doctype") val docType: String,
-    @SerialName("proof") override val proof: Proof? = null,
-    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO? = null,
-    @SerialName("claims") val claims: JsonObject?,
-) : FormatBasedIssuanceRequestTO
-
-@Serializable
-@OptIn(ExperimentalSerializationApi::class)
-@SerialName("SdJwtVcIssuanceRequestTO")
-internal data class SdJwtVcIssuanceRequestTO(
-    @EncodeDefault @SerialName("format") private val format: String = FORMAT_SD_JWT_VC,
-    @SerialName("vct") val vct: String,
-    @SerialName("proof") override val proof: Proof? = null,
-    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO? = null,
-    @SerialName("claims") val claims: JsonObject? = null,
-) : FormatBasedIssuanceRequestTO
-
-@Serializable
-@OptIn(ExperimentalSerializationApi::class)
-@SerialName("W3CSignedJwtVcIssuanceRequestTO")
-internal data class W3CSignedJwtVcIssuanceRequestTO(
-    @EncodeDefault @SerialName("format") private val format: String = FORMAT_W3C_SIGNED_JWT,
-    @SerialName("credential_definition") val credentialDefinition: CredentialDefinitionTO,
-    @SerialName("proof") override val proof: Proof? = null,
-    @SerialName("credential_response_encryption") override val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO? = null,
-) : FormatBasedIssuanceRequestTO
-
-@Serializable
 internal data class CredentialDefinitionTO(
     @SerialName("type") val type: List<String>,
     @SerialName("credentialSubject") val credentialSubject: JsonObject? = null,
 )
+
+@Serializable
+internal data class SingleCredentialTO(
+    @SerialName("credential_identifier") val credentialIdentifier: String? = null,
+    @SerialName("format") val format: String? = null,
+    @SerialName("doctype") val docType: String? = null,
+    @SerialName("vct") val vct: String? = null,
+    @SerialName("proof") val proof: Proof? = null,
+    @SerialName("credential_response_encryption") val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO? = null,
+    @SerialName("claims") val claims: JsonObject? = null,
+    @SerialName("credential_definition") val credentialDefinition: CredentialDefinitionTO? = null,
+) {
+    init {
+        require(format != null || credentialIdentifier != null) { "Either format or credentialIdentifier must be set" }
+    }
+}
