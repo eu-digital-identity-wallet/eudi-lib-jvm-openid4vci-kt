@@ -25,7 +25,12 @@ internal class AuthorizeIssuanceImpl(
 ) : AuthorizeIssuance {
 
     private val authServerClient: AuthorizationServerClient =
-        AuthorizationServerClient(credentialOffer.authorizationServerMetadata, config, ktorHttpClientFactory)
+        AuthorizationServerClient(
+            credentialOffer.credentialIssuerIdentifier,
+            credentialOffer.authorizationServerMetadata,
+            config,
+            ktorHttpClientFactory,
+        )
 
     override suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared> = runCatching {
         val (scopes, configurationIds) = scopesAndCredentialConfigurationIds()

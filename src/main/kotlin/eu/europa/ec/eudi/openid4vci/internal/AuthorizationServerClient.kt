@@ -24,6 +24,7 @@ import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import com.nimbusds.oauth2.sdk.pkce.CodeVerifier
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail
 import com.nimbusds.oauth2.sdk.rar.AuthorizationType
+import com.nimbusds.oauth2.sdk.rar.Location
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
@@ -110,6 +111,7 @@ internal data class TokenResponse(
 )
 
 internal class AuthorizationServerClient(
+    private val credentialIssuerId: CredentialIssuerId,
     private val authorizationServerMetadata: CIAuthorizationServerMetadata,
     private val config: OpenId4VCIConfig,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
@@ -149,10 +151,8 @@ internal class AuthorizationServerClient(
                 scopes.takeIf { scopes.isNotEmpty() }?.let {
                     scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray() + "openid"))
                 }
-                credentialsConfigurationIds.takeIf { credentialsConfigurationIds.isNotEmpty() }?.let {
-                    authorizationDetails(
-                        credentialsConfigurationIds.map(::toNimbusAuthorizationDetails),
-                    )
+                credentialsConfigurationIds.takeIf { it.isNotEmpty() }?.let {
+                    authorizationDetails(it.map(::toNimbus))
                 }
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
@@ -183,10 +183,8 @@ internal class AuthorizationServerClient(
             credentialsScopes.takeIf { credentialsScopes.isNotEmpty() }?.let {
                 scope(com.nimbusds.oauth2.sdk.Scope(*credentialsScopes.map { it.value }.toTypedArray() + "openid"))
             }
-            credentialsAuthorizationDetails.takeIf { credentialsAuthorizationDetails.isNotEmpty() }?.let {
-                authorizationDetails(
-                    credentialsAuthorizationDetails.map(::toNimbusAuthorizationDetails),
-                )
+            credentialsAuthorizationDetails.takeIf { it.isNotEmpty() }?.let {
+                authorizationDetails(it.map(::toNimbus))
             }
         }.build()
 
@@ -295,9 +293,22 @@ internal class AuthorizationServerClient(
         else response.body<PushedAuthorizationRequestResponse.Failure>()
     }
 
+    private fun toNimbus(
+        credentialConfigurationId: CredentialConfigurationIdentifier,
+    ): AuthorizationDetail =
+        with(NimbusAuthorizationDetail.Builder(AuthorizationType(OPENID_CREDENTIAL))) {
+            if (credentialIssuerId.toString() != authorizationServerMetadata.issuer.toString()) {
+                val locations = listOf(Location(credentialIssuerId.value.value.toURI()))
+                locations(locations)
+            }
+            field("credential_configuration_id", credentialConfigurationId.value)
+        }.build()
+
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =
         authorizationRequest.toParameters().mapValues { (_, value) -> value[0] }.toMap()
 }
+
+private const val OPENID_CREDENTIAL = "openid_credential"
 
 private object AuthorizationEndpointParams {
     const val PARAM_CLIENT_ID = "client_id"
@@ -361,8 +372,3 @@ internal sealed interface TokenEndpointForm {
         }
     }
 }
-
-private fun toNimbusAuthorizationDetails(it: CredentialConfigurationIdentifier): AuthorizationDetail? =
-    NimbusAuthorizationDetail.Builder(AuthorizationType("openid_credential"))
-        .field("credential_configuration_id", it.value)
-        .build()
