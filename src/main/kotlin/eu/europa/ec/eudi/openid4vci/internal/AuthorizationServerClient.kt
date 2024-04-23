@@ -34,6 +34,7 @@ import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
+import com.nimbusds.oauth2.sdk.Scope as NimbusScope
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail as NimbusAuthorizationDetail
 
 /**
@@ -152,11 +153,11 @@ internal class AuthorizationServerClient(
                 codeChallenge(codeVerifier, CodeChallengeMethod.S256)
                 state(State(state))
                 issuerState?.let { customParameter("issuer_state", issuerState) }
-                scopes.takeIf { scopes.isNotEmpty() }?.let {
-                    scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray() + "openid"))
+                if (scopes.isNotEmpty()) {
+                    scope(NimbusScope(*scopes.map { it.value }.toTypedArray() + "openid"))
                 }
-                credentialsConfigurationIds.takeIf { it.isNotEmpty() }?.let {
-                    authorizationDetails(it.map(::toNimbus))
+                if (credentialsConfigurationIds.isNotEmpty()) {
+                    authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
                 }
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
@@ -184,11 +185,11 @@ internal class AuthorizationServerClient(
             codeChallenge(codeVerifier, CodeChallengeMethod.S256)
             state(State(state))
             issuerState?.let { customParameter("issuer_state", issuerState) }
-            credentialsScopes.takeIf { credentialsScopes.isNotEmpty() }?.let {
-                scope(com.nimbusds.oauth2.sdk.Scope(*credentialsScopes.map { it.value }.toTypedArray() + "openid"))
+            if (credentialsScopes.isNotEmpty()) {
+                scope(NimbusScope(*credentialsScopes.map { it.value }.toTypedArray() + "openid"))
             }
-            credentialsAuthorizationDetails.takeIf { it.isNotEmpty() }?.let {
-                authorizationDetails(it.map(::toNimbus))
+            if (credentialsAuthorizationDetails.isNotEmpty()) {
+                authorizationDetails(credentialsAuthorizationDetails.map(::toNimbus))
             }
         }.build()
 

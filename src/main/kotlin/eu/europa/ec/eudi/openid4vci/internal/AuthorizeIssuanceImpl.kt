@@ -31,7 +31,7 @@ internal class AuthorizeIssuanceImpl(
             credentialOffer.authorizationServerMetadata,
             config,
             dPoPJwtFactory,
-            ktorHttpClientFactory
+            ktorHttpClientFactory,
         )
 
     override suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared> = runCatching {
