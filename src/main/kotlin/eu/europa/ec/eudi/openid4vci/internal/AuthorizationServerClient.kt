@@ -24,6 +24,7 @@ import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import com.nimbusds.oauth2.sdk.pkce.CodeVerifier
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail
 import com.nimbusds.oauth2.sdk.rar.AuthorizationType
+import com.nimbusds.oauth2.sdk.rar.Location
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
@@ -110,6 +111,7 @@ internal data class TokenResponse(
 )
 
 internal class AuthorizationServerClient(
+    private val credentialIssuerId: CredentialIssuerId,
     private val authorizationServerMetadata: CIAuthorizationServerMetadata,
     private val config: OpenId4VCIConfig,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
@@ -151,7 +153,7 @@ internal class AuthorizationServerClient(
                 }
                 credentialsConfigurationIds.takeIf { credentialsConfigurationIds.isNotEmpty() }?.let {
                     authorizationDetails(
-                        credentialsConfigurationIds.map(::toNimbusAuthorizationDetails),
+                        credentialsConfigurationIds.map { toNimbusAuthorizationDetails(credentialIssuerId, it) },
                     )
                 }
             }.build()
@@ -185,7 +187,7 @@ internal class AuthorizationServerClient(
             }
             credentialsAuthorizationDetails.takeIf { credentialsAuthorizationDetails.isNotEmpty() }?.let {
                 authorizationDetails(
-                    credentialsAuthorizationDetails.map(::toNimbusAuthorizationDetails),
+                    credentialsAuthorizationDetails.map { toNimbusAuthorizationDetails(credentialIssuerId, it) },
                 )
             }
         }.build()
@@ -362,7 +364,11 @@ internal sealed interface TokenEndpointForm {
     }
 }
 
-private fun toNimbusAuthorizationDetails(it: CredentialConfigurationIdentifier): AuthorizationDetail? =
+private fun toNimbusAuthorizationDetails(
+    credentialIssuerId: CredentialIssuerId,
+    credentialConfigurationId: CredentialConfigurationIdentifier,
+): AuthorizationDetail? =
     NimbusAuthorizationDetail.Builder(AuthorizationType("openid_credential"))
-        .field("credential_configuration_id", it.value)
+        .locations(listOf(Location(credentialIssuerId.value.value.toURI())))
+        .field("credential_configuration_id", credentialConfigurationId.value)
         .build()
