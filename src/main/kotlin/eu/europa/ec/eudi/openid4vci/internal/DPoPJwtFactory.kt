@@ -15,8 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.nimbusds.jose.JOSEException
 import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.dpop.DPoPUtils
 import com.nimbusds.oauth2.sdk.id.JWTID
@@ -27,12 +27,10 @@ import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.ProofSigner
 import io.ktor.client.request.*
 import io.ktor.http.*
-import java.net.URI
 import java.net.URL
 import java.time.Clock
 import java.util.*
 import com.nimbusds.oauth2.sdk.dpop.DPoPProofFactory as NimbusDPoPProofFactory
-import com.nimbusds.oauth2.sdk.token.AccessToken as NimbusAccessToken
 import com.nimbusds.oauth2.sdk.token.DPoPAccessToken as NimbusDPoPAccessToken
 
 internal enum class Htm {
@@ -43,7 +41,7 @@ internal enum class Htm {
  * https://datatracker.ietf.org/doc/rfc9449/
  */
 internal class DPoPJwtFactory(
-    signer: ProofSigner,
+    private val signer: ProofSigner,
     private val jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
     private val clock: Clock,
 ) {
@@ -51,7 +49,11 @@ internal class DPoPJwtFactory(
         require(jtiByteLength > 0) { "jtiByteLength must be greater than zero" }
     }
 
-    private val delegate: NimbusDPoPProofFactory = createNimbusFactory(signer)
+    private val publicJwk: JWK by lazy {
+        val bk = signer.getBindingKey()
+        require(bk is BindingKey.Jwk) { "Only JWK binding key is supported" }
+        bk.jwk
+    }
 
     fun createDPoPJwt(
         htm: Htm,
@@ -59,7 +61,11 @@ internal class DPoPJwtFactory(
         accessToken: AccessToken.DPoP? = null,
         nonce: String? = null,
     ): Result<SignedJWT> = runCatching {
-        delegate.createDPoPJWT(
+        val jwsHeader: JWSHeader = JWSHeader.Builder(signer.getAlgorithm())
+            .type(NimbusDPoPProofFactory.TYPE)
+            .jwk(publicJwk)
+            .build()
+        val jwtClaimsSet = DPoPUtils.createJWTClaimsSet(
             jti(),
             htm.name,
             htu.toURI(),
@@ -69,6 +75,7 @@ internal class DPoPJwtFactory(
             },
             nonce?.let { Nonce(it) },
         )
+        SignedJWT(jwsHeader, jwtClaimsSet).apply { sign(signer) }
     }
 
     private fun now(): Date = Date.from(clock.instant())
@@ -149,74 +156,3 @@ private fun HttpRequestBuilder.bearerAuth(accessToken: AccessToken.Bearer) {
 }
 
 internal const val DPoP = "DPoP"
-
-internal fun createNimbusFactory(signer: ProofSigner): NimbusDPoPProofFactory = object : NimbusDPoPProofFactory {
-
-    private val publicJwk = run {
-        val bk = signer.getBindingKey()
-        require(bk is BindingKey.Jwk) { "Only JWK binding key is supported" }
-        bk.jwk
-    }
-
-    @Throws(JOSEException::class)
-    override fun createDPoPJWT(
-        htm: String?,
-        htu: URI?,
-    ): SignedJWT = createDPoPJWT(htm, htu, null, null)
-
-    @Throws(JOSEException::class)
-    override fun createDPoPJWT(
-        htm: String?,
-        htu: URI?,
-        nonce: Nonce?,
-    ): SignedJWT = createDPoPJWT(htm, htu, null, nonce)
-
-    @Throws(JOSEException::class)
-    override fun createDPoPJWT(
-        htm: String?,
-        htu: URI?,
-        accessToken: NimbusAccessToken?,
-    ): SignedJWT = createDPoPJWT(htm, htu, accessToken, null)
-
-    @Throws(JOSEException::class)
-    override fun createDPoPJWT(
-        htm: String?,
-        htu: URI?,
-        accessToken: NimbusAccessToken?,
-        nonce: Nonce?,
-    ): SignedJWT =
-        createDPoPJWT(JWTID(NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH), htm, htu, Date(), accessToken, nonce)
-
-    @Deprecated(
-        message = "Deprecated in Java",
-        replaceWith = ReplaceWith("createDPoPJWT(jti, htm, htu, iat, accessToken, null)"),
-    )
-    @Throws(JOSEException::class)
-    override fun createDPoPJWT(
-        jti: JWTID?,
-        htm: String?,
-        htu: URI?,
-        iat: Date?,
-        accessToken: NimbusAccessToken?,
-    ): SignedJWT = createDPoPJWT(jti, htm, htu, iat, accessToken, null)
-
-    @Throws(JOSEException::class)
-    override fun createDPoPJWT(
-        jti: JWTID?,
-        htm: String?,
-        htu: URI?,
-        iat: Date?,
-        accessToken: NimbusAccessToken?,
-        nonce: Nonce?,
-    ): SignedJWT {
-        val jwsHeader: JWSHeader = JWSHeader.Builder(signer.getAlgorithm())
-            .type(NimbusDPoPProofFactory.TYPE)
-            .jwk(publicJwk)
-            .build()
-
-        val jwtClaimsSet = DPoPUtils.createJWTClaimsSet(jti, htm, htu, iat, accessToken, nonce)
-        val signedJWT = SignedJWT(jwsHeader, jwtClaimsSet)
-        signedJWT.sign(signer)
-        return signedJWT
-    }
-}
