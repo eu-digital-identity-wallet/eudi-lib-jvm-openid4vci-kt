@@ -17,6 +17,8 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
+import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
+import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
 
@@ -27,18 +29,19 @@ import kotlinx.serialization.Serializable
 data class AuthorizationRequestPrepared(
     val authorizationCodeURL: HttpsUrl,
     val pkceVerifier: PKCEVerifier,
-)
+) : java.io.Serializable
 
 /**
  * Sealed hierarchy of states describing an authorized issuance request. These states hold an access token issued by the
  * authorization server that protects the credential issuer.
  */
-sealed interface AuthorizedRequest {
+sealed interface AuthorizedRequest : java.io.Serializable {
 
     /**
      * Access token authorizing the request(s) to issue credential(s)
      */
     val accessToken: AccessToken
+    val refreshToken: RefreshToken?
     val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?
 
     /**
@@ -48,6 +51,7 @@ sealed interface AuthorizedRequest {
      */
     data class NoProofRequired(
         override val accessToken: AccessToken,
+        override val refreshToken: RefreshToken?,
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
     ) : AuthorizedRequest
 
@@ -60,6 +64,7 @@ sealed interface AuthorizedRequest {
      */
     data class ProofRequired(
         override val accessToken: AccessToken,
+        override val refreshToken: RefreshToken?,
         val cNonce: CNonce,
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
     ) : AuthorizedRequest
@@ -68,7 +73,7 @@ sealed interface AuthorizedRequest {
 /**
  * The result of a request for issuance
  */
-sealed interface IssuedCredential {
+sealed interface IssuedCredential : java.io.Serializable {
 
     /**
      * Credential was issued from server and the result is returned inline.
@@ -95,7 +100,7 @@ sealed interface IssuedCredential {
 /**
  * Sealed hierarchy of states describing the state of an issuance request submitted to a credential issuer.
  */
-sealed interface SubmittedRequest {
+sealed interface SubmittedRequest : java.io.Serializable {
 
     /**
      * State that denotes the successful submission of an issuance request
@@ -127,7 +132,7 @@ sealed interface SubmittedRequest {
      * State denoting a special case of request failure. Issuer has responded that the proof of possession provided in
      * the request was invalid. Along with the error, issuer responds with a new c_nonce to be used in the request retry.
      *
-     * @param cNonce The c_nonce provided from issuer along with the error
+     * @param cNonce The c_nonce provided from issuer along the error
      * @param errorDescription Description of the error that caused the failure
      */
     class InvalidProof(
@@ -142,7 +147,7 @@ interface AuthorizeIssuance {
      * Initial step to authorize an issuance request using Authorized Code Flow.
      * If the specified authorization server supports PAR then this method executes the first step of PAR by pushing the authorization
      * request to authorization server's 'par endpoint'.
-     * If PAR is not supported then this method prepares the authorization request as a typical authorization code flow authorization
+     * If PAR is not supported, then this method prepares the authorization request as a typical authorization code flow authorization
      * request with the request's elements as query parameters.
      *
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
@@ -346,6 +351,30 @@ interface ProofSigner : JWSSigner {
     fun getBindingKey(): BindingKey
 
     fun getAlgorithm(): JWSAlgorithm
+
+    companion object {
+
+        fun make(
+            privateKey: JWK,
+            publicKey: BindingKey,
+            algorithm: JWSAlgorithm,
+        ): ProofSigner {
+            require(privateKey.isPrivate) { "A private key is required" }
+            require(
+                when (publicKey) {
+                    is BindingKey.Did -> true // Would require DID resolution which is out of scope
+                    is BindingKey.Jwk -> privateKey.toPublicJWK() == publicKey.jwk
+                    is BindingKey.X509 -> privateKey.toPublicJWK() == JWK.parse(publicKey.chain.first())
+                },
+            ) { "Public/private key don't match" }
+
+            val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
+            return object : ProofSigner, JWSSigner by signer {
+                override fun getBindingKey(): BindingKey = publicKey
+                override fun getAlgorithm(): JWSAlgorithm = algorithm
+            }
+        }
+    }
 }
 
 /**

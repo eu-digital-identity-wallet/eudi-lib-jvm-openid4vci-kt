@@ -34,6 +34,7 @@ import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
+import com.nimbusds.oauth2.sdk.Scope as NimbusScope
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail as NimbusAuthorizationDetail
 
 /**
@@ -81,7 +82,9 @@ internal sealed interface AccessTokenRequestResponseTO {
      */
     @Serializable
     data class Success(
+        @SerialName("token_type") val tokenType: String? = null,
         @SerialName("access_token") val accessToken: String,
+        @SerialName("refresh_token") val refreshToken: String? = null,
         @SerialName("expires_in") val expiresIn: Long? = null,
         @SerialName("c_nonce") val cNonce: String? = null,
         @SerialName("c_nonce_expires_in") val cNonceExpiresIn: Long? = null,
@@ -106,6 +109,7 @@ internal sealed interface AccessTokenRequestResponseTO {
 
 internal data class TokenResponse(
     val accessToken: AccessToken,
+    val refreshToken: RefreshToken?,
     val cNonce: CNonce?,
     val authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> = emptyMap(),
 )
@@ -114,6 +118,7 @@ internal class AuthorizationServerClient(
     private val credentialIssuerId: CredentialIssuerId,
     private val authorizationServerMetadata: CIAuthorizationServerMetadata,
     private val config: OpenId4VCIConfig,
+    private val dPoPJwtFactory: DPoPJwtFactory?,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
 
@@ -148,11 +153,11 @@ internal class AuthorizationServerClient(
                 codeChallenge(codeVerifier, CodeChallengeMethod.S256)
                 state(State(state))
                 issuerState?.let { customParameter("issuer_state", issuerState) }
-                scopes.takeIf { scopes.isNotEmpty() }?.let {
-                    scope(com.nimbusds.oauth2.sdk.Scope(*scopes.map { it.value }.toTypedArray() + "openid"))
+                if (scopes.isNotEmpty()) {
+                    scope(NimbusScope(*scopes.map { it.value }.toTypedArray() + "openid"))
                 }
-                credentialsConfigurationIds.takeIf { it.isNotEmpty() }?.let {
-                    authorizationDetails(it.map(::toNimbus))
+                if (credentialsConfigurationIds.isNotEmpty()) {
+                    authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
                 }
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
@@ -180,11 +185,11 @@ internal class AuthorizationServerClient(
             codeChallenge(codeVerifier, CodeChallengeMethod.S256)
             state(State(state))
             issuerState?.let { customParameter("issuer_state", issuerState) }
-            credentialsScopes.takeIf { credentialsScopes.isNotEmpty() }?.let {
-                scope(com.nimbusds.oauth2.sdk.Scope(*credentialsScopes.map { it.value }.toTypedArray() + "openid"))
+            if (credentialsScopes.isNotEmpty()) {
+                scope(NimbusScope(*credentialsScopes.map { it.value }.toTypedArray() + "openid"))
             }
-            credentialsAuthorizationDetails.takeIf { it.isNotEmpty() }?.let {
-                authorizationDetails(it.map(::toNimbus))
+            if (credentialsAuthorizationDetails.isNotEmpty()) {
+                authorizationDetails(credentialsAuthorizationDetails.map(::toNimbus))
             }
         }.build()
 
@@ -233,7 +238,7 @@ internal class AuthorizationServerClient(
             config.clientId,
             codeVerifier,
         )
-        requestAccessToken(params).accessTokenOrFail()
+        requestAccessToken(params).tokensOrFail()
     }
 
     /**
@@ -250,28 +255,36 @@ internal class AuthorizationServerClient(
         txCode: String?,
     ): Result<TokenResponse> = runCatching {
         val params = TokenEndpointForm.PreAuthCodeFlow.of(config.clientId, preAuthorizedCode, txCode)
-        requestAccessToken(params).accessTokenOrFail()
+        requestAccessToken(params).tokensOrFail()
     }
 
-    private fun AccessTokenRequestResponseTO.accessTokenOrFail(): TokenResponse =
+    private fun AccessTokenRequestResponseTO.tokensOrFail(): TokenResponse =
         when (this) {
             is AccessTokenRequestResponseTO.Success -> {
-                val cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) }
-                TokenResponse(AccessToken(accessToken), cNonce, authorizationDetails ?: emptyMap())
+                TokenResponse(
+                    accessToken = AccessToken(accessToken, DPoP.equals(other = tokenType, ignoreCase = true)),
+                    refreshToken = refreshToken?.let { RefreshToken(it) },
+                    cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) },
+                    authorizationDetails = authorizationDetails ?: emptyMap(),
+                )
             }
 
             is AccessTokenRequestResponseTO.Failure -> throw AccessTokenRequestFailed(error, errorDescription)
         }
 
-    private suspend fun requestAccessToken(params: Map<String, String>): AccessTokenRequestResponseTO =
+    private suspend fun requestAccessToken(
+        params: Map<String, String>,
+    ): AccessTokenRequestResponseTO =
         ktorHttpClientFactory().use { client ->
             val url = authorizationServerMetadata.tokenEndpointURI.toURL()
-            val response = client.submitForm(
-                url = url.toString(),
-                formParameters = Parameters.build {
-                    params.entries.forEach { (k, v) -> append(k, v) }
-                },
-            )
+            val formParameters = Parameters.build {
+                params.entries.forEach { (k, v) -> append(k, v) }
+            }
+            val response = client.submitForm(url.toString(), formParameters) {
+                dPoPJwtFactory?.let { factory ->
+                    dpop(factory, url, Htm.POST, accessToken = null, nonce = null)
+                }
+            }
             if (response.status.isSuccess()) response.body<AccessTokenRequestResponseTO.Success>()
             else response.body<AccessTokenRequestResponseTO.Failure>()
         }
@@ -342,7 +355,7 @@ internal sealed interface TokenEndpointForm {
     }
 
     data object PreAuthCodeFlow : TokenEndpointForm {
-        const val CLIENT_ID_PARAM = "client_id"
+        private const val CLIENT_ID_PARAM = "client_id"
         private const val GRANT_TYPE_PARAM = "grant_type"
         const val GRANT_TYPE_PARAM_VALUE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
         const val TX_CODE_PARAM = "tx_code"

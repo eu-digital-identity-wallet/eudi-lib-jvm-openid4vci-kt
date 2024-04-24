@@ -21,6 +21,9 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
+import eu.europa.ec.eudi.openid4vci.AccessToken.Bearer
+import eu.europa.ec.eudi.openid4vci.AccessToken.Companion.requireNotEmpty
+import eu.europa.ec.eudi.openid4vci.AccessToken.DPoP
 import kotlinx.serialization.Serializable
 import java.net.URI
 import java.net.URL
@@ -75,7 +78,7 @@ value class CredentialIdentifier(val value: String) {
 data class PKCEVerifier(
     val codeVerifier: String,
     val codeVerifierMethod: String,
-) {
+) : java.io.Serializable {
     init {
         require(codeVerifier.isNotEmpty()) { "Code verifier must not be empty" }
         require(codeVerifierMethod.isNotEmpty()) { "Code verifier method must not be empty" }
@@ -84,11 +87,45 @@ data class PKCEVerifier(
 
 /**
  * Domain object to describe a valid issuance access token
+ *
+ * [Bearer] is the usual bearer access token
+ * [DPoP] is an access token that must be used with a DPoP JWT
  */
+sealed interface AccessToken : java.io.Serializable {
+
+    val accessToken: String
+
+    @JvmInline
+    value class Bearer(override val accessToken: String) : AccessToken {
+        init {
+            requireNotEmpty(accessToken)
+        }
+    }
+
+    @JvmInline
+    value class DPoP(override val accessToken: String) : AccessToken {
+        init {
+            requireNotEmpty(accessToken)
+        }
+    }
+
+    companion object {
+        operator fun invoke(accessToken: String, useDPoP: Boolean): AccessToken {
+            requireNotEmpty(accessToken)
+            return if (useDPoP) DPoP(accessToken)
+            else Bearer(accessToken)
+        }
+
+        private fun requireNotEmpty(accessToken: String) {
+            require(accessToken.isNotEmpty()) { "Access Token must not be empty" }
+        }
+    }
+}
+
 @JvmInline
-value class AccessToken(val accessToken: String) {
+value class RefreshToken(val refreshToken: String) {
     init {
-        require(accessToken.isNotEmpty()) { "Access Token must not be empty" }
+        require(refreshToken.isNotEmpty()) { "Refresh Token must not be empty" }
     }
 }
 
@@ -111,7 +148,7 @@ value class AuthorizationCode(val code: String) {
 data class CNonce(
     val value: String,
     val expiresInSeconds: Long? = 5,
-) {
+) : java.io.Serializable {
     init {
         require(value.isNotEmpty()) { "Value cannot be empty" }
     }

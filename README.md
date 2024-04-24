@@ -117,7 +117,8 @@ val openId4VCIConfig = OpenId4VCIConfig(
     clientId = "wallet-dev", // the client id of wallet (acting as an OAUTH2 client)
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
     keyGenerationConfig = KeyGenerationConfig.ecOnly(Curve.P_256), // what kind of ephemeral keys could be generated to encrypt credential issuance response
-    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED // policy concerning the wallet's requirements for encryption of credential responses 
+    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses
+    dPoPProofSigner = ProofSigner.make(..) // if specified, enables DPoP provided that auth. server supports it  
 )
 val credentialOffer: CredentialOffer = CredentialOfferRequestResolver().resolve(coUrl).getOrThrow()
 val issuer = Issuer.make(openId4VCIConfig, credentialOffer).getOrThrow()
@@ -183,7 +184,7 @@ with(issuer) {
             }
         }
         is SubmittedRequest.Failed -> // handle failed request
-        is SubmittedRequest.InvalidProof -> // handle specific case of missing or invalid proof(s) 
+        is SubmittedRequest.InvalidProof -> // handle a specific case of missing or invalid proof(s) 
     }
 }
 ```
@@ -210,7 +211,7 @@ with(issuer) {
             }            
         }
         is SubmittedRequest.Failed -> // handle failed request
-        is SubmittedRequest.InvalidProof -> // handle specific case of missing or invalid proof 
+        is SubmittedRequest.InvalidProof -> // handle a specific case of missing or invalid proof 
     }
 }
 ```
@@ -251,7 +252,7 @@ val resolver = AuthorizationServerMetadataResolver() // get a default implementa
 val metadata: CIAuthorizationServerMetadata = resolver.resolve(HttpsUrl("https://...")).getOrThrow() // fetch and parse authorization server metadata
 ```
 
-There is also a convenient method that obtains the credentials issuer metadata & the metadata of all
+There is also a convenient method that obtains the credential issuer metadata & the metadata of all
 authorization servers with a single call
 
 ```kotlin
@@ -264,31 +265,46 @@ val (issuerMetadata, authServersMetadata) = Issuer.metaData(httpClient, credenti
 ## Features supported
 
 ### Issuer metadata 
+
 In [section 11.2.2](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#section-11.2.2) specification recommends the use of header `Accept-Language` to indicate the language(s) preferred for display.
 Current version of the library does not support this. 
 In [section 11.2.3](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#section-11.2.3) specification details the metadata an issuer advertises through its metadata endpoint.
 Current version of the library supports all metadata specified there except `signed_metadata` attribute.
 
 ### Authorization
+
 Specification defines ([section 5.1.1](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#section-5.1.1)) that a credential's issuance 
-can be requested using `authorization_details` or `scope` parameter when using authorization code flow. Current version of the library supports usage of both parameters.
+can be requested using `authorization_details` or `scope` parameter when using authorization code flow. The current version of the library supports usage of both parameters.
 Though for `authorization_details` we don't yet support the `format` attribute and its specializations per profile as specified in [Appendix A](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#appendix-A).
 Only `credential_configuration_id` attribute is supported.
 
 The same stands for the **token endpoint** when (as specified in [section 6.2](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#section-6.2)) server response includes 
-`authorization_details`. In this case too library does not support authorization details that include `format` attribute. 
+`authorization_details`. In this case too, the library does not support authorization details that include `format` attribute. 
+
+### Demonstrating Proof of Possession (DPoP)
+
+Library supports [RFC9449](https://datatracker.ietf.org/doc/html/rfc9449). In addition to
+bearer authentication scheme, library can be configured to use DPoP authentication provided
+that the authorization server, that protects the credential issuer, supports this feature as well.
 
 ### Credential Request
-Current version of the library implements integrations with issuer's [Credential Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-credential-endpoint),
+
+The current version of the library implements integrations with issuer's [Credential Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-credential-endpoint),
 [Batch Credential Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-batch-credential-endpoint),
 [Deferred Credential Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-deferred-credential-endpoin) and
 [Notification Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-notification-endpoint).
 
 #### Credential Format Profiles
-OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library fully supports **ISO mDL** and **IETF SD-JWT VC** profiles.  
+
+OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library fully supports 
+**ISO mDL**, **IETF SD-JWT VC** and
+**W3C VC DM (VC Signed as a JWT, Not Using JSON-LD)** profiles.  
 
 #### Proof Types
-OpenId4VCI specification (draft 13) defines two types of proofs that can be included in a credential issuance request, JWT proof type and CWT proof type. Current version of the library supports only JWT proof types
+
+OpenId4VCI specification (draft 13) defines two types of proofs that can be included in a credential issuance request, 
+JWT proof type, and CWT proof type.
+The current version of the library supports only JWT proof types
 
 ## How to contribute
 
@@ -302,7 +318,7 @@ involved, follow the guidelines found in [CONTRIBUTING.md](CONTRIBUTING.md).
 * OAUTH2 & OIDC Support: [Nimbus OAuth 2.0 SDK with OpenID Connect extensions](https://connect2id.com/products/nimbus-oauth-openid-connect-sdk)
 * URI parsing: [Uri KMP](https://github.com/eygraber/uri-kmp)
 * Http Client: [Ktor](https://ktor.io/)
-* Json : [Kotlinx Serialization](https://github.com/Kotlin/kotlinx.serialization)
+* Json: [Kotlinx Serialization](https://github.com/Kotlin/kotlinx.serialization)
 
 ### License details
 

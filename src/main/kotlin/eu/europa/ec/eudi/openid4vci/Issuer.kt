@@ -74,14 +74,23 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Result<Issuer> = runCatching {
+            val dPoPJwtFactory = config.dPoPProofSigner?.let { signer ->
+                DPoPJwtFactory.createForServer(
+                    signer = signer,
+                    clock = config.clock,
+                    oauthServerMetadata = credentialOffer.authorizationServerMetadata,
+                ).getOrThrow()
+            }
             val issuanceServerClient = IssuanceServerClient(
                 credentialOffer.credentialIssuerMetadata,
                 ktorHttpClientFactory,
+                dPoPJwtFactory,
             )
             val authorizeIssuance = AuthorizeIssuanceImpl(
                 credentialOffer,
                 config,
                 ktorHttpClientFactory,
+                dPoPJwtFactory,
             )
             val requestIssuance = RequestIssuanceImpl(
                 credentialOffer,

@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import java.net.URI
+import java.time.Clock
 
 typealias ClientId = String
 
@@ -28,6 +29,10 @@ typealias ClientId = String
  * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
  * @param keyGenerationConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
  * @param credentialResponseEncryptionPolicy Wallet's policy for Credential Response encryption
+ * @param authorizeIssuanceConfig Instruction on how to assemble the authorization request. If scopes are supported
+ * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
+ * Otherwise, authorization details (RAR)
+ * @param dPoPProofSigner a signer that if provided will enable the use of DPoP JWT
  */
 data class OpenId4VCIConfig(
     val clientId: ClientId,
@@ -35,7 +40,21 @@ data class OpenId4VCIConfig(
     val keyGenerationConfig: KeyGenerationConfig,
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-)
+    val dPoPProofSigner: ProofSigner? = null,
+    val clock: Clock = Clock.systemDefaultZone(),
+) {
+    init {
+        if (null != dPoPProofSigner) {
+            val key = dPoPProofSigner.getBindingKey()
+            require(key is BindingKey.Jwk) {
+                "Only JWK can be used with DPoP Proof signer"
+            }
+            require(!key.jwk.isPrivate) {
+                "JWK in binding key must be public"
+            }
+        }
+    }
+}
 
 /**
  * Wallet's policy concerning Credential Response encryption.
