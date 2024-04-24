@@ -360,6 +360,14 @@ interface ProofSigner : JWSSigner {
             algorithm: JWSAlgorithm,
         ): ProofSigner {
             require(privateKey.isPrivate) { "A private key is required" }
+            require(
+                when (publicKey) {
+                    is BindingKey.Did -> true // Would require DID resolution which is out of scope
+                    is BindingKey.Jwk -> privateKey.toPublicJWK() == publicKey.jwk
+                    is BindingKey.X509 -> privateKey.toPublicJWK() == JWK.parse(publicKey.chain.first())
+                },
+            ) { "Public/private key don't match" }
+
             val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
             return object : ProofSigner, JWSSigner by signer {
                 override fun getBindingKey(): BindingKey = publicKey
