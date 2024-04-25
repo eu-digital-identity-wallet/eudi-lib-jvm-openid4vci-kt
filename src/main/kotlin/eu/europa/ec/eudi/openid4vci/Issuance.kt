@@ -66,7 +66,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
         override val accessToken: AccessToken,
         override val refreshToken: RefreshToken?,
         val cNonce: CNonce,
-        val clientId: String,
+        val clientId: ClientId,
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
     ) : AuthorizedRequest
 }
