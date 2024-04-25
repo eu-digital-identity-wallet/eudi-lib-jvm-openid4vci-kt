@@ -38,7 +38,7 @@ internal class RequestIssuanceImpl private constructor(
         proofSigner: ProofSigner,
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
-            singleRequest(requestPayload, proofFactory(proofSigner, cNonce, clientId), credentialIdentifiers)
+            singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
         }
     }
 
@@ -58,7 +58,7 @@ internal class RequestIssuanceImpl private constructor(
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (requestPayload, proofSigner) ->
-                singleRequest(requestPayload, proofFactory(proofSigner, cNonce, clientId), credentialIdentifiers)
+                singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
             }
             CredentialIssuanceRequest.BatchRequest(credentialRequests)
         }
@@ -71,9 +71,9 @@ internal class RequestIssuanceImpl private constructor(
         }
     }
 
-    private fun proofFactory(proofSigner: ProofSigner, cNonce: CNonce, clientId: ClientId): ProofFactory = { credentialSupported ->
+    private fun proofFactory(proofSigner: ProofSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
         ProofBuilder.ofType(ProofType.JWT) {
-            iss(clientId)
+            iss(config.clientId)
             aud(credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier.toString())
             publicKey(proofSigner.getBindingKey())
             credentialSpec(credentialSupported)
@@ -151,7 +151,6 @@ internal class RequestIssuanceImpl private constructor(
         accessToken,
         refreshToken,
         cNonce,
-        config.clientId,
         credentialIdentifiers,
     )
 
