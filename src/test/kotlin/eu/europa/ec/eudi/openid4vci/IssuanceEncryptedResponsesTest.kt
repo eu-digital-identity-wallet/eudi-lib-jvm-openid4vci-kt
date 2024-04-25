@@ -353,7 +353,7 @@ class IssuanceEncryptedResponsesTest {
                         val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                         when (submittedRequest) {
                             is SubmittedRequest.InvalidProof -> {
-                                val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce, "client_id")
+                                val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
                                 val response = proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
 
                                 assertThat(

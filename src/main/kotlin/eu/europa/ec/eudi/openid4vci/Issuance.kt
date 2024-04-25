@@ -281,7 +281,6 @@ interface RequestIssuance {
      */
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
-        clientId: ClientId,
     ): AuthorizedRequest.ProofRequired
 }
 
