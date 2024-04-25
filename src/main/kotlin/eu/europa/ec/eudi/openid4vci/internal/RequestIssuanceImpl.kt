@@ -146,7 +146,7 @@ internal class RequestIssuanceImpl private constructor(
 
     override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
-        clientId: ClientId
+        clientId: ClientId,
     ): AuthorizedRequest.ProofRequired = AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, clientId, credentialIdentifiers)
 
     private suspend fun placeIssuanceRequest(
