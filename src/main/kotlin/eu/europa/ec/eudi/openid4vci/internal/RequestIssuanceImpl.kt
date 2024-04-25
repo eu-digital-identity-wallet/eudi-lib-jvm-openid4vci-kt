@@ -21,6 +21,7 @@ import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 
 internal class RequestIssuanceImpl private constructor(
     private val credentialOffer: CredentialOffer,
+    private val config: OpenId4VCIConfig,
     private val issuanceServerClient: IssuanceServerClient,
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ) : RequestIssuance {
@@ -72,6 +73,7 @@ internal class RequestIssuanceImpl private constructor(
 
     private fun proofFactory(proofSigner: ProofSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
         ProofBuilder.ofType(ProofType.JWT) {
+            iss(config.clientId)
             aud(credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier.toString())
             publicKey(proofSigner.getBindingKey())
             credentialSpec(credentialSupported)
@@ -179,7 +181,7 @@ internal class RequestIssuanceImpl private constructor(
         ): Result<RequestIssuanceImpl> = runCatching {
             val responseEncryptionSpec =
                 responseEncryptionSpec(credentialOffer, config, responseEncryptionSpecFactory).getOrThrow()
-            RequestIssuanceImpl(credentialOffer, issuanceServerClient, responseEncryptionSpec)
+            RequestIssuanceImpl(credentialOffer, config, issuanceServerClient, responseEncryptionSpec)
         }
     }
 }
