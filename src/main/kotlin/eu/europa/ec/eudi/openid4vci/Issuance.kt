@@ -66,6 +66,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
         override val accessToken: AccessToken,
         override val refreshToken: RefreshToken?,
         val cNonce: CNonce,
+        val clientId: String,
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
     ) : AuthorizedRequest
 }
@@ -280,6 +281,7 @@ interface RequestIssuance {
      */
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
+        clientId: String
     ): AuthorizedRequest.ProofRequired
 }
 

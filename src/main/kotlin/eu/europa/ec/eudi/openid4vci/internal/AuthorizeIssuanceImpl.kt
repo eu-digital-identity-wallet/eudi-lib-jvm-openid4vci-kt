@@ -109,7 +109,7 @@ internal class AuthorizeIssuanceImpl(
 
         when {
             cNonce != null && offerRequiresProofs ->
-                AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, authDetails)
+                AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, config.clientId, authDetails)
 
             else ->
                 AuthorizedRequest.NoProofRequired(accessToken, refreshToken, authDetails)
@@ -147,7 +147,7 @@ internal class AuthorizeIssuanceImpl(
 
         when {
             cNonce != null && offerRequiresProofs ->
-                AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, emptyMap())
+                AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, config.clientId, emptyMap())
             else ->
                 AuthorizedRequest.NoProofRequired(accessToken, refreshToken, emptyMap())
         }

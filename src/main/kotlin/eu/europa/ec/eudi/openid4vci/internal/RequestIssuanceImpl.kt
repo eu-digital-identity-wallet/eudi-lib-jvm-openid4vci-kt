@@ -37,7 +37,7 @@ internal class RequestIssuanceImpl private constructor(
         proofSigner: ProofSigner,
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
-            singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
+            singleRequest(requestPayload, proofFactory(proofSigner, cNonce, clientId), credentialIdentifiers)
         }
     }
 
@@ -57,7 +57,7 @@ internal class RequestIssuanceImpl private constructor(
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (requestPayload, proofSigner) ->
-                singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
+                singleRequest(requestPayload, proofFactory(proofSigner, cNonce, clientId), credentialIdentifiers)
             }
             CredentialIssuanceRequest.BatchRequest(credentialRequests)
         }
@@ -70,8 +70,9 @@ internal class RequestIssuanceImpl private constructor(
         }
     }
 
-    private fun proofFactory(proofSigner: ProofSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
+    private fun proofFactory(proofSigner: ProofSigner, cNonce: CNonce, clientId: ClientId): ProofFactory = { credentialSupported ->
         ProofBuilder.ofType(ProofType.JWT) {
+            iss(clientId)
             aud(credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier.toString())
             publicKey(proofSigner.getBindingKey())
             credentialSpec(credentialSupported)
@@ -145,7 +146,8 @@ internal class RequestIssuanceImpl private constructor(
 
     override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
-    ): AuthorizedRequest.ProofRequired = AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, credentialIdentifiers)
+        clientId: ClientId
+    ): AuthorizedRequest.ProofRequired = AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, clientId, credentialIdentifiers)
 
     private suspend fun placeIssuanceRequest(
         token: AccessToken,

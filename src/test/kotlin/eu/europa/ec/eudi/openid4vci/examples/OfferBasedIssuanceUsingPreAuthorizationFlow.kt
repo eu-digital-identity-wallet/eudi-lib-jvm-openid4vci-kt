@@ -86,7 +86,7 @@ private suspend fun submitProvidingNoProofs(
             is SubmittedRequest.InvalidProof -> {
                 submitProvidingProofs(
                     issuer,
-                    authorized.handleInvalidProof(submittedRequest.cNonce),
+                    authorized.handleInvalidProof(submittedRequest.cNonce, "client_id"),
                     credentialConfigurationId,
                 )
             }
