@@ -86,7 +86,8 @@ suspend fun authorizeRequestForCredentialOffer(
     val authorizedRequest = with(issuer) {
         val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
         val authorizationCode = UUID.randomUUID().toString()
-        authRequestPrepared.authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode)).getOrThrow()
+        val serverState = authRequestPrepared.state
+        authRequestPrepared.authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState).getOrThrow()
     }
     return Triple(offer, authorizedRequest, issuer)
 }

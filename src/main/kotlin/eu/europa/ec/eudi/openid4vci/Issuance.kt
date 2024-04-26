@@ -25,10 +25,17 @@ import kotlinx.serialization.Serializable
 /**
  * State holding the authorization request as a URL to be passed to front-channel for retrieving an authorization code in an oAuth2
  * authorization code grant type flow.
+ * @param authorizationCodeURL the authorization code URL
+ * Contains all the parameters
+ * @param pkceVerifier the PKCE verifier which was used
+ * for preparing the authorization request
+ * @param state the state which was sent with the
+ * authorization request
  */
 data class AuthorizationRequestPrepared(
     val authorizationCodeURL: HttpsUrl,
     val pkceVerifier: PKCEVerifier,
+    val state: String,
 ) : java.io.Serializable
 
 /**
@@ -149,11 +156,13 @@ interface AuthorizeIssuance {
      * request to authorization server's 'par endpoint'.
      * If PAR is not supported, then this method prepares the authorization request as a typical authorization code flow authorization
      * request with the request's elements as query parameters.
-     *
+     * @param walletState an optional parameter that if provided will
+     * be included in the authorization request. If it is not provided,
+     * a random value will be used
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
      * @return an HTTPS URL of the authorization request to be placed
      */
-    suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared>
+    suspend fun prepareAuthorizationRequest(walletState: String? = null): Result<AuthorizationRequestPrepared>
 
     /**
      * Using the access code retrieved after performing the authorization request prepared from a call to
@@ -162,10 +171,12 @@ interface AuthorizeIssuance {
      * [AuthorizedRequest] state
      *
      * @param authorizationCode The authorization code returned from authorization server via front-channel
+     * @param serverState The state returned from  authorization server via front-channel
      * @return an issuance request in authorized state
      */
     suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
         authorizationCode: AuthorizationCode,
+        serverState: String,
     ): Result<AuthorizedRequest>
 
     /**
@@ -388,6 +399,14 @@ typealias ResponseEncryptionSpecFactory =
  * Errors that can happen in the process of issuance process
  */
 sealed class CredentialIssuanceError(message: String) : Throwable(message) {
+
+    /**
+     * Indicates that the state returned by the authorization server doesn't match the state
+     * included which was included in the authorization request, during authorization code flow
+     */
+    data object InvalidAuthorizationState : CredentialIssuanceError("InvalidAuthorizationState") {
+        private fun readResolve(): Any = InvalidAuthorizationState
+    }
 
     /**
      * Failure when placing Pushed Authorization Request to Authorization Server
