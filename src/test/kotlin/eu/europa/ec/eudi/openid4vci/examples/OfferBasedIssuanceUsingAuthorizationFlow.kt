@@ -78,7 +78,7 @@ private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer, actingUs
 
         authorizationLog("Get authorization code URL is: ${prepareAuthorizationCodeRequest.authorizationCodeURL.value}")
 
-        val authorizationCode = loginUserAndGetAuthCode(
+        val (authorizationCode, serverState) = loginUserAndGetAuthCode(
             prepareAuthorizationCodeRequest.authorizationCodeURL.value,
             actingUser,
         ) ?: error("Could not retrieve authorization code")
@@ -87,6 +87,7 @@ private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer, actingUs
 
         val authorizedRequest = prepareAuthorizationCodeRequest.authorizeWithAuthorizationCode(
             AuthorizationCode(authorizationCode),
+            serverState,
         ).getOrThrow()
 
         authorizationLog("Authorization code exchanged with access token : ${authorizedRequest.accessToken.accessToken}")
@@ -94,7 +95,7 @@ private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer, actingUs
         authorizedRequest
     }
 
-private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): String? {
+private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): Pair<String, String>? {
     return createHttpClient().use { client ->
         val loginUrl = client.get(getAuthorizationCodeUrl).body<String>().extractASLoginUrl()
 
@@ -109,7 +110,9 @@ private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, acting
             },
         )
         val redirectLocation = response.headers["Location"].toString()
-        URLBuilder(redirectLocation).parameters["code"]
+        with(URLBuilder(redirectLocation)) {
+            parameters["code"] to parameters["state"]
+        }.toNullable()
     }
 }
 

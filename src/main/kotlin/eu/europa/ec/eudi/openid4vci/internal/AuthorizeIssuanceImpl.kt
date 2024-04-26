@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
 
 internal class AuthorizeIssuanceImpl(
     private val credentialOffer: CredentialOffer,
@@ -34,9 +35,9 @@ internal class AuthorizeIssuanceImpl(
             ktorHttpClientFactory,
         )
 
-    override suspend fun prepareAuthorizationRequest(): Result<AuthorizationRequestPrepared> = runCatching {
+    override suspend fun prepareAuthorizationRequest(walletState: String?): Result<AuthorizationRequestPrepared> = runCatching {
         val (scopes, configurationIds) = scopesAndCredentialConfigurationIds()
-        prepareAuthorizationRequest(scopes, configurationIds).getOrThrow()
+        prepareAuthorizationRequest(walletState, scopes, configurationIds).getOrThrow()
     }
 
     private fun scopesAndCredentialConfigurationIds(): Pair<List<Scope>, List<CredentialConfigurationIdentifier>> {
@@ -61,13 +62,14 @@ internal class AuthorizeIssuanceImpl(
     }
 
     private suspend fun prepareAuthorizationRequest(
+        walletState: String?,
         scopes: List<Scope>,
         credentialConfigurationIds: List<CredentialConfigurationIdentifier>,
     ): Result<AuthorizationRequestPrepared> = runCatching {
         require(scopes.isNotEmpty() || credentialConfigurationIds.isNotEmpty()) {
             "Either scopes or credential configuration ids must be provided"
         }
-        val state = State().value
+        val state = walletState ?: State().value
         val issuerState = when (credentialOffer.grants) {
             is Grants.AuthorizationCode -> credentialOffer.grants.issuerState
             is Grants.Both -> credentialOffer.grants.authorizationCode.issuerState
@@ -87,7 +89,7 @@ internal class AuthorizeIssuanceImpl(
             false -> authServerClient.authorizationRequestUrl(scopes, credentialConfigurationIds, state, issuerState)
                 .getOrThrow()
         }
-        AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier)
+        AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier, state)
     }
 
     private fun credentialConfigurationSupportedById(
@@ -102,19 +104,23 @@ internal class AuthorizeIssuanceImpl(
 
     override suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
         authorizationCode: AuthorizationCode,
-    ): Result<AuthorizedRequest> = kotlin.runCatching {
-        val offerRequiresProofs = credentialOffer.requiresProofs()
-        val (accessToken, refreshToken, cNonce, authDetails) =
-            authServerClient.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier).getOrThrow()
+        serverState: String,
+    ): Result<AuthorizedRequest> =
+        runCatching {
+            ensure(serverState == state) { InvalidAuthorizationState }
+            val offerRequiresProofs = credentialOffer.requiresProofs()
+            val (accessToken, refreshToken, cNonce, authDetails) =
+                authServerClient.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier)
+                    .getOrThrow()
 
-        when {
-            cNonce != null && offerRequiresProofs ->
-                AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, authDetails)
+            when {
+                cNonce != null && offerRequiresProofs ->
+                    AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, authDetails)
 
-            else ->
-                AuthorizedRequest.NoProofRequired(accessToken, refreshToken, authDetails)
+                else ->
+                    AuthorizedRequest.NoProofRequired(accessToken, refreshToken, authDetails)
+            }
         }
-    }
 
     override suspend fun authorizeWithPreAuthorizationCode(txCode: String?): Result<AuthorizedRequest> = runCatching {
         val offeredGrants = credentialOffer.grants
@@ -148,6 +154,7 @@ internal class AuthorizeIssuanceImpl(
         when {
             cNonce != null && offerRequiresProofs ->
                 AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, emptyMap())
+
             else ->
                 AuthorizedRequest.NoProofRequired(accessToken, refreshToken, emptyMap())
         }

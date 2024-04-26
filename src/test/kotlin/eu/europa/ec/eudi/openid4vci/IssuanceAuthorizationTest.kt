@@ -135,8 +135,9 @@ class IssuanceAuthorizationTest {
             with(issuer) {
                 val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
+                val serverState = authRequestPrepared.state // dummy don't use it
                 authRequestPrepared
-                    .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode))
+                    .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
                     .also { println(it) }
             }
         }
@@ -218,8 +219,9 @@ class IssuanceAuthorizationTest {
             with(issuer) {
                 val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
+                val serverState = authRequestPrepared.state
                 authRequestPrepared
-                    .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode))
+                    .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
                     .also { println(it) }
             }
         }
@@ -457,8 +459,10 @@ class IssuanceAuthorizationTest {
             ).getOrThrow()
 
             with(issuer) {
-                val authorizedRequest = prepareAuthorizationRequest().getOrThrow()
-                    .authorizeWithAuthorizationCode(AuthorizationCode("auth-code"))
+                val prepareAuthorizationRequest = prepareAuthorizationRequest().getOrThrow()
+                val serverState = prepareAuthorizationRequest.state
+                val authorizedRequest = prepareAuthorizationRequest
+                    .authorizeWithAuthorizationCode(AuthorizationCode("auth-code"), serverState)
                     .getOrThrow()
 
                 assertTrue("Token endpoint provides c_nonce but authorized request is not ProofRequired") {
@@ -515,8 +519,10 @@ class IssuanceAuthorizationTest {
             ).getOrThrow()
 
             with(issuer) {
-                val authorizedRequest = prepareAuthorizationRequest().getOrThrow()
-                    .authorizeWithAuthorizationCode(AuthorizationCode("auth-code"))
+                val authorizationRequestPrepared = prepareAuthorizationRequest().getOrThrow()
+                val serverState = authorizationRequestPrepared.state
+                val authorizedRequest = authorizationRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode("auth-code"), serverState)
                     .getOrThrow()
 
                 assertTrue("Offer does not require proofs but authorized request is ProofRequired instead of NoProofRequired") {
@@ -559,8 +565,10 @@ class IssuanceAuthorizationTest {
             ).getOrThrow()
 
             with(issuer) {
-                val authorizedRequest = prepareAuthorizationRequest().getOrThrow()
-                    .authorizeWithAuthorizationCode(AuthorizationCode("auth-code"))
+                val authorizationRequestPrepared = prepareAuthorizationRequest().getOrThrow()
+                val serverState = authorizationRequestPrepared.state
+                val authorizedRequest = authorizationRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode("auth-code"), serverState)
                     .getOrThrow()
 
                 assertTrue("Expected authorized request to be of type NoProofRequired but is ProofRequired") {
@@ -648,8 +656,9 @@ class IssuanceAuthorizationTest {
             with(issuer) {
                 val parPlaced = prepareAuthorizationRequest().getOrThrow()
                 val authorizationCode = UUID.randomUUID().toString()
+                val serverState = parPlaced.state
                 parPlaced
-                    .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode))
+                    .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
                     .fold(
                         onSuccess = {
                             fail("Exception expected to be thrown")
