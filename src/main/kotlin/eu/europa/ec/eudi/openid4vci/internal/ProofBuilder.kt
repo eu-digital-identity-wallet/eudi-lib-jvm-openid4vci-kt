@@ -71,6 +71,10 @@ internal sealed interface ProofBuilder {
             ensure(ProofType.JWT in proofTypesSupported.keys) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
             }
+            val proofTypeSigningAlgorithmsSupported = proofTypesSupported[ProofType.JWT].orEmpty()
+            ensure(proofSigner.getAlgorithm() in proofTypeSigningAlgorithmsSupported) {
+                CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported
+            }
             val header = run {
                 val algorithm = proofSigner.getAlgorithm()
                 val headerBuilder = JWSHeader.Builder(algorithm)

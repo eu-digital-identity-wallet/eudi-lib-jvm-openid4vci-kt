@@ -550,6 +550,13 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         data object ProofTypeNotSupported : ProofGenerationError("ProofTypeNotSupported") {
             private fun readResolve(): Any = ProofTypeNotSupported
         }
+
+        /**
+         * Proof type signing algorithm provided for specific credential is not supported from issuance server
+         */
+        data object ProofTypeSigningAlgorithmNotSupported : ProofGenerationError("ProofTypeSigningAlgorithmNotSupported") {
+            private fun readResolve(): Any = ProofTypeSigningAlgorithmNotSupported
+        }
     }
 
     /**

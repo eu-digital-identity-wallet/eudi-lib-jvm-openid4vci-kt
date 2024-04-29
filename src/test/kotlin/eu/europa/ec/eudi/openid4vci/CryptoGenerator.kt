@@ -38,12 +38,12 @@ object CryptoGenerator {
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
 
-    fun rsaProofSigner(): ProofSigner {
+    fun rsaProofSigner(signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256): ProofSigner {
         val keyPair = randomRSASigningKey(2048)
         val bindingKey = BindingKey.Jwk(
             jwk = keyPair.toPublicJWK(),
         )
-        return ProofSigner.make(keyPair, bindingKey, JWSAlgorithm.RS256)
+        return ProofSigner.make(keyPair, bindingKey, signingAlgorithm)
     }
 
     fun ecProofSigner(): ProofSigner {
