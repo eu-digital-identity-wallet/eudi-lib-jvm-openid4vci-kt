@@ -15,8 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.BatchIssuanceSuccessResponseTO
-import eu.europa.ec.eudi.openid4vci.internal.IssuanceResponseTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.BatchCredentialResponseSuccessTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.IssuanceResponseTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -42,7 +42,7 @@ class IssuanceBatchRequestTest {
                     if (textContent.text.contains("\"proof\":")) {
                         respond(
                             content = Json.encodeToString(
-                                BatchIssuanceSuccessResponseTO(
+                                BatchCredentialResponseSuccessTO(
                                     credentialResponses = listOf(
                                         IssuanceResponseTO(
                                             credential = "issued_credential_content_mso_mdoc",
