@@ -22,94 +22,51 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
 internal object IssuanceRequestJsonMapper {
-    fun asJson(request: CredentialIssuanceRequest.SingleRequest): SingleCredentialTO = transferObjectOfSingle(request)
-    fun asJson(request: CredentialIssuanceRequest.BatchRequest): BatchCredentialsTO = toTransferObject(request)
-}
+    fun asJson(request: CredentialIssuanceRequest.SingleRequest): CredentialRequestTO =
+        CredentialRequestTO.from(request)
 
-private fun toTransferObject(request: CredentialIssuanceRequest.BatchRequest): BatchCredentialsTO =
-    request.credentialRequests
-        .map { transferObjectOfSingle(it) }
-        .let { BatchCredentialsTO(it) }
+    fun asJson(request: CredentialIssuanceRequest.BatchRequest): BatchCredentialRequestTO =
+        BatchCredentialRequestTO.from(request)
 
-private fun transferObjectOfSingle(
-    request: CredentialIssuanceRequest.SingleRequest,
-): SingleCredentialTO {
-    val credentialResponseEncryptionSpecTO = request.encryption?.run { transferObject() }
-
-    return when (request) {
-        is CredentialIssuanceRequest.FormatBased ->
-            when (val credential = request.credential) {
-                is CredentialType.MsoMdocDocType -> SingleCredentialTO(
-                    format = FORMAT_MSO_MDOC,
-                    proof = request.proof,
-                    credentialResponseEncryptionSpec = credentialResponseEncryptionSpecTO,
-                    docType = credential.doctype,
-                    claims = credential.claimSet?.let {
-                        Json.encodeToJsonElement(it).jsonObject
-                    },
-                )
-
-                is CredentialType.SdJwtVcType -> SingleCredentialTO(
-                    format = FORMAT_SD_JWT_VC,
-                    proof = request.proof,
-                    credentialResponseEncryptionSpec = credentialResponseEncryptionSpecTO,
-                    vct = credential.type,
-                    claims = credential.claims?.let {
-                        buildJsonObject {
-                            it.claims.forEach { claimName ->
-                                put(claimName, JsonObject(emptyMap()))
-                            }
-                        }
-                    },
-                )
-
-                is CredentialType.W3CSignedJwtType -> SingleCredentialTO(
-                    format = FORMAT_W3C_SIGNED_JWT,
-                    proof = request.proof,
-                    credentialResponseEncryptionSpec = credentialResponseEncryptionSpecTO,
-                    credentialDefinition = CredentialDefinitionTO(
-                        type = credential.type,
-                        credentialSubject = credential.claims?.let {
-                            buildJsonObject {
-                                it.claims.forEach { claimName ->
-                                    put(claimName, JsonObject(emptyMap()))
-                                }
-                            }
-                        },
-                    ),
-                )
-            }
-
-        is CredentialIssuanceRequest.IdentifierBased -> SingleCredentialTO(
-            credentialIdentifier = request.credentialId.value,
-            proof = request.proof,
-            credentialResponseEncryptionSpec = credentialResponseEncryptionSpecTO,
-        )
-    }
-}
-
-internal fun IssuanceResponseEncryptionSpec.transferObject(): CredentialResponseEncryptionSpecTO {
-    val credentialEncryptionJwk = Json.parseToJsonElement(jwk.toPublicJWK().toString()).jsonObject
-    val credentialResponseEncryptionAlg = algorithm.toString()
-    val credentialResponseEncryptionMethod = encryptionMethod.toString()
-    return CredentialResponseEncryptionSpecTO(
-        credentialEncryptionJwk,
-        credentialResponseEncryptionAlg,
-        credentialResponseEncryptionMethod,
-    )
+    fun asJson(
+        deferredCredential: IssuedCredential.Deferred,
+        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+    ): DeferredRequestTO = DeferredRequestTO.from(deferredCredential, responseEncryptionSpec)
 }
 
 @Serializable
-internal data class BatchCredentialsTO(
-    @SerialName("credential_requests") val credentialRequests: List<SingleCredentialTO>,
-)
+internal data class BatchCredentialRequestTO(
+    @SerialName("credential_requests") val credentialRequests: List<CredentialRequestTO>,
+) {
+    companion object {
+        fun from(batchRequest: CredentialIssuanceRequest.BatchRequest): BatchCredentialRequestTO =
+            batchRequest.credentialRequests
+                .map { CredentialRequestTO.from(it) }
+                .let { BatchCredentialRequestTO(it) }
+    }
+}
 
 @Serializable
 internal data class CredentialResponseEncryptionSpecTO(
     @SerialName("jwk") val jwk: JsonObject,
     @SerialName("alg") val encryptionAlgorithm: String,
     @SerialName("enc") val encryptionMethod: String,
-)
+) {
+    companion object {
+
+        fun from(responseEncryption: IssuanceResponseEncryptionSpec): CredentialResponseEncryptionSpecTO {
+            val credentialEncryptionJwk =
+                Json.parseToJsonElement(responseEncryption.jwk.toPublicJWK().toString()).jsonObject
+            val credentialResponseEncryptionAlg = responseEncryption.algorithm.toString()
+            val credentialResponseEncryptionMethod = responseEncryption.encryptionMethod.toString()
+            return CredentialResponseEncryptionSpecTO(
+                credentialEncryptionJwk,
+                credentialResponseEncryptionAlg,
+                credentialResponseEncryptionMethod,
+            )
+        }
+    }
+}
 
 @Serializable
 internal data class CredentialDefinitionTO(
@@ -118,35 +75,109 @@ internal data class CredentialDefinitionTO(
 )
 
 @Serializable
-internal data class SingleCredentialTO(
+internal data class CredentialRequestTO(
     @SerialName("credential_identifier") val credentialIdentifier: String? = null,
     @SerialName("format") val format: String? = null,
     @SerialName("doctype") val docType: String? = null,
     @SerialName("vct") val vct: String? = null,
     @SerialName("proof") val proof: Proof? = null,
-    @SerialName("credential_response_encryption") val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO? = null,
+    @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionSpecTO? = null,
     @SerialName("claims") val claims: JsonObject? = null,
     @SerialName("credential_definition") val credentialDefinition: CredentialDefinitionTO? = null,
 ) {
     init {
         require(format != null || credentialIdentifier != null) { "Either format or credentialIdentifier must be set" }
     }
+
+    companion object {
+        fun from(request: CredentialIssuanceRequest.SingleRequest): CredentialRequestTO {
+            val credentialResponseEncryptionSpecTO = request.encryption?.run {
+                CredentialResponseEncryptionSpecTO.from(this)
+            }
+
+            fun toTransferObject(
+                request: CredentialIssuanceRequest.FormatBased,
+                credential: CredentialType.MsoMdocDocType,
+            ) = CredentialRequestTO(
+                format = FORMAT_MSO_MDOC,
+                proof = request.proof,
+                credentialResponseEncryption = credentialResponseEncryptionSpecTO,
+                docType = credential.doctype,
+                claims = credential.claimSet?.let {
+                    Json.encodeToJsonElement(it).jsonObject
+                },
+            )
+
+            fun toTransferObject(
+                request: CredentialIssuanceRequest.FormatBased,
+                credential: CredentialType.SdJwtVcType,
+            ) = CredentialRequestTO(
+                format = FORMAT_SD_JWT_VC,
+                proof = request.proof,
+                credentialResponseEncryption = credentialResponseEncryptionSpecTO,
+                vct = credential.type,
+                claims = credential.claims?.let {
+                    buildJsonObject {
+                        it.claims.forEach { claimName ->
+                            put(claimName, JsonObject(emptyMap()))
+                        }
+                    }
+                },
+            )
+
+            fun toTransferObject(
+                request: CredentialIssuanceRequest.FormatBased,
+                credential: CredentialType.W3CSignedJwtType,
+            ) = CredentialRequestTO(
+                format = FORMAT_W3C_SIGNED_JWT,
+                proof = request.proof,
+                credentialResponseEncryption = credentialResponseEncryptionSpecTO,
+                credentialDefinition = CredentialDefinitionTO(
+                    type = credential.type,
+                    credentialSubject = credential.claims?.let {
+                        buildJsonObject {
+                            it.claims.forEach { claimName ->
+                                put(claimName, JsonObject(emptyMap()))
+                            }
+                        }
+                    },
+                ),
+            )
+
+            fun toTransferObject(identifierBased: CredentialIssuanceRequest.IdentifierBased) =
+                CredentialRequestTO(
+                    credentialIdentifier = identifierBased.credentialId.value,
+                    proof = identifierBased.proof,
+                    credentialResponseEncryption = credentialResponseEncryptionSpecTO,
+                )
+            return when (request) {
+                is CredentialIssuanceRequest.FormatBased -> when (val credential = request.credential) {
+                    is CredentialType.MsoMdocDocType -> toTransferObject(request, credential)
+                    is CredentialType.SdJwtVcType -> toTransferObject(request, credential)
+                    is CredentialType.W3CSignedJwtType -> toTransferObject(request, credential)
+                }
+
+                is CredentialIssuanceRequest.IdentifierBased -> toTransferObject(request)
+            }
+        }
+    }
 }
 
 @Serializable
-internal data class DeferredIssuanceRequestTO(
+internal data class DeferredRequestTO(
     @SerialName("transaction_id") val transactionId: String,
     @SerialName("credential_response_encryption") val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO? = null,
-)
-
-internal object DeferredRequestJsonMapper {
-
-    fun asJson(
-        deferredCredential: IssuedCredential.Deferred,
-        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): DeferredIssuanceRequestTO {
-        val transactionId = deferredCredential.transactionId.value
-        val credentialResponseEncryptionSpecTO = responseEncryptionSpec?.run { transferObject() }
-        return DeferredIssuanceRequestTO(transactionId, credentialResponseEncryptionSpecTO)
+) {
+    companion object {
+        fun from(
+            deferredCredential: IssuedCredential.Deferred,
+            responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+        ): DeferredRequestTO {
+            val transactionId = deferredCredential.transactionId.value
+            val credentialResponseEncryptionSpecTO = responseEncryptionSpec?.run {
+                CredentialResponseEncryptionSpecTO.from(this)
+            }
+            return DeferredRequestTO(transactionId, credentialResponseEncryptionSpecTO)
+        }
     }
 }

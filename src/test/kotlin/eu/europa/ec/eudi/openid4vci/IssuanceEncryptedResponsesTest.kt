@@ -29,7 +29,7 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
-import eu.europa.ec.eudi.openid4vci.internal.formats.SingleCredentialTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -164,9 +164,9 @@ class IssuanceEncryptedResponsesTest {
                 singleIssuanceRequestMocker(
                     requestValidator = {
                         val textContent = it.body as TextContent
-                        val issuanceRequestTO = Json.decodeFromString<SingleCredentialTO>(textContent.text)
+                        val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
                         assertTrue("No encryption parameters expected to be sent") {
-                            issuanceRequestTO.credentialResponseEncryptionSpec == null
+                            issuanceRequestTO.credentialResponseEncryption == null
                         }
                     },
                 ),
@@ -201,9 +201,9 @@ class IssuanceEncryptedResponsesTest {
                 singleIssuanceRequestMocker(
                     requestValidator = {
                         val textContent = it.body as TextContent
-                        val issuanceRequestTO = Json.decodeFromString<SingleCredentialTO>(textContent.text)
+                        val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
                         assertTrue("Encryption parameters were expected to be sent but was not.") {
-                            issuanceRequestTO.credentialResponseEncryptionSpec != null
+                            issuanceRequestTO.credentialResponseEncryption != null
                         }
                     },
                 ),
@@ -238,9 +238,9 @@ class IssuanceEncryptedResponsesTest {
                 singleIssuanceRequestMocker(
                     requestValidator = {
                         val textContent = it.body as TextContent
-                        val issuanceRequestTO = Json.decodeFromString<SingleCredentialTO>(textContent.text)
+                        val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
                         assertTrue("Encryption parameters were expected to be sent but was not.") {
-                            issuanceRequestTO.credentialResponseEncryptionSpec == null
+                            issuanceRequestTO.credentialResponseEncryption == null
                         }
                     },
                 ),
@@ -271,10 +271,10 @@ class IssuanceEncryptedResponsesTest {
                     responseBuilder = {
                         val textContent = it?.body as TextContent
                         if (textContent.text.contains("\"proof\":")) {
-                            val issuanceRequestTO = Json.decodeFromString<SingleCredentialTO>(textContent.text)
-                            val jwk = JWK.parse(issuanceRequestTO.credentialResponseEncryptionSpec?.jwk.toString())
-                            val alg = JWEAlgorithm.parse(issuanceRequestTO.credentialResponseEncryptionSpec?.encryptionAlgorithm)
-                            val enc = EncryptionMethod.parse(issuanceRequestTO.credentialResponseEncryptionSpec?.encryptionMethod)
+                            val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
+                            val jwk = JWK.parse(issuanceRequestTO.credentialResponseEncryption?.jwk.toString())
+                            val alg = JWEAlgorithm.parse(issuanceRequestTO.credentialResponseEncryption?.encryptionAlgorithm)
+                            val enc = EncryptionMethod.parse(issuanceRequestTO.credentialResponseEncryption?.encryptionMethod)
                             respond(
                                 content = encryptedResponse(jwk, alg, enc).getOrThrow(),
                                 status = HttpStatusCode.OK,
@@ -311,16 +311,16 @@ class IssuanceEncryptedResponsesTest {
 
                         val textContent = it.body as TextContent
                         val issuanceRequestTO = assertDoesNotThrow("Wrong credential request type") {
-                            Json.decodeFromString<SingleCredentialTO>(textContent.text)
+                            Json.decodeFromString<CredentialRequestTO>(textContent.text)
                         }
                         assertTrue("Missing response encryption JWK") {
-                            issuanceRequestTO.credentialResponseEncryptionSpec?.jwk != null
+                            issuanceRequestTO.credentialResponseEncryption?.jwk != null
                         }
                         assertTrue("Missing response encryption algorithm") {
-                            issuanceRequestTO.credentialResponseEncryptionSpec?.encryptionAlgorithm != null
+                            issuanceRequestTO.credentialResponseEncryption?.encryptionAlgorithm != null
                         }
                         assertTrue("Missing response encryption method") {
-                            issuanceRequestTO.credentialResponseEncryptionSpec?.encryptionMethod != null
+                            issuanceRequestTO.credentialResponseEncryption?.encryptionMethod != null
                         }
                     },
                 ),

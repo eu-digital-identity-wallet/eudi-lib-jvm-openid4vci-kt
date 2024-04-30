@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.formats.SingleCredentialTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -64,7 +64,7 @@ class IssuanceSingleRequestTest {
                     }
 
                     val textContent = it.body as TextContent
-                    val issuanceRequestTO = Json.decodeFromString<SingleCredentialTO>(textContent.text)
+                    val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
                     assertThat(
                         "Wrong credential request type",
                         issuanceRequestTO.format != null && issuanceRequestTO.format == FORMAT_MSO_MDOC,
@@ -237,7 +237,7 @@ class IssuanceSingleRequestTest {
                 credential = credential,
                 requestValidator = {
                     val textContent = it.body as TextContent
-                    val issuanceRequest = Json.decodeFromString<SingleCredentialTO>(textContent.text)
+                    val issuanceRequest = Json.decodeFromString<CredentialRequestTO>(textContent.text)
                     issuanceRequest.proof?.let {
                         assertIs<Proof.Jwt>(issuanceRequest.proof)
                     }
@@ -409,7 +409,7 @@ class IssuanceSingleRequestTest {
                 credential = "credential",
                 requestValidator = {
                     val textContent = it.body as TextContent
-                    val issuanceRequestTO = Json.decodeFromString<SingleCredentialTO>(textContent.text)
+                    val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
                     assertThat(
                         "Expected identifier based issuance request but credential_identifier is null",
                         issuanceRequestTO.credentialIdentifier != null,
@@ -450,10 +450,10 @@ class IssuanceSingleRequestTest {
                 credential = "credential",
                 requestValidator = {
                     val textContent = it.body as TextContent
-                    val issuanceRequestTO = Json.decodeFromString<SingleCredentialTO>(textContent.text)
+                    val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
                     assertThat(
                         "Expected identifier based issuance request but credential_identifier is null",
-                        issuanceRequestTO.credentialResponseEncryptionSpec != null,
+                        issuanceRequestTO.credentialResponseEncryption != null,
                     )
                 },
             ),
@@ -492,7 +492,7 @@ class IssuanceSingleRequestTest {
                 credential = "credential",
                 requestValidator = {
                     val textContent = it.body as TextContent
-                    val issuanceRequestTO = Json.decodeFromString<SingleCredentialTO>(textContent.text)
+                    val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
                     assertThat(
                         "Expected identifier based issuance request but credential_identifier is null",
                         issuanceRequestTO.credentialIdentifier != null,
@@ -536,7 +536,7 @@ class IssuanceSingleRequestTest {
                 credential = "credential",
                 requestValidator = {
                     val textContent = it.body as TextContent
-                    val issuanceRequestTO = Json.decodeFromString<SingleCredentialTO>(textContent.text)
+                    val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
                     assertThat(
                         "Expected identifier based issuance request but credential_identifier is null",
                         issuanceRequestTO.credentialIdentifier != null,

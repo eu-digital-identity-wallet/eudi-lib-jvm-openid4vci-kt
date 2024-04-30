@@ -24,7 +24,6 @@ import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
-import eu.europa.ec.eudi.openid4vci.internal.formats.DeferredRequestJsonMapper
 import eu.europa.ec.eudi.openid4vci.internal.formats.IssuanceRequestJsonMapper
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -171,7 +170,7 @@ internal class IssuanceServerClient(
         ensureNotNull(issuerMetadata.deferredCredentialEndpoint) { IssuerDoesNotSupportDeferredIssuance }
         ktorHttpClientFactory().use { client ->
             val url = issuerMetadata.deferredCredentialEndpoint.value.value
-            val request = DeferredRequestJsonMapper.asJson(deferredCredential, responseEncryptionSpec)
+            val request = IssuanceRequestJsonMapper.asJson(deferredCredential, responseEncryptionSpec)
             val response = client.post(url) {
                 bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
