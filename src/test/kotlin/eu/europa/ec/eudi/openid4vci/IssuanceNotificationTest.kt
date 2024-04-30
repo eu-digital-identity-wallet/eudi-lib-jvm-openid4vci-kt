@@ -15,8 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.internal.NotificationEventTO
 import eu.europa.ec.eudi.openid4vci.internal.NotificationTO
-import eu.europa.ec.eudi.openid4vci.internal.NotifiedEvent
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -59,7 +59,7 @@ class IssuanceNotificationTest {
                     val textContent = it.body as TextContent
                     val notificationTO = Json.decodeFromString<NotificationTO>(textContent.text)
                     assertTrue("Not expected event type") {
-                        notificationTO.event == NotifiedEvent.CREDENTIAL_ACCEPTED
+                        notificationTO.event == NotificationEventTO.CREDENTIAL_ACCEPTED
                     }
                 },
             ),

@@ -92,13 +92,18 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 ktorHttpClientFactory,
                 dPoPJwtFactory,
             )
+            val responseEncryptionSpec =
+                responseEncryptionSpec(credentialOffer, config, responseEncryptionSpecFactory).getOrThrow()
             val requestIssuance = RequestIssuanceImpl(
                 credentialOffer,
                 config,
                 issuanceServerClient,
-                responseEncryptionSpecFactory,
-            ).getOrThrow()
-            val queryForDeferredCredential = QueryForDeferredCredentialImpl(issuanceServerClient)
+                responseEncryptionSpec,
+            )
+            val queryForDeferredCredential = QueryForDeferredCredentialImpl(
+                issuanceServerClient,
+                responseEncryptionSpec,
+            )
             val notifyIssuer = NotifyIssuerImpl(issuanceServerClient)
 
             object :

@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.DeferredIssuanceRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.formats.DeferredIssuanceRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.formats.SingleCredentialTO
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*

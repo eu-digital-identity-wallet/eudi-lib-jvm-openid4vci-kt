@@ -24,6 +24,7 @@ import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
+import eu.europa.ec.eudi.openid4vci.internal.formats.DeferredRequestJsonMapper
 import eu.europa.ec.eudi.openid4vci.internal.formats.IssuanceRequestJsonMapper
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -33,12 +34,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-internal data class DeferredIssuanceRequestTO(
-    @SerialName("transaction_id") val transactionId: String,
-)
-
-@Serializable
-private data class GenericErrorResponse(
+private data class GenericErrorResponseTO(
     @SerialName("error") val error: String,
     @SerialName("error_description") val errorDescription: String? = null,
     @SerialName("c_nonce") val cNonce: String? = null,
@@ -47,7 +43,7 @@ private data class GenericErrorResponse(
 )
 
 @Serializable
-private data class SingleIssuanceSuccessResponse(
+private data class IssuanceSuccessResponseTO(
     @SerialName("credential") val credential: String? = null,
     @SerialName("transaction_id") val transactionId: String? = null,
     @SerialName("notification_id") val notificationId: String? = null,
@@ -56,33 +52,33 @@ private data class SingleIssuanceSuccessResponse(
 )
 
 @Serializable
-internal data class CertificateIssuanceResponse(
+internal data class IssuanceResponseTO(
     @SerialName("credential") val credential: String? = null,
     @SerialName("transaction_id") val transactionId: String? = null,
     @SerialName("notification_id") val notificationId: String? = null,
 )
 
 @Serializable
-internal data class BatchIssuanceSuccessResponse(
-    @SerialName("credential_responses") val credentialResponses: List<CertificateIssuanceResponse>,
+internal data class BatchIssuanceSuccessResponseTO(
+    @SerialName("credential_responses") val credentialResponses: List<IssuanceResponseTO>,
     @SerialName("c_nonce") val cNonce: String? = null,
     @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
 )
 
 @Serializable
-private data class DeferredIssuanceSuccessResponse(
+private data class DeferredIssuanceSuccessResponseTO(
     @SerialName("credential") val credential: String,
 )
 
 @Serializable
 internal class NotificationTO(
     @SerialName("notification_id") val id: String,
-    @SerialName("event") val event: NotifiedEvent,
+    @SerialName("event") val event: NotificationEventTO,
     @SerialName("event_description") val description: String? = null,
 )
 
 @Serializable
-internal enum class NotifiedEvent {
+internal enum class NotificationEventTO {
     @SerialName("credential_accepted")
     CREDENTIAL_ACCEPTED,
 
@@ -123,18 +119,17 @@ internal class IssuanceServerClient(
     suspend fun placeIssuanceRequest(
         accessToken: AccessToken,
         request: CredentialIssuanceRequest.SingleRequest,
-    ): Result<CredentialIssuanceResponse> =
-        runCatching {
-            ktorHttpClientFactory().use { client ->
-                val url = issuerMetadata.credentialEndpoint.value.value
-                val response = client.post(url) {
-                    bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
-                    contentType(ContentType.Application.Json)
-                    setBody(IssuanceRequestJsonMapper.asJson(request))
-                }
-                handleResponseSingle(response, request)
+    ): Result<CredentialIssuanceResponse> = runCatching {
+        ktorHttpClientFactory().use { client ->
+            val url = issuerMetadata.credentialEndpoint.value.value
+            val response = client.post(url) {
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
+                contentType(ContentType.Application.Json)
+                setBody(IssuanceRequestJsonMapper.asJson(request))
             }
+            handleResponseSingle(response, request.encryption)
         }
+    }
 
     /**
      * Method that submits a request to credential issuer for the batch issuance of credentials.
@@ -148,7 +143,6 @@ internal class IssuanceServerClient(
         request: CredentialIssuanceRequest.BatchRequest,
     ): Result<CredentialIssuanceResponse> = runCatching {
         ensureNotNull(issuerMetadata.batchCredentialEndpoint) { IssuerDoesNotSupportBatchIssuance }
-
         ktorHttpClientFactory().use { client ->
             val url = issuerMetadata.batchCredentialEndpoint.value.value
             val payload = IssuanceRequestJsonMapper.asJson(request)
@@ -157,85 +151,33 @@ internal class IssuanceServerClient(
                 contentType(ContentType.Application.Json)
                 setBody(payload)
             }
-            handleResponseBatch(response)
+            // TODO pass responseEncryptionSpec
+            handleResponseBatch(response, null)
         }
     }
-
-    private suspend inline fun handleResponseSingle(
-        response: HttpResponse,
-        request: CredentialIssuanceRequest.SingleRequest,
-    ): CredentialIssuanceResponse =
-        if (response.status.isSuccess()) {
-            when (val encryptionSpec = request.encryption) {
-                null -> {
-                    val success = response.body<SingleIssuanceSuccessResponse>()
-                    success.toDomain()
-                }
-
-                else -> {
-                    val jwt = response.body<String>()
-                    DefaultJWTProcessor<SecurityContext>().apply {
-                        jweKeySelector = JWEDecryptionKeySelector(
-                            encryptionSpec.algorithm,
-                            encryptionSpec.encryptionMethod,
-                            ImmutableJWKSet(JWKSet(encryptionSpec.jwk)),
-                        )
-                    }.process(jwt, null)
-                        .toSingleIssuanceSuccessResponse()
-                        .toDomain()
-                }
-            }
-        } else {
-            val error = response.body<GenericErrorResponse>()
-            throw error.toIssuanceError()
-        }
-
-    private fun JWTClaimsSet.toSingleIssuanceSuccessResponse(): SingleIssuanceSuccessResponse =
-        SingleIssuanceSuccessResponse(
-            credential = getStringClaim("credential"),
-            transactionId = getStringClaim("transaction_id"),
-            notificationId = getStringClaim("notification_id"),
-            cNonce = getStringClaim("c_nonce"),
-            cNonceExpiresInSeconds = getLongClaim("c_nonce_expires_in"),
-        )
-
-    private suspend inline fun handleResponseBatch(response: HttpResponse): CredentialIssuanceResponse =
-        if (response.status.isSuccess()) {
-            when (issuerMetadata.credentialResponseEncryption) {
-                is CredentialResponseEncryption.NotSupported -> {
-                    val success = response.body<BatchIssuanceSuccessResponse>()
-                    success.toDomain()
-                }
-
-                else -> {
-                    TODO("ENCRYPTED RESPONSES OF BATCH ISSUANCE NOT YET SUPPORTED")
-                }
-            }
-        } else {
-            val error = response.body<GenericErrorResponse>()
-            throw error.toIssuanceError()
-        }
 
     /**
      * Method that submits a request to credential issuer's Deferred Credential Endpoint
      *
      * @param accessToken Access token authorizing the request
-     * @param transactionId The identifier of the Deferred Issuance transaction
+     * @param deferredCredential The identifier of the Deferred Issuance transaction
      * @return response from issuer. Can be either positive if a credential is issued or error in case issuance is still pending
      */
     suspend fun placeDeferredCredentialRequest(
         accessToken: AccessToken,
-        transactionId: TransactionId,
+        deferredCredential: IssuedCredential.Deferred,
+        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<DeferredCredentialQueryOutcome> = runCatching {
         ensureNotNull(issuerMetadata.deferredCredentialEndpoint) { IssuerDoesNotSupportDeferredIssuance }
         ktorHttpClientFactory().use { client ->
             val url = issuerMetadata.deferredCredentialEndpoint.value.value
+            val request = DeferredRequestJsonMapper.asJson(deferredCredential, responseEncryptionSpec)
             val response = client.post(url) {
                 bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
-                setBody(transactionId.toDeferredRequestTO())
+                setBody(request)
             }
-            handleResponseDeferred(response)
+            handleResponseDeferred(response, responseEncryptionSpec)
         }
     }
 
@@ -255,38 +197,27 @@ internal class IssuanceServerClient(
             if (response.status.isSuccess()) {
                 Unit
             } else {
-                val errorResponse = response.body<GenericErrorResponse>()
+                val errorResponse = response.body<GenericErrorResponseTO>()
                 throw NotificationFailed(errorResponse.error)
             }
         }
     }
+}
 
-    private fun TransactionId.toDeferredRequestTO(): DeferredIssuanceRequestTO =
-        DeferredIssuanceRequestTO(value)
+private suspend fun handleResponseSingle(
+    response: HttpResponse,
+    responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+): CredentialIssuanceResponse {
+    fun JWTClaimsSet.toTransferObject(): IssuanceSuccessResponseTO =
+        IssuanceSuccessResponseTO(
+            credential = getStringClaim("credential"),
+            transactionId = getStringClaim("transaction_id"),
+            notificationId = getStringClaim("notification_id"),
+            cNonce = getStringClaim("c_nonce"),
+            cNonceExpiresInSeconds = getLongClaim("c_nonce_expires_in"),
+        )
 
-    private suspend inline fun handleResponseDeferred(
-        response: HttpResponse,
-
-    ): DeferredCredentialQueryOutcome =
-        if (response.status.isSuccess()) {
-            val success = response.body<DeferredIssuanceSuccessResponse>()
-            DeferredCredentialQueryOutcome.Issued(
-                IssuedCredential.Issued(
-                    credential = success.credential,
-                ),
-            )
-        } else {
-            val responsePayload = response.body<GenericErrorResponse>()
-            when (responsePayload.error) {
-                "issuance_pending" -> DeferredCredentialQueryOutcome.IssuancePending(responsePayload.interval)
-                else -> DeferredCredentialQueryOutcome.Errored(
-                    responsePayload.error,
-                    responsePayload.errorDescription,
-                )
-            }
-        }
-
-    private fun SingleIssuanceSuccessResponse.toDomain(): CredentialIssuanceResponse {
+    fun IssuanceSuccessResponseTO.fromTransferObject(): CredentialIssuanceResponse {
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
         val issuedCredential = issuedCredentialOf(transactionId, notificationId, credential)
         return CredentialIssuanceResponse(
@@ -295,28 +226,24 @@ internal class IssuanceServerClient(
         )
     }
 
-    private fun issuedCredentialOf(
-        transactionId: String?,
-        notificationId: String?,
-        credential: String?,
-    ): IssuedCredential {
-        ensure(!(transactionId == null && credential == null)) {
-            val error =
-                "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters"
-            ResponseUnparsable(error)
-        }
-        return when {
-            transactionId != null -> IssuedCredential.Deferred(TransactionId(transactionId))
-            credential != null -> {
-                val notificationIdentifier = notificationId?.let { NotificationId(notificationId) }
-                IssuedCredential.Issued(credential, notificationIdentifier)
-            }
-
-            else -> error("Cannot happen")
-        }
+    return if (response.status.isSuccess()) {
+        handlePossiblyEncrypted(
+            response,
+            responseEncryptionSpec,
+            fromTransferObject = { it.fromTransferObject() },
+            transferObjectFromJwtClaims = { it.toTransferObject() },
+        )
+    } else {
+        val error = response.body<GenericErrorResponseTO>()
+        throw error.toIssuanceError()
     }
+}
 
-    private fun BatchIssuanceSuccessResponse.toDomain(): CredentialIssuanceResponse {
+private suspend fun handleResponseBatch(
+    response: HttpResponse,
+    responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+): CredentialIssuanceResponse {
+    fun BatchIssuanceSuccessResponseTO.toDomain(): CredentialIssuanceResponse {
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
         return CredentialIssuanceResponse(
             cNonce = cNonce,
@@ -329,24 +256,93 @@ internal class IssuanceServerClient(
             },
         )
     }
+    fun JWTClaimsSet.fromJwtClaims(): BatchIssuanceSuccessResponseTO = TODO()
 
-    private fun GenericErrorResponse.toIssuanceError(): CredentialIssuanceError = when (error) {
-        "invalid_proof" ->
-            cNonce
-                ?.let { InvalidProof(cNonce, cNonceExpiresInSeconds, errorDescription) }
-                ?: ResponseUnparsable("Issuer responded with invalid_proof error but no c_nonce was provided")
+    return if (response.status.isSuccess()) {
+        handlePossiblyEncrypted(
+            response,
+            responseEncryptionSpec,
+            fromTransferObject = { it.toDomain() },
+            transferObjectFromJwtClaims = { it.fromJwtClaims() },
+        )
+    } else {
+        val error = response.body<GenericErrorResponseTO>()
+        throw error.toIssuanceError()
+    }
+}
 
-        "issuance_pending" ->
-            interval
-                ?.let { DeferredCredentialIssuancePending(interval) }
-                ?: DeferredCredentialIssuancePending()
+private suspend fun handleResponseDeferred(
+    response: HttpResponse,
+    responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+): DeferredCredentialQueryOutcome {
+    fun DeferredIssuanceSuccessResponseTO.toDomain(): DeferredCredentialQueryOutcome.Issued {
+        return DeferredCredentialQueryOutcome.Issued(IssuedCredential.Issued(credential))
+    }
+    fun JWTClaimsSet.fromJwtClaims(): DeferredIssuanceSuccessResponseTO =
+        DeferredIssuanceSuccessResponseTO(getStringClaim("credential"))
 
-        "invalid_token" -> InvalidToken
-        "invalid_transaction_id " -> InvalidTransactionId
-        "unsupported_credential_type " -> UnsupportedCredentialType
-        "unsupported_credential_format " -> UnsupportedCredentialFormat
-        "invalid_encryption_parameters " -> InvalidEncryptionParameters
-        else -> IssuanceRequestFailed(error, errorDescription)
+    return if (response.status.isSuccess()) {
+        handlePossiblyEncrypted(
+            response,
+            responseEncryptionSpec,
+            fromTransferObject = { it.toDomain() },
+            transferObjectFromJwtClaims = { it.fromJwtClaims() },
+        )
+    } else {
+        val responsePayload = response.body<GenericErrorResponseTO>()
+        when (responsePayload.error) {
+            "issuance_pending" -> DeferredCredentialQueryOutcome.IssuancePending(responsePayload.interval)
+            else -> DeferredCredentialQueryOutcome.Errored(
+                responsePayload.error,
+                responsePayload.errorDescription,
+            )
+        }
+    }
+}
+
+private suspend inline fun <reified ResponseJson, Response> handlePossiblyEncrypted(
+    response: HttpResponse,
+    encryptionSpec: IssuanceResponseEncryptionSpec?,
+    fromTransferObject: (ResponseJson) -> Response,
+    transferObjectFromJwtClaims: (JWTClaimsSet) -> ResponseJson,
+): Response {
+    check(response.status.isSuccess())
+    val responseJson = when (encryptionSpec) {
+        null -> response.body<ResponseJson>()
+        else -> {
+            val jwt = response.body<String>()
+            val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
+                jweKeySelector = JWEDecryptionKeySelector(
+                    encryptionSpec.algorithm,
+                    encryptionSpec.encryptionMethod,
+                    ImmutableJWKSet(JWKSet(encryptionSpec.jwk)),
+                )
+            }
+            val jwtClaimSet = jwtProcessor.process(jwt, null)
+            transferObjectFromJwtClaims(jwtClaimSet)
+        }
+    }
+    return fromTransferObject(responseJson)
+}
+
+private fun issuedCredentialOf(
+    transactionId: String?,
+    notificationId: String?,
+    credential: String?,
+): IssuedCredential {
+    ensure(!(transactionId == null && credential == null)) {
+        val error =
+            "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters"
+        ResponseUnparsable(error)
+    }
+    return when {
+        transactionId != null -> IssuedCredential.Deferred(TransactionId(transactionId))
+        credential != null -> {
+            val notificationIdentifier = notificationId?.let { NotificationId(notificationId) }
+            IssuedCredential.Issued(credential, notificationIdentifier)
+        }
+
+        else -> error("Cannot happen")
     }
 }
 
@@ -354,19 +350,38 @@ private fun CredentialIssuanceEvent.toTransferObject(): NotificationTO =
     when (this) {
         is CredentialIssuanceEvent.Accepted -> NotificationTO(
             id = id.value,
-            event = NotifiedEvent.CREDENTIAL_ACCEPTED,
+            event = NotificationEventTO.CREDENTIAL_ACCEPTED,
             description = this.description,
         )
 
         is CredentialIssuanceEvent.Deleted -> NotificationTO(
             id = id.value,
-            event = NotifiedEvent.CREDENTIAL_DELETED,
+            event = NotificationEventTO.CREDENTIAL_DELETED,
             description = this.description,
         )
 
         is CredentialIssuanceEvent.Failed -> NotificationTO(
             id = id.value,
-            event = NotifiedEvent.CREDENTIAL_FAILURE,
+            event = NotificationEventTO.CREDENTIAL_FAILURE,
             description = this.description,
         )
     }
+
+private fun GenericErrorResponseTO.toIssuanceError(): CredentialIssuanceError = when (error) {
+    "invalid_proof" ->
+        cNonce
+            ?.let { InvalidProof(cNonce, cNonceExpiresInSeconds, errorDescription) }
+            ?: ResponseUnparsable("Issuer responded with invalid_proof error but no c_nonce was provided")
+
+    "issuance_pending" ->
+        interval
+            ?.let { DeferredCredentialIssuancePending(interval) }
+            ?: DeferredCredentialIssuancePending()
+
+    "invalid_token" -> InvalidToken
+    "invalid_transaction_id " -> InvalidTransactionId
+    "unsupported_credential_type " -> UnsupportedCredentialType
+    "unsupported_credential_format " -> UnsupportedCredentialFormat
+    "invalid_encryption_parameters " -> InvalidEncryptionParameters
+    else -> IssuanceRequestFailed(error, errorDescription)
+}

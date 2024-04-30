@@ -15,10 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.formats
 
-import eu.europa.ec.eudi.openid4vci.FORMAT_MSO_MDOC
-import eu.europa.ec.eudi.openid4vci.FORMAT_SD_JWT_VC
-import eu.europa.ec.eudi.openid4vci.FORMAT_W3C_SIGNED_JWT
-import eu.europa.ec.eudi.openid4vci.IssuanceResponseEncryptionSpec
+import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -91,7 +88,7 @@ private fun transferObjectOfSingle(
     }
 }
 
-private fun IssuanceResponseEncryptionSpec.transferObject(): CredentialResponseEncryptionSpecTO {
+internal fun IssuanceResponseEncryptionSpec.transferObject(): CredentialResponseEncryptionSpecTO {
     val credentialEncryptionJwk = Json.parseToJsonElement(jwk.toPublicJWK().toString()).jsonObject
     val credentialResponseEncryptionAlg = algorithm.toString()
     val credentialResponseEncryptionMethod = encryptionMethod.toString()
@@ -133,5 +130,23 @@ internal data class SingleCredentialTO(
 ) {
     init {
         require(format != null || credentialIdentifier != null) { "Either format or credentialIdentifier must be set" }
+    }
+}
+
+@Serializable
+internal data class DeferredIssuanceRequestTO(
+    @SerialName("transaction_id") val transactionId: String,
+    @SerialName("credential_response_encryption") val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO? = null,
+)
+
+internal object DeferredRequestJsonMapper {
+
+    fun asJson(
+        deferredCredential: IssuedCredential.Deferred,
+        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+    ): DeferredIssuanceRequestTO {
+        val transactionId = deferredCredential.transactionId.value
+        val credentialResponseEncryptionSpecTO = responseEncryptionSpec?.run { transferObject() }
+        return DeferredIssuanceRequestTO(transactionId, credentialResponseEncryptionSpecTO)
     }
 }
