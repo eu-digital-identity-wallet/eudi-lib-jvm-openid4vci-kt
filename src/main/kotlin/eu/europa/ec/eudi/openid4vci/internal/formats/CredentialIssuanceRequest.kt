@@ -34,6 +34,8 @@ internal sealed interface CredentialType {
  */
 internal sealed interface CredentialIssuanceRequest {
 
+    val encryption: IssuanceResponseEncryptionSpec?
+
     /**
      * Models an issuance request for a batch of credentials
      *
@@ -43,6 +45,7 @@ internal sealed interface CredentialIssuanceRequest {
      */
     data class BatchRequest(
         val credentialRequests: List<SingleRequest>,
+        override val encryption: IssuanceResponseEncryptionSpec?,
     ) : CredentialIssuanceRequest
 
     /**
@@ -50,7 +53,6 @@ internal sealed interface CredentialIssuanceRequest {
      */
     sealed interface SingleRequest : CredentialIssuanceRequest {
         val proof: Proof?
-        val encryption: IssuanceResponseEncryptionSpec?
     }
 
     /**

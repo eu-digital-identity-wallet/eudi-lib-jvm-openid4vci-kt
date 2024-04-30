@@ -37,12 +37,16 @@ internal object IssuanceRequestJsonMapper {
 @Serializable
 internal data class BatchCredentialRequestTO(
     @SerialName("credential_requests") val credentialRequests: List<CredentialRequestTO>,
+    @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionSpecTO? = null,
 ) {
     companion object {
-        fun from(batchRequest: CredentialIssuanceRequest.BatchRequest): BatchCredentialRequestTO =
-            batchRequest.credentialRequests
-                .map { CredentialRequestTO.from(it) }
-                .let { BatchCredentialRequestTO(it) }
+        fun from(batchRequest: CredentialIssuanceRequest.BatchRequest): BatchCredentialRequestTO {
+            val credentialRequests = batchRequest.credentialRequests.map { CredentialRequestTO.from(it) }
+            val credentialResponseEncryption = batchRequest.encryption?.run {
+                CredentialResponseEncryptionSpecTO.from(this)
+            }
+            return BatchCredentialRequestTO(credentialRequests, credentialResponseEncryption)
+        }
     }
 }
 
@@ -90,31 +94,28 @@ internal data class CredentialRequestTO(
     }
 
     companion object {
-        fun from(request: CredentialIssuanceRequest.SingleRequest): CredentialRequestTO {
-            val credentialResponseEncryptionSpecTO = request.encryption?.run {
+
+        private fun credentialResponseEncryption(request: CredentialIssuanceRequest) =
+            request.encryption?.run {
                 CredentialResponseEncryptionSpecTO.from(this)
             }
 
-            fun toTransferObject(
-                request: CredentialIssuanceRequest.FormatBased,
-                credential: CredentialType.MsoMdocDocType,
-            ) = CredentialRequestTO(
+        fun from(request: CredentialIssuanceRequest.FormatBased, credential: CredentialType.MsoMdocDocType) =
+            CredentialRequestTO(
                 format = FORMAT_MSO_MDOC,
                 proof = request.proof,
-                credentialResponseEncryption = credentialResponseEncryptionSpecTO,
+                credentialResponseEncryption = credentialResponseEncryption(request),
                 docType = credential.doctype,
                 claims = credential.claimSet?.let {
                     Json.encodeToJsonElement(it).jsonObject
                 },
             )
 
-            fun toTransferObject(
-                request: CredentialIssuanceRequest.FormatBased,
-                credential: CredentialType.SdJwtVcType,
-            ) = CredentialRequestTO(
+        fun from(request: CredentialIssuanceRequest.FormatBased, credential: CredentialType.SdJwtVcType) =
+            CredentialRequestTO(
                 format = FORMAT_SD_JWT_VC,
                 proof = request.proof,
-                credentialResponseEncryption = credentialResponseEncryptionSpecTO,
+                credentialResponseEncryption = credentialResponseEncryption(request),
                 vct = credential.type,
                 claims = credential.claims?.let {
                     buildJsonObject {
@@ -125,13 +126,11 @@ internal data class CredentialRequestTO(
                 },
             )
 
-            fun toTransferObject(
-                request: CredentialIssuanceRequest.FormatBased,
-                credential: CredentialType.W3CSignedJwtType,
-            ) = CredentialRequestTO(
+        fun from(request: CredentialIssuanceRequest.FormatBased, credential: CredentialType.W3CSignedJwtType) =
+            CredentialRequestTO(
                 format = FORMAT_W3C_SIGNED_JWT,
                 proof = request.proof,
-                credentialResponseEncryption = credentialResponseEncryptionSpecTO,
+                credentialResponseEncryption = credentialResponseEncryption(request),
                 credentialDefinition = CredentialDefinitionTO(
                     type = credential.type,
                     credentialSubject = credential.claims?.let {
@@ -144,20 +143,22 @@ internal data class CredentialRequestTO(
                 ),
             )
 
-            fun toTransferObject(identifierBased: CredentialIssuanceRequest.IdentifierBased) =
-                CredentialRequestTO(
-                    credentialIdentifier = identifierBased.credentialId.value,
-                    proof = identifierBased.proof,
-                    credentialResponseEncryption = credentialResponseEncryptionSpecTO,
-                )
+        fun from(request: CredentialIssuanceRequest.IdentifierBased) =
+            CredentialRequestTO(
+                credentialIdentifier = request.credentialId.value,
+                proof = request.proof,
+                credentialResponseEncryption = credentialResponseEncryption(request),
+            )
+
+        fun from(request: CredentialIssuanceRequest.SingleRequest): CredentialRequestTO {
             return when (request) {
                 is CredentialIssuanceRequest.FormatBased -> when (val credential = request.credential) {
-                    is CredentialType.MsoMdocDocType -> toTransferObject(request, credential)
-                    is CredentialType.SdJwtVcType -> toTransferObject(request, credential)
-                    is CredentialType.W3CSignedJwtType -> toTransferObject(request, credential)
+                    is CredentialType.MsoMdocDocType -> from(request, credential)
+                    is CredentialType.SdJwtVcType -> from(request, credential)
+                    is CredentialType.W3CSignedJwtType -> from(request, credential)
                 }
 
-                is CredentialIssuanceRequest.IdentifierBased -> toTransferObject(request)
+                is CredentialIssuanceRequest.IdentifierBased -> from(request)
             }
         }
     }

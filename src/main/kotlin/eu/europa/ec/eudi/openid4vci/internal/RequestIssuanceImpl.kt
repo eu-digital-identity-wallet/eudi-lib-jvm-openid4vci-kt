@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 
 internal class RequestIssuanceImpl(
@@ -25,6 +24,7 @@ internal class RequestIssuanceImpl(
     private val issuanceServerClient: IssuanceServerClient,
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ) : RequestIssuance {
+
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
     ): Result<SubmittedRequest> = runCatching {
@@ -49,7 +49,7 @@ internal class RequestIssuanceImpl(
             val credentialRequests = credentialsMetadata.map {
                 singleRequest(it, null, credentialIdentifiers)
             }
-            CredentialIssuanceRequest.BatchRequest(credentialRequests)
+            CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
         }
     }
 
@@ -60,7 +60,7 @@ internal class RequestIssuanceImpl(
             val credentialRequests = credentialsMetadata.map { (requestPayload, proofSigner) ->
                 singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
             }
-            CredentialIssuanceRequest.BatchRequest(credentialRequests)
+            CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
         }
     }
 
