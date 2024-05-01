@@ -17,7 +17,9 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
+import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.NoProofRequired
+import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.ProofRequired
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidAuthorizationState
 import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationServerClient
 
 internal data class TokenResponse(
@@ -43,30 +45,25 @@ internal class AuthorizeIssuanceImpl(
             ktorHttpClientFactory,
         )
 
-    override suspend fun prepareAuthorizationRequest(walletState: String?): Result<AuthorizationRequestPrepared> = runCatching {
-        val (scopes, configurationIds) = scopesAndCredentialConfigurationIds()
-        prepareAuthorizationRequest(walletState, scopes, configurationIds).getOrThrow()
-    }
+    override suspend fun prepareAuthorizationRequest(walletState: String?): Result<AuthorizationRequestPrepared> =
+        runCatching {
+            val (scopes, configurationIds) = scopesAndCredentialConfigurationIds()
+            prepareAuthorizationRequest(walletState, scopes, configurationIds).getOrThrow()
+        }
 
     private fun scopesAndCredentialConfigurationIds(): Pair<List<Scope>, List<CredentialConfigurationIdentifier>> {
         val scopes = mutableListOf<Scope>()
         val configurationIdentifiers = mutableListOf<CredentialConfigurationIdentifier>()
-        credentialOffer.credentialConfigurationIdentifiers.map { credentialConfigurationId ->
-            val credentialConfiguration = credentialConfigurationSupportedById(credentialConfigurationId)
-
-            fun authDetailsByCfgId() = configurationIdentifiers.add(credentialConfigurationId)
-
+        for (id in credentialOffer.credentialConfigurationIdentifiers) {
+            val credentialConfiguration = credentialConfigurationSupportedById(id)
+            fun authDetailsByCfgId() = configurationIdentifiers.add(id)
             fun addScope(): Boolean = credentialConfiguration.scope?.let { scopes.add(Scope(it)) } ?: false
-
             when (config.authorizeIssuanceConfig) {
                 AuthorizeIssuanceConfig.AUTHORIZATION_DETAILS -> authDetailsByCfgId()
-                AuthorizeIssuanceConfig.FAVOR_SCOPES -> {
-                    if (!addScope()) authDetailsByCfgId()
-                    else Unit
-                }
+                AuthorizeIssuanceConfig.FAVOR_SCOPES -> if (!addScope()) authDetailsByCfgId()
             }
         }
-        return Pair(scopes, configurationIdentifiers)
+        return scopes to configurationIdentifiers
     }
 
     private suspend fun prepareAuthorizationRequest(
@@ -86,17 +83,14 @@ internal class AuthorizeIssuanceImpl(
 
         val authorizationServerSupportsPar =
             credentialOffer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI != null
-        val (codeVerifier, authorizationCodeUrl) = when (authorizationServerSupportsPar) {
-            true -> authServerClient.submitPushedAuthorizationRequest(
-                scopes,
-                credentialConfigurationIds,
-                state,
-                issuerState,
-            ).getOrThrow()
+        val (codeVerifier, authorizationCodeUrl) =
+            with(authServerClient) {
+                if (authorizationServerSupportsPar)
+                    submitPushedAuthorizationRequest(scopes, credentialConfigurationIds, state, issuerState)
+                else
+                    authorizationRequestUrl(scopes, credentialConfigurationIds, state, issuerState)
+            }.getOrThrow()
 
-            false -> authServerClient.authorizationRequestUrl(scopes, credentialConfigurationIds, state, issuerState)
-                .getOrThrow()
-        }
         AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier, state)
     }
 
@@ -118,16 +112,12 @@ internal class AuthorizeIssuanceImpl(
             ensure(serverState == state) { InvalidAuthorizationState }
             val offerRequiresProofs = credentialOffer.requiresProofs()
             val (accessToken, refreshToken, cNonce, authDetails) =
-                authServerClient.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier)
-                    .getOrThrow()
+                authServerClient.requestAccessTokenAuthFlow(authorizationCode, pkceVerifier).getOrThrow()
 
             when {
-                cNonce != null && offerRequiresProofs ->
-                    AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, authDetails)
-
+                cNonce != null && offerRequiresProofs -> ProofRequired(accessToken, refreshToken, cNonce, authDetails)
                 else ->
-                    AuthorizedRequest.NoProofRequired(accessToken, refreshToken, authDetails)
-            }
+                    NoProofRequired(accessToken, refreshToken, authDetails) }
         }
 
     override suspend fun authorizeWithPreAuthorizationCode(txCode: String?): Result<AuthorizedRequest> = runCatching {
@@ -155,16 +145,13 @@ internal class AuthorizeIssuanceImpl(
         }
         val offerRequiresProofs = credentialOffer.requiresProofs()
         val (accessToken, refreshToken, cNonce, _) = authServerClient.requestAccessTokenPreAuthFlow(
-            preAuthorizedCode.preAuthorizedCode,
+            preAuthorizedCode,
             txCode,
         ).getOrThrow()
 
         when {
-            cNonce != null && offerRequiresProofs ->
-                AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, emptyMap())
-
-            else ->
-                AuthorizedRequest.NoProofRequired(accessToken, refreshToken, emptyMap())
+            cNonce != null && offerRequiresProofs -> ProofRequired(accessToken, refreshToken, cNonce, emptyMap())
+            else -> NoProofRequired(accessToken, refreshToken, emptyMap())
         }
     }
 

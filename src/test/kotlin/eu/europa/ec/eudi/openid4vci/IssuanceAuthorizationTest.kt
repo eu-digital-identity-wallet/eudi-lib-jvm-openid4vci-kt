@@ -25,9 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.*
-import kotlin.test.Test
-import kotlin.test.assertTrue
-import kotlin.test.fail
+import kotlin.test.*
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail as NimbusAuthorizationDetail
 
 class IssuanceAuthorizationTest {
@@ -60,87 +58,92 @@ class IssuanceAuthorizationTest {
     """.trimIndent()
 
     @Test
-    fun `successful authorization with authorization code flow (wallet initiated)`() =
-        runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                oidcWellKnownMocker(),
-                authServerWellKnownMocker(),
-                parPostMocker { request ->
-                    assertTrue(
-                        "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
-                    ) {
-                        request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
-                    }
-                    assertTrue("Not a form post") {
-                        request.body is FormDataContent
-                    }
-                    val form = request.body as FormDataContent
+    fun `successful authorization with authorization code flow (wallet initiated)`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oidcWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker { request ->
+                assertTrue(
+                    "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
+                ) {
+                    request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
+                }
 
-                    assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
-                        form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
-                    }
-                    assertTrue("Missing scope eu.europa.ec.eudiw.pid_mso_mdoc") {
-                        form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc") ?: false
-                    }
-                    assertTrue("No issuer_state expected when issuance starts from wallet") {
-                        form.formData["issuer_state"] == null
-                    }
-                    assertTrue("PKCE code challenge was expected but not sent.") {
-                        form.formData["code_challenge"] != null
-                    }
-                    assertTrue("PKCE code challenge method was expected but not sent.") {
-                        form.formData["code_challenge_method"] != null
-                    }
-                },
-                tokenPostMocker { request ->
-                    assertTrue(
-                        "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
-                    ) {
-                        request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
-                    }
-                    assertTrue("Not a form post") {
-                        request.body is FormDataContent
-                    }
-                    val form = request.body as FormDataContent
-                    assertTrue("PKCE code verifier was expected but not sent.") {
-                        form.formData[TokenEndpointForm.AuthCodeFlow.CODE_VERIFIER_PARAM] != null
-                    }
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM] != null
-                    }
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM] != null
-                    }
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM] != null
-                    }
-                    val grantType = form.formData[TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM]
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM} was expected but not sent.") {
-                        grantType != null
-                    }
-                    assertTrue(
-                        "Expected grant_type is ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but instead sent $grantType.",
-                    ) {
-                        grantType == TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE
-                    }
-                },
-            )
+                val form = assertIs<FormDataContent>(request.body, "Not a form post")
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
-            val issuer = Issuer.make(
-                config = OpenId4VCIConfiguration,
-                credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            ).getOrThrow()
-            with(issuer) {
-                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
-                val authorizationCode = UUID.randomUUID().toString()
-                val serverState = authRequestPrepared.state // dummy don't use it
-                authRequestPrepared
-                    .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
-                    .also { println(it) }
-            }
+                assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
+                    form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
+                }
+                assertTrue("Missing scope eu.europa.ec.eudiw.pid_mso_mdoc") {
+                    form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc") ?: false
+                }
+                assertNull(
+                    form.formData["issuer_state"],
+                    "No issuer_state expected when issuance starts from wallet",
+                )
+                assertNotNull(
+                    form.formData["code_challenge"],
+                    "PKCE code challenge was expected but not sent.",
+                )
+                assertNotNull(
+                    form.formData["code_challenge_method"],
+                    "PKCE code challenge method was expected but not sent.",
+                )
+            },
+            tokenPostMocker { request ->
+
+                assertEquals(
+                    "application/x-www-form-urlencoded; charset=UTF-8",
+                    request.body.contentType?.toString(),
+                    "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
+                )
+
+                val form = assertIs<FormDataContent>(request, "Not a form post")
+                assertNotNull(
+                    form.formData[TokenEndpointForm.CODE_VERIFIER_PARAM],
+                    "PKCE code verifier was expected but not sent.",
+                )
+                assertNotNull(
+                    form.formData[TokenEndpointForm.AUTHORIZATION_CODE_PARAM],
+                    "Parameter ${TokenEndpointForm.AUTHORIZATION_CODE_PARAM} was expected but not sent.",
+                )
+
+                assertNotNull(
+                    form.formData[TokenEndpointForm.REDIRECT_URI_PARAM],
+                    "Parameter ${TokenEndpointForm.REDIRECT_URI_PARAM} was expected but not sent.",
+                )
+                assertNotNull(
+                    form.formData[TokenEndpointForm.CLIENT_ID_PARAM],
+                    "Parameter ${TokenEndpointForm.CLIENT_ID_PARAM} was expected but not sent.",
+                )
+                val grantType = form.formData[TokenEndpointForm.GRANT_TYPE_PARAM]
+                assertNotNull(
+                    grantType,
+                    "Parameter ${TokenEndpointForm.GRANT_TYPE_PARAM} was expected but not sent.",
+                )
+                assertEquals(
+                    TokenEndpointForm.AUTHORIZATION_CODE_GRANT,
+                    grantType,
+                    "Expected grant_type is ${TokenEndpointForm.AUTHORIZATION_CODE_GRANT} but instead sent $grantType.",
+                )
+            },
+        )
+
+        val offer = credentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
+        val issuer = Issuer.make(
+            config = OpenId4VCIConfiguration,
+            credentialOffer = offer,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+        ).getOrThrow()
+        with(issuer) {
+            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
+            val authorizationCode = UUID.randomUUID().toString()
+            val serverState = authRequestPrepared.state // dummy don't use it
+            authRequestPrepared
+                .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
+                .also { println(it) }
         }
+    }
 
     @Test
     fun `successful authorization with authorization code flow`() =
@@ -182,31 +185,34 @@ class IssuanceAuthorizationTest {
                     ) {
                         request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
                     }
-                    assertTrue("Not a form post") {
-                        request.body is FormDataContent
-                    }
-                    val form = request.body as FormDataContent
-                    assertTrue("PKCE code verifier was expected but not sent.") {
-                        form.formData[TokenEndpointForm.AuthCodeFlow.CODE_VERIFIER_PARAM] != null
-                    }
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.AuthCodeFlow.AUTHORIZATION_CODE_PARAM] != null
-                    }
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.AuthCodeFlow.REDIRECT_URI_PARAM] != null
-                    }
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.AuthCodeFlow.CLIENT_ID_PARAM] != null
-                    }
-                    val grantType = form.formData[TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM]
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM} was expected but not sent.") {
-                        grantType != null
-                    }
-                    assertTrue(
-                        "Expected grant_type is ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but instead sent $grantType.",
-                    ) {
-                        grantType == TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM_VALUE
-                    }
+
+                    val form = assertIs<FormDataContent>(request.body, "Not a form post")
+                    assertNull(
+                        form.formData[TokenEndpointForm.CODE_VERIFIER_PARAM],
+                        "PKCE code verifier was expected but not sent.",
+                    )
+                    assertNotNull(
+                        form.formData[TokenEndpointForm.AUTHORIZATION_CODE_PARAM],
+                        "Parameter ${TokenEndpointForm.AUTHORIZATION_CODE_PARAM} was expected but not sent.",
+                    )
+                    assertNotNull(
+                        form.formData[TokenEndpointForm.REDIRECT_URI_PARAM],
+                        "Parameter ${TokenEndpointForm.REDIRECT_URI_PARAM} was expected but not sent.",
+                    )
+                    assertNull(
+                        form.formData[TokenEndpointForm.CLIENT_ID_PARAM],
+                        "Parameter ${TokenEndpointForm.CLIENT_ID_PARAM} was expected but not sent.",
+                    )
+                    val grantType = form.formData[TokenEndpointForm.GRANT_TYPE_PARAM]
+                    assertNotNull(
+                        grantType,
+                        "Parameter ${TokenEndpointForm.GRANT_TYPE_PARAM} was expected but not sent.",
+                    )
+                    assertEquals(
+                        TokenEndpointForm.AUTHORIZATION_CODE_GRANT,
+                        grantType,
+                        "Expected grant_type is ${TokenEndpointForm.AUTHORIZATION_CODE_GRANT} but instead sent $grantType.",
+                    )
                 },
             )
 
@@ -249,21 +255,21 @@ class IssuanceAuthorizationTest {
                     assertTrue("PKCE code verifier was not expected but sent.") {
                         form.formData["code_verifier"] == null
                     }
-                    assertTrue("Parameter ${TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.PreAuthCodeFlow.PRE_AUTHORIZED_CODE_PARAM] != null
+                    assertTrue("Parameter ${TokenEndpointForm.PRE_AUTHORIZED_CODE_PARAM} was expected but not sent.") {
+                        form.formData[TokenEndpointForm.PRE_AUTHORIZED_CODE_PARAM] != null
                     }
-                    assertTrue("Parameter ${TokenEndpointForm.PreAuthCodeFlow.TX_CODE_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.PreAuthCodeFlow.TX_CODE_PARAM] != null
+                    assertTrue("Parameter ${TokenEndpointForm.TX_CODE_PARAM} was expected but not sent.") {
+                        form.formData[TokenEndpointForm.TX_CODE_PARAM] != null
                     }
 
-                    val grantType = form.formData[TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM]
-                    assertTrue("Parameter ${TokenEndpointForm.AuthCodeFlow.GRANT_TYPE_PARAM} was expected but not sent.") {
+                    val grantType = form.formData[TokenEndpointForm.GRANT_TYPE_PARAM]
+                    assertTrue("Parameter ${TokenEndpointForm.GRANT_TYPE_PARAM} was expected but not sent.") {
                         grantType != null
                     }
                     assertTrue(
-                        "Expected grant_type is ${TokenEndpointForm.PreAuthCodeFlow.GRANT_TYPE_PARAM_VALUE} but got $grantType.",
+                        "Expected grant_type is ${TokenEndpointForm.PRE_AUTHORIZED_CODE_GRANT} but got $grantType.",
                     ) {
-                        grantType == TokenEndpointForm.PreAuthCodeFlow.GRANT_TYPE_PARAM_VALUE
+                        grantType == TokenEndpointForm.PRE_AUTHORIZED_CODE_GRANT
                     }
                 },
             )
