@@ -16,15 +16,29 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
+import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
 
-internal class RequestIssuanceImpl private constructor(
+/**
+ * Models a response of the issuer to a successful issuance request.
+ *
+ * @param credentials The outcome of the issuance request.
+ * if the issuance request was a batch request, it will contain
+ * the results of each issuance request.
+ * If it was a single issuance request list will contain only one result.
+ * @param cNonce Nonce information sent back from the issuance server.
+ */
+internal data class CredentialIssuanceResponse(
+    val credentials: List<IssuedCredential>,
+    val cNonce: CNonce?,
+)
+
+internal class RequestIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     private val config: OpenId4VCIConfig,
     private val issuanceServerClient: IssuanceServerClient,
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ) : RequestIssuance {
+
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
     ): Result<SubmittedRequest> = runCatching {
@@ -49,7 +63,7 @@ internal class RequestIssuanceImpl private constructor(
             val credentialRequests = credentialsMetadata.map {
                 singleRequest(it, null, credentialIdentifiers)
             }
-            CredentialIssuanceRequest.BatchRequest(credentialRequests)
+            CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
         }
     }
 
@@ -60,7 +74,7 @@ internal class RequestIssuanceImpl private constructor(
             val credentialRequests = credentialsMetadata.map { (requestPayload, proofSigner) ->
                 singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
             }
-            CredentialIssuanceRequest.BatchRequest(credentialRequests)
+            CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
         }
     }
 
@@ -169,81 +183,6 @@ internal class RequestIssuanceImpl private constructor(
                     onFailure = { handleIssuanceFailure(it) },
                 )
             }
-        }
-    }
-
-    companion object {
-        operator fun invoke(
-            credentialOffer: CredentialOffer,
-            config: OpenId4VCIConfig,
-            issuanceServerClient: IssuanceServerClient,
-            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
-        ): Result<RequestIssuanceImpl> = runCatching {
-            val responseEncryptionSpec =
-                responseEncryptionSpec(credentialOffer, config, responseEncryptionSpecFactory).getOrThrow()
-            RequestIssuanceImpl(credentialOffer, config, issuanceServerClient, responseEncryptionSpec)
-        }
-    }
-}
-
-private fun responseEncryptionSpec(
-    credentialOffer: CredentialOffer,
-    config: OpenId4VCIConfig,
-    responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
-): Result<IssuanceResponseEncryptionSpec?> = runCatching {
-    fun IssuanceResponseEncryptionSpec.validate(
-        supportedAlgorithmsAndMethods: SupportedEncryptionAlgorithmsAndMethods,
-    ) {
-        ensure(algorithm in supportedAlgorithmsAndMethods.algorithms) {
-            ResponseEncryptionAlgorithmNotSupportedByIssuer
-        }
-        ensure(encryptionMethod in supportedAlgorithmsAndMethods.encryptionMethods) {
-            ResponseEncryptionMethodNotSupportedByIssuer
-        }
-    }
-
-    when (val encryption = credentialOffer.credentialIssuerMetadata.credentialResponseEncryption) {
-        CredentialResponseEncryption.NotSupported ->
-            // Issuance server does not support Credential Response encryption.
-            // In case Wallet requires Credential Response encryption, fail.
-            when (config.credentialResponseEncryptionPolicy) {
-                CredentialResponseEncryptionPolicy.SUPPORTED -> null
-                CredentialResponseEncryptionPolicy.REQUIRED -> throw ResponseEncryptionRequiredByWalletButNotSupportedByIssuer
-            }
-
-        is CredentialResponseEncryption.SupportedNotRequired -> {
-            // Issuance server supports but does not require Credential Response encryption.
-            // Fail in case Wallet requires Credential Response encryption but no crypto material can be generated,
-            // or in case algorithm/method supported by Wallet is not supported by issuance server.
-            val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
-            val maybeSpec = runCatching {
-                responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)
-                    ?.apply {
-                        validate(supportedAlgorithmsAndMethods)
-                    }
-            }.getOrNull()
-
-            when (config.credentialResponseEncryptionPolicy) {
-                CredentialResponseEncryptionPolicy.SUPPORTED -> maybeSpec
-
-                CredentialResponseEncryptionPolicy.REQUIRED -> {
-                    ensureNotNull(maybeSpec) {
-                        WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated
-                    }
-                }
-            }
-        }
-
-        is CredentialResponseEncryption.Required -> {
-            // Issuance server requires Credential Response encryption.
-            // Fail in case Wallet does not support Credential Response encryption or,
-            // algorithms/methods supported by Wallet are not supported by issuance server.
-            val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
-            val maybeSpec = responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)
-                ?.apply {
-                    validate(supportedAlgorithmsAndMethods)
-                }
-            ensureNotNull(maybeSpec) { IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided }
         }
     }
 }

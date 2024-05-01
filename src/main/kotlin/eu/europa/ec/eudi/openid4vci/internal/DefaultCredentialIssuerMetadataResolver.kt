@@ -20,7 +20,7 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuerMetadataJsonParser
+import eu.europa.ec.eudi.openid4vci.internal.http.CredentialIssuerMetadataJsonParser
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*

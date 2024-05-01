@@ -18,6 +18,14 @@ package eu.europa.ec.eudi.openid4vci.internal
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
+import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationServerClient
+
+internal data class TokenResponse(
+    val accessToken: AccessToken,
+    val refreshToken: RefreshToken?,
+    val cNonce: CNonce?,
+    val authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> = emptyMap(),
+)
 
 internal class AuthorizeIssuanceImpl(
     private val credentialOffer: CredentialOffer,

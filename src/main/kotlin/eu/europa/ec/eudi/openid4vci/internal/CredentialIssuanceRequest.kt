@@ -13,13 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal.formats
+package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidIssuanceRequest
-import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.ensure
-import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
 
 internal sealed interface CredentialType {
     data class MsoMdocDocType(val doctype: String, val claimSet: MsoMdocClaimSet?) : CredentialType
@@ -34,6 +31,8 @@ internal sealed interface CredentialType {
  */
 internal sealed interface CredentialIssuanceRequest {
 
+    val encryption: IssuanceResponseEncryptionSpec?
+
     /**
      * Models an issuance request for a batch of credentials
      *
@@ -43,6 +42,7 @@ internal sealed interface CredentialIssuanceRequest {
      */
     data class BatchRequest(
         val credentialRequests: List<SingleRequest>,
+        override val encryption: IssuanceResponseEncryptionSpec?,
     ) : CredentialIssuanceRequest
 
     /**
@@ -50,7 +50,6 @@ internal sealed interface CredentialIssuanceRequest {
      */
     sealed interface SingleRequest : CredentialIssuanceRequest {
         val proof: Proof?
-        val encryption: IssuanceResponseEncryptionSpec?
     }
 
     /**

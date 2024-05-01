@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.*
 import eu.europa.ec.eudi.openid4vci.internal.RequestIssuanceImpl
+import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
 import io.ktor.client.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -92,13 +93,18 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 ktorHttpClientFactory,
                 dPoPJwtFactory,
             )
+            val responseEncryptionSpec =
+                responseEncryptionSpec(credentialOffer, config, responseEncryptionSpecFactory).getOrThrow()
             val requestIssuance = RequestIssuanceImpl(
                 credentialOffer,
                 config,
                 issuanceServerClient,
-                responseEncryptionSpecFactory,
-            ).getOrThrow()
-            val queryForDeferredCredential = QueryForDeferredCredentialImpl(issuanceServerClient)
+                responseEncryptionSpec,
+            )
+            val queryForDeferredCredential = QueryForDeferredCredentialImpl(
+                issuanceServerClient,
+                responseEncryptionSpec,
+            )
             val notifyIssuer = NotifyIssuerImpl(issuanceServerClient)
 
             object :

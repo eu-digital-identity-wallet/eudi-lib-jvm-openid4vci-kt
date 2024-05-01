@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal
+package eu.europa.ec.eudi.openid4vci.internal.http
 
 import com.nimbusds.oauth2.sdk.AuthorizationRequest
 import com.nimbusds.oauth2.sdk.PushedAuthorizationRequest
@@ -28,6 +28,11 @@ import com.nimbusds.oauth2.sdk.rar.Location
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
+import eu.europa.ec.eudi.openid4vci.internal.*
+import eu.europa.ec.eudi.openid4vci.internal.DPoP
+import eu.europa.ec.eudi.openid4vci.internal.DPoPJwtFactory
+import eu.europa.ec.eudi.openid4vci.internal.GrantedAuthorizationDetailsSerializer
+import eu.europa.ec.eudi.openid4vci.internal.Htm
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -40,7 +45,7 @@ import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail as NimbusAuthorizationDet
 /**
  * Sealed hierarchy of possible responses to a Pushed Authorization Request.
  */
-internal sealed interface PushedAuthorizationRequestResponse {
+internal sealed interface PushedAuthorizationRequestResponseTO {
 
     /**
      * Successful request submission.
@@ -52,7 +57,7 @@ internal sealed interface PushedAuthorizationRequestResponse {
     data class Success(
         @SerialName("request_uri") val requestURI: String,
         @SerialName("expires_in") val expiresIn: Long = 5,
-    ) : PushedAuthorizationRequestResponse
+    ) : PushedAuthorizationRequestResponseTO
 
     /**
      * Request failed
@@ -64,13 +69,13 @@ internal sealed interface PushedAuthorizationRequestResponse {
     data class Failure(
         @SerialName("error") val error: String,
         @SerialName("error_description") val errorDescription: String? = null,
-    ) : PushedAuthorizationRequestResponse
+    ) : PushedAuthorizationRequestResponseTO
 }
 
 /**
  * Sealed hierarchy of possible responses to an Access Token request.
  */
-internal sealed interface AccessTokenRequestResponseTO {
+internal sealed interface TokenResponseTO {
 
     /**
      * Successful request submission.
@@ -92,7 +97,7 @@ internal sealed interface AccessTokenRequestResponseTO {
         @SerialName(
             "authorization_details",
         ) val authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>? = null,
-    ) : AccessTokenRequestResponseTO
+    ) : TokenResponseTO
 
     /**
      * Request failed
@@ -104,15 +109,22 @@ internal sealed interface AccessTokenRequestResponseTO {
     data class Failure(
         @SerialName("error") val error: String,
         @SerialName("error_description") val errorDescription: String? = null,
-    ) : AccessTokenRequestResponseTO
-}
+    ) : TokenResponseTO
 
-internal data class TokenResponse(
-    val accessToken: AccessToken,
-    val refreshToken: RefreshToken?,
-    val cNonce: CNonce?,
-    val authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> = emptyMap(),
-)
+    fun tokensOrFail(): TokenResponse =
+        when (this) {
+            is Success -> {
+                TokenResponse(
+                    accessToken = AccessToken(accessToken, DPoP.equals(other = tokenType, ignoreCase = true)),
+                    refreshToken = refreshToken?.let { RefreshToken(it) },
+                    cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) },
+                    authorizationDetails = authorizationDetails ?: emptyMap(),
+                )
+            }
+
+            is Failure -> throw AccessTokenRequestFailed(error, errorDescription)
+        }
+}
 
 internal class AuthorizationServerClient(
     private val credentialIssuerId: CredentialIssuerId,
@@ -198,12 +210,12 @@ internal class AuthorizationServerClient(
         pkceVerifier to url
     }
 
-    private fun PushedAuthorizationRequestResponse.authorizationCodeUrlOrFail(
+    private fun PushedAuthorizationRequestResponseTO.authorizationCodeUrlOrFail(
         clientID: ClientID,
         codeVerifier: CodeVerifier,
         state: String,
     ): Pair<PKCEVerifier, HttpsUrl> = when (this) {
-        is PushedAuthorizationRequestResponse.Success -> {
+        is PushedAuthorizationRequestResponseTO.Success -> {
             val authorizationCodeUrl = run {
                 val httpsUrl = URLBuilder(Url(authorizationServerMetadata.authorizationEndpointURI.toString())).apply {
                     parameters.append(AuthorizationEndpointParams.PARAM_CLIENT_ID, clientID.value)
@@ -216,7 +228,7 @@ internal class AuthorizationServerClient(
             pkceVerifier to authorizationCodeUrl
         }
 
-        is PushedAuthorizationRequestResponse.Failure -> throw PushedAuthorizationRequestFailed(error, errorDescription)
+        is PushedAuthorizationRequestResponseTO.Failure -> throw PushedAuthorizationRequestFailed(error, errorDescription)
     }
 
     /**
@@ -258,23 +270,9 @@ internal class AuthorizationServerClient(
         requestAccessToken(params).tokensOrFail()
     }
 
-    private fun AccessTokenRequestResponseTO.tokensOrFail(): TokenResponse =
-        when (this) {
-            is AccessTokenRequestResponseTO.Success -> {
-                TokenResponse(
-                    accessToken = AccessToken(accessToken, DPoP.equals(other = tokenType, ignoreCase = true)),
-                    refreshToken = refreshToken?.let { RefreshToken(it) },
-                    cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) },
-                    authorizationDetails = authorizationDetails ?: emptyMap(),
-                )
-            }
-
-            is AccessTokenRequestResponseTO.Failure -> throw AccessTokenRequestFailed(error, errorDescription)
-        }
-
     private suspend fun requestAccessToken(
         params: Map<String, String>,
-    ): AccessTokenRequestResponseTO =
+    ): TokenResponseTO =
         ktorHttpClientFactory().use { client ->
             val url = authorizationServerMetadata.tokenEndpointURI.toURL()
             val formParameters = Parameters.build {
@@ -285,14 +283,14 @@ internal class AuthorizationServerClient(
                     dpop(factory, url, Htm.POST, accessToken = null, nonce = null)
                 }
             }
-            if (response.status.isSuccess()) response.body<AccessTokenRequestResponseTO.Success>()
-            else response.body<AccessTokenRequestResponseTO.Failure>()
+            if (response.status.isSuccess()) response.body<TokenResponseTO.Success>()
+            else response.body<TokenResponseTO.Failure>()
         }
 
     private suspend fun pushAuthorizationRequest(
         parEndpoint: URI,
         pushedAuthorizationRequest: PushedAuthorizationRequest,
-    ): PushedAuthorizationRequestResponse = ktorHttpClientFactory().use { client ->
+    ): PushedAuthorizationRequestResponseTO = ktorHttpClientFactory().use { client ->
         val url = parEndpoint.toURL()
         val formParameters = pushedAuthorizationRequest.asFormPostParams()
 
@@ -302,8 +300,8 @@ internal class AuthorizationServerClient(
                 formParameters.entries.forEach { (k, v) -> append(k, v) }
             },
         )
-        if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponse.Success>()
-        else response.body<PushedAuthorizationRequestResponse.Failure>()
+        if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponseTO.Success>()
+        else response.body<PushedAuthorizationRequestResponseTO.Failure>()
     }
 
     private fun toNimbus(

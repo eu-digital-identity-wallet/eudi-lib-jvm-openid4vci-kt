@@ -16,8 +16,8 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.EncryptedResponses.*
-import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponseTO
-import eu.europa.ec.eudi.openid4vci.internal.PushedAuthorizationRequestResponse
+import eu.europa.ec.eudi.openid4vci.internal.http.PushedAuthorizationRequestResponseTO
+import eu.europa.ec.eudi.openid4vci.internal.http.TokenResponseTO
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -83,7 +83,7 @@ internal fun parPostMocker(validator: (request: HttpRequestData) -> Unit = {}): 
         responseBuilder = {
             respond(
                 content = Json.encodeToString(
-                    PushedAuthorizationRequestResponse.Success(
+                    PushedAuthorizationRequestResponseTO.Success(
                         "org:example:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
                         3600,
                     ),
@@ -103,7 +103,7 @@ internal fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit = {})
         responseBuilder = {
             respond(
                 content = Json.encodeToString(
-                    AccessTokenRequestResponseTO.Success(
+                    TokenResponseTO.Success(
                         accessToken = UUID.randomUUID().toString(),
                         expiresIn = 3600,
                     ),
@@ -126,7 +126,7 @@ internal fun tokenPostMockerWithAuthDetails(
         responseBuilder = {
             respond(
                 content = Json.encodeToString(
-                    AccessTokenRequestResponseTO.Success(
+                    TokenResponseTO.Success(
                         accessToken = UUID.randomUUID().toString(),
                         expiresIn = 3600,
                         authorizationDetails = authorizationDetails(configurationIds),

@@ -15,8 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.DeferredIssuanceRequestTO
-import eu.europa.ec.eudi.openid4vci.internal.formats.SingleCredentialTO
+import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.http.DeferredRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -301,7 +301,7 @@ class IssuanceDeferredRequestTest {
 
     private fun respondToCredentialIssuanceRequest(
         call: MockRequestHandleScope,
-        issuanceRequest: SingleCredentialTO?,
+        issuanceRequest: CredentialRequestTO?,
     ): HttpResponseData =
         if (issuanceRequest == null) {
             call.respond(
@@ -346,16 +346,16 @@ class IssuanceDeferredRequestTest {
             )
         }
 
-    private fun asDeferredIssuanceRequest(bodyStr: String): DeferredIssuanceRequestTO? =
+    private fun asDeferredIssuanceRequest(bodyStr: String): DeferredRequestTO? =
         try {
-            Json.decodeFromString<DeferredIssuanceRequestTO>(bodyStr)
+            Json.decodeFromString<DeferredRequestTO>(bodyStr)
         } catch (ex: Exception) {
             null
         }
 
-    private fun asIssuanceRequest(bodyStr: String): SingleCredentialTO? =
+    private fun asIssuanceRequest(bodyStr: String): CredentialRequestTO? =
         try {
-            Json.decodeFromString<SingleCredentialTO>(bodyStr)
+            Json.decodeFromString<CredentialRequestTO>(bodyStr)
         } catch (ex: Exception) {
             null
         }
