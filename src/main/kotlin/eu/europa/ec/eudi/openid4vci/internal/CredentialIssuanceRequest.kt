@@ -13,13 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal.formats
+package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidIssuanceRequest
-import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.ensure
-import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
 
 internal sealed interface CredentialType {
     data class MsoMdocDocType(val doctype: String, val claimSet: MsoMdocClaimSet?) : CredentialType

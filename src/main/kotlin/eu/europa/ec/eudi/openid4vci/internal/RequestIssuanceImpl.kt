@@ -16,8 +16,21 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
 import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
+
+/**
+ * Models a response of the issuer to a successful issuance request.
+ *
+ * @param credentials The outcome of the issuance request.
+ * if the issuance request was a batch request, it will contain
+ * the results of each issuance request.
+ * If it was a single issuance request list will contain only one result.
+ * @param cNonce Nonce information sent back from the issuance server.
+ */
+internal data class CredentialIssuanceResponse(
+    val credentials: List<IssuedCredential>,
+    val cNonce: CNonce?,
+)
 
 internal class RequestIssuanceImpl(
     private val credentialOffer: CredentialOffer,

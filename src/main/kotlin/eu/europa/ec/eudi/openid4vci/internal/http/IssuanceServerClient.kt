@@ -23,29 +23,16 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
+import eu.europa.ec.eudi.openid4vci.internal.*
+import eu.europa.ec.eudi.openid4vci.internal.CredentialIssuanceRequest
 import eu.europa.ec.eudi.openid4vci.internal.DPoPJwtFactory
 import eu.europa.ec.eudi.openid4vci.internal.Htm
 import eu.europa.ec.eudi.openid4vci.internal.bearerOrDPoPAuth
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
-import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-
-/**
- * Models a response of the issuer to a successful issuance request.
- *
- * @param credentials The outcome of the issuance request.
- * if the issuance request was a batch request, it will contain
- * the results of each issuance request.
- * If it was a single issuance request list will contain only one result.
- * @param cNonce Nonce information sent back from the issuance server.
- */
-internal data class CredentialIssuanceResponse(
-    val credentials: List<IssuedCredential>,
-    val cNonce: CNonce?,
-)
 
 internal class IssuanceServerClient(
     private val issuerMetadata: CredentialIssuerMetadata,

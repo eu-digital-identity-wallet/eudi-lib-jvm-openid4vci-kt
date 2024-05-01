@@ -57,6 +57,8 @@ private sealed interface CredentialSupportedTO {
     val credentialSigningAlgorithmsSupported: List<String>?
     val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>?
     val display: List<CredentialSupportedDisplayTO>?
+
+    fun toDomain(): CredentialConfiguration
 }
 
 @Serializable
@@ -86,6 +88,43 @@ private data class MsdMdocCredentialTO(
     init {
         require(format == FORMAT_MSO_MDOC) { "invalid format '$format'" }
     }
+
+    override fun toDomain(): MsoMdocCredential {
+        val bindingMethods = cryptographicBindingMethodsSupported
+            ?.map { cryptographicBindingMethodOf(it) }
+            ?: emptyList()
+        val display = display?.map { it.toDomain() } ?: emptyList()
+        val proofTypesSupported = proofTypesSupported.toProofTypes()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported ?: emptyList()
+
+        fun claims(): MsoMdocClaims = claims?.mapValues { (_, claims) ->
+            claims.mapValues { (_, claim) ->
+                claim.let { claimObject ->
+                    Claim(
+                        claimObject.mandatory ?: false,
+                        claimObject.valueType,
+                        claimObject.display?.map { displayObject ->
+                            Claim.Display(
+                                displayObject.name,
+                                displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
+                            )
+                        } ?: emptyList(),
+                    )
+                }
+            }
+        } ?: emptyMap()
+
+        return MsoMdocCredential(
+            scope,
+            bindingMethods,
+            cryptographicSuitesSupported,
+            proofTypesSupported,
+            display,
+            docType,
+            claims(),
+            order ?: emptyList(),
+        )
+    }
 }
 
 @Serializable
@@ -106,6 +145,38 @@ private data class SdJwtVcCredentialTO(
     init {
         require(format == FORMAT_SD_JWT_VC) { "invalid format '$format'" }
     }
+
+    override fun toDomain(): SdJwtVcCredential {
+        val bindingMethods = cryptographicBindingMethodsSupported
+            ?.map { cryptographicBindingMethodOf(it) }
+            ?: emptyList()
+        val display = display?.map { it.toDomain() } ?: emptyList()
+        val proofTypesSupported = proofTypesSupported.toProofTypes()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported ?: emptyList()
+
+        return SdJwtVcCredential(
+            scope,
+            bindingMethods,
+            cryptographicSuitesSupported,
+            proofTypesSupported,
+            display,
+            type,
+            claims?.mapValues { (_, claim) ->
+                claim.let {
+                    Claim(
+                        it.mandatory ?: false,
+                        it.valueType,
+                        it.display?.map { displayObject ->
+                            Claim.Display(
+                                displayObject.name,
+                                displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
+                            )
+                        } ?: emptyList(),
+                    )
+                }
+            },
+        )
+    }
 }
 
 @Serializable
@@ -113,7 +184,14 @@ private data class W3CJsonLdCredentialDefinitionTO(
     @SerialName("@context") val context: List<String>,
     @SerialName("type") val types: List<String>,
     @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>? = null,
-)
+) {
+
+    fun toDomain(): W3CJsonLdCredentialDefinition = W3CJsonLdCredentialDefinition(
+        context = context.map { URL(it) },
+        type = types,
+        credentialSubject = credentialSubject?.let { it.toDomain() },
+    )
+}
 
 /**
  * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
@@ -138,6 +216,27 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
     init {
         require(format == FORMAT_W3C_JSONLD_DATA_INTEGRITY) { "invalid format '$format'" }
     }
+
+    override fun toDomain(): W3CJsonLdDataIntegrityCredential {
+        val bindingMethods = cryptographicBindingMethodsSupported
+            ?.map { cryptographicBindingMethodOf(it) }
+            ?: emptyList()
+        val display = display?.map { it.toDomain() } ?: emptyList()
+        val proofTypesSupported = proofTypesSupported.toProofTypes()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported ?: emptyList()
+
+        return W3CJsonLdDataIntegrityCredential(
+            scope = scope,
+            cryptographicBindingMethodsSupported = bindingMethods,
+            credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
+            proofTypesSupported = proofTypesSupported,
+            display = display,
+            context = context,
+            type = type,
+            credentialDefinition = credentialDefinition.toDomain(),
+            order = order ?: emptyList(),
+        )
+    }
 }
 
 /**
@@ -161,6 +260,26 @@ private data class W3CJsonLdSignedJwtCredentialTO(
 ) : CredentialSupportedTO {
     init {
         require(format == FORMAT_W3C_JSONLD_SIGNED_JWT) { "invalid format '$format'" }
+    }
+
+    override fun toDomain(): W3CJsonLdSignedJwtCredential {
+        val bindingMethods = cryptographicBindingMethodsSupported
+            ?.map { cryptographicBindingMethodOf(it) }
+            ?: emptyList()
+        val display = display?.map { it.toDomain() } ?: emptyList()
+        val proofTypesSupported = proofTypesSupported.toProofTypes()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported ?: emptyList()
+
+        return W3CJsonLdSignedJwtCredential(
+            scope = scope,
+            cryptographicBindingMethodsSupported = bindingMethods,
+            credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
+            proofTypesSupported = proofTypesSupported,
+            display = display,
+            context = context,
+            credentialDefinition = credentialDefinition.toDomain(),
+            order = order ?: emptyList(),
+        )
     }
 }
 
@@ -190,7 +309,32 @@ private data class W3CSignedJwtCredentialTO(
     data class CredentialDefinitionTO(
         @SerialName("type") val types: List<String>,
         @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>? = null,
-    )
+    ) {
+        fun toDomain(): W3CSignedJwtCredential.CredentialDefinition =
+            W3CSignedJwtCredential.CredentialDefinition(
+                type = types,
+                credentialSubject = credentialSubject?.let { it.toDomain() },
+            )
+    }
+
+    override fun toDomain(): W3CSignedJwtCredential {
+        val bindingMethods = cryptographicBindingMethodsSupported
+            ?.map { cryptographicBindingMethodOf(it) }
+            ?: emptyList()
+        val display = display?.map { it.toDomain() } ?: emptyList()
+        val proofTypesSupported = proofTypesSupported.toProofTypes()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported ?: emptyList()
+
+        return W3CSignedJwtCredential(
+            scope = scope,
+            cryptographicBindingMethodsSupported = bindingMethods,
+            credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
+            proofTypesSupported = proofTypesSupported,
+            display = display,
+            credentialDefinition = credentialDefinition.toDomain(),
+            order = order ?: emptyList(),
+        )
+    }
 }
 
 /**
@@ -210,7 +354,75 @@ private data class CredentialIssuerMetadataTO(
     @SerialName("credential_configurations_supported") val credentialConfigurationsSupported: Map<String, CredentialSupportedTO> =
         emptyMap(),
     @SerialName("display") val display: List<DisplayTO>? = null,
-)
+) {
+    /**
+     * Converts and validates  a [CredentialIssuerMetadataTO] as a [CredentialIssuerMetadata] instance.
+     */
+    fun toDomain(): CredentialIssuerMetadata {
+        fun ensureHttpsUrl(s: String, ex: (Throwable) -> Throwable) = HttpsUrl(s).ensureSuccess(ex)
+
+        val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
+            .ensureSuccess(::InvalidCredentialIssuerId)
+
+        val authorizationServers = authorizationServers
+            ?.map { ensureHttpsUrl(it, CredentialIssuerMetadataValidationError::InvalidAuthorizationServer) }
+            ?: listOf(credentialIssuerIdentifier.value)
+
+        val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
+            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialEndpoint)
+
+        val batchCredentialEndpoint = batchCredentialEndpoint?.let {
+            CredentialIssuerEndpoint(it)
+                .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidBatchCredentialEndpoint)
+        }
+
+        val deferredCredentialEndpoint = deferredCredentialEndpoint?.let {
+            CredentialIssuerEndpoint(it)
+                .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidDeferredCredentialEndpoint)
+        }
+        val notificationEndpoint = notificationEndpoint?.let {
+            CredentialIssuerEndpoint(it)
+                .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
+        }
+
+        ensure(credentialConfigurationsSupported.isNotEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired }
+        val credentialsSupported = credentialConfigurationsSupported.map { (id, credentialSupportedTO) ->
+            val credentialId = CredentialConfigurationIdentifier(id)
+            val credential = runCatching { credentialSupportedTO.toDomain() }
+                .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
+            credentialId to credential
+        }.toMap()
+
+        val display = display?.map(DisplayTO::toDomain) ?: emptyList()
+
+        return CredentialIssuerMetadata(
+            credentialIssuerIdentifier,
+            authorizationServers,
+            credentialEndpoint,
+            batchCredentialEndpoint,
+            deferredCredentialEndpoint,
+            notificationEndpoint,
+            credentialResponseEncryption(),
+            credentialIdentifiersSupported,
+            credentialsSupported,
+            display,
+        )
+    }
+
+    private fun credentialResponseEncryption(): CredentialResponseEncryption {
+        fun algsAndMethods(): SupportedEncryptionAlgorithmsAndMethods {
+            requireNotNull(credentialResponseEncryption)
+            val encryptionAlgorithms = credentialResponseEncryption.algorithmsSupported.map { JWEAlgorithm.parse(it) }
+            val encryptionMethods = credentialResponseEncryption.methodsSupported.map { EncryptionMethod.parse(it) }
+            return SupportedEncryptionAlgorithmsAndMethods(encryptionAlgorithms, encryptionMethods)
+        }
+        return when {
+            credentialResponseEncryption == null -> CredentialResponseEncryption.NotSupported
+            credentialResponseEncryption.encryptionRequired -> CredentialResponseEncryption.Required(algsAndMethods())
+            else -> CredentialResponseEncryption.SupportedNotRequired(algsAndMethods())
+        }
+    }
+}
 
 @Serializable
 private data class CredentialResponseEncryptionTO(
@@ -223,20 +435,40 @@ private data class CredentialResponseEncryptionTO(
  * Display properties of a supported credential type for a certain language.
  */
 @Serializable
-internal data class CredentialSupportedDisplayTO(
+private data class CredentialSupportedDisplayTO(
     @SerialName("name") @Required val name: String,
     @SerialName("locale") val locale: String? = null,
     @SerialName("logo") val logo: LogoObject? = null,
     @SerialName("description") val description: String? = null,
     @SerialName("background_color") val backgroundColor: String? = null,
     @SerialName("text_color") val textColor: String? = null,
-)
+) {
+    /**
+     * Utility method to convert a [CredentialSupportedDisplayTO] transfer object to the respective [Display] domain object.
+     */
+    fun toDomain(): Display {
+        fun LogoObject.toLogo(): Display.Logo =
+            Display.Logo(
+                uri?.let { URI.create(it) },
+                alternativeText,
+            )
+
+        return Display(
+            name,
+            locale?.let { Locale.forLanguageTag(it) },
+            logo?.toLogo(),
+            description,
+            backgroundColor,
+            textColor,
+        )
+    }
+}
 
 /**
  * Logo information.
  */
 @Serializable
-internal data class LogoObject(
+private data class LogoObject(
     @SerialName("uri") val uri: String? = null,
     @SerialName("alt_text") val alternativeText: String? = null,
 )
@@ -245,284 +477,39 @@ internal data class LogoObject(
  * The details of a Claim.
  */
 @Serializable
-internal data class ClaimTO(
+private data class ClaimTO(
     @SerialName("mandatory") val mandatory: Boolean? = null,
     @SerialName("value_type") val valueType: String? = null,
     @SerialName("display") val display: List<DisplayTO>? = null,
-)
+) {
+    fun toDomain(): Claim =
+        Claim(
+            mandatory = mandatory ?: false,
+            valueType = valueType,
+            display = display?.map { it.toClaimDisplay() } ?: emptyList(),
+        )
+}
 
 /**
  * Display properties of a Claim.
  */
 @Serializable
-internal data class DisplayTO(
+private data class DisplayTO(
     @SerialName("name") val name: String? = null,
     @SerialName("locale") val locale: String? = null,
-)
+) {
+    /**
+     * Converts a [DisplayTO] to a [CredentialIssuerMetadata.Display] instance.
+     */
+    fun toDomain(): CredentialIssuerMetadata.Display =
+        CredentialIssuerMetadata.Display(name, locale)
 
-/**
- * Converts and validates  a [CredentialIssuerMetadataTO] as a [CredentialIssuerMetadata] instance.
- */
-private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
-    fun ensureHttpsUrl(s: String, ex: (Throwable) -> Throwable) = HttpsUrl(s).ensureSuccess(ex)
-
-    val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
-        .ensureSuccess(::InvalidCredentialIssuerId)
-
-    val authorizationServers = authorizationServers
-        ?.map { ensureHttpsUrl(it, CredentialIssuerMetadataValidationError::InvalidAuthorizationServer) }
-        ?: listOf(credentialIssuerIdentifier.value)
-
-    val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
-        .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialEndpoint)
-
-    val batchCredentialEndpoint = batchCredentialEndpoint?.let {
-        CredentialIssuerEndpoint(it)
-            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidBatchCredentialEndpoint)
-    }
-
-    val deferredCredentialEndpoint = deferredCredentialEndpoint?.let {
-        CredentialIssuerEndpoint(it)
-            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidDeferredCredentialEndpoint)
-    }
-    val notificationEndpoint = notificationEndpoint?.let {
-        CredentialIssuerEndpoint(it)
-            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
-    }
-
-    ensure(credentialConfigurationsSupported.isNotEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired }
-    val credentialsSupported = credentialConfigurationsSupported.map { (id, credentialSupportedTO) ->
-        val credentialId = CredentialConfigurationIdentifier(id)
-        val credential = credentialSupportedTO.toDomain()
-            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
-        credentialId to credential
-    }.toMap()
-
-    val display = display?.map(DisplayTO::toDomain) ?: emptyList()
-
-    return CredentialIssuerMetadata(
-        credentialIssuerIdentifier,
-        authorizationServers,
-        credentialEndpoint,
-        batchCredentialEndpoint,
-        deferredCredentialEndpoint,
-        notificationEndpoint,
-        credentialResponseEncryption(),
-        credentialIdentifiersSupported,
-        credentialsSupported,
-        display,
-    )
+    fun toClaimDisplay(): Claim.Display =
+        Claim.Display(name, locale?.let { languageTag -> Locale.forLanguageTag(languageTag) })
 }
 
-private fun CredentialSupportedTO.toDomain(): Result<CredentialConfiguration> = runCatching {
-    when (this) {
-        is MsdMdocCredentialTO -> credentialSupportedFromTransferObject(this)
-        is SdJwtVcCredentialTO -> credentialSupportedFromTransferObject(this)
-        is W3CJsonLdDataIntegrityCredentialTO -> credentialSupportedFromTransferObject(this)
-        is W3CJsonLdSignedJwtCredentialTO -> credentialSupportedFromTransferObject(this)
-        is W3CSignedJwtCredentialTO -> credentialSupportedFromTransferObject(this)
-    }
-}
-
-private fun credentialSupportedFromTransferObject(transferObject: MsdMdocCredentialTO): MsoMdocCredential {
-    val bindingMethods = transferObject.cryptographicBindingMethodsSupported
-        ?.map { cryptographicBindingMethodOf(it) }
-        ?: emptyList()
-    val display = transferObject.display?.map { it.toDomain() } ?: emptyList()
-    val proofTypesSupported = transferObject.proofTypesSupported.toProofTypes()
-    val cryptographicSuitesSupported = transferObject.credentialSigningAlgorithmsSupported ?: emptyList()
-
-    fun claims(): MsoMdocClaims = transferObject.claims?.mapValues { (_, claims) ->
-        claims.mapValues { (_, claim) ->
-            claim.let { claimObject ->
-                Claim(
-                    claimObject.mandatory ?: false,
-                    claimObject.valueType,
-                    claimObject.display?.map { displayObject ->
-                        Claim.Display(
-                            displayObject.name,
-                            displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                        )
-                    } ?: emptyList(),
-                )
-            }
-        }
-    } ?: emptyMap()
-
-    return MsoMdocCredential(
-        transferObject.scope,
-        bindingMethods,
-        cryptographicSuitesSupported,
-        proofTypesSupported,
-        display,
-        transferObject.docType,
-        claims(),
-        transferObject.order ?: emptyList(),
-    )
-}
-
-private fun credentialSupportedFromTransferObject(csJson: SdJwtVcCredentialTO): SdJwtVcCredential {
-    val bindingMethods = csJson.cryptographicBindingMethodsSupported
-        ?.map { cryptographicBindingMethodOf(it) }
-        ?: emptyList()
-    val display = csJson.display?.map { it.toDomain() } ?: emptyList()
-    val proofTypesSupported = csJson.proofTypesSupported.toProofTypes()
-    val cryptographicSuitesSupported = csJson.credentialSigningAlgorithmsSupported ?: emptyList()
-
-    return SdJwtVcCredential(
-        csJson.scope,
-        bindingMethods,
-        cryptographicSuitesSupported,
-        proofTypesSupported,
-        display,
-        csJson.type,
-        csJson.claims?.mapValues { (_, claim) ->
-            claim.let {
-                Claim(
-                    it.mandatory ?: false,
-                    it.valueType,
-                    it.display?.map { displayObject ->
-                        Claim.Display(
-                            displayObject.name,
-                            displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                        )
-                    } ?: emptyList(),
-                )
-            }
-        },
-    )
-}
-
-private fun toDomain(
-    credentialDefinitionTO: W3CJsonLdCredentialDefinitionTO,
-): W3CJsonLdCredentialDefinition = W3CJsonLdCredentialDefinition(
-    context = credentialDefinitionTO.context.map { URL(it) },
-    type = credentialDefinitionTO.types,
-    credentialSubject = credentialDefinitionTO.credentialSubject?.let { toDomain(it) },
-)
-
-private fun toDomain(ms: Map<String, ClaimTO>): Map<ClaimName, Claim?> =
-    ms.mapValues { (_, claim) -> toDomain(claim) }
-
-private fun toDomain(it: ClaimTO): Claim =
-    Claim(
-        it.mandatory ?: false,
-        it.valueType,
-        it.display?.map { displayObject ->
-            Claim.Display(
-                displayObject.name,
-                displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-            )
-        } ?: emptyList(),
-    )
-
-private fun credentialSupportedFromTransferObject(
-    csJson: W3CJsonLdDataIntegrityCredentialTO,
-): W3CJsonLdDataIntegrityCredential {
-    val bindingMethods = csJson.cryptographicBindingMethodsSupported
-        ?.map { cryptographicBindingMethodOf(it) }
-        ?: emptyList()
-    val display = csJson.display?.map { it.toDomain() } ?: emptyList()
-    val proofTypesSupported = csJson.proofTypesSupported.toProofTypes()
-    val cryptographicSuitesSupported = csJson.credentialSigningAlgorithmsSupported ?: emptyList()
-
-    return W3CJsonLdDataIntegrityCredential(
-        scope = csJson.scope,
-        cryptographicBindingMethodsSupported = bindingMethods,
-        credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
-        proofTypesSupported = proofTypesSupported,
-        display = display,
-        context = csJson.context,
-        type = csJson.type,
-        credentialDefinition = toDomain(csJson.credentialDefinition),
-        order = csJson.order ?: emptyList(),
-    )
-}
-
-private fun credentialSupportedFromTransferObject(csJson: W3CJsonLdSignedJwtCredentialTO): W3CJsonLdSignedJwtCredential {
-    val bindingMethods = csJson.cryptographicBindingMethodsSupported
-        ?.map { cryptographicBindingMethodOf(it) }
-        ?: emptyList()
-    val display = csJson.display?.map { it.toDomain() } ?: emptyList()
-    val proofTypesSupported = csJson.proofTypesSupported.toProofTypes()
-    val cryptographicSuitesSupported = csJson.credentialSigningAlgorithmsSupported ?: emptyList()
-
-    return W3CJsonLdSignedJwtCredential(
-        scope = csJson.scope,
-        cryptographicBindingMethodsSupported = bindingMethods,
-        credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
-        proofTypesSupported = proofTypesSupported,
-        display = display,
-        context = csJson.context,
-        credentialDefinition = toDomain(csJson.credentialDefinition),
-        order = csJson.order ?: emptyList(),
-    )
-}
-
-private fun credentialSupportedFromTransferObject(csJson: W3CSignedJwtCredentialTO): W3CSignedJwtCredential {
-    fun W3CSignedJwtCredentialTO.CredentialDefinitionTO.toDomain(): W3CSignedJwtCredential.CredentialDefinition =
-        W3CSignedJwtCredential.CredentialDefinition(
-            type = types,
-            credentialSubject = credentialSubject?.let { toDomain(it) },
-        )
-
-    val bindingMethods = csJson.cryptographicBindingMethodsSupported
-        ?.map { cryptographicBindingMethodOf(it) }
-        ?: emptyList()
-    val display = csJson.display?.map { it.toDomain() } ?: emptyList()
-    val proofTypesSupported = csJson.proofTypesSupported.toProofTypes()
-    val cryptographicSuitesSupported = csJson.credentialSigningAlgorithmsSupported ?: emptyList()
-
-    return W3CSignedJwtCredential(
-        scope = csJson.scope,
-        cryptographicBindingMethodsSupported = bindingMethods,
-        credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
-        proofTypesSupported = proofTypesSupported,
-        display = display,
-        credentialDefinition = csJson.credentialDefinition.toDomain(),
-        order = csJson.order ?: emptyList(),
-    )
-}
-
-private fun CredentialIssuerMetadataTO.credentialResponseEncryption(): CredentialResponseEncryption {
-    fun algsAndMethods(): SupportedEncryptionAlgorithmsAndMethods {
-        requireNotNull(credentialResponseEncryption)
-        val encryptionAlgorithms = credentialResponseEncryption.algorithmsSupported.map { JWEAlgorithm.parse(it) }
-        val encryptionMethods = credentialResponseEncryption.methodsSupported.map { EncryptionMethod.parse(it) }
-        return SupportedEncryptionAlgorithmsAndMethods(encryptionAlgorithms, encryptionMethods)
-    }
-    return when {
-        credentialResponseEncryption == null -> CredentialResponseEncryption.NotSupported
-        credentialResponseEncryption.encryptionRequired -> CredentialResponseEncryption.Required(algsAndMethods())
-        else -> CredentialResponseEncryption.SupportedNotRequired(algsAndMethods())
-    }
-}
-
-/**
- * Converts a [DisplayTO] to a [CredentialIssuerMetadata.Display] instance.
- */
-private fun DisplayTO.toDomain(): CredentialIssuerMetadata.Display =
-    CredentialIssuerMetadata.Display(name, locale)
-
-/**
- * Utility method to convert a [CredentialSupportedDisplayTO] transfer object to the respective [Display] domain object.
- */
-private fun CredentialSupportedDisplayTO.toDomain(): Display {
-    fun LogoObject.toLogo(): Display.Logo =
-        Display.Logo(
-            uri?.let { URI.create(it) },
-            alternativeText,
-        )
-
-    return Display(
-        name,
-        locale?.let { Locale.forLanguageTag(it) },
-        logo?.toLogo(),
-        description,
-        backgroundColor,
-        textColor,
-    )
-}
+private fun Map<String, ClaimTO>.toDomain(): Map<ClaimName, Claim?> =
+    mapValues { (_, claim) -> claim.toDomain() }
 
 /**
  * Utility method to convert a list of string to a list of [ProofType].
