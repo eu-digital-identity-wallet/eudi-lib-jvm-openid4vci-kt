@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialIssuanceRequest
+import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
 
 internal class RequestIssuanceImpl(
     private val credentialOffer: CredentialOffer,

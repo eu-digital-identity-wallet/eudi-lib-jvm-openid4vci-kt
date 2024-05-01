@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.formats.CredentialRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*

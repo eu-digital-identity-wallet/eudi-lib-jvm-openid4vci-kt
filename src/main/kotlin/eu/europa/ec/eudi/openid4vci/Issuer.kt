@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.*
 import eu.europa.ec.eudi.openid4vci.internal.RequestIssuanceImpl
+import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
 import io.ktor.client.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

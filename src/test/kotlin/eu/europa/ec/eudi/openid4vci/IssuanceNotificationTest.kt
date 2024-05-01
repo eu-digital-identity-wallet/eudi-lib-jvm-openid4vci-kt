@@ -15,8 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.formats.NotificationEventTO
-import eu.europa.ec.eudi.openid4vci.internal.formats.NotificationTO
+import eu.europa.ec.eudi.openid4vci.internal.http.NotificationEventTO
+import eu.europa.ec.eudi.openid4vci.internal.http.NotificationTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*

@@ -15,8 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.formats.BatchCredentialResponseSuccessTO
-import eu.europa.ec.eudi.openid4vci.internal.formats.IssuanceResponseTO
+import eu.europa.ec.eudi.openid4vci.internal.http.BatchCredentialResponseSuccessTO
+import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceResponseTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*

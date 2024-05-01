@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal
+package eu.europa.ec.eudi.openid4vci.internal.http
 
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet
@@ -23,6 +23,10 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
+import eu.europa.ec.eudi.openid4vci.internal.DPoPJwtFactory
+import eu.europa.ec.eudi.openid4vci.internal.Htm
+import eu.europa.ec.eudi.openid4vci.internal.bearerOrDPoPAuth
+import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vci.internal.formats.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*

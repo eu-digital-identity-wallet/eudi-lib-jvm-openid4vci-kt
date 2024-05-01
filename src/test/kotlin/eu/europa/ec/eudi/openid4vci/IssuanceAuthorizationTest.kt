@@ -15,9 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.AccessTokenRequestResponseTO
-import eu.europa.ec.eudi.openid4vci.internal.PushedAuthorizationRequestResponse
-import eu.europa.ec.eudi.openid4vci.internal.TokenEndpointForm
+import eu.europa.ec.eudi.openid4vci.internal.http.PushedAuthorizationRequestResponseTO
+import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointForm
+import eu.europa.ec.eudi.openid4vci.internal.http.TokenResponseTO
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -381,7 +381,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponseTO.Success(
+                                TokenResponseTO.Success(
                                     accessToken = UUID.randomUUID().toString(),
                                     expiresIn = 3600,
                                     cNonce = "dfghhj34wpCJp",
@@ -436,7 +436,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponseTO.Success(
+                                TokenResponseTO.Success(
                                     accessToken = UUID.randomUUID().toString(),
                                     expiresIn = 3600,
                                     cNonce = "dfghhj34wpCJp",
@@ -483,7 +483,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponseTO.Success(
+                                TokenResponseTO.Success(
                                     accessToken = UUID.randomUUID().toString(),
                                     expiresIn = 3600,
                                     cNonce = "dfghhj34wpCJp",
@@ -543,7 +543,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponseTO.Success(
+                                TokenResponseTO.Success(
                                     accessToken = UUID.randomUUID().toString(),
                                     expiresIn = 3600,
                                 ),
@@ -588,7 +588,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                PushedAuthorizationRequestResponse.Failure(
+                                PushedAuthorizationRequestResponseTO.Failure(
                                     "invalid_request",
                                     "The redirect_uri is not valid for the given client",
                                 ),
@@ -634,7 +634,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponseTO.Failure(
+                                TokenResponseTO.Failure(
                                     error = "unauthorized_client",
                                 ),
                             ),
@@ -684,7 +684,7 @@ class IssuanceAuthorizationTest {
                     responseBuilder = {
                         respond(
                             content = Json.encodeToString(
-                                AccessTokenRequestResponseTO.Failure(
+                                TokenResponseTO.Failure(
                                     error = "unauthorized_client",
                                 ),
                             ),
