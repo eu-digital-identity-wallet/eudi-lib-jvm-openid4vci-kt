@@ -94,7 +94,7 @@ internal class IssuanceServerClient(
             if (response.status.isSuccess()) {
                 responsePossiblyEncrypted(
                     response,
-                    request.encryption,
+                    null, // Replace with responseEncryptionSpec value as soon VCI spec decide on this
                     fromTransferObject = { it.toDomain() },
                     transferObjectFromJwtClaims = { BatchCredentialResponseSuccessTO.from(it) },
                 )
@@ -128,7 +128,7 @@ internal class IssuanceServerClient(
             if (response.status.isSuccess()) {
                 responsePossiblyEncrypted<DeferredIssuanceSuccessResponseTO, DeferredCredentialQueryOutcome.Issued>(
                     response,
-                    responseEncryptionSpec,
+                    null, // Replace with responseEncryptionSpec value as soon VCI spec decide on this
                     fromTransferObject = { it.toDomain() },
                     transferObjectFromJwtClaims = { DeferredIssuanceSuccessResponseTO.from(it) },
                 )
