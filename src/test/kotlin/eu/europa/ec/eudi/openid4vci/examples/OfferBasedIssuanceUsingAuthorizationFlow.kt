@@ -46,9 +46,7 @@ fun main(): Unit = runBlocking {
     val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, actingUser)
     authorizationLog("Authorization retrieved: $authorizedRequest")
 
-    val offerCredentialConfIds = listOf(PID_SdJwtVC_config_id, PID_MsoMdoc_config_id, MDL_config_id).map {
-        CredentialConfigurationIdentifier(it)
-    }
+    val offerCredentialConfIds = issuer.credentialOffer.credentialConfigurationIdentifiers
 
     val credentials = when (authorizedRequest) {
         is AuthorizedRequest.NoProofRequired -> offerCredentialConfIds.map { credentialId ->
