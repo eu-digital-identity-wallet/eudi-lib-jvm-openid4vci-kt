@@ -25,6 +25,8 @@ import kotlinx.coroutines.coroutineScope
 
 interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredential, NotifyIssuer {
 
+    val credentialOffer: CredentialOffer
+
     companion object {
 
         /**
@@ -112,7 +114,10 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 AuthorizeIssuance by authorizeIssuance,
                 RequestIssuance by requestIssuance,
                 QueryForDeferredCredential by queryForDeferredCredential,
-                NotifyIssuer by notifyIssuer {}
+                NotifyIssuer by notifyIssuer {
+                override val credentialOffer: CredentialOffer
+                    get() = credentialOffer
+            }
         }
 
         /**
