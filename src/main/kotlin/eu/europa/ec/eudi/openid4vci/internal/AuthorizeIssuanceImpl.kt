@@ -15,10 +15,12 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
+import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.NoProofRequired
+import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.ProofRequired
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidAuthorizationState
 import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationServerClient
+import com.nimbusds.oauth2.sdk.id.State as NimbusState
 
 internal data class TokenResponse(
     val accessToken: AccessToken,
@@ -34,7 +36,7 @@ internal class AuthorizeIssuanceImpl(
     dPoPJwtFactory: DPoPJwtFactory?,
 ) : AuthorizeIssuance {
 
-    private val authServerClient: AuthorizationServerClient =
+    private val authorizationServer: AuthorizationServerClient =
         AuthorizationServerClient(
             credentialOffer.credentialIssuerIdentifier,
             credentialOffer.authorizationServerMetadata,
@@ -43,71 +45,43 @@ internal class AuthorizeIssuanceImpl(
             ktorHttpClientFactory,
         )
 
-    override suspend fun prepareAuthorizationRequest(walletState: String?): Result<AuthorizationRequestPrepared> = runCatching {
-        val (scopes, configurationIds) = scopesAndCredentialConfigurationIds()
-        prepareAuthorizationRequest(walletState, scopes, configurationIds).getOrThrow()
-    }
+    override suspend fun prepareAuthorizationRequest(walletState: String?): Result<AuthorizationRequestPrepared> =
+        runCatching {
+            val (scopes, configurationIds) = scopesAndCredentialConfigurationIds()
+            require(scopes.isNotEmpty() || configurationIds.isNotEmpty()) {
+                "Either scopes or credential configuration ids must be provided"
+            }
+            val state = walletState ?: NimbusState().value
+            val issuerState = credentialOffer.grants?.authorizationCode()?.issuerState
+            val (codeVerifier, authorizationCodeUrl) =
+                authorizationServer.submitParOrCreateAuthorizationRequestUrl(
+                    scopes,
+                    configurationIds,
+                    state,
+                    issuerState,
+                ).getOrThrow()
+            AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier, state)
+        }
 
     private fun scopesAndCredentialConfigurationIds(): Pair<List<Scope>, List<CredentialConfigurationIdentifier>> {
         val scopes = mutableListOf<Scope>()
         val configurationIdentifiers = mutableListOf<CredentialConfigurationIdentifier>()
-        credentialOffer.credentialConfigurationIdentifiers.map { credentialConfigurationId ->
-            val credentialConfiguration = credentialConfigurationSupportedById(credentialConfigurationId)
-
-            fun authDetailsByCfgId() = configurationIdentifiers.add(credentialConfigurationId)
-
-            fun addScope(): Boolean = credentialConfiguration.scope?.let { scopes.add(Scope(it)) } ?: false
-
-            when (config.authorizeIssuanceConfig) {
-                AuthorizeIssuanceConfig.AUTHORIZATION_DETAILS -> authDetailsByCfgId()
-                AuthorizeIssuanceConfig.FAVOR_SCOPES -> {
-                    if (!addScope()) authDetailsByCfgId()
-                    else Unit
-                }
+        fun credentialConfigurationById(id: CredentialConfigurationIdentifier): CredentialConfiguration {
+            val issuerMetadata = credentialOffer.credentialIssuerMetadata
+            return requireNotNull(issuerMetadata.credentialConfigurationsSupported[id]) {
+                "$id was not found within issuer metadata"
             }
         }
-        return Pair(scopes, configurationIdentifiers)
-    }
-
-    private suspend fun prepareAuthorizationRequest(
-        walletState: String?,
-        scopes: List<Scope>,
-        credentialConfigurationIds: List<CredentialConfigurationIdentifier>,
-    ): Result<AuthorizationRequestPrepared> = runCatching {
-        require(scopes.isNotEmpty() || credentialConfigurationIds.isNotEmpty()) {
-            "Either scopes or credential configuration ids must be provided"
+        for (id in credentialOffer.credentialConfigurationIdentifiers) {
+            val credentialConfiguration = credentialConfigurationById(id)
+            fun authDetailsByCfgId() = configurationIdentifiers.add(id)
+            fun addScope(): Boolean = credentialConfiguration.scope?.let { scopes.add(Scope(it)) } ?: false
+            when (config.authorizeIssuanceConfig) {
+                AuthorizeIssuanceConfig.AUTHORIZATION_DETAILS -> authDetailsByCfgId()
+                AuthorizeIssuanceConfig.FAVOR_SCOPES -> if (!addScope()) authDetailsByCfgId()
+            }
         }
-        val state = walletState ?: State().value
-        val issuerState = when (credentialOffer.grants) {
-            is Grants.AuthorizationCode -> credentialOffer.grants.issuerState
-            is Grants.Both -> credentialOffer.grants.authorizationCode.issuerState
-            else -> null
-        }
-
-        val authorizationServerSupportsPar =
-            credentialOffer.authorizationServerMetadata.pushedAuthorizationRequestEndpointURI != null
-        val (codeVerifier, authorizationCodeUrl) = when (authorizationServerSupportsPar) {
-            true -> authServerClient.submitPushedAuthorizationRequest(
-                scopes,
-                credentialConfigurationIds,
-                state,
-                issuerState,
-            ).getOrThrow()
-
-            false -> authServerClient.authorizationRequestUrl(scopes, credentialConfigurationIds, state, issuerState)
-                .getOrThrow()
-        }
-        AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier, state)
-    }
-
-    private fun credentialConfigurationSupportedById(
-        credentialConfigurationId: CredentialConfigurationIdentifier,
-    ): CredentialConfiguration {
-        val credentialSupported =
-            credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credentialConfigurationId]
-        return requireNotNull(credentialSupported) {
-            "$credentialConfigurationId was not found within issuer metadata"
-        }
+        return scopes to configurationIdentifiers
     }
 
     override suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
@@ -116,60 +90,55 @@ internal class AuthorizeIssuanceImpl(
     ): Result<AuthorizedRequest> =
         runCatching {
             ensure(serverState == state) { InvalidAuthorizationState }
-            val offerRequiresProofs = credentialOffer.requiresProofs()
-            val (accessToken, refreshToken, cNonce, authDetails) =
-                authServerClient.requestAccessTokenAuthFlow(authorizationCode.code, pkceVerifier.codeVerifier)
-                    .getOrThrow()
-
-            when {
-                cNonce != null && offerRequiresProofs ->
-                    AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, authDetails)
-
-                else ->
-                    AuthorizedRequest.NoProofRequired(accessToken, refreshToken, authDetails)
-            }
+            val tokenResponse =
+                authorizationServer.requestAccessTokenAuthFlow(authorizationCode, pkceVerifier).getOrThrow()
+            authorizedRequest(credentialOffer, tokenResponse)
         }
 
     override suspend fun authorizeWithPreAuthorizationCode(txCode: String?): Result<AuthorizedRequest> = runCatching {
-        val offeredGrants = credentialOffer.grants
-        require(offeredGrants != null) { "Grant not specified in credential offer." }
-        val preAuthorizedCode = when (offeredGrants) {
-            is Grants.PreAuthorizedCode -> offeredGrants
-            is Grants.Both -> offeredGrants.preAuthorizedCode
-            is Grants.AuthorizationCode -> error("Pre-authorized code grant expected")
+        val offeredGrants = requireNotNull(credentialOffer.grants) {
+            "Grant not specified in credential offer."
         }
-        preAuthorizedCode.txCode?.let {
-            require(!txCode.isNullOrEmpty()) {
-                "Issuer's grant is pre-authorization code with transaction code required but no transaction code passed"
-            }
-            preAuthorizedCode.txCode.length?.let {
-                require(preAuthorizedCode.txCode.length == txCode.length) {
-                    "Expected transaction code length is ${preAuthorizedCode.txCode.length} but code of length ${txCode.length} passed"
-                }
-            }
-            if (TxCodeInputMode.NUMERIC == preAuthorizedCode.txCode.inputMode) {
-                require(txCode.toIntOrNull() != null) {
-                    "Issuers expects transaction code to be numeric but is not."
-                }
-            }
+        val preAuthorizedCode = requireNotNull(offeredGrants.preAuthorizedCode()) {
+            "Pre-authorized code grant expected"
         }
-        val offerRequiresProofs = credentialOffer.requiresProofs()
-        val (accessToken, refreshToken, cNonce, _) = authServerClient.requestAccessTokenPreAuthFlow(
-            preAuthorizedCode.preAuthorizedCode,
-            txCode,
-        ).getOrThrow()
+        with(preAuthorizedCode) { validate(txCode) }
+        val tokenResponse =
+            authorizationServer.requestAccessTokenPreAuthFlow(preAuthorizedCode, txCode).getOrThrow()
+        authorizedRequest(credentialOffer, tokenResponse)
+    }
+}
 
-        when {
-            cNonce != null && offerRequiresProofs ->
-                AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, emptyMap())
+internal fun Grants.PreAuthorizedCode.validate(txCode: String?) {
+    val expectedTxCodeSpec = this@validate.txCode
+    if (expectedTxCodeSpec != null) {
+        with(expectedTxCodeSpec) { validate(txCode) }
+    }
+}
 
-            else ->
-                AuthorizedRequest.NoProofRequired(accessToken, refreshToken, emptyMap())
+internal fun TxCode.validate(txCode: String?) {
+    require(!txCode.isNullOrEmpty()) {
+        "Issuer's grant is pre-authorization code with transaction code required but no transaction code passed"
+    }
+    length?.let {
+        require(length == txCode.length) {
+            "Expected transaction code length is $length but code of length ${txCode.length} passed"
         }
     }
-
-    private fun CredentialOffer.requiresProofs(): Boolean =
-        credentialConfigurationIdentifiers.any {
-            !credentialIssuerMetadata.credentialConfigurationsSupported[it]?.proofTypesSupported.isNullOrEmpty()
+    if (TxCodeInputMode.NUMERIC == inputMode) {
+        requireNotNull(txCode.toIntOrNull()) {
+            "Issuers expects transaction code to be numeric but is not."
         }
+    }
+}
+
+internal fun authorizedRequest(offer: CredentialOffer, tokenResponse: TokenResponse): AuthorizedRequest {
+    val offerRequiresProofs = offer.credentialConfigurationIdentifiers.any {
+        !offer.credentialIssuerMetadata.credentialConfigurationsSupported[it]?.proofTypesSupported.isNullOrEmpty()
+    }
+    val (accessToken, refreshToken, cNonce, authorizationDetails) = tokenResponse
+    return when {
+        cNonce != null && offerRequiresProofs -> ProofRequired(accessToken, refreshToken, cNonce, authorizationDetails)
+        else -> NoProofRequired(accessToken, refreshToken, authorizationDetails)
+    }
 }

@@ -101,6 +101,18 @@ sealed interface Grants : Serializable {
         val authorizationCode: AuthorizationCode,
         val preAuthorizedCode: PreAuthorizedCode,
     ) : Grants
+
+    fun authorizationCode(): AuthorizationCode? = when (this) {
+        is PreAuthorizedCode -> null
+        is Both -> authorizationCode
+        is AuthorizationCode -> this
+    }
+
+    fun preAuthorizedCode(): PreAuthorizedCode? = when (this) {
+        is PreAuthorizedCode -> this
+        is Both -> preAuthorizedCode
+        is AuthorizationCode -> null
+    }
 }
 
 data class TxCode(

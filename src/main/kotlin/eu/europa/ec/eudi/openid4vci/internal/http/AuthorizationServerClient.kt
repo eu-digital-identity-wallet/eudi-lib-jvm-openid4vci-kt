@@ -28,11 +28,8 @@ import com.nimbusds.oauth2.sdk.rar.Location
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
+import eu.europa.ec.eudi.openid4vci.Grants.PreAuthorizedCode
 import eu.europa.ec.eudi.openid4vci.internal.*
-import eu.europa.ec.eudi.openid4vci.internal.DPoP
-import eu.europa.ec.eudi.openid4vci.internal.DPoPJwtFactory
-import eu.europa.ec.eudi.openid4vci.internal.GrantedAuthorizationDetailsSerializer
-import eu.europa.ec.eudi.openid4vci.internal.Htm
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -134,6 +131,21 @@ internal class AuthorizationServerClient(
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
 
+    private val supportsPar: Boolean
+        get() = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI != null
+
+    suspend fun submitParOrCreateAuthorizationRequestUrl(
+        scopes: List<Scope>,
+        credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
+        state: String,
+        issuerState: String?,
+    ): Result<Pair<PKCEVerifier, HttpsUrl>> =
+        if (supportsPar) {
+            submitPushedAuthorizationRequest(scopes, credentialsConfigurationIds, state, issuerState)
+        } else {
+            authorizationRequestUrl(scopes, credentialsConfigurationIds, state, issuerState)
+        }
+
     /**
      * Submit Pushed Authorization Request for authorizing an issuance request.
      *
@@ -228,7 +240,10 @@ internal class AuthorizationServerClient(
             pkceVerifier to authorizationCodeUrl
         }
 
-        is PushedAuthorizationRequestResponseTO.Failure -> throw PushedAuthorizationRequestFailed(error, errorDescription)
+        is PushedAuthorizationRequestResponseTO.Failure -> throw PushedAuthorizationRequestFailed(
+            error,
+            errorDescription,
+        )
     }
 
     /**
@@ -236,19 +251,19 @@ internal class AuthorizationServerClient(
      * authorization code flow
      *
      * @param authorizationCode The authorization code generated from authorization server.
-     * @param codeVerifier  The code verifier that was used when submitting the Pushed Authorization Request.
+     * @param pkceVerifier  The code verifier that was used when submitting the Pushed Authorization Request.
      * @return The result of the request as a pair of the access token and the optional c_nonce information returned
      *      from token endpoint.
      */
     suspend fun requestAccessTokenAuthFlow(
-        authorizationCode: String,
-        codeVerifier: String,
+        authorizationCode: AuthorizationCode,
+        pkceVerifier: PKCEVerifier,
     ): Result<TokenResponse> = runCatching {
-        val params = TokenEndpointForm.AuthCodeFlow.of(
-            authorizationCode,
-            config.authFlowRedirectionURI,
-            config.clientId,
-            codeVerifier,
+        val params = TokenEndpointForm.authCodeFlow(
+            authorizationCode = authorizationCode,
+            redirectionURI = config.authFlowRedirectionURI,
+            clientId = config.clientId,
+            pkceVerifier = pkceVerifier,
         )
         requestAccessToken(params).tokensOrFail()
     }
@@ -263,10 +278,14 @@ internal class AuthorizationServerClient(
      *      from token endpoint.
      */
     suspend fun requestAccessTokenPreAuthFlow(
-        preAuthorizedCode: String,
+        preAuthorizedCode: PreAuthorizedCode,
         txCode: String?,
     ): Result<TokenResponse> = runCatching {
-        val params = TokenEndpointForm.PreAuthCodeFlow.of(config.clientId, preAuthorizedCode, txCode)
+        val params = TokenEndpointForm.preAuthCodeFlow(
+            clientId = config.clientId,
+            preAuthorizedCode = preAuthorizedCode,
+            txCode = txCode,
+        )
         requestAccessToken(params).tokensOrFail()
     }
 
@@ -327,59 +346,39 @@ private object AuthorizationEndpointParams {
     const val PARAM_STATE = "state"
 }
 
-internal sealed interface TokenEndpointForm {
+internal object TokenEndpointForm {
+    const val AUTHORIZATION_CODE_GRANT = "authorization_code"
+    const val PRE_AUTHORIZED_CODE_GRANT = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+    const val REDIRECT_URI_PARAM = "redirect_uri"
+    const val CODE_VERIFIER_PARAM = "code_verifier"
+    const val AUTHORIZATION_CODE_PARAM = "code"
+    const val CLIENT_ID_PARAM = "client_id"
+    const val GRANT_TYPE_PARAM = "grant_type"
+    const val TX_CODE_PARAM = "tx_code"
+    const val PRE_AUTHORIZED_CODE_PARAM = "pre-authorized_code"
 
-    data object AuthCodeFlow : TokenEndpointForm {
+    fun authCodeFlow(
+        clientId: String,
+        authorizationCode: AuthorizationCode,
+        redirectionURI: URI,
+        pkceVerifier: PKCEVerifier,
+    ): Map<String, String> = buildMap<String, String> {
+        put(CLIENT_ID_PARAM, clientId)
+        put(GRANT_TYPE_PARAM, AUTHORIZATION_CODE_GRANT)
+        put(AUTHORIZATION_CODE_PARAM, authorizationCode.code)
+        put(REDIRECT_URI_PARAM, redirectionURI.toString())
+        put(CODE_VERIFIER_PARAM, pkceVerifier.codeVerifier)
+    }.toMap()
 
-        const val GRANT_TYPE_PARAM = "grant_type"
-        const val GRANT_TYPE_PARAM_VALUE = "authorization_code"
-        const val REDIRECT_URI_PARAM = "redirect_uri"
-        const val CLIENT_ID_PARAM = "client_id"
-        const val CODE_VERIFIER_PARAM = "code_verifier"
-        const val AUTHORIZATION_CODE_PARAM = "code"
-
-        fun of(
-            authorizationCode: String,
-            redirectionURI: URI,
-            clientId: String,
-            codeVerifier: String,
-        ): Map<String, String> = mapOf(
-            GRANT_TYPE_PARAM to GRANT_TYPE_PARAM_VALUE,
-            AUTHORIZATION_CODE_PARAM to authorizationCode,
-            REDIRECT_URI_PARAM to redirectionURI.toString(),
-            CLIENT_ID_PARAM to clientId,
-            CODE_VERIFIER_PARAM to codeVerifier,
-        )
-    }
-
-    data object PreAuthCodeFlow : TokenEndpointForm {
-        private const val CLIENT_ID_PARAM = "client_id"
-        private const val GRANT_TYPE_PARAM = "grant_type"
-        const val GRANT_TYPE_PARAM_VALUE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
-        const val TX_CODE_PARAM = "tx_code"
-        const val PRE_AUTHORIZED_CODE_PARAM = "pre-authorized_code"
-
-        fun of(
-            clientId: String,
-            preAuthorizedCode: String,
-            txCode: String?,
-        ): Map<String, String> = when (txCode) {
-            null -> {
-                mapOf(
-                    CLIENT_ID_PARAM to clientId,
-                    GRANT_TYPE_PARAM to GRANT_TYPE_PARAM_VALUE,
-                    PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
-                )
-            }
-
-            else -> {
-                mapOf(
-                    CLIENT_ID_PARAM to clientId,
-                    GRANT_TYPE_PARAM to GRANT_TYPE_PARAM_VALUE,
-                    PRE_AUTHORIZED_CODE_PARAM to preAuthorizedCode,
-                    TX_CODE_PARAM to txCode,
-                )
-            }
-        }
-    }
+    fun preAuthCodeFlow(
+        clientId: String,
+        preAuthorizedCode: PreAuthorizedCode,
+        txCode: String?,
+    ): Map<String, String> =
+        buildMap {
+            put(CLIENT_ID_PARAM, clientId)
+            put(GRANT_TYPE_PARAM, PRE_AUTHORIZED_CODE_GRANT)
+            put(PRE_AUTHORIZED_CODE_PARAM, preAuthorizedCode.preAuthorizedCode)
+            txCode?.let { put(TX_CODE_PARAM, it) }
+        }.toMap()
 }
