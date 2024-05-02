@@ -131,6 +131,21 @@ internal class AuthorizationServerClient(
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
 
+    private val supportsPar: Boolean
+        get() = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI != null
+
+    suspend fun submitParOrCreateAuthorizationRequestUrl(
+        scopes: List<Scope>,
+        credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
+        state: String,
+        issuerState: String?,
+    ): Result<Pair<PKCEVerifier, HttpsUrl>> =
+        if (supportsPar) {
+            submitPushedAuthorizationRequest(scopes, credentialsConfigurationIds, state, issuerState)
+        } else {
+            authorizationRequestUrl(scopes, credentialsConfigurationIds, state, issuerState)
+        }
+
     /**
      * Submit Pushed Authorization Request for authorizing an issuance request.
      *

@@ -21,6 +21,7 @@ import eu.europa.ec.eudi.openid4vci.internal.http.TokenResponseTO
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import io.ktor.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -28,9 +29,7 @@ import java.util.*
 import kotlin.test.*
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail as NimbusAuthorizationDetail
 
-class IssuanceAuthorizationTest {
-
-    private val AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
+private val AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
           "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
@@ -40,9 +39,9 @@ class IssuanceAuthorizationTest {
             }
           }
         }
-    """.trimIndent()
+""".trimIndent()
 
-    private val PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
+private val PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
           "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
@@ -55,7 +54,9 @@ class IssuanceAuthorizationTest {
             }
           }
         }
-    """.trimIndent()
+""".trimIndent()
+
+class IssuanceAuthorizationTest {
 
     @Test
     fun `successful authorization with authorization code flow (wallet initiated)`() = runTest {
@@ -63,12 +64,11 @@ class IssuanceAuthorizationTest {
             oidcWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker { request ->
-                assertTrue(
+                assertEquals(
+                    "application/x-www-form-urlencoded; charset=UTF-8",
+                    request.body.contentType?.toString(),
                     "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
-                ) {
-                    request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
-                }
-
+                )
                 val form = assertIs<FormDataContent>(request.body, "Not a form post")
 
                 assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
@@ -152,16 +152,12 @@ class IssuanceAuthorizationTest {
                 oidcWellKnownMocker(),
                 authServerWellKnownMocker(),
                 parPostMocker { request ->
-                    assertTrue(
+                    assertEquals(
+                        "application/x-www-form-urlencoded; charset=UTF-8",
+                        request.body.contentType?.toString(),
                         "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
-                    ) {
-                        request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
-                    }
-                    assertTrue("Not a form post") {
-                        request.body is FormDataContent
-                    }
-
-                    val form = request.body as FormDataContent
+                    )
+                    val form = assertIs<FormDataContent>(request.body, "Not a form post")
 
                     assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
                         form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
@@ -169,15 +165,18 @@ class IssuanceAuthorizationTest {
                     assertTrue("Missing scope eu.europa.ec.eudiw.pid_mso_mdoc") {
                         form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc") ?: false
                     }
-                    assertTrue("No issuer_state expected when issuance starts from wallet") {
-                        form.formData["issuer_state"] == null
-                    }
-                    assertTrue("PKCE code challenge was expected but not sent.") {
-                        form.formData["code_challenge"] != null
-                    }
-                    assertTrue("PKCE code challenge method was expected but not sent.") {
-                        form.formData["code_challenge_method"] != null
-                    }
+                    assertNull(
+                        form.formData["issuer_state"],
+                        "No issuer_state expected when issuance starts from wallet",
+                    )
+                    assertNotNull(
+                        form.formData["code_challenge"],
+                        "PKCE code challenge was expected but not sent.",
+                    )
+                    assertNotNull(
+                        form.formData["code_challenge_method"],
+                        "PKCE code challenge method was expected but not sent.",
+                    )
                 },
                 tokenPostMocker { request ->
                     assertTrue(
