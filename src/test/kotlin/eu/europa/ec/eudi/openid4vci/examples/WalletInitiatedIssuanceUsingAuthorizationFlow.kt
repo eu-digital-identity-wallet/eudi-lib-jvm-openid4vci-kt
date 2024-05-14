@@ -46,7 +46,7 @@ fun runUseCase(credentialIssuerId: CredentialIssuerId, credentialConfigurationId
     val identifiers = credentialConfigurationIds.map { CredentialConfigurationIdentifier(it) }
 
     identifiers.forEach {
-        ensure(issuerMetadata.credentialConfigurationsSupported.get(it) != null) {
+        ensure(issuerMetadata.credentialConfigurationsSupported[it] != null) {
             error("Credential identifier $it not supported by issuer")
         }
     }
@@ -61,6 +61,7 @@ fun runUseCase(credentialIssuerId: CredentialIssuerId, credentialConfigurationId
     val issuer = Issuer.make(
         config = DefaultOpenId4VCIConfig,
         credentialOffer = credentialOffer,
+        ktorHttpClientFactory = ::createHttpClient,
     ).getOrThrow()
 
     authorizationLog("Using authorized code flow to authorize")
