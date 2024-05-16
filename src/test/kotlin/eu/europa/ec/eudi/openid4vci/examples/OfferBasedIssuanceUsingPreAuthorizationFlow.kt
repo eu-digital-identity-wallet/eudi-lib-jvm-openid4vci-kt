@@ -35,17 +35,16 @@ fun main(): Unit = runBlocking {
 
     println("[[Scenario: Issuance based on credential offer url: $credentialOfferUrl]] ")
 
-    val resolver = CredentialOfferRequestResolver(ktorHttpClientFactory = ::createHttpClient)
-    val credentialOffer = resolver.resolve(credentialOfferUrl).getOrThrow()
+    val issuer = Issuer.make(
+        config = vciConfig,
+        credentialOfferUri = credentialOfferUrl,
+        ktorHttpClientFactory = ::createHttpClient,
+    ).getOrThrow()
 
+    val credentialOffer = issuer.credentialOffer
     ensure(credentialOffer.grants is Grants.PreAuthorizedCode || credentialOffer.grants is Grants.Both) {
         IllegalStateException("Offer does not have expected grants (PreAuthorizedCode | Both)")
     }
-
-    val issuer = Issuer.make(
-        config = vciConfig,
-        credentialOffer = credentialOffer,
-    ).getOrThrow()
 
     authorizationLog("Using pre-authorized code flow to authorize with txCode $txCode")
     val authorizedRequest = issuer.authorizeWithPreAuthorizationCode(txCode).getOrThrow()

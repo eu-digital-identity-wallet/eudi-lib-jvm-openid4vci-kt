@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.examples
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -40,13 +41,19 @@ fun main(): Unit = runBlocking {
     val issuer = Issuer.make(
         config = DefaultOpenId4VCIConfig,
         credentialOfferUri = credentialOfferUrl,
+        ktorHttpClientFactory = ::createHttpClient,
     ).getOrThrow()
+
+    val credentialOffer = issuer.credentialOffer
+    ensure(credentialOffer.grants is Grants.AuthorizationCode || credentialOffer.grants is Grants.Both) {
+        IllegalStateException("Offer does not have expected grants (AuthorizationCode | Both)")
+    }
 
     authorizationLog("Using authorized code flow to authorize")
     val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, actingUser)
     authorizationLog("Authorization retrieved: $authorizedRequest")
 
-    val offerCredentialConfIds = issuer.credentialOffer.credentialConfigurationIdentifiers
+    val offerCredentialConfIds = credentialOffer.credentialConfigurationIdentifiers
 
     val credentials = when (authorizedRequest) {
         is AuthorizedRequest.NoProofRequired -> offerCredentialConfIds.map { credentialId ->
