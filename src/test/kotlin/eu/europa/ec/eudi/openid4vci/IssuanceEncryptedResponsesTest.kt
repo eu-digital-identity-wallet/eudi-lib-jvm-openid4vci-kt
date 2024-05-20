@@ -29,22 +29,21 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
+import eu.europa.ec.eudi.openid4vci.internal.http.BatchCredentialRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.http.BatchCredentialResponseSuccessTO
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.http.CredentialResponseSuccessTO
+import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceResponseTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.hamcrest.MatcherAssert.assertThat
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.util.*
-import kotlin.test.Test
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
-import kotlin.test.fail
+import kotlin.test.*
 
 class IssuanceEncryptedResponsesTest {
 
@@ -276,7 +275,7 @@ class IssuanceEncryptedResponsesTest {
                             val alg = JWEAlgorithm.parse(issuanceRequestTO.credentialResponseEncryption?.encryptionAlgorithm)
                             val enc = EncryptionMethod.parse(issuanceRequestTO.credentialResponseEncryption?.encryptionMethod)
                             respond(
-                                content = encryptedResponse(jwk, alg, enc).getOrThrow(),
+                                content = singleIssuanceEncryptedResponse(jwk, alg, enc).getOrThrow(),
                                 status = HttpStatusCode.OK,
                                 headers = headersOf(
                                     HttpHeaders.ContentType to listOf("application/jwt"),
@@ -373,27 +372,175 @@ class IssuanceEncryptedResponsesTest {
             }
         }
 
+    @Test
+    fun `when issuer mandates encrypted responses, batch request must not include encryption spec in its individual single requests`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                oidcWellKnownMocker(EncryptedResponses.REQUIRED),
+                batchIssuanceRequestMocker(
+                    responseBuilder = { TODO("Not needed") },
+                    requestValidator = {
+                        val textContent = it.body as TextContent
+                        val batchRequestTO = assertDoesNotThrow("Wrong credential request type") {
+                            Json.decodeFromString<BatchCredentialRequestTO>(textContent.text)
+                        }
+                        assertTrue("Missing response encryption JWK") {
+                            batchRequestTO.credentialResponseEncryption?.jwk != null
+                        }
+                        assertTrue("Missing response encryption algorithm") {
+                            batchRequestTO.credentialResponseEncryption?.encryptionAlgorithm != null
+                        }
+                        assertTrue("Missing response encryption method") {
+                            batchRequestTO.credentialResponseEncryption?.encryptionMethod != null
+                        }
+                        assertTrue("Individual single requests must not include encryption specification") {
+                            batchRequestTO.credentialRequests.all { it.credentialResponseEncryption == null }
+                        }
+                    },
+                ),
+            )
+
+            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
+                jwk = randomRSAEncryptionKey(2048),
+                algorithm = JWEAlgorithm.RSA_OAEP_256,
+                encryptionMethod = EncryptionMethod.A128CBC_HS256,
+            )
+
+            val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
+            )
+
+            with(issuer) {
+                assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
+
+                val batchRequestPayload = listOf(
+                    IssuanceRequestPayload.ConfigurationBased(
+                        CredentialConfigurationIdentifier(PID_MsoMdoc),
+                        null,
+                    ),
+                    IssuanceRequestPayload.ConfigurationBased(
+                        CredentialConfigurationIdentifier(PID_SdJwtVC),
+                        null,
+                    ),
+                    IssuanceRequestPayload.ConfigurationBased(
+                        CredentialConfigurationIdentifier(DEGREE_JwtVcJson),
+                        null,
+                    ),
+                )
+                authorizedRequest.requestBatch(batchRequestPayload)
+            }
+        }
+
+    @Test
+    fun `when issuer mandates encrypted responses, batch response is encrypted and parsable`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                oidcWellKnownMocker(EncryptedResponses.REQUIRED),
+                batchIssuanceRequestMocker(
+                    responseBuilder = {
+                        val textContent = it?.body as TextContent
+                        val issuanceRequestTO = Json.decodeFromString<BatchCredentialRequestTO>(textContent.text)
+                        assertIs<BatchCredentialRequestTO>(issuanceRequestTO)
+                        val jwk = JWK.parse(issuanceRequestTO.credentialResponseEncryption?.jwk.toString())
+                        val alg = JWEAlgorithm.parse(issuanceRequestTO.credentialResponseEncryption?.encryptionAlgorithm)
+                        val enc = EncryptionMethod.parse(issuanceRequestTO.credentialResponseEncryption?.encryptionMethod)
+                        respond(
+                            content = batchIssuanceEncryptedResponse(jwk, alg, enc).getOrThrow(),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(
+                                HttpHeaders.ContentType to listOf("application/jwt"),
+                            ),
+                        )
+                    },
+                    requestValidator = {},
+                ),
+            )
+
+            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
+                jwk = randomRSAEncryptionKey(2048),
+                algorithm = JWEAlgorithm.RSA_OAEP_256,
+                encryptionMethod = EncryptionMethod.A128CBC_HS256,
+            )
+
+            val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
+            )
+
+            with(issuer) {
+                assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
+
+                val batchRequestPayload = listOf(
+                    IssuanceRequestPayload.ConfigurationBased(
+                        CredentialConfigurationIdentifier(PID_MsoMdoc),
+                        null,
+                    ),
+                    IssuanceRequestPayload.ConfigurationBased(
+                        CredentialConfigurationIdentifier(PID_SdJwtVC),
+                        null,
+                    ),
+                    IssuanceRequestPayload.ConfigurationBased(
+                        CredentialConfigurationIdentifier(DEGREE_JwtVcJson),
+                        null,
+                    ),
+                )
+                authorizedRequest.requestBatch(batchRequestPayload).fold(
+                    onSuccess = {
+                        assertIs<SubmittedRequest.Success>(it)
+                        assertTrue("One deferred credential response expected") {
+                            it.credentials.any { credential -> credential is IssuedCredential.Deferred }
+                        }
+                    },
+                    onFailure = { fail("Failed with error ${it.message}") },
+                )
+            }
+        }
+
     fun randomRSAEncryptionKey(size: Int): RSAKey = RSAKeyGenerator(size)
         .keyUse(KeyUse.ENCRYPTION)
         .keyID(UUID.randomUUID().toString())
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
 
-    fun randomRSASigningKey(size: Int): RSAKey = RSAKeyGenerator(size)
-        .keyUse(KeyUse.SIGNATURE)
-        .keyID(UUID.randomUUID().toString())
-        .issueTime(Date(System.currentTimeMillis()))
-        .generate()
+    private fun singleIssuanceEncryptedResponse(jwk: JWK, alg: JWEAlgorithm, enc: EncryptionMethod): Result<String> {
+        val successResponseTO = CredentialResponseSuccessTO(
+            credential = "issued_credential",
+            notificationId = "fgh126lbHjtspVbn",
+            cNonce = "wlbQc6pCJp",
+            cNonceExpiresInSeconds = 86400,
+        )
+        val jsonStr = Json.encodeToString(successResponseTO)
+        return encypt(JWTClaimsSet.parse(jsonStr), jwk, alg, enc)
+    }
 
-    private fun encryptedResponse(jwk: JWK, alg: JWEAlgorithm, enc: EncryptionMethod): Result<String> {
-        val jsonObject =
-            buildJsonObject {
-                put("format", "mso_mdoc")
-                put("credential", "issued_credential")
-                put("c_nonce", "wlbQc6pCJp")
-                put("c_nonce_expires_in", 86400)
-            }
-        val jsonStr = Json.encodeToString(jsonObject)
+    private fun batchIssuanceEncryptedResponse(jwk: JWK, alg: JWEAlgorithm, enc: EncryptionMethod): Result<String> {
+        val successResponseTO = BatchCredentialResponseSuccessTO(
+            credentialResponses = listOf(
+                IssuanceResponseTO(
+                    transactionId = "jjj136kojtspbnq",
+                ),
+                IssuanceResponseTO(
+                    credential = "${PID_MsoMdoc}_issued_credential",
+                    notificationId = "fgh126lbHjtspVbn",
+                ),
+                IssuanceResponseTO(
+                    credential = "${DEGREE_JwtVcJson}_issued_credential",
+                    notificationId = "aaffbnmyw23lbHjtspVbn",
+                ),
+            ),
+            cNonce = "wlbQc6pCJp",
+            cNonceExpiresInSeconds = 86400,
+        )
+        val jsonStr = Json.encodeToString(successResponseTO)
         return encypt(JWTClaimsSet.parse(jsonStr), jwk, alg, enc)
     }
 

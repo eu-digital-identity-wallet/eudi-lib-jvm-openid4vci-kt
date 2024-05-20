@@ -94,7 +94,7 @@ internal class IssuanceServerClient(
             if (response.status.isSuccess()) {
                 responsePossiblyEncrypted(
                     response,
-                    null, // Replace with responseEncryptionSpec value as soon VCI spec decide on this
+                    request.encryption,
                     fromTransferObject = { it.toDomain() },
                     transferObjectFromJwtClaims = { BatchCredentialResponseSuccessTO.from(it) },
                 )
@@ -161,15 +161,15 @@ internal class IssuanceServerClient(
     }
 }
 
-private suspend inline fun <reified ResponseJson, Response> responsePossiblyEncrypted(
+private suspend inline fun <reified ResponseTO, Response> responsePossiblyEncrypted(
     response: HttpResponse,
     encryptionSpec: IssuanceResponseEncryptionSpec?,
-    fromTransferObject: (ResponseJson) -> Response,
-    transferObjectFromJwtClaims: (JWTClaimsSet) -> ResponseJson,
+    fromTransferObject: (ResponseTO) -> Response,
+    transferObjectFromJwtClaims: (JWTClaimsSet) -> ResponseTO,
 ): Response {
     check(response.status.isSuccess())
     val responseJson = when (encryptionSpec) {
-        null -> response.body<ResponseJson>()
+        null -> response.body<ResponseTO>()
         else -> {
             val jwt = response.body<String>()
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {

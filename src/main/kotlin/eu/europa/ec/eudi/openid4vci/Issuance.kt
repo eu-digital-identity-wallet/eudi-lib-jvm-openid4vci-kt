@@ -604,4 +604,10 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
             private fun readResolve(): Any = WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated
         }
     }
+
+    data object BatchRequestHasEncryptionSpecInIndividualRequests : CredentialIssuanceError(
+        "BatchRequestContainsEncryptionOnIndividualRequest",
+    ) {
+        private fun readResolve(): Any = BatchRequestHasEncryptionSpecInIndividualRequests
+    }
 }
