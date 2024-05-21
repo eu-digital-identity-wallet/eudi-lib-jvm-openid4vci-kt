@@ -172,7 +172,7 @@ private suspend inline fun <reified ResponseTO, Response> responsePossiblyEncryp
         null -> response.body<ResponseTO>()
         else -> {
             ensure(response.contentType() == ContentType.parse("application/jwt")) {
-                InvalidEncryptedResponseContentType(response.contentType().toString())
+                InvalidEncryptedResponseContentType("application/jwt", response.contentType().toString())
             }
             val jwt = response.body<String>()
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
