@@ -61,7 +61,7 @@ internal class RequestIssuanceImpl(
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map {
-                singleRequest(it, null, credentialIdentifiers, false)
+                singleRequest(it, null, credentialIdentifiers, true)
             }
             CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
         }
@@ -72,7 +72,7 @@ internal class RequestIssuanceImpl(
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (requestPayload, proofSigner) ->
-                singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers, false)
+                singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers, true)
             }
             CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
         }
@@ -100,9 +100,10 @@ internal class RequestIssuanceImpl(
         requestPayload: IssuanceRequestPayload,
         proofFactory: ProofFactory?,
         credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
-        includeEncryptionSpec: Boolean = true,
-    ): CredentialIssuanceRequest.SingleRequest =
-        when (requestPayload) {
+        partOfBatch: Boolean = false,
+    ): CredentialIssuanceRequest.SingleRequest {
+        val includeEncryptionSpec = !partOfBatch
+        return when (requestPayload) {
             is IssuanceRequestPayload.ConfigurationBased -> {
                 formatBasedRequest(
                     requestPayload.credentialConfigurationIdentifier,
@@ -123,6 +124,7 @@ internal class RequestIssuanceImpl(
                 identifierBasedRequest(credentialConfigurationId, credentialId, proofFactory, includeEncryptionSpec)
             }
         }
+    }
 
     private fun formatBasedRequest(
         credentialConfigurationId: CredentialConfigurationIdentifier,

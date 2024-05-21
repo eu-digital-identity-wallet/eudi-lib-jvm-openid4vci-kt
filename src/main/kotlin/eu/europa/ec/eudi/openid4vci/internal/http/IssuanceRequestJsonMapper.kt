@@ -71,12 +71,15 @@ internal data class BatchCredentialResponseSuccessTO(
     companion object {
         fun from(jwtClaimsSet: JWTClaimsSet): BatchCredentialResponseSuccessTO = with(jwtClaimsSet) {
             val jsonArray = JSONObjectUtils.getJSONObjectArray(claims, "credential_responses")
+            ensure(jsonArray != null) {
+                InvalidBatchIssuanceResponse("missing credential_responses in response")
+            }
             BatchCredentialResponseSuccessTO(
-                credentialResponses = jsonArray.map {
+                credentialResponses = jsonArray.map { attr ->
                     IssuanceResponseTO(
-                        credential = JSONObjectUtils.getString(it, "credential"),
-                        transactionId = JSONObjectUtils.getString(it, "transaction_id"),
-                        notificationId = JSONObjectUtils.getString(it, "notification_id"),
+                        credential = JSONObjectUtils.getString(attr, "credential"),
+                        transactionId = JSONObjectUtils.getString(attr, "transaction_id"),
+                        notificationId = JSONObjectUtils.getString(attr, "notification_id"),
                     )
                 },
                 cNonce = getStringClaim("c_nonce"),
