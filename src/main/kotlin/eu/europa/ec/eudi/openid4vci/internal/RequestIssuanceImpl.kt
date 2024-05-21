@@ -61,7 +61,7 @@ internal class RequestIssuanceImpl(
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map {
-                singleRequest(it, null, credentialIdentifiers)
+                singleRequest(it, null, credentialIdentifiers, true)
             }
             CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
         }
@@ -72,7 +72,7 @@ internal class RequestIssuanceImpl(
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (requestPayload, proofSigner) ->
-                singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
+                singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers, true)
             }
             CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
         }
@@ -100,13 +100,16 @@ internal class RequestIssuanceImpl(
         requestPayload: IssuanceRequestPayload,
         proofFactory: ProofFactory?,
         credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
-    ): CredentialIssuanceRequest.SingleRequest =
-        when (requestPayload) {
+        partOfBatch: Boolean = false,
+    ): CredentialIssuanceRequest.SingleRequest {
+        val includeEncryptionSpec = !partOfBatch
+        return when (requestPayload) {
             is IssuanceRequestPayload.ConfigurationBased -> {
                 formatBasedRequest(
                     requestPayload.credentialConfigurationIdentifier,
                     requestPayload.claimSet,
                     proofFactory,
+                    includeEncryptionSpec,
                 )
             }
 
@@ -118,34 +121,42 @@ internal class RequestIssuanceImpl(
                 ) {
                     "The credential identifier passed is not valid or unknown"
                 }
-                identifierBasedRequest(credentialConfigurationId, credentialId, proofFactory)
+                identifierBasedRequest(credentialConfigurationId, credentialId, proofFactory, includeEncryptionSpec)
             }
         }
+    }
 
     private fun formatBasedRequest(
         credentialConfigurationId: CredentialConfigurationIdentifier,
         claimSet: ClaimSet?,
         proofFactory: ProofFactory?,
+        includeEncryptionSpec: Boolean,
     ): CredentialIssuanceRequest.FormatBased {
         require(credentialOffer.credentialConfigurationIdentifiers.contains(credentialConfigurationId)) {
             "The requested credential is not authorized for issuance"
         }
         val credentialSupported = credentialSupportedById(credentialConfigurationId)
         val proof = proofFactory?.invoke(credentialSupported)?.also { assertProofSupported(it, credentialSupported) }
-        return CredentialIssuanceRequest.formatBased(credentialSupported, claimSet, proof, responseEncryptionSpec)
+        return CredentialIssuanceRequest.formatBased(
+            credentialSupported,
+            claimSet,
+            proof,
+            responseEncryptionSpec.takeIf { includeEncryptionSpec },
+        )
     }
 
     private fun identifierBasedRequest(
         credentialConfigurationId: CredentialConfigurationIdentifier,
         credentialId: CredentialIdentifier,
         proofFactory: ProofFactory?,
+        includeEncryptionSpec: Boolean,
     ): CredentialIssuanceRequest.IdentifierBased {
         require(credentialOffer.credentialConfigurationIdentifiers.contains(credentialConfigurationId)) {
             "The requested credential is not authorized for issuance"
         }
         val credentialSupported = credentialSupportedById(credentialConfigurationId)
         val proof = proofFactory?.invoke(credentialSupported)?.also { assertProofSupported(it, credentialSupported) }
-        return CredentialIssuanceRequest.IdentifierBased(credentialId, proof, responseEncryptionSpec)
+        return CredentialIssuanceRequest.IdentifierBased(credentialId, proof, responseEncryptionSpec.takeIf { includeEncryptionSpec })
     }
 
     private fun assertProofSupported(p: Proof, credentialSupported: CredentialConfiguration) {

@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.BatchRequestHasEncryptionSpecInIndividualRequests
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidIssuanceRequest
 
 internal sealed interface CredentialType {
@@ -43,7 +44,13 @@ internal sealed interface CredentialIssuanceRequest {
     data class BatchRequest(
         val credentialRequests: List<SingleRequest>,
         override val encryption: IssuanceResponseEncryptionSpec?,
-    ) : CredentialIssuanceRequest
+    ) : CredentialIssuanceRequest {
+        init {
+            ensure(credentialRequests.all { it.encryption == null }) {
+                BatchRequestHasEncryptionSpecInIndividualRequests
+            }
+        }
+    }
 
     /**
      * Sealed hierarchy of credential issuance requests.

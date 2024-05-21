@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
+import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
@@ -68,7 +69,23 @@ internal data class BatchCredentialResponseSuccessTO(
     }
 
     companion object {
-        fun from(jwtClaimsSet: JWTClaimsSet): BatchCredentialResponseSuccessTO = TODO()
+        fun from(jwtClaimsSet: JWTClaimsSet): BatchCredentialResponseSuccessTO = with(jwtClaimsSet) {
+            val jsonArray = JSONObjectUtils.getJSONObjectArray(claims, "credential_responses")
+            ensure(jsonArray != null) {
+                InvalidBatchIssuanceResponse("missing credential_responses in response")
+            }
+            BatchCredentialResponseSuccessTO(
+                credentialResponses = jsonArray.map { attr ->
+                    IssuanceResponseTO(
+                        credential = JSONObjectUtils.getString(attr, "credential"),
+                        transactionId = JSONObjectUtils.getString(attr, "transaction_id"),
+                        notificationId = JSONObjectUtils.getString(attr, "notification_id"),
+                    )
+                },
+                cNonce = getStringClaim("c_nonce"),
+                cNonceExpiresInSeconds = getLongClaim("c_nonce_expires_in"),
+            )
+        }
     }
 }
 

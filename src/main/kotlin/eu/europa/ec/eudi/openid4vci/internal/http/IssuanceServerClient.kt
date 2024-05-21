@@ -24,11 +24,6 @@ import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
 import eu.europa.ec.eudi.openid4vci.internal.*
-import eu.europa.ec.eudi.openid4vci.internal.CredentialIssuanceRequest
-import eu.europa.ec.eudi.openid4vci.internal.DPoPJwtFactory
-import eu.europa.ec.eudi.openid4vci.internal.Htm
-import eu.europa.ec.eudi.openid4vci.internal.bearerOrDPoPAuth
-import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -94,7 +89,7 @@ internal class IssuanceServerClient(
             if (response.status.isSuccess()) {
                 responsePossiblyEncrypted(
                     response,
-                    null, // Replace with responseEncryptionSpec value as soon VCI spec decide on this
+                    request.encryption,
                     fromTransferObject = { it.toDomain() },
                     transferObjectFromJwtClaims = { BatchCredentialResponseSuccessTO.from(it) },
                 )
@@ -161,16 +156,22 @@ internal class IssuanceServerClient(
     }
 }
 
-private suspend inline fun <reified ResponseJson, Response> responsePossiblyEncrypted(
+private suspend inline fun <reified ResponseTO, Response> responsePossiblyEncrypted(
     response: HttpResponse,
     encryptionSpec: IssuanceResponseEncryptionSpec?,
-    fromTransferObject: (ResponseJson) -> Response,
-    transferObjectFromJwtClaims: (JWTClaimsSet) -> ResponseJson,
+    fromTransferObject: (ResponseTO) -> Response,
+    transferObjectFromJwtClaims: (JWTClaimsSet) -> ResponseTO,
 ): Response {
     check(response.status.isSuccess())
     val responseJson = when (encryptionSpec) {
-        null -> response.body<ResponseJson>()
+        null -> {
+            response.ensureContentType(ContentType.Application.Json)
+            response.body<ResponseTO>()
+        }
+
         else -> {
+            val applicationJwt = ContentType("application", "jwt")
+            response.ensureContentType(applicationJwt)
             val jwt = response.body<String>()
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
                 jweKeySelector = JWEDecryptionKeySelector(
@@ -184,4 +185,13 @@ private suspend inline fun <reified ResponseJson, Response> responsePossiblyEncr
         }
     }
     return fromTransferObject(responseJson)
+}
+
+private fun HttpResponse.ensureContentType(expectedContentType: ContentType) {
+    ensure(contentType() == expectedContentType) {
+        InvalidResponseContentType(
+            expectedContentType = expectedContentType.toString(),
+            invalidContentType = contentType().toString(),
+        )
+    }
 }

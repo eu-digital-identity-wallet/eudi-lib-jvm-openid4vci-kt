@@ -604,4 +604,24 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
             private fun readResolve(): Any = WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated
         }
     }
+
+    data object BatchRequestHasEncryptionSpecInIndividualRequests : CredentialIssuanceError(
+        "BatchRequestContainsEncryptionOnIndividualRequest",
+    ) {
+        private fun readResolve(): Any = BatchRequestHasEncryptionSpecInIndividualRequests
+    }
+
+    /**
+     * Wrong content-type of encrypted response. Content-type of encrypted responses must be application/jwt
+     */
+    data class InvalidResponseContentType(
+        val expectedContentType: String,
+        val invalidContentType: String,
+    ) : CredentialIssuanceError(
+        "Encrypted response content-type expected to be $expectedContentType but instead was $invalidContentType",
+    )
+
+    data class InvalidBatchIssuanceResponse(
+        val error: String,
+    ) : CredentialIssuanceError("Invalid batch issuance response: $error")
 }
