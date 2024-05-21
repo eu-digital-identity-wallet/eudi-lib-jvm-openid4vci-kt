@@ -141,9 +141,7 @@ private suspend fun submitProvidingNoProofs(
 ): String {
     with(issuer) {
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-        val submittedRequest = authorized.requestSingle(requestPayload).getOrThrow()
-
-        return when (submittedRequest) {
+        return when (val submittedRequest = authorized.requestSingle(requestPayload).getOrThrow()) {
             is SubmittedRequest.Success -> handleSuccess(submittedRequest, issuer, authorized)
             is SubmittedRequest.Failed -> throw submittedRequest.error
             is SubmittedRequest.InvalidProof -> {
