@@ -115,10 +115,12 @@ sealed interface SubmittedRequest : java.io.Serializable {
      * If the issuance request was a batch request, it will contain the results of each issuance request.
      * If it was a single issuance request list will contain only one result.
      * @param cNonce Nonce information sent back from the issuance server.
+     * @param responseEncryptionSpec The response encryption information as specified in the issuance request.
      */
     data class Success(
         val credentials: List<IssuedCredential>,
         val cNonce: CNonce?,
+        val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ) : SubmittedRequest
 
     /**
@@ -317,10 +319,12 @@ fun interface QueryForDeferredCredential {
      * Given an authorized request submits a deferred credential request for an identifier of a Deferred Issuance transaction.
      *
      * @param deferredCredential The identifier of a Deferred Issuance transaction.
+     * @param responseEncryptionSpec The response encryption information as specified when placing the issuance request.
      * @return The result of the submission.
      */
     suspend fun AuthorizedRequest.queryForDeferredCredential(
         deferredCredential: IssuedCredential.Deferred,
+        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<DeferredCredentialQueryOutcome>
 }
 
@@ -605,6 +609,9 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         }
     }
 
+    /**
+     * Batch credential request syntax is incorrect. Encryption information included in individual requests while shouldn't
+     */
     data object BatchRequestHasEncryptionSpecInIndividualRequests : CredentialIssuanceError(
         "BatchRequestContainsEncryptionOnIndividualRequest",
     ) {
@@ -621,6 +628,9 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         "Encrypted response content-type expected to be $expectedContentType but instead was $invalidContentType",
     )
 
+    /**
+     * Batch response is not syntactically as expected.
+     */
     data class InvalidBatchIssuanceResponse(
         val error: String,
     ) : CredentialIssuanceError("Invalid batch issuance response: $error")

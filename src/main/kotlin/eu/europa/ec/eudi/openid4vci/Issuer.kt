@@ -105,7 +105,6 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             )
             val queryForDeferredCredential = QueryForDeferredCredentialImpl(
                 issuanceServerClient,
-                responseEncryptionSpec,
             )
             val notifyIssuer = NotifyIssuerImpl(issuanceServerClient)
 

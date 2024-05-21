@@ -78,7 +78,7 @@ class IssuanceDeferredRequestTest {
                             }
 
                             val requestDeferredIssuance =
-                                authorizedRequest.queryForDeferredCredential(deferred)
+                                authorizedRequest.queryForDeferredCredential(deferred, null)
                                     .getOrThrow()
 
                             assertTrue("Expected response type Errored but was not") {
@@ -155,7 +155,7 @@ class IssuanceDeferredRequestTest {
                             }
 
                             val requestDeferredIssuance =
-                                authorizedRequest.queryForDeferredCredential(deferred)
+                                authorizedRequest.queryForDeferredCredential(deferred, null)
                                     .getOrThrow()
 
                             assertIs<DeferredCredentialQueryOutcome.IssuancePending>(requestDeferredIssuance)
@@ -243,7 +243,7 @@ class IssuanceDeferredRequestTest {
                                 else -> fail("Success response expected but was not")
                             }
 
-                            val requestDeferredIssuance = authorizedRequest.queryForDeferredCredential(deferred)
+                            val requestDeferredIssuance = authorizedRequest.queryForDeferredCredential(deferred, null)
                                 .getOrThrow()
                             assertIs<DeferredCredentialQueryOutcome.Issued>(requestDeferredIssuance)
                         }

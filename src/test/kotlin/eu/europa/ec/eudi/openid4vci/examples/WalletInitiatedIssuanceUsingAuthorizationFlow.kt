@@ -184,7 +184,7 @@ private suspend fun handleSuccess(
 ) = when (val issuedCredential = submittedRequest.credentials[0]) {
     is IssuedCredential.Issued -> issuedCredential.credential
     is IssuedCredential.Deferred -> {
-        handleDeferred(issuer, noProofRequiredState, issuedCredential)
+        handleDeferred(issuer, noProofRequiredState, issuedCredential, submittedRequest.responseEncryptionSpec)
     }
 }
 
@@ -192,12 +192,13 @@ private suspend fun handleDeferred(
     issuer: Issuer,
     authorized: AuthorizedRequest,
     deferred: IssuedCredential.Deferred,
+    encryption: IssuanceResponseEncryptionSpec?,
 ): String {
     issuanceLog(
         "Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
     )
     with(issuer) {
-        return when (val outcome = authorized.queryForDeferredCredential(deferred).getOrThrow()) {
+        return when (val outcome = authorized.queryForDeferredCredential(deferred, encryption).getOrThrow()) {
             is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
             is DeferredCredentialQueryOutcome.IssuancePending -> throw RuntimeException(
                 "Credential not ready yet. Try after ${outcome.interval}",
