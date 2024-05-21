@@ -614,7 +614,7 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     /**
      * Wrong content-type of encrypted response. Content-type of encrypted responses must be application/jwt
      */
-    data class InvalidEncryptedResponseContentType(
+    data class InvalidResponseContentType(
         val expectedContentType: String,
         val invalidContentType: String,
     ) : CredentialIssuanceError(
