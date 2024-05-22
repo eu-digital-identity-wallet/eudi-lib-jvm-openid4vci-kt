@@ -17,8 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.crypto.RSASSAVerifier
+import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
 import java.net.URI
@@ -54,11 +53,11 @@ sealed interface Client {
         val popSigningAlgorithm: JWSAlgorithm,
     ) : Client {
         init {
+            require(id.isNotBlank() && id.isNotEmpty())
             require(instanceKey.isPrivate) { "Instance key must be private" }
-            require(
-                popSigningAlgorithm in ECDSAVerifier.SUPPORTED_ALGORITHMS ||
-                    popSigningAlgorithm in RSASSAVerifier.SUPPORTED_ALGORITHMS,
-            )
+            require(popSigningAlgorithm !in MACSigner.SUPPORTED_ALGORITHMS) {
+                "MAC signing alg is not supported"
+            }
         }
     }
 }

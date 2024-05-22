@@ -284,19 +284,22 @@ internal class AuthorizationServerClient(
         val params = TokenEndpointForm.authCodeFlow(
             authorizationCode = authorizationCode,
             redirectionURI = config.authFlowRedirectionURI,
-            clientId = config.clientId,
-            clientAttestation = clientAttestation(),
+            clientId = config.client.id,
+            clientAttestation = buildClientAttestationIfNeeded(),
             pkceVerifier = pkceVerifier,
         )
         requestAccessToken(params).tokensOrFail()
     }
 
-    private suspend fun clientAttestation(): JwtClientAttestation? = coroutineScope {
+    private suspend fun buildClientAttestationIfNeeded(): JwtClientAttestation? = coroutineScope {
         when (val wallet = config.client) {
             is Client.Public -> null
             is Client.Attested -> {
-                val jwtClientAssertionIssuer = checkNotNull(config.jwtClientAssertionIssuer)
-                jwtClientAssertionIssuer.issue(wallet, authorizationServerMetadata)
+                val jwtClientAssertionIssuer = checkNotNull(config.jwtClientAssertionIssuer) {
+                    "Missing jwtClientAssertionIssuer"
+                }
+                val authServer = authorizationServerMetadata.issuer
+                jwtClientAssertionIssuer.issue(wallet, authServer.value)
             }
         }
     }
@@ -315,10 +318,10 @@ internal class AuthorizationServerClient(
         txCode: String?,
     ): Result<TokenResponse> = runCatching {
         val params = TokenEndpointForm.preAuthCodeFlow(
-            clientId = config.clientId,
+            clientId = config.client.id,
             preAuthorizedCode = preAuthorizedCode,
             txCode = txCode,
-            clientAttestation = null, // TODO Create client attestation (if needed)
+            clientAttestation = buildClientAttestationIfNeeded(),
         )
         requestAccessToken(params).tokensOrFail()
     }

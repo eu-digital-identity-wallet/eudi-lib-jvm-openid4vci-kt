@@ -15,18 +15,20 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSSigner
-import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.crypto.RSASSAVerifier
+import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.Ed25519Signer
+import com.nimbusds.jose.crypto.MACSigner
+import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
 import com.nimbusds.jose.proc.JOSEObjectTypeVerifier
 import com.nimbusds.jose.proc.JWSKeySelector
 import com.nimbusds.jose.proc.SecurityContext
+import com.nimbusds.jose.produce.JWSSignerFactory
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
@@ -39,24 +41,41 @@ import java.util.*
 import kotlin.time.Duration
 
 internal class SelfAttestedIssuer(
-    private val clock: Clock,
+    supportedSigningAlgorithms: Set<JWSAlgorithm> = DefaultSupportedSigningAlgorithms,
     private val attestationDuration: Duration,
-    private val typ: JOSEObjectType = JOSEObjectType.JWT,
     private val headerCustomization: JWSHeader.Builder.() -> Unit = {},
 ) : ClientAttestationIssuer {
+    init {
+        require(supportedSigningAlgorithms.isNotEmpty()) {
+            "supportedSigningAlgorithms cannot be empty"
+        }
+        require(supportedSigningAlgorithms.all { it !in MACSigner.SUPPORTED_ALGORITHMS }) {
+            "MAC algorithms are not allowed"
+        }
+        require(attestationDuration.isPositive()) {
+            "Attestation duration must be positive"
+        }
+    }
 
-    override suspend fun issue(client: Client.Attested): ClientAttestationJWT {
-        val signer = DefaultJWSSignerFactory().createJWSSigner(client.instanceKey, client.popSigningAlgorithm)
+    private val signerFactory = jwsSignerFactoryFor(supportedSigningAlgorithms)
+
+    override suspend fun issue(clock: Clock, client: Client.Attested): ClientAttestationJWT {
+        val (clientId, instanceKey, popSigningAlgorithm) = client
+        val signer = signerFactory.createJWSSigner(instanceKey, popSigningAlgorithm)
         val builder = ClientAttestationJwtBuilder(
             clock = clock,
-            issuer = client.id,
+            issuer = clientId,
             duration = attestationDuration,
-            algorithm = client.popSigningAlgorithm,
+            algorithm = popSigningAlgorithm,
             signer = signer,
-            typ = typ,
             headerCustomization = headerCustomization,
         )
         return builder.build(client)
+    }
+
+    companion object {
+        val DefaultSupportedSigningAlgorithms =
+            ECDSASigner.SUPPORTED_ALGORITHMS + RSASSASigner.SUPPORTED_ALGORITHMS + Ed25519Signer.SUPPORTED_ALGORITHMS
     }
 }
 
@@ -66,48 +85,45 @@ internal class ClientAttestationJwtBuilder(
     private val duration: Duration,
     private val algorithm: JWSAlgorithm,
     private val signer: JWSSigner,
-    private val typ: JOSEObjectType = JOSEObjectType.JWT,
     private val headerCustomization: JWSHeader.Builder.() -> Unit = {},
 ) {
     init {
-        require(
-            algorithm in ECDSAVerifier.SUPPORTED_ALGORITHMS ||
-                algorithm in RSASSAVerifier.SUPPORTED_ALGORITHMS,
-        )
+        require(algorithm !in MACSigner.SUPPORTED_ALGORITHMS)
         require(duration.isPositive()) { "Duration must be positive" }
     }
 
     fun build(client: Client.Attested): ClientAttestationJWT {
         require(client.id.isNotBlank()) { "Wallet id cannot be blank" }
 
-        val header = with(JWSHeader.Builder(algorithm)) {
-            type(typ)
+        val header = JWSHeader.Builder(algorithm).apply {
             headerCustomization()
-            build()
+        }.build()
+
+        val claims = JWTClaimsSet.Builder().apply {
+            val now = clock.instant()
+            val exp = now.plusSeconds(duration.inWholeSeconds)
+            issuer(issuer)
+            subject(client.id)
+            claim("cnf", cnf(client.instanceKey.toPublicJWK()))
+            issueTime(Date.from(now))
+            expirationTime(Date.from(exp))
+        }.build()
+
+        val jwt = SignedJWT(header, claims).apply {
+            sign(signer)
         }
-        val now = clock.instant()
-        val claims = JWTClaimsSet.Builder()
-            .issuer(issuer)
-            .subject(client.id)
-            .claim("cnf", cnf(client.instanceKey.toPublicJWK()))
-            .issueTime(Date.from(now))
-            .expirationTime(Date.from(now.plusSeconds(duration.inWholeSeconds)))
-            .build()
-        val jwt = SignedJWT(header, claims).apply { sign(signer) }
         return ClientAttestationJWT(jwt)
     }
 }
 
-object ClientAttestationJWTProcessorFactory {
+internal object ClientAttestationJWTProcessorFactory {
 
     private class ClaimsSetVerifier private constructor(
         private val clock: Clock,
         exactMatchClaims: JWTClaimsSet,
     ) : DefaultJWTClaimsVerifier<SecurityContext>(exactMatchClaims, requiredClaims) {
 
-        override fun currentTime(): Date {
-            return Date.from(clock.instant())
-        }
+        override fun currentTime(): Date = Date.from(clock.instant())
 
         companion object {
 
@@ -143,30 +159,43 @@ object ClientAttestationJWTProcessorFactory {
 private fun cnf(jwk: JWK): Map<String, Any> =
     mapOf("jwk" to jwk.toJSONObject())
 
-class DefaultClientAttestationPopBuilder(
-    private val clock: Clock,
+internal class DefaultClientAttestationPopBuilder(
+    supportedSigningAlgorithms: Set<JWSAlgorithm>,
     private val duration: Duration,
-
 ) : ClientAttestationPoPBuilder {
 
     init {
         require(duration.isPositive())
     }
 
-    override suspend fun issue(client: Client.Attested, authServerId: String): ClientAttestationPoP {
-        val header = JWSHeader.Builder(client.popSigningAlgorithm).build()
+    private val signerFactory = jwsSignerFactoryFor(supportedSigningAlgorithms)
 
-        val now = clock.instant()
-        val exp = now.plusSeconds(duration.inWholeSeconds)
+    override suspend fun build(clock: Clock, client: Client.Attested, authServerId: String): ClientAttestationPoP {
+        val header = JWSHeader.Builder(client.popSigningAlgorithm).build()
         val claimSet = JWTClaimsSet.Builder().apply {
+            val now = clock.instant()
+            val exp = now.plusSeconds(duration.inWholeSeconds)
             issuer(client.id)
             jwtID(JWTID().value)
             issueTime(Date.from(now))
             expirationTime(Date.from(exp))
             audience(authServerId)
         }.build()
-        val signer = DefaultJWSSignerFactory().createJWSSigner(client.instanceKey, client.popSigningAlgorithm)
-        val jwt = SignedJWT(header, claimSet).apply { sign(signer) }
+        val jwt = SignedJWT(header, claimSet).apply {
+            val signer = signerFactory.createJWSSigner(client.instanceKey, client.popSigningAlgorithm)
+            sign(signer)
+        }
         return ClientAttestationPoP(jwt)
+    }
+}
+
+private fun jwsSignerFactoryFor(supportedAlgorithms: Set<JWSAlgorithm>): JWSSignerFactory {
+    require(supportedAlgorithms.isNotEmpty())
+    val default = DefaultJWSSignerFactory()
+    require(default.supportedJWSAlgorithms().containsAll(supportedAlgorithms)) {
+        "There algorithms not supported. You can define at most ${default.supportedJWSAlgorithms()}"
+    }
+    return object : JWSSignerFactory by default {
+        override fun supportedJWSAlgorithms(): MutableSet<JWSAlgorithm> = supportedAlgorithms.toMutableSet()
     }
 }
