@@ -34,6 +34,7 @@ import eu.europa.ec.eudi.openid4vci.internal.*
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
@@ -188,7 +189,7 @@ internal class AuthorizationServerClient(
 
         val parEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
         checkNotNull(parEndpoint) { "PAR endpoint not advertised" }
-        val clientID = ClientID(config.clientId)
+        val clientID = ClientID(config.client.id)
         val codeVerifier = CodeVerifier()
         val pushedAuthorizationRequest = run {
             val request = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
@@ -284,9 +285,20 @@ internal class AuthorizationServerClient(
             authorizationCode = authorizationCode,
             redirectionURI = config.authFlowRedirectionURI,
             clientId = config.clientId,
+            clientAttestation = clientAttestation(),
             pkceVerifier = pkceVerifier,
         )
         requestAccessToken(params).tokensOrFail()
+    }
+
+    private suspend fun clientAttestation(): JwtClientAttestation? = coroutineScope {
+        when (val wallet = config.client) {
+            is Client.Public -> null
+            is Client.Attested -> {
+                val jwtClientAssertionIssuer = checkNotNull(config.jwtClientAssertionIssuer)
+                jwtClientAssertionIssuer.issue(wallet, authorizationServerMetadata)
+            }
+        }
     }
 
     /**
@@ -306,6 +318,7 @@ internal class AuthorizationServerClient(
             clientId = config.clientId,
             preAuthorizedCode = preAuthorizedCode,
             txCode = txCode,
+            clientAttestation = null, // TODO Create client attestation (if needed)
         )
         requestAccessToken(params).tokensOrFail()
     }
@@ -380,11 +393,13 @@ internal object TokenEndpointForm {
 
     fun authCodeFlow(
         clientId: String,
+        clientAttestation: JwtClientAttestation?,
         authorizationCode: AuthorizationCode,
         redirectionURI: URI,
         pkceVerifier: PKCEVerifier,
-    ): Map<String, String> = buildMap<String, String> {
+    ): Map<String, String> = buildMap {
         put(CLIENT_ID_PARAM, clientId)
+        clientAttestation?.let { putAll(AttestationBasedClientAuthenticationForm.assemble(it)) }
         put(GRANT_TYPE_PARAM, AUTHORIZATION_CODE_GRANT)
         put(AUTHORIZATION_CODE_PARAM, authorizationCode.code)
         put(REDIRECT_URI_PARAM, redirectionURI.toString())
@@ -393,13 +408,29 @@ internal object TokenEndpointForm {
 
     fun preAuthCodeFlow(
         clientId: String,
+        clientAttestation: JwtClientAttestation?,
         preAuthorizedCode: PreAuthorizedCode,
         txCode: String?,
     ): Map<String, String> =
         buildMap {
             put(CLIENT_ID_PARAM, clientId)
+            clientAttestation?.let { putAll(AttestationBasedClientAuthenticationForm.assemble(it)) }
             put(GRANT_TYPE_PARAM, PRE_AUTHORIZED_CODE_GRANT)
             put(PRE_AUTHORIZED_CODE_PARAM, preAuthorizedCode.preAuthorizedCode)
             txCode?.let { put(TX_CODE_PARAM, it) }
         }.toMap()
+}
+
+internal object AttestationBasedClientAuthenticationForm {
+
+    const val CLIENT_ASSERTION_TYPE_PARAM = "client_assertion_type"
+    const val CLIENT_ASSERTION_PARAM = "client_assertion"
+    const val CLIENT_ASSERTION_TYPE_JWT_CLIENT_ATTESTATION =
+        "urn:ietf:params:oauth:client-assertion-type:jwt-client-attestation"
+
+    fun assemble(clientAttestation: JwtClientAttestation): Map<String, String> =
+        mapOf(
+            CLIENT_ASSERTION_TYPE_PARAM to CLIENT_ASSERTION_TYPE_JWT_CLIENT_ATTESTATION,
+            CLIENT_ASSERTION_PARAM to clientAttestation.serialize(),
+        )
 }

@@ -16,16 +16,57 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.crypto.ECDSAVerifier
+import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.JWK
 import java.net.URI
 import java.time.Clock
 
 typealias ClientId = String
 
 /**
+ * Wallet's OAUTH2 client view
+ */
+sealed interface Client {
+    /**
+     * The client_id of the Wallet, issued when interacting with a credential issuer
+     */
+    val id: ClientId
+
+    /**
+     * Public Client
+     */
+    data class Public(override val id: ClientId) : Client
+
+    /**
+     * Client to be authenticated to the credential issuer
+     * using Attestation-Based Client Authentication
+     *
+     * @param instanceKey The wallet instance key (pair). This key will be used to identify the wallet
+     * to a specific credential issuer. Should not be re-used.
+     * @param popSigningAlgorithm the algorithm to be used to sign the [ClientAttestationPoP]
+     */
+    data class Attested(
+        override val id: ClientId,
+        val instanceKey: JWK,
+        val popSigningAlgorithm: JWSAlgorithm,
+    ) : Client {
+        init {
+            require(instanceKey.isPrivate) { "Instance key must be private" }
+            require(
+                popSigningAlgorithm in ECDSAVerifier.SUPPORTED_ALGORITHMS ||
+                    popSigningAlgorithm in RSASSAVerifier.SUPPORTED_ALGORITHMS,
+            )
+        }
+    }
+}
+
+/**
  * Configuration object to pass configuration properties to the issuance components.
  *
- * @param clientId  The authorization client's identifier.
+ * @param client  The wallet as OAUTH2 client during issuance
  * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
  * @param keyGenerationConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
  * @param credentialResponseEncryptionPolicy Wallet's policy for Credential Response encryption
@@ -34,17 +75,21 @@ typealias ClientId = String
  * Otherwise, authorization details (RAR)
  * @param dPoPSigner a signer that if provided will enable the use of DPoP JWT
  * @param parUsage whether to use PAR in case of authorization code grant
+ * @param jwtClientAssertionIssuer a function for issuing [JwtClientAssertionIssuer]. Required in case
+ * [client] is [Client.Attested]
  * @param clock Wallet's clock
  */
 data class OpenId4VCIConfig(
-    val clientId: ClientId,
+    val client: Client,
     val authFlowRedirectionURI: URI,
     val keyGenerationConfig: KeyGenerationConfig,
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPSigner: PopSigner.Jwt? = null,
     val parUsage: ParUsage = ParUsage.IfSupported,
+    val jwtClientAssertionIssuer: JwtClientAssertionIssuer? = null,
     val clock: Clock = Clock.systemDefaultZone(),
+
 ) {
 
     init {
@@ -57,7 +102,16 @@ data class OpenId4VCIConfig(
                 "JWK in binding key must be public"
             }
         }
+        if (client is Client.Attested) {
+            requireNotNull(jwtClientAssertionIssuer) {
+                "jwtClientAssertionIssuer issuer must be configured"
+            }
+        }
     }
+
+    @Deprecated(message = "Deprecated", replaceWith = ReplaceWith("client.id"))
+    val clientId: ClientId
+        get() = client.id
 }
 
 /**
