@@ -15,10 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredRequestTO
-import io.ktor.client.engine.mock.*
-import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
@@ -35,16 +32,10 @@ class IssuanceDeferredRequestTest {
             parPostMocker(),
             tokenPostMocker(),
             singleIssuanceRequestMocker(
-                responseBuilder = {
-                    val textContent = it?.body as TextContent
-                    val issuanceRequest = asIssuanceRequest(textContent.text)
-                    respondToCredentialIssuanceRequest(this, issuanceRequest)
-                },
+                responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it) },
             ),
             deferredIssuanceRequestMocker(
-                responseBuilder = {
-                    respondToDeferredIssuanceRequest(this, credentialIsReady = true, transactionIdIsValid = false)
-                },
+                responseBuilder = { defaultIssuanceResponseDataBuilder(credentialIsReady = true, transactionIdIsValid = false) },
             ),
         )
         val (_, authorizedRequest, issuer) =
@@ -70,7 +61,7 @@ class IssuanceDeferredRequestTest {
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
                                     val issuedCredential = secondSubmittedRequest.credentials[0]
-                                    require(issuedCredential is IssuedCredential.Deferred)
+                                    assertIs<IssuedCredential.Deferred>(issuedCredential)
                                     issuedCredential
                                 }
 
@@ -110,16 +101,10 @@ class IssuanceDeferredRequestTest {
             parPostMocker(),
             tokenPostMocker(),
             singleIssuanceRequestMocker(
-                responseBuilder = {
-                    val textContent = it?.body as TextContent
-                    val issuanceRequest = asIssuanceRequest(textContent.text)
-                    respondToCredentialIssuanceRequest(this, issuanceRequest)
-                },
+                responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it) },
             ),
             deferredIssuanceRequestMocker(
-                responseBuilder = {
-                    respondToDeferredIssuanceRequest(this, false)
-                },
+                responseBuilder = { defaultIssuanceResponseDataBuilder(false) },
             ),
         )
 
@@ -147,7 +132,7 @@ class IssuanceDeferredRequestTest {
                             val deferred = when (secondSubmittedRequest) {
                                 is SubmittedRequest.Success -> {
                                     val issuedCredential = secondSubmittedRequest.credentials[0]
-                                    require(issuedCredential is IssuedCredential.Deferred)
+                                    assertIs<IssuedCredential.Deferred>(issuedCredential)
                                     issuedCredential
                                 }
 
@@ -181,16 +166,10 @@ class IssuanceDeferredRequestTest {
             parPostMocker(),
             tokenPostMocker(),
             singleIssuanceRequestMocker(
-                responseBuilder = {
-                    val textContent = it?.body as TextContent
-                    val issuanceRequest = asIssuanceRequest(textContent.text)
-                    respondToCredentialIssuanceRequest(this, issuanceRequest)
-                },
+                responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it) },
             ),
             deferredIssuanceRequestMocker(
-                responseBuilder = {
-                    respondToDeferredIssuanceRequest(this, true)
-                },
+                responseBuilder = { defaultIssuanceResponseDataBuilder(true) },
                 requestValidator = {
                     assertTrue("No Authorization header passed.") {
                         it.headers.contains("Authorization")
@@ -259,103 +238,9 @@ class IssuanceDeferredRequestTest {
         }
     }
 
-    private fun respondToDeferredIssuanceRequest(
-        call: MockRequestHandleScope,
-        credentialIsReady: Boolean,
-        transactionIdIsValid: Boolean = true,
-    ): HttpResponseData =
-        if (credentialIsReady && transactionIdIsValid) {
-            call.respond(
-                content = """
-                    {
-                      "format": "vc+sd-jwt",
-                      "credential": "credential_content"
-                    }
-                """.trimIndent(),
-                status = HttpStatusCode.OK,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf("application/json"),
-                ),
-            )
-        } else {
-            val error =
-                if (!transactionIdIsValid) {
-                    "invalid_transaction_id "
-                } else {
-                    "issuance_pending"
-                }
-
-            call.respond(
-                content = """
-                    {
-                      "error": "$error",
-                      "interval": 5
-                    }
-                """.trimIndent(),
-                status = HttpStatusCode.BadRequest,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf("application/json"),
-                ),
-            )
-        }
-
-    private fun respondToCredentialIssuanceRequest(
-        call: MockRequestHandleScope,
-        issuanceRequest: CredentialRequestTO?,
-    ): HttpResponseData =
-        if (issuanceRequest == null) {
-            call.respond(
-                content = """
-                                {
-                                  "error": "invalid_request"                              
-                                }
-                """.trimIndent(),
-                status = HttpStatusCode.BadRequest,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf("application/json"),
-                ),
-            )
-        } else if (issuanceRequest.proof != null) {
-            call.respond(
-                content = """
-                    {
-                      "format": "vc+sd-jwt",
-                      "transaction_id": "1234565768122",
-                      "c_nonce": "wlbQc6pCJp",
-                      "c_nonce_expires_in": 86400
-                    }
-                """.trimIndent(),
-                status = HttpStatusCode.OK,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf("application/json"),
-                ),
-            )
-        } else {
-            call.respond(
-                content = """
-                    {
-                        "error": "invalid_proof",
-                        "c_nonce": "ERE%@^TGWYEYWEY",
-                        "c_nonce_expires_in": 34
-                    } 
-                """.trimIndent(),
-                status = HttpStatusCode.BadRequest,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf("application/json"),
-                ),
-            )
-        }
-
     private fun asDeferredIssuanceRequest(bodyStr: String): DeferredRequestTO? =
         try {
             Json.decodeFromString<DeferredRequestTO>(bodyStr)
-        } catch (ex: Exception) {
-            null
-        }
-
-    private fun asIssuanceRequest(bodyStr: String): CredentialRequestTO? =
-        try {
-            Json.decodeFromString<CredentialRequestTO>(bodyStr)
         } catch (ex: Exception) {
             null
         }
