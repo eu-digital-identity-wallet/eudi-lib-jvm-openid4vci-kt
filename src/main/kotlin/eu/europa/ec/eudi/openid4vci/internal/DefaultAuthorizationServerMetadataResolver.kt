@@ -27,7 +27,6 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import net.minidev.json.JSONObject
-import java.net.URL
 
 internal class DefaultAuthorizationServerMetadataResolver(
     private val httpClient: HttpClient,
@@ -44,13 +43,10 @@ internal class DefaultAuthorizationServerMetadataResolver(
      */
     private suspend fun fetchOidcServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
         runCatching {
-            val url =
-                URLBuilder(issuer.value.toString())
-                    .appendPathSegments("/.well-known/openid-configuration", encodeSlash = false)
-                    .build()
-                    .toURI()
-                    .toURL()
-
+            val url = issuer.metadataUrl("/.well-known/openid-configuration")
+            fetchAndParse(url, OIDCProviderMetadata::parse)
+        }.recoverCatching {
+            val url = issuer.metadataUrl("/.well-known/openid-configuration", false)
             fetchAndParse(url, OIDCProviderMetadata::parse)
         }
 
@@ -60,13 +56,10 @@ internal class DefaultAuthorizationServerMetadataResolver(
      */
     private suspend fun fetchOauthServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
         runCatching {
-            val url =
-                URLBuilder(issuer.value.toString())
-                    .appendPathSegments("/.well-known/oauth-authorization-server", encodeSlash = false)
-                    .build()
-                    .toURI()
-                    .toURL()
-
+            val url = issuer.metadataUrl("/.well-known/oauth-authorization-server")
+            fetchAndParse(url, AuthorizationServerMetadata::parse)
+        }.recoverCatching {
+            val url = issuer.metadataUrl("/.well-known/oauth-authorization-server", false)
             fetchAndParse(url, AuthorizationServerMetadata::parse)
         }
 
@@ -74,7 +67,7 @@ internal class DefaultAuthorizationServerMetadataResolver(
      * Fetches the content of the provided [url], parses it as a [JSONObject], and further parses it
      * using the provided [parser].
      */
-    private suspend fun <T> fetchAndParse(url: URL, parser: (String) -> T): T {
+    private suspend fun <T> fetchAndParse(url: Url, parser: (String) -> T): T {
         val body = httpClient.get(url).body<String>()
         return parser(body)
     }
@@ -85,3 +78,23 @@ internal class DefaultAuthorizationServerMetadataResolver(
  */
 private fun CIAuthorizationServerMetadata.expectIssuer(expected: HttpsUrl) =
     require(issuer == Issuer(expected.value.toURI())) { "issuer does not match the expected value" }
+
+/**
+ * Gets a well-known metadata URL of an issuer.
+ *
+ * @receiver the Issuer
+ * @param metadata the well-known metadata URL to get
+ * @param specCompliant whether to get a spec-compliant URL or not
+ */
+private fun HttpsUrl.metadataUrl(metadata: String, specCompliant: Boolean = true): Url =
+    with(Url(this.value.toString())) {
+        return if (specCompliant) {
+            URLBuilder(this).apply {
+                path("/${metadata.removePrefix("/").removeSuffix("/")}${pathSegments.joinToString("/")}")
+            }.build()
+        } else {
+            URLBuilder(this)
+                .appendPathSegments("/${metadata.removePrefix("/").removeSuffix("/")}", encodeSlash = false)
+                .build()
+        }
+    }
