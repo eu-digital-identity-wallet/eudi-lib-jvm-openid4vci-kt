@@ -17,6 +17,9 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
+import io.ktor.client.plugins.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import java.net.URI
 import kotlin.test.Test
@@ -114,6 +117,23 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
         }
         val cause = assertIs<IllegalArgumentException>(ex.cause)
         assertEquals("issuer does not match the expected value", cause.message)
+    }
+
+    @Test
+    internal fun `fails when none of the possible urls returns the metadata`() = runTest {
+        val issuer = HttpsUrl("https://keycloak.netcompany.com/realms/pid-issuer-realm").getOrThrow()
+        val resolver = AuthorizationServerMetadataResolver(mockedKtorHttpClientFactory(expectSuccessOnly = true))
+        val error = assertFailsWith<AuthorizationServerMetadataResolutionException> {
+            resolver.resolve(issuer).getOrThrow()
+        }
+        val cause = assertIs<ClientRequestException>(error.cause)
+        assertEquals(HttpStatusCode.NotFound, cause.response.status)
+
+        // Verify the last URL that was tried, is the common lookup for oauth2 authorization server metadata.
+        assertEquals(
+            "https://keycloak.netcompany.com/realms/pid-issuer-realm/.well-known/oauth-authorization-server",
+            cause.response.request.url.toString(),
+        )
     }
 }
 
