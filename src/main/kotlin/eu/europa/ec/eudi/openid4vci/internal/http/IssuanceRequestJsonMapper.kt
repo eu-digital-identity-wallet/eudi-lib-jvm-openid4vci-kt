@@ -20,10 +20,6 @@ import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
 import eu.europa.ec.eudi.openid4vci.internal.*
-import eu.europa.ec.eudi.openid4vci.internal.CredentialIssuanceRequest
-import eu.europa.ec.eudi.openid4vci.internal.CredentialType
-import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.ensure
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -270,18 +266,13 @@ private fun issuedCredentialOf(
 @Serializable
 internal data class DeferredRequestTO(
     @SerialName("transaction_id") val transactionId: String,
-    @SerialName("credential_response_encryption") val credentialResponseEncryptionSpec: CredentialResponseEncryptionSpecTO? = null,
 ) {
     companion object {
         fun from(
             deferredCredential: IssuedCredential.Deferred,
-            responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
         ): DeferredRequestTO {
             val transactionId = deferredCredential.transactionId.value
-            val credentialResponseEncryptionSpecTO = responseEncryptionSpec?.run {
-                CredentialResponseEncryptionSpecTO.from(this)
-            }
-            return DeferredRequestTO(transactionId, credentialResponseEncryptionSpecTO)
+            return DeferredRequestTO(transactionId)
         }
     }
 }

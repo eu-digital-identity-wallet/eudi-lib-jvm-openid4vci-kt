@@ -605,6 +605,9 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         }
     }
 
+    /**
+     * Batch credential request syntax is incorrect. Encryption information included in individual requests while shouldn't
+     */
     data object BatchRequestHasEncryptionSpecInIndividualRequests : CredentialIssuanceError(
         "BatchRequestContainsEncryptionOnIndividualRequest",
     ) {
@@ -621,6 +624,9 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         "Encrypted response content-type expected to be $expectedContentType but instead was $invalidContentType",
     )
 
+    /**
+     * Batch response is not syntactically as expected.
+     */
     data class InvalidBatchIssuanceResponse(
         val error: String,
     ) : CredentialIssuanceError("Invalid batch issuance response: $error")

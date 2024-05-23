@@ -15,7 +15,20 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JOSEObjectType
+import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWEHeader
+import com.nimbusds.jose.crypto.ECDHEncrypter
+import com.nimbusds.jose.crypto.RSAEncrypter
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jwt.EncryptedJWT
+import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.EncryptedResponses.*
+import eu.europa.ec.eudi.openid4vci.internal.http.BatchCredentialRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.PushedAuthorizationRequestResponseTO
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenResponseTO
 import io.ktor.client.engine.mock.*
@@ -216,3 +229,126 @@ private fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(request: H
         )
     }
 }
+
+fun MockRequestHandleScope.respondToIssuanceRequestWithDeferredResponseDataBuilder(request: HttpRequestData?): HttpResponseData {
+    val textContent = request?.body as TextContent
+    val issuanceRequest = Json.decodeFromString<CredentialRequestTO>(textContent.text)
+    return if (issuanceRequest.proof != null) {
+        respond(
+            content = """
+                    {                      
+                      "transaction_id": "1234565768122"                     
+                    }
+            """.trimIndent(),
+            status = HttpStatusCode.OK,
+            headers = headersOf(
+                HttpHeaders.ContentType to listOf("application/json"),
+            ),
+        )
+    } else {
+        respond(
+            content = """
+                    {
+                        "error": "invalid_proof",
+                        "c_nonce": "ERE%@^TGWYEYWEY",
+                        "c_nonce_expires_in": 34
+                    } 
+            """.trimIndent(),
+            status = HttpStatusCode.BadRequest,
+            headers = headersOf(
+                HttpHeaders.ContentType to listOf("application/json"),
+            ),
+        )
+    }
+}
+
+fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(
+    credentialIsReady: Boolean,
+    transactionIdIsValid: Boolean = true,
+): HttpResponseData =
+    if (credentialIsReady && transactionIdIsValid) {
+        respond(
+            content = """
+                    {                     
+                      "credential": "credential_content",
+                      "c_nonce": "ERE%@^TGWYEYWEY",
+                      "c_nonce_expires_in": 34
+                    }
+            """.trimIndent(),
+            status = HttpStatusCode.OK,
+            headers = headersOf(
+                HttpHeaders.ContentType to listOf("application/json"),
+            ),
+        )
+    } else {
+        val error =
+            if (!transactionIdIsValid) {
+                "invalid_transaction_id "
+            } else {
+                "issuance_pending"
+            }
+
+        respond(
+            content = """
+                    {
+                      "error": "$error",
+                      "interval": 5
+                    }
+            """.trimIndent(),
+            status = HttpStatusCode.BadRequest,
+            headers = headersOf(
+                HttpHeaders.ContentType to listOf("application/json"),
+            ),
+        )
+    }
+
+fun MockRequestHandleScope.encryptedResponseDataBuilder(
+    request: HttpRequestData?,
+    successResponseJsonProvider: () -> String,
+): HttpResponseData {
+    val (jwk, alg, enc) = extractEncryptionSpec(request)
+    val responseJson = successResponseJsonProvider()
+    return respond(
+        content = encypt(JWTClaimsSet.parse(responseJson), jwk, alg, enc).getOrThrow(),
+        status = HttpStatusCode.OK,
+        headers = headersOf(
+            HttpHeaders.ContentType to listOf("application/jwt"),
+        ),
+    )
+}
+
+private fun extractEncryptionSpec(request: HttpRequestData?): Triple<JWK, JWEAlgorithm, EncryptionMethod> {
+    val textContent = request?.body as TextContent
+    val text = textContent.text
+    val credentialResponseEncryption = if (text.contains("credential_requests")) {
+        Json.decodeFromString<BatchCredentialRequestTO>(text).credentialResponseEncryption
+    } else {
+        Json.decodeFromString<CredentialRequestTO>(text).credentialResponseEncryption
+    }
+    val jwk = JWK.parse(credentialResponseEncryption?.jwk.toString())
+    val alg = JWEAlgorithm.parse(credentialResponseEncryption?.encryptionAlgorithm)
+    val enc = EncryptionMethod.parse(credentialResponseEncryption?.encryptionMethod)
+    return Triple(jwk, alg, enc)
+}
+
+fun encypt(claimSet: JWTClaimsSet, jwk: JWK, alg: JWEAlgorithm, enc: EncryptionMethod): Result<String> =
+    runCatching {
+        randomRSAEncryptionKey(2048)
+        val header =
+            JWEHeader.Builder(alg, enc)
+                .jwk(jwk.toPublicJWK())
+                .keyID(jwk.keyID)
+                .type(JOSEObjectType.JWT)
+                .build()
+
+        val jwt = EncryptedJWT(header, claimSet)
+        val encrypter =
+            when (jwk) {
+                is RSAKey -> RSAEncrypter(jwk)
+                is ECKey -> ECDHEncrypter(jwk)
+                else -> error("unsupported 'kty': '${jwk.keyType.value}'")
+            }
+
+        jwt.encrypt(encrypter)
+        jwt.serialize()
+    }

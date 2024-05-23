@@ -105,6 +105,9 @@ internal class IssuanceServerClient(
      *
      * @param accessToken Access token authorizing the request
      * @param deferredCredential The identifier of the Deferred Issuance transaction
+     * @param responseEncryptionSpec The response encryption information as specified when placing the issuance request. If initial request
+     *      had specified response encryption then the issuer response is expected to be encrypted by the encryption details of the initial
+     *      issuance request.
      * @return response from issuer. Can be either positive if a credential is issued or error in case issuance is still pending
      */
     suspend fun placeDeferredCredentialRequest(
@@ -118,12 +121,12 @@ internal class IssuanceServerClient(
             val response = client.post(url) {
                 bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
-                setBody(DeferredRequestTO.from(deferredCredential, responseEncryptionSpec))
+                setBody(DeferredRequestTO.from(deferredCredential))
             }
             if (response.status.isSuccess()) {
                 responsePossiblyEncrypted<DeferredIssuanceSuccessResponseTO, DeferredCredentialQueryOutcome.Issued>(
                     response,
-                    null, // Replace with responseEncryptionSpec value as soon VCI spec decide on this
+                    responseEncryptionSpec,
                     fromTransferObject = { it.toDomain() },
                     transferObjectFromJwtClaims = { DeferredIssuanceSuccessResponseTO.from(it) },
                 )
