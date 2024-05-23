@@ -285,13 +285,13 @@ internal class AuthorizationServerClient(
             authorizationCode = authorizationCode,
             redirectionURI = config.authFlowRedirectionURI,
             clientId = config.client.id,
-            clientAttestation = buildClientAttestationIfNeeded(),
+            clientAttestation = buildClientAttestationIfNeeded(popJwtId = null),
             pkceVerifier = pkceVerifier,
         )
         requestAccessToken(params).tokensOrFail()
     }
 
-    private suspend fun buildClientAttestationIfNeeded(): JwtClientAttestation? = coroutineScope {
+    private suspend fun buildClientAttestationIfNeeded(popJwtId: String?): JwtClientAttestation? = coroutineScope {
         when (val wallet = config.client) {
             is Client.Public -> null
             is Client.Attested -> {
@@ -299,7 +299,7 @@ internal class AuthorizationServerClient(
                     "Missing jwtClientAssertionIssuer"
                 }
                 val authServer = authorizationServerMetadata.issuer
-                jwtClientAssertionIssuer.issue(wallet, authServer.value)
+                jwtClientAssertionIssuer.issue(wallet, authServer.value, popJwtId)
             }
         }
     }
@@ -321,7 +321,7 @@ internal class AuthorizationServerClient(
             clientId = config.client.id,
             preAuthorizedCode = preAuthorizedCode,
             txCode = txCode,
-            clientAttestation = buildClientAttestationIfNeeded(),
+            clientAttestation = buildClientAttestationIfNeeded(popJwtId = null),
         )
         requestAccessToken(params).tokensOrFail()
     }

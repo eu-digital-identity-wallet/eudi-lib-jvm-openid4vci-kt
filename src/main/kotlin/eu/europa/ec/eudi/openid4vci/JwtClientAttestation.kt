@@ -21,13 +21,16 @@ import com.nimbusds.jose.JWSObject
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.internal.DefaultClientAttestationPopBuilder
 import eu.europa.ec.eudi.openid4vci.internal.SelfAttestedIssuer
-import eu.europa.ec.eudi.openid4vci.internal.SelfAttestedIssuer.Companion.DefaultSupportedSigningAlgorithms
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
 import kotlin.time.Duration
+
+// TODO Check if the values bellow can be used as default `typ`
+const val JOSE_TYPE_WALLET_ATTESTATION_JWT = "wallet-attestation+jwt"
+const val JOSE_TYPE_WALLET_ATTESTATION_POP_JWT = "wallet-attestation-pop+jwt"
 
 /**
  * Qualification of a JWT that adheres to client attestation JWT
@@ -94,8 +97,8 @@ fun interface ClientAttestationIssuer {
          * signs the [ClientAttestationJWT] (without a back-end service)
          *
          * @param supportedSigningAlgorithms the algorithms to be used to sign the [ClientAttestationJWT]
-         * if not provided defaults to [DefaultSupportedSigningAlgorithms]. Caller should make sure that
-         * the provided algorithms are compatible with [Client.Attested.instanceKey]
+         * if not provided defaults to [Client.Attested.DefaultSupportedSigningAlgorithms].
+         * Caller should make sure that the provided algorithms are compatible with [Client.Attested.instanceKey]
          * @param attestationDuration how long the attestation could live. It will be used to calculate
          * the expiration time of the [ClientAttestationJWT]
          * @param headerCustomization possible customization of the JOSE header of the [ClientAttestationJWT].
@@ -104,7 +107,7 @@ fun interface ClientAttestationIssuer {
          * @return an issuer as described above
          */
         fun selfAttested(
-            supportedSigningAlgorithms: Set<JWSAlgorithm> = DefaultSupportedSigningAlgorithms,
+            supportedSigningAlgorithms: Set<JWSAlgorithm> = Client.Attested.DefaultSupportedSigningAlgorithms,
             attestationDuration: Duration,
             headerCustomization: JWSHeader.Builder.() -> Unit = {},
         ): ClientAttestationIssuer = SelfAttestedIssuer(
@@ -127,26 +130,30 @@ fun interface ClientAttestationPoPJWTBuilder {
      * @param client the wallet's data
      * @param authServerId the issuer claim of the OAUTH2/OIDC server to which
      * the attestation will be presented for authentication.
-     * @param duration the time to live of the PoP JWT. It will be used to calculate
-     * the expiration time (`exp` claim)
+     *
      * @param jwtId an option identifier to be included a `jit` claim. If not provided,
      * a random value will be used
-
      * @return the PoP JWT
      */
     suspend fun build(
         clock: Clock,
         client: Client.Attested,
         authServerId: String,
-        duration: Duration,
         jwtId: String?,
     ): ClientAttestationPoPJWT
 
     companion object {
         /**
          * Default implementation
+         * @param typ the `typ` claims of the JOSE header. If not provided, the claim will not be
+         *      * populated
+         * @param duration the time to live of the PoP JWT. It will be used to calculate
+         * the expiration time (`exp` claim)
          */
-        val Default: ClientAttestationPoPJWTBuilder = DefaultClientAttestationPopBuilder
+        fun default(
+            duration: Duration,
+            typ: String?,
+        ): ClientAttestationPoPJWTBuilder = DefaultClientAttestationPopBuilder(duration, typ)
     }
 }
 
@@ -156,6 +163,7 @@ fun interface ClientAttestationPoPJWTBuilder {
  * @param attestationIssuer a way of issuing [ClientAttestationJWT]
  * @param popJwtBuilder a way of building a [ClientAttestationPoPJWT]
  * @param popJwtDuration the duration of the [ClientAttestationPoPJWT]
+ * @param popTyp the
  * @param clientAttestationJwt a [ClientAttestationJWT] that wallet may have issued before, by other means.
  * If not provided, or if it is expired, a new [ClientAttestationJWT] will be issued using [attestationIssuer]
  */
@@ -164,6 +172,7 @@ class JwtClientAssertionIssuer(
     private val attestationIssuer: ClientAttestationIssuer,
     private val popJwtBuilder: ClientAttestationPoPJWTBuilder,
     private val popJwtDuration: Duration,
+    private val popTyp: String? = null,
     private var clientAttestationJwt: ClientAttestationJWT? = null,
 ) {
 
@@ -176,18 +185,21 @@ class JwtClientAssertionIssuer(
      * @param client the wallet's data to be signed by the issuer
      * @param authServerIssuer the authorization server to which the wallet will present the [JwtClientAttestation].
      * It is used to populate the audience claim of the [ClientAttestationPoPJWT]
+     * @param popJwtId if provided it will be used to populate the `jit` claim of the [ClientAttestationPoPJWT].
+     * Otherwise, a random value will be used.
      */
     suspend fun issue(
         client: Client.Attested,
         authServerIssuer: String,
+        popJwtId: String?,
     ): JwtClientAttestation = coroutineScope {
         val attestationJwt = async { issueIfNeededAttestationJwt(client) }
-        val attestationPoPJwt = async { buildPopJwt(client, authServerIssuer) }
+        val attestationPoPJwt = async { buildPopJwt(client, authServerIssuer, popJwtId) }
 
         JwtClientAttestation(attestationJwt.await(), attestationPoPJwt.await())
     }
 
-    private suspend fun issueIfNeededAttestationJwt(client: Client.Attested): ClientAttestationJWT =
+    private suspend fun issueIfNeededAttestationJwt(client: Client.Attested) =
         mutex.withLock {
             val current = clientAttestationJwt
             if (current == null || current.jwt.isExpired()) {
@@ -196,8 +208,8 @@ class JwtClientAssertionIssuer(
             checkNotNull(clientAttestationJwt)
         }
 
-    private suspend fun buildPopJwt(client: Client.Attested, authServerIssuer: String): ClientAttestationPoPJWT =
-        popJwtBuilder.build(clock, client, authServerIssuer, popJwtDuration, null)
+    private suspend fun buildPopJwt(client: Client.Attested, authServerIssuer: String, popJwtId: String?) =
+        popJwtBuilder.build(clock, client, authServerIssuer, popJwtId)
 
     // TODO this needs to take into account clock skew
     private fun SignedJWT.isExpired(): Boolean {

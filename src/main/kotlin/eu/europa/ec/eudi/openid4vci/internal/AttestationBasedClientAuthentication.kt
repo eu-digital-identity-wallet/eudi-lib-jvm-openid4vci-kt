@@ -15,13 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSSigner
-import com.nimbusds.jose.crypto.ECDSASigner
-import com.nimbusds.jose.crypto.Ed25519Signer
-import com.nimbusds.jose.crypto.MACSigner
-import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
@@ -41,7 +38,7 @@ import java.util.*
 import kotlin.time.Duration
 
 internal class SelfAttestedIssuer(
-    supportedSigningAlgorithms: Set<JWSAlgorithm> = DefaultSupportedSigningAlgorithms,
+    supportedSigningAlgorithms: Set<JWSAlgorithm>,
     private val attestationDuration: Duration,
     private val headerCustomization: JWSHeader.Builder.() -> Unit = {},
 ) : ClientAttestationIssuer {
@@ -49,9 +46,7 @@ internal class SelfAttestedIssuer(
         require(supportedSigningAlgorithms.isNotEmpty()) {
             "supportedSigningAlgorithms cannot be empty"
         }
-        require(supportedSigningAlgorithms.all { it !in MACSigner.SUPPORTED_ALGORITHMS }) {
-            "MAC algorithms are not allowed"
-        }
+        supportedSigningAlgorithms.forEach { Client.Attested.requireIsAllowedAlgorithm(it) }
         require(attestationDuration.isPositive()) {
             "Attestation duration must be positive"
         }
@@ -72,11 +67,6 @@ internal class SelfAttestedIssuer(
         )
         return builder.build(client)
     }
-
-    companion object {
-        val DefaultSupportedSigningAlgorithms =
-            ECDSASigner.SUPPORTED_ALGORITHMS + RSASSASigner.SUPPORTED_ALGORITHMS + Ed25519Signer.SUPPORTED_ALGORITHMS
-    }
 }
 
 internal class ClientAttestationJwtBuilder(
@@ -88,13 +78,11 @@ internal class ClientAttestationJwtBuilder(
     private val headerCustomization: JWSHeader.Builder.() -> Unit = {},
 ) {
     init {
-        require(algorithm !in MACSigner.SUPPORTED_ALGORITHMS)
+        Client.Attested.requireIsAllowedAlgorithm(algorithm)
         require(duration.isPositive()) { "Duration must be positive" }
     }
 
     fun build(client: Client.Attested): ClientAttestationJWT {
-        require(client.id.isNotBlank()) { "Wallet id cannot be blank" }
-
         val header = JWSHeader.Builder(algorithm).apply {
             headerCustomization()
         }.build()
@@ -164,19 +152,25 @@ private fun cnf(jwk: JWK): Map<String, Any> =
  * Populates only the mandatory claims : `iss`, `exp`, `jit`, `aud` and the optional `iat`
  * In regard to JOSE header, only `alg` claim is being populated
  */
-internal object DefaultClientAttestationPopBuilder : ClientAttestationPoPJWTBuilder {
+internal class DefaultClientAttestationPopBuilder(
+    private val duration: Duration,
+    private val typ: String?,
+) : ClientAttestationPoPJWTBuilder {
+    init {
+        require(duration.isPositive()) { "duration must be positive" }
+    }
 
     override suspend fun build(
         clock: Clock,
         client: Client.Attested,
         authServerId: String,
-        duration: Duration,
         jwtId: String?,
     ): ClientAttestationPoPJWT {
-        require(duration.isPositive()) { "duration must be positive" }
         fun randomJwtId() = JWTID().value
         val (clientId, instanceKey, popSigningAlgorithm) = client
-        val header = JWSHeader.Builder(popSigningAlgorithm).build()
+        val header = JWSHeader.Builder(popSigningAlgorithm).apply {
+            typ?.let { type(JOSEObjectType(typ)) }
+        }.build()
         val claimSet = JWTClaimsSet.Builder().apply {
             val now = clock.instant()
             val exp = now.plusSeconds(duration.inWholeSeconds)

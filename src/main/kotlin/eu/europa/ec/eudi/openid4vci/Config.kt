@@ -17,7 +17,9 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.MACSigner
+import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
 import java.net.URI
@@ -55,9 +57,20 @@ sealed interface Client {
         init {
             require(id.isNotBlank() && id.isNotEmpty())
             require(instanceKey.isPrivate) { "Instance key must be private" }
-            require(popSigningAlgorithm !in MACSigner.SUPPORTED_ALGORITHMS) {
-                "MAC signing alg is not supported"
-            }
+            requireIsAllowedAlgorithm(popSigningAlgorithm)
+        }
+
+        companion object {
+            /**
+             * [ECDSASigner.SUPPORTED_ALGORITHMS] & [RSASSASigner.SUPPORTED_ALGORITHMS]
+             */
+            val DefaultSupportedSigningAlgorithms =
+                ECDSASigner.SUPPORTED_ALGORITHMS + RSASSASigner.SUPPORTED_ALGORITHMS
+
+            internal fun requireIsAllowedAlgorithm(alg: JWSAlgorithm) =
+                require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
+
+            private fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
         }
     }
 }
