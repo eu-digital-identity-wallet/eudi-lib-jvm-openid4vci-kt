@@ -63,7 +63,9 @@ private sealed interface CredentialSupportedTO {
 
 @Serializable
 private data class ProofSigningAlgorithmsSupportedTO(
-    @SerialName("proof_signing_alg_values_supported") @Required val algorithms: List<String>,
+    @SerialName("proof_signing_alg_values_supported") val algorithms: List<String> = emptyList(),
+    @SerialName("proof_alg_values_supported") val cwtAlgorithms: List<Int> = emptyList(),
+    @SerialName("proof_crv_values_supported") val cwtCurves: List<Int> = emptyList(),
 )
 
 /**
@@ -511,20 +513,22 @@ private data class DisplayTO(
 private fun Map<String, ClaimTO>.toDomain(): Map<ClaimName, Claim?> =
     mapValues { (_, claim) -> claim.toDomain() }
 
-/**
- * Utility method to convert a list of string to a list of [ProofType].
- */
-private fun Map<String, ProofSigningAlgorithmsSupportedTO>?.toProofTypes(): Map<ProofType, List<JWSAlgorithm>> =
-    this?.map {
-        proofTypeOf(it.key) to it.value.algorithms.map { s -> JWSAlgorithm.parse(s) }
-    }?.toMap() ?: emptyMap()
+private fun Map<String, ProofSigningAlgorithmsSupportedTO>?.toProofTypes(): ProofTypesSupported =
+    when (this) {
+        null -> ProofTypesSupported.Empty
+        else -> {
+            val values = map { (type, meta) -> proofTypeMeta(type, meta) }.toSet()
+            ProofTypesSupported(values)
+        }
+    }
 
-private fun proofTypeOf(s: String): ProofType = when (s) {
-    "jwt" -> ProofType.JWT
-    "cwt" -> ProofType.CWT
-    "ldp_vp" -> ProofType.LDP_VP
-    else -> error("Unknown Proof Type '$s'")
-}
+private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta =
+    when (type) {
+        "jwt" -> ProofTypeMeta.Jwt(algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) })
+        "cwt" -> ProofTypeMeta.Cwt(algorithms = meta.cwtAlgorithms, curves = meta.cwtCurves)
+        "ldp_vp" -> ProofTypeMeta.LdpVp
+        else -> error("Unknown Proof Type '$type'")
+    }
 
 /**
  * Utility method to convert a list of string to a list of [CryptographicBindingMethod].
