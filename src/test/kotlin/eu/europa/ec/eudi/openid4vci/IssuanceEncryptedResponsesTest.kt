@@ -588,6 +588,62 @@ class IssuanceEncryptedResponsesTest {
             assertIs<DeferredCredentialQueryOutcome.Issued>(response)
         }
     }
+
+    @Test
+    fun `when deferred request is responded with issuance_pending and encryption was mandated, response must contain encryption info`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+                oidcWellKnownMocker(EncryptedResponses.REQUIRED),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                singleIssuanceRequestMocker(
+                    responseBuilder = {
+                        encryptedResponseDataBuilder(it) {
+                            """ { "transaction_id": "1234565768122" } """.trimIndent()
+                        }
+                    },
+                ),
+                deferredIssuanceRequestMocker(
+                    responseBuilder = { defaultIssuanceResponseDataBuilder(credentialIsReady = false, transactionIdIsValid = true) },
+                ),
+            )
+
+            val responseEncryption = IssuanceResponseEncryptionSpec(
+                jwk = randomRSAEncryptionKey(2048),
+                algorithm = JWEAlgorithm.RSA_OAEP_256,
+                encryptionMethod = EncryptionMethod.A128CBC_HS256,
+            )
+
+            val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                responseEncryptionSpecFactory = { _, _ -> responseEncryption },
+            )
+
+            with(issuer) {
+                assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                    CredentialConfigurationIdentifier(PID_SdJwtVC),
+                    null,
+                )
+                val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
+                assertIs<SubmittedRequest.Success>(submittedRequest)
+
+                val deferredCredential = submittedRequest.credentials[0]
+                assertIs<IssuedCredential.Deferred>(deferredCredential)
+
+                val response = authorizedRequest.queryForDeferredCredential(
+                    deferredCredential,
+                    submittedRequest.responseEncryptionSpec,
+                ).getOrThrow()
+
+                assertIs<DeferredCredentialQueryOutcome.IssuancePending>(response)
+                assertTrue("Encryption info was expected in outcome but not found") {
+                    response.responseEncryptionSpec != null
+                }
+            }
+        }
 }
 
 fun randomRSAEncryptionKey(size: Int): RSAKey = RSAKeyGenerator(size)

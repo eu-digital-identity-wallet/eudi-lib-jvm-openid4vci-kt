@@ -45,50 +45,31 @@ class IssuanceDeferredRequestTest {
             )
 
         with(issuer) {
-            when (authorizedRequest) {
-                is AuthorizedRequest.NoProofRequired -> {
-                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(PID_SdJwtVC),
-                        null,
-                    )
-                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
-                    when (submittedRequest) {
-                        is SubmittedRequest.InvalidProof -> {
-                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                            val secondSubmittedRequest =
-                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+            assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
 
-                            val deferred = when (secondSubmittedRequest) {
-                                is SubmittedRequest.Success -> {
-                                    val issuedCredential = secondSubmittedRequest.credentials[0]
-                                    assertIs<IssuedCredential.Deferred>(issuedCredential)
-                                    issuedCredential
-                                }
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_SdJwtVC),
+                null,
+            )
+            val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
+            assertIs<SubmittedRequest.InvalidProof>(submittedRequest)
 
-                                else -> fail("Success response expected but was not")
-                            }
+            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+            val secondSubmittedRequest =
+                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
 
-                            val requestDeferredIssuance =
-                                authorizedRequest.queryForDeferredCredential(deferred, null)
-                                    .getOrThrow()
+            assertIs<SubmittedRequest.Success>(secondSubmittedRequest)
 
-                            assertTrue("Expected response type Errored but was not") {
-                                requestDeferredIssuance is DeferredCredentialQueryOutcome.Errored
-                            }
+            val issuedCredential = secondSubmittedRequest.credentials[0]
+            assertIs<IssuedCredential.Deferred>(issuedCredential)
 
-                            assertTrue("Expected interval but was not present") {
-                                (requestDeferredIssuance as DeferredCredentialQueryOutcome.Errored)
-                                    .error != "invalid_transaction_id"
-                            }
-                        }
+            val requestDeferredIssuance =
+                authorizedRequest.queryForDeferredCredential(issuedCredential, null)
+                    .getOrThrow()
 
-                        is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
-                        is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
-                    }
-                }
-
-                is AuthorizedRequest.ProofRequired ->
-                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+            assertIs<DeferredCredentialQueryOutcome.Errored>(requestDeferredIssuance)
+            assertTrue("Expected error response invalid_transaction_id but was not") {
+                requestDeferredIssuance.error != "invalid_transaction_id"
             }
         }
     }
@@ -115,45 +96,31 @@ class IssuanceDeferredRequestTest {
             )
 
         with(issuer) {
-            when (authorizedRequest) {
-                is AuthorizedRequest.NoProofRequired -> {
-                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(PID_SdJwtVC),
-                        null,
-                    )
-                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
-                    when (submittedRequest) {
-                        is SubmittedRequest.InvalidProof -> {
-                            val proofRequired =
-                                authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                            val secondSubmittedRequest =
-                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+            assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_SdJwtVC),
+                null,
+            )
+            val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
 
-                            val deferred = when (secondSubmittedRequest) {
-                                is SubmittedRequest.Success -> {
-                                    val issuedCredential = secondSubmittedRequest.credentials[0]
-                                    assertIs<IssuedCredential.Deferred>(issuedCredential)
-                                    issuedCredential
-                                }
+            assertIs<SubmittedRequest.InvalidProof>(submittedRequest)
+            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+            val secondSubmittedRequest = proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
 
-                                else -> fail("Success response expected but was not")
-                            }
+            assertIs<SubmittedRequest.Success>(secondSubmittedRequest)
+            val issuedCredential = secondSubmittedRequest.credentials[0]
+            assertIs<IssuedCredential.Deferred>(issuedCredential)
 
-                            val requestDeferredIssuance =
-                                authorizedRequest.queryForDeferredCredential(deferred, null)
-                                    .getOrThrow()
+            val requestDeferredIssuance =
+                authorizedRequest.queryForDeferredCredential(issuedCredential, null)
+                    .getOrThrow()
 
-                            assertIs<DeferredCredentialQueryOutcome.IssuancePending>(requestDeferredIssuance)
-                            assertNotNull(requestDeferredIssuance.interval) { "Expected interval but was not present" }
-                        }
-
-                        is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
-                        is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
-                    }
-                }
-
-                is AuthorizedRequest.ProofRequired ->
-                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
+            assertIs<DeferredCredentialQueryOutcome.IssuancePending>(requestDeferredIssuance)
+            assertTrue("Expected interval but was not present") {
+                requestDeferredIssuance.interval != null
+            }
+            assertTrue("No encryption info was expected but was provided") {
+                requestDeferredIssuance.responseEncryptionSpec == null
             }
         }
     }
@@ -199,42 +166,25 @@ class IssuanceDeferredRequestTest {
             )
 
         with(issuer) {
-            when (authorizedRequest) {
-                is AuthorizedRequest.NoProofRequired -> {
-                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(PID_SdJwtVC),
-                        null,
-                    )
-                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
-                    when (submittedRequest) {
-                        is SubmittedRequest.InvalidProof -> {
-                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                            val secondSubmittedRequest =
-                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+            assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_SdJwtVC),
+                null,
+            )
+            val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
 
-                            val deferred = when (secondSubmittedRequest) {
-                                is SubmittedRequest.Success -> {
-                                    val issuedCredential = secondSubmittedRequest.credentials[0]
-                                    require(issuedCredential is IssuedCredential.Deferred)
-                                    issuedCredential
-                                }
+            assertIs<SubmittedRequest.InvalidProof>(submittedRequest)
+            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+            val secondSubmittedRequest =
+                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
 
-                                else -> fail("Success response expected but was not")
-                            }
+            assertIs<SubmittedRequest.Success>(secondSubmittedRequest)
+            val issuedCredential = secondSubmittedRequest.credentials[0]
+            require(issuedCredential is IssuedCredential.Deferred)
 
-                            val requestDeferredIssuance = authorizedRequest.queryForDeferredCredential(deferred, null)
-                                .getOrThrow()
-                            assertIs<DeferredCredentialQueryOutcome.Issued>(requestDeferredIssuance)
-                        }
-
-                        is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
-                        is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
-                    }
-                }
-
-                is AuthorizedRequest.ProofRequired ->
-                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
-            }
+            val requestDeferredIssuance = authorizedRequest.queryForDeferredCredential(issuedCredential, null)
+                .getOrThrow()
+            assertIs<DeferredCredentialQueryOutcome.Issued>(requestDeferredIssuance)
         }
     }
 

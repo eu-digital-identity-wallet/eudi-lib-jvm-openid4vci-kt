@@ -301,7 +301,9 @@ sealed interface DeferredCredentialQueryOutcome {
     data class Issued(val credential: IssuedCredential.Issued) : DeferredCredentialQueryOutcome
 
     data class IssuancePending(
+        val transactionId: TransactionId,
         val interval: Long? = null,
+        val responseEncryptionSpec: IssuanceResponseEncryptionSpec? = null,
     ) : DeferredCredentialQueryOutcome
 
     data class Errored(

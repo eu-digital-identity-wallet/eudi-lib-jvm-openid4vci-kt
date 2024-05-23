@@ -132,7 +132,10 @@ internal class IssuanceServerClient(
                 )
             } else {
                 val responsePayload = response.body<GenericErrorResponseTO>()
-                responsePayload.toDeferredCredentialQueryOutcome()
+                responsePayload.toDeferredCredentialQueryOutcome(
+                    deferredCredential.transactionId,
+                    responseEncryptionSpec,
+                )
             }
         }
     }

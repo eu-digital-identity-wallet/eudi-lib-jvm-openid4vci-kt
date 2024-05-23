@@ -370,9 +370,12 @@ internal data class GenericErrorResponseTO(
         else -> IssuanceRequestFailed(error, errorDescription)
     }
 
-    fun toDeferredCredentialQueryOutcome(): DeferredCredentialQueryOutcome =
+    fun toDeferredCredentialQueryOutcome(
+        transactionId: TransactionId,
+        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+    ): DeferredCredentialQueryOutcome =
         when (error) {
-            "issuance_pending" -> DeferredCredentialQueryOutcome.IssuancePending(interval)
+            "issuance_pending" -> DeferredCredentialQueryOutcome.IssuancePending(transactionId, interval, responseEncryptionSpec)
             else -> DeferredCredentialQueryOutcome.Errored(error, errorDescription)
         }
 }
