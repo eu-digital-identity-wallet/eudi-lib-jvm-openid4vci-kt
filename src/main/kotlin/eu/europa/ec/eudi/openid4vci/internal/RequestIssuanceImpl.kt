@@ -183,14 +183,14 @@ internal class RequestIssuanceImpl(
         return when (val credentialRequest = issuanceRequestSupplier()) {
             is CredentialIssuanceRequest.SingleRequest -> {
                 issuanceServerClient.placeIssuanceRequest(token, credentialRequest).fold(
-                    onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce, credentialRequest.encryption) },
+                    onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
                 )
             }
 
             is CredentialIssuanceRequest.BatchRequest -> {
                 issuanceServerClient.placeBatchIssuanceRequest(token, credentialRequest).fold(
-                    onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce, credentialRequest.encryption) },
+                    onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
                 )
             }

@@ -64,7 +64,7 @@ class IssuanceDeferredRequestTest {
             assertIs<IssuedCredential.Deferred>(issuedCredential)
 
             val requestDeferredIssuance =
-                authorizedRequest.queryForDeferredCredential(issuedCredential, null)
+                authorizedRequest.queryForDeferredCredential(issuedCredential)
                     .getOrThrow()
 
             assertIs<DeferredCredentialQueryOutcome.Errored>(requestDeferredIssuance)
@@ -112,15 +112,12 @@ class IssuanceDeferredRequestTest {
             assertIs<IssuedCredential.Deferred>(issuedCredential)
 
             val requestDeferredIssuance =
-                authorizedRequest.queryForDeferredCredential(issuedCredential, null)
+                authorizedRequest.queryForDeferredCredential(issuedCredential)
                     .getOrThrow()
 
             assertIs<DeferredCredentialQueryOutcome.IssuancePending>(requestDeferredIssuance)
             assertTrue("Expected interval but was not present") {
                 requestDeferredIssuance.interval != null
-            }
-            assertTrue("No encryption info was expected but was provided") {
-                requestDeferredIssuance.responseEncryptionSpec == null
             }
         }
     }
@@ -182,7 +179,7 @@ class IssuanceDeferredRequestTest {
             val issuedCredential = secondSubmittedRequest.credentials[0]
             require(issuedCredential is IssuedCredential.Deferred)
 
-            val requestDeferredIssuance = authorizedRequest.queryForDeferredCredential(issuedCredential, null)
+            val requestDeferredIssuance = authorizedRequest.queryForDeferredCredential(issuedCredential)
                 .getOrThrow()
             assertIs<DeferredCredentialQueryOutcome.Issued>(requestDeferredIssuance)
         }

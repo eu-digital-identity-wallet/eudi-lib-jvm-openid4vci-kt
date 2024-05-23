@@ -115,12 +115,10 @@ sealed interface SubmittedRequest : java.io.Serializable {
      * If the issuance request was a batch request, it will contain the results of each issuance request.
      * If it was a single issuance request list will contain only one result.
      * @param cNonce Nonce information sent back from the issuance server.
-     * @param responseEncryptionSpec The response encryption information as specified in the issuance request.
      */
     data class Success(
         val credentials: List<IssuedCredential>,
         val cNonce: CNonce?,
-        val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ) : SubmittedRequest
 
     /**
@@ -301,9 +299,7 @@ sealed interface DeferredCredentialQueryOutcome {
     data class Issued(val credential: IssuedCredential.Issued) : DeferredCredentialQueryOutcome
 
     data class IssuancePending(
-        val transactionId: TransactionId,
         val interval: Long? = null,
-        val responseEncryptionSpec: IssuanceResponseEncryptionSpec? = null,
     ) : DeferredCredentialQueryOutcome
 
     data class Errored(
@@ -321,12 +317,10 @@ fun interface QueryForDeferredCredential {
      * Given an authorized request submits a deferred credential request for an identifier of a Deferred Issuance transaction.
      *
      * @param deferredCredential The identifier of a Deferred Issuance transaction.
-     * @param responseEncryptionSpec The response encryption information as specified when placing the issuance request.
      * @return The result of the submission.
      */
     suspend fun AuthorizedRequest.queryForDeferredCredential(
         deferredCredential: IssuedCredential.Deferred,
-        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<DeferredCredentialQueryOutcome>
 }
 
