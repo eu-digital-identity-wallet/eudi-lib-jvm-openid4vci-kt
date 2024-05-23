@@ -45,7 +45,7 @@ sealed interface Client {
      *
      * @param instanceKey The wallet instance key (pair). This key will be used to identify the wallet
      * to a specific credential issuer. Should not be re-used.
-     * @param popSigningAlgorithm the algorithm to be used to sign the [ClientAttestationPoP]
+     * @param popSigningAlgorithm the algorithm to be used to sign the [ClientAttestationPoPJWT]
      */
     data class Attested(
         override val id: ClientId,

@@ -159,33 +159,39 @@ internal object ClientAttestationJWTProcessorFactory {
 private fun cnf(jwk: JWK): Map<String, Any> =
     mapOf("jwk" to jwk.toJSONObject())
 
-internal class DefaultClientAttestationPopBuilder(
-    supportedSigningAlgorithms: Set<JWSAlgorithm>,
-    private val duration: Duration,
-) : ClientAttestationPoPBuilder {
+/**
+ * Default implementation of [ClientAttestationPoPJWTBuilder]
+ * Populates only the mandatory claims : `iss`, `exp`, `jit`, `aud` and the optional `iat`
+ * In regard to JOSE header, only `alg` claim is being populated
+ */
+internal object DefaultClientAttestationPopBuilder : ClientAttestationPoPJWTBuilder {
 
-    init {
-        require(duration.isPositive())
-    }
-
-    private val signerFactory = jwsSignerFactoryFor(supportedSigningAlgorithms)
-
-    override suspend fun build(clock: Clock, client: Client.Attested, authServerId: String): ClientAttestationPoP {
-        val header = JWSHeader.Builder(client.popSigningAlgorithm).build()
+    override suspend fun build(
+        clock: Clock,
+        client: Client.Attested,
+        authServerId: String,
+        duration: Duration,
+        jwtId: String?,
+    ): ClientAttestationPoPJWT {
+        require(duration.isPositive()) { "duration must be positive" }
+        fun randomJwtId() = JWTID().value
+        val (clientId, instanceKey, popSigningAlgorithm) = client
+        val header = JWSHeader.Builder(popSigningAlgorithm).build()
         val claimSet = JWTClaimsSet.Builder().apply {
             val now = clock.instant()
             val exp = now.plusSeconds(duration.inWholeSeconds)
-            issuer(client.id)
-            jwtID(JWTID().value)
+            issuer(clientId)
+            jwtID(jwtId ?: randomJwtId())
             issueTime(Date.from(now))
             expirationTime(Date.from(exp))
             audience(authServerId)
         }.build()
         val jwt = SignedJWT(header, claimSet).apply {
-            val signer = signerFactory.createJWSSigner(client.instanceKey, client.popSigningAlgorithm)
+            val signerFactory = jwsSignerFactoryFor(setOf(popSigningAlgorithm))
+            val signer = signerFactory.createJWSSigner(instanceKey, popSigningAlgorithm)
             sign(signer)
         }
-        return ClientAttestationPoP(jwt)
+        return ClientAttestationPoPJWT(jwt)
     }
 }
 
