@@ -43,10 +43,16 @@ internal class DefaultAuthorizationServerMetadataResolver(
      */
     private suspend fun fetchOidcServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
         runCatching {
-            val url = issuer.metadataUrl("/.well-known/openid-configuration")
+            val url = issuer.metadataUrl(
+                metadata = "/.well-known/openid-configuration",
+                lookup = Lookup.BySpecification,
+            )
             fetchAndParse(url, OIDCProviderMetadata::parse)
         }.recoverCatching {
-            val url = issuer.metadataUrl("/.well-known/openid-configuration", false)
+            val url = issuer.metadataUrl(
+                metadata = "/.well-known/openid-configuration",
+                lookup = Lookup.CommonDeviation,
+            )
             fetchAndParse(url, OIDCProviderMetadata::parse)
         }
 
@@ -56,10 +62,16 @@ internal class DefaultAuthorizationServerMetadataResolver(
      */
     private suspend fun fetchOauthServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
         runCatching {
-            val url = issuer.metadataUrl("/.well-known/oauth-authorization-server")
+            val url = issuer.metadataUrl(
+                metadata = "/.well-known/oauth-authorization-server",
+                lookup = Lookup.BySpecification,
+            )
             fetchAndParse(url, AuthorizationServerMetadata::parse)
         }.recoverCatching {
-            val url = issuer.metadataUrl("/.well-known/oauth-authorization-server", false)
+            val url = issuer.metadataUrl(
+                metadata = "/.well-known/oauth-authorization-server",
+                lookup = Lookup.CommonDeviation,
+            )
             fetchAndParse(url, AuthorizationServerMetadata::parse)
         }
 
@@ -80,21 +92,31 @@ private fun CIAuthorizationServerMetadata.expectIssuer(expected: HttpsUrl) =
     require(issuer == Issuer(expected.value.toURI())) { "issuer does not match the expected value" }
 
 /**
+ * How metadata lookup should be performed.
+ */
+private enum class Lookup {
+    BySpecification,
+    CommonDeviation,
+}
+
+/**
  * Gets a well-known metadata URL of an issuer.
  *
  * @receiver the Issuer
  * @param metadata the well-known metadata URL to get
- * @param specCompliant whether to get a spec-compliant URL or not
+ * @param lookup whether to produce a spec-compliant URL or not
  */
-private fun HttpsUrl.metadataUrl(metadata: String, specCompliant: Boolean = true): Url =
-    with(Url(this.value.toString())) {
-        return if (specCompliant) {
-            URLBuilder(this).apply {
-                path("/${metadata.removePrefix("/").removeSuffix("/")}${pathSegments.joinToString("/")}")
+private fun HttpsUrl.metadataUrl(metadata: String, lookup: Lookup): Url {
+    val issuer = Url(this.value.toString())
+    return when (lookup) {
+        Lookup.BySpecification ->
+            URLBuilder(issuer).apply {
+                path("/${metadata.removePrefix("/").removeSuffix("/")}${issuer.pathSegments.joinToString("/")}")
             }.build()
-        } else {
-            URLBuilder(this)
+
+        Lookup.CommonDeviation ->
+            URLBuilder(issuer)
                 .appendPathSegments("/${metadata.removePrefix("/").removeSuffix("/")}", encodeSlash = false)
                 .build()
-        }
     }
+}
