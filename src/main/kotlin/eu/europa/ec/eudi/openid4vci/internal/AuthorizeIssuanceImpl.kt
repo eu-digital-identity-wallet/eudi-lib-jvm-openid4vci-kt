@@ -134,7 +134,8 @@ internal fun TxCode.validate(txCode: String?) {
 
 internal fun authorizedRequest(offer: CredentialOffer, tokenResponse: TokenResponse): AuthorizedRequest {
     val offerRequiresProofs = offer.credentialConfigurationIdentifiers.any {
-        !offer.credentialIssuerMetadata.credentialConfigurationsSupported[it]?.proofTypesSupported.isNullOrEmpty()
+        val credentialConfiguration = offer.credentialIssuerMetadata.credentialConfigurationsSupported[it]
+        credentialConfiguration != null && credentialConfiguration.proofTypesSupported.values.isNotEmpty()
     }
     val (accessToken, refreshToken, cNonce, authorizationDetails) = tokenResponse
     return when {

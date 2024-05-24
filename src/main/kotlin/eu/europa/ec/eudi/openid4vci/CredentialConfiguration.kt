@@ -57,6 +57,44 @@ enum class ProofType : Serializable {
     LDP_VP,
 }
 
+sealed interface ProofTypeMeta : Serializable {
+    data class Jwt(val algorithms: List<JWSAlgorithm>) : ProofTypeMeta {
+        init {
+            require(algorithms.isNotEmpty()) { "Supported algorithms in case of JWT cannot be empty" }
+        }
+    }
+
+    data object Cwt : ProofTypeMeta {
+        private fun readResolve(): Any = Cwt
+    }
+
+    data object LdpVp : ProofTypeMeta {
+        private fun readResolve(): Any = LdpVp
+    }
+}
+
+fun ProofTypeMeta.type(): ProofType = when (this) {
+    is ProofTypeMeta.Jwt -> ProofType.JWT
+    is ProofTypeMeta.Cwt -> ProofType.CWT
+    is ProofTypeMeta.LdpVp -> ProofType.LDP_VP
+}
+
+@JvmInline
+value class ProofTypesSupported private constructor(val values: Set<ProofTypeMeta>) {
+
+    operator fun get(type: ProofType): ProofTypeMeta? = values.firstOrNull { it.type() == type }
+
+    companion object {
+        val Empty: ProofTypesSupported = ProofTypesSupported(emptySet())
+        operator fun invoke(values: Set<ProofTypeMeta>): ProofTypesSupported {
+            require(values.groupBy(ProofTypeMeta::type).all { (_, instances) -> instances.size == 1 }) {
+                "Multiple instance of the same proof type are not allowed"
+            }
+            return ProofTypesSupported(values)
+        }
+    }
+}
+
 typealias CssColor = String
 
 /**
@@ -87,7 +125,7 @@ sealed interface CredentialConfiguration : Serializable {
     val scope: String?
     val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod>
     val credentialSigningAlgorithmsSupported: List<String>
-    val proofTypesSupported: Map<ProofType, List<JWSAlgorithm>>
+    val proofTypesSupported: ProofTypesSupported
     val display: List<Display>
 }
 
@@ -122,7 +160,7 @@ data class MsoMdocCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
-    override val proofTypesSupported: Map<ProofType, List<JWSAlgorithm>> = emptyMap(),
+    override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val display: List<Display> = emptyList(),
     val docType: String,
     val claims: MsoMdocClaims = emptyMap(),
@@ -133,7 +171,7 @@ data class SdJwtVcCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
-    override val proofTypesSupported: Map<ProofType, List<JWSAlgorithm>> = emptyMap(),
+    override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val display: List<Display> = emptyList(),
     val type: String,
     val claims: Map<ClaimName, Claim?>?,
@@ -152,7 +190,7 @@ data class W3CJsonLdDataIntegrityCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
-    override val proofTypesSupported: Map<ProofType, List<JWSAlgorithm>> = emptyMap(),
+    override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val display: List<Display> = emptyList(),
     val context: List<String> = emptyList(),
     val type: List<String> = emptyList(),
@@ -167,7 +205,7 @@ data class W3CJsonLdSignedJwtCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
-    override val proofTypesSupported: Map<ProofType, List<JWSAlgorithm>> = emptyMap(),
+    override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val display: List<Display> = emptyList(),
     val context: List<String> = emptyList(),
     val credentialDefinition: W3CJsonLdCredentialDefinition,
@@ -181,7 +219,7 @@ data class W3CSignedJwtCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
-    override val proofTypesSupported: Map<ProofType, List<JWSAlgorithm>> = emptyMap(),
+    override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val display: List<Display> = emptyList(),
     val credentialDefinition: CredentialDefinition,
     val order: List<ClaimName> = emptyList(),

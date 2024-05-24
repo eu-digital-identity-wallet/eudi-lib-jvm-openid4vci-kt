@@ -68,10 +68,11 @@ internal sealed interface ProofBuilder {
                 "No credential specification provided"
             }
             val proofTypesSupported = spec.proofTypesSupported
-            ensure(ProofType.JWT in proofTypesSupported.keys) {
+            val jwtProofTypeMeta = proofTypesSupported.values.filterIsInstance<ProofTypeMeta.Jwt>().firstOrNull()
+            ensureNotNull(jwtProofTypeMeta) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
             }
-            val proofTypeSigningAlgorithmsSupported = proofTypesSupported[ProofType.JWT].orEmpty()
+            val proofTypeSigningAlgorithmsSupported = jwtProofTypeMeta.algorithms
             ensure(proofSigner.getAlgorithm() in proofTypeSigningAlgorithmsSupported) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported
             }

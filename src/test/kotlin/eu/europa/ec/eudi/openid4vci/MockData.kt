@@ -81,7 +81,7 @@ internal fun universityDegreeJwt() = W3CSignedJwtCredential(
     "UniversityDegree_JWT",
     listOf(CryptographicBindingMethod.DID("did:example")),
     listOf("ES256K"),
-    mapOf(ProofType.JWT to listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256)),
+    ProofTypesSupported(setOf(ProofTypeMeta.Jwt(listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256)))),
     listOf(
         Display(
             "University Credential",
@@ -132,7 +132,7 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
     "UniversityDegree_LDP_VC",
     listOf(CryptographicBindingMethod.DID("did:example")),
     listOf("Ed25519Signature2018"),
-    mapOf(ProofType.JWT to listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256)),
+    ProofTypesSupported(setOf(ProofTypeMeta.Jwt(listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256)))),
     listOf(
         Display(
             "University Credential",
@@ -192,7 +192,7 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
     "UniversityDegree_JWT_VC_JSON-LD",
     listOf(CryptographicBindingMethod.DID("did:example")),
     listOf("Ed25519Signature2018"),
-    mapOf(ProofType.JWT to listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256)),
+    ProofTypesSupported(setOf(ProofTypeMeta.Jwt(listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256)))),
     listOf(
         Display(
             "University Credential",
@@ -251,7 +251,7 @@ internal fun mobileDrivingLicense() = MsoMdocCredential(
     "MobileDrivingLicense_msoMdoc",
     listOf(CryptographicBindingMethod.COSE),
     listOf("ES256", "ES384", "ES512"),
-    mapOf(ProofType.JWT to listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256)),
+    ProofTypesSupported(setOf(ProofTypeMeta.Jwt(listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256)))),
     listOf(
         Display(
             "Mobile Driving License",

@@ -55,16 +55,18 @@ val DefaultOpenId4VCIConfig = OpenId4VCIConfig(
     dPoPProofSigner = CryptoGenerator.ecProofSigner(),
 )
 
-internal fun createHttpClient(): HttpClient = HttpClient(Apache) {
+internal fun createHttpClient(enableLogging: Boolean = true): HttpClient = HttpClient(Apache) {
     install(ContentNegotiation) {
         json(
             json = Json { ignoreUnknownKeys = true },
         )
     }
     install(HttpCookies)
-    install(Logging) {
-        logger = Logger.DEFAULT
-        level = LogLevel.ALL
+    if (enableLogging) {
+        install(Logging) {
+            logger = Logger.DEFAULT
+            level = LogLevel.ALL
+        }
     }
     engine {
         customizeClient {

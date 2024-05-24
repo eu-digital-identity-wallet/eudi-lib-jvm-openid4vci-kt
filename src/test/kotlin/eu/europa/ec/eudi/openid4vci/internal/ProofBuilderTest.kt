@@ -16,14 +16,9 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JWSAlgorithm
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator
-import eu.europa.ec.eudi.openid4vci.ProofType
+import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.universityDegreeJwt
-import kotlin.test.Test
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Test cases for [ProofBuilder].
@@ -34,8 +29,12 @@ internal class ProofBuilderTest {
     fun `proof is successfully generated when signing algorithm is supported by the issuer`() {
         val signingAlgorithm = JWSAlgorithm.RS256
         val credentialConfiguration = universityDegreeJwt()
-        assertTrue { ProofType.JWT in credentialConfiguration.proofTypesSupported }
-        assertTrue { signingAlgorithm in credentialConfiguration.proofTypesSupported[ProofType.JWT].orEmpty() }
+        val proofTypeMeta = credentialConfiguration.proofTypesSupported
+            .values.filterIsInstance<ProofTypeMeta.Jwt>()
+            .firstOrNull()
+        assertNotNull(proofTypeMeta)
+
+        assertTrue { signingAlgorithm in proofTypeMeta.algorithms }
 
         val signer = CryptoGenerator.rsaProofSigner(signingAlgorithm)
         ProofBuilder.ofType(ProofType.JWT) {
@@ -52,8 +51,11 @@ internal class ProofBuilderTest {
     fun `proof is not generated when signing algorithm is not supported by the issuer`() {
         val signingAlgorithm = JWSAlgorithm.RS512
         val credentialConfiguration = universityDegreeJwt()
-        assertTrue { ProofType.JWT in credentialConfiguration.proofTypesSupported }
-        assertFalse { signingAlgorithm in credentialConfiguration.proofTypesSupported[ProofType.JWT].orEmpty() }
+        val proofTypeMeta = credentialConfiguration.proofTypesSupported
+            .values.filterIsInstance<ProofTypeMeta.Jwt>()
+            .firstOrNull()
+        assertNotNull(proofTypeMeta)
+        assertFalse { signingAlgorithm in proofTypeMeta.algorithms }
 
         val signer = CryptoGenerator.rsaProofSigner(signingAlgorithm)
         assertFailsWith(CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported::class) {
