@@ -58,10 +58,16 @@ enum class ProofType : Serializable {
 }
 
 sealed interface ProofTypeMeta : Serializable {
-    data class Jwt(val algorithms: List<JWSAlgorithm>) : ProofTypeMeta
+    data class Jwt(val algorithms: List<JWSAlgorithm>) : ProofTypeMeta {
+        init {
+            require(algorithms.isNotEmpty()) { "Supported algorithms in case of JWT cannot be empty" }
+        }
+    }
+
     data object Cwt : ProofTypeMeta {
         private fun readResolve(): Any = Cwt
     }
+
     data object LdpVp : ProofTypeMeta {
         private fun readResolve(): Any = LdpVp
     }
@@ -77,6 +83,7 @@ fun ProofTypeMeta.type(): ProofType = when (this) {
 value class ProofTypesSupported private constructor(val values: Set<ProofTypeMeta>) {
 
     operator fun get(type: ProofType): ProofTypeMeta? = values.firstOrNull { it.type() == type }
+
     companion object {
         val Empty: ProofTypesSupported = ProofTypesSupported(emptySet())
         operator fun invoke(values: Set<ProofTypeMeta>): ProofTypesSupported {

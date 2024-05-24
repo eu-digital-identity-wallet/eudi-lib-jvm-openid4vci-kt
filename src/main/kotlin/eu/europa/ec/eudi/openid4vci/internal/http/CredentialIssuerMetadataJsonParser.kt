@@ -64,8 +64,6 @@ private sealed interface CredentialSupportedTO {
 @Serializable
 private data class ProofSigningAlgorithmsSupportedTO(
     @SerialName("proof_signing_alg_values_supported") val algorithms: List<String> = emptyList(),
-    @SerialName("proof_alg_values_supported") val cwtAlgorithms: List<Int> = emptyList(),
-    @SerialName("proof_crv_values_supported") val cwtCurves: List<Int> = emptyList(),
 )
 
 /**
@@ -527,6 +525,7 @@ private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO)
         "jwt" -> ProofTypeMeta.Jwt(
             algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) },
         )
+
         "cwt" -> ProofTypeMeta.Cwt
         "ldp_vp" -> ProofTypeMeta.LdpVp
         else -> error("Unknown Proof Type '$type'")
