@@ -57,12 +57,11 @@ enum class ProofType : Serializable {
     LDP_VP,
 }
 
-@JvmInline
-value class CurveIdentifier(val value: Int)
-
 sealed interface ProofTypeMeta : Serializable {
     data class Jwt(val algorithms: List<JWSAlgorithm>) : ProofTypeMeta
-    data class Cwt(val algorithms: List<Int>, val curves: List<CurveIdentifier>) : ProofTypeMeta
+    data object Cwt : ProofTypeMeta {
+        private fun readResolve(): Any = Cwt
+    }
     data object LdpVp : ProofTypeMeta {
         private fun readResolve(): Any = LdpVp
     }

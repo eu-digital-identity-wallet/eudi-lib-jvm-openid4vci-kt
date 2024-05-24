@@ -527,10 +527,7 @@ private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO)
         "jwt" -> ProofTypeMeta.Jwt(
             algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) },
         )
-        "cwt" -> ProofTypeMeta.Cwt(
-            algorithms = meta.cwtAlgorithms,
-            curves = meta.cwtCurves.map { CurveIdentifier(it) },
-        )
+        "cwt" -> ProofTypeMeta.Cwt
         "ldp_vp" -> ProofTypeMeta.LdpVp
         else -> error("Unknown Proof Type '$type'")
     }
