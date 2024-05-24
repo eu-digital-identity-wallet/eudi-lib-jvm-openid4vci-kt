@@ -58,7 +58,7 @@ enum class ProofType : Serializable {
 }
 
 @JvmInline
-value class CurveIdentifier(val value : Int)
+value class CurveIdentifier(val value: Int)
 
 sealed interface ProofTypeMeta : Serializable {
     data class Jwt(val algorithms: List<JWSAlgorithm>) : ProofTypeMeta

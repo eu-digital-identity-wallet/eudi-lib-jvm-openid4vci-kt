@@ -525,11 +525,11 @@ private fun Map<String, ProofSigningAlgorithmsSupportedTO>?.toProofTypes(): Proo
 private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta =
     when (type) {
         "jwt" -> ProofTypeMeta.Jwt(
-            algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
+            algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) },
         )
         "cwt" -> ProofTypeMeta.Cwt(
             algorithms = meta.cwtAlgorithms,
-            curves = meta.cwtCurves.map { CurveIdentifier(it) }
+            curves = meta.cwtCurves.map { CurveIdentifier(it) },
         )
         "ldp_vp" -> ProofTypeMeta.LdpVp
         else -> error("Unknown Proof Type '$type'")
