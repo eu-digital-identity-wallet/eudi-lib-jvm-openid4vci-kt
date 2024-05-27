@@ -46,7 +46,7 @@ data class OpenId4VCIConfig(
     init {
         if (null != dPoPProofSigner) {
             val key = dPoPProofSigner.getBindingKey()
-            require(key is BindingKey.Jwk) {
+            require(key is JwtBindingKey.Jwk) {
                 "Only JWK can be used with DPoP Proof signer"
             }
             require(!key.jwk.isPrivate) {

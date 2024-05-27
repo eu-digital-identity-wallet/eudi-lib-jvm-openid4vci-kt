@@ -40,7 +40,7 @@ object CryptoGenerator {
 
     fun rsaProofSigner(signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256): ProofSigner {
         val keyPair = randomRSASigningKey(2048)
-        val bindingKey = BindingKey.Jwk(
+        val bindingKey = JwtBindingKey.Jwk(
             jwk = keyPair.toPublicJWK(),
         )
         return ProofSigner.make(keyPair, bindingKey, signingAlgorithm)
@@ -48,7 +48,7 @@ object CryptoGenerator {
 
     fun ecProofSigner(): ProofSigner {
         val keyPair = randomECSigningKey(Curve.P_256)
-        val bindingKey = BindingKey.Jwk(
+        val bindingKey = JwtBindingKey.Jwk(
             jwk = keyPair.toPublicJWK(),
         )
         return ProofSigner.make(keyPair, bindingKey, JWSAlgorithm.ES256)

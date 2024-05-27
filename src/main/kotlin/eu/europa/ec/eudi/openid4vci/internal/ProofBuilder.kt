@@ -23,25 +23,21 @@ import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import java.time.Instant
 import java.util.*
-import kotlin.contracts.ExperimentalContracts
-import kotlin.contracts.InvocationKind
-import kotlin.contracts.contract
 
-internal sealed interface ProofBuilder {
+internal sealed interface ProofBuilder<BINDING_KEY, out PROOF : Proof> {
     fun iss(iss: String)
     fun aud(aud: String)
     fun nonce(nonce: String)
-    fun publicKey(publicKey: BindingKey)
     fun credentialSpec(credentialSpec: CredentialConfiguration)
+    fun publicKey(publicKey: BINDING_KEY)
+    fun build(proofSigner: ProofSigner): PROOF
 
-    fun build(proofSigner: ProofSigner): Proof
-
-    private class JwtProofBuilder : ProofBuilder {
+    class JwtProofBuilder() : ProofBuilder<JwtBindingKey, Proof.Jwt> {
 
         private val headerType = "openid4vci-proof+jwt"
-        val claimsSet = JWTClaimsSet.Builder()
-        var publicKey: BindingKey? = null
-        var credentialSpec: CredentialConfiguration? = null
+        private val claimsSet = JWTClaimsSet.Builder()
+        private var publicKey: JwtBindingKey? = null
+        private var credentialSpec: CredentialConfiguration? = null
 
         override fun iss(iss: String) {
             claimsSet.issuer(iss)
@@ -55,7 +51,7 @@ internal sealed interface ProofBuilder {
             claimsSet.claim("nonce", nonce)
         }
 
-        override fun publicKey(publicKey: BindingKey) {
+        override fun publicKey(publicKey: JwtBindingKey) {
             this.publicKey = publicKey
         }
 
@@ -81,9 +77,9 @@ internal sealed interface ProofBuilder {
                 val headerBuilder = JWSHeader.Builder(algorithm)
                 headerBuilder.type(JOSEObjectType(headerType))
                 when (val key = checkNotNull(publicKey) { "No public key provided" }) {
-                    is BindingKey.Jwk -> headerBuilder.jwk(key.jwk.toPublicJWK())
-                    is BindingKey.Did -> headerBuilder.keyID(key.identity)
-                    is BindingKey.X509 -> headerBuilder.x509CertChain(key.chain.map { Base64.encode(it.encoded) })
+                    is JwtBindingKey.Jwk -> headerBuilder.jwk(key.jwk.toPublicJWK())
+                    is JwtBindingKey.Did -> headerBuilder.keyID(key.identity)
+                    is JwtBindingKey.X509 -> headerBuilder.x509CertChain(key.chain.map { Base64.encode(it.encoded) })
                 }
                 headerBuilder.build()
             }
@@ -95,25 +91,6 @@ internal sealed interface ProofBuilder {
             }
             val signedJWT = SignedJWT(header, claims).apply { sign(proofSigner) }
             return Proof.Jwt(signedJWT)
-        }
-    }
-
-    companion object {
-        @OptIn(ExperimentalContracts::class)
-        fun ofType(type: ProofType, usage: ProofBuilder.() -> Proof): Proof {
-            contract {
-                callsInPlace(usage, InvocationKind.EXACTLY_ONCE)
-            }
-            return when (type) {
-                ProofType.JWT -> {
-                    with(JwtProofBuilder()) {
-                        usage()
-                    }
-                }
-
-                ProofType.CWT -> TODO("CWT proofs not supported yet")
-                ProofType.LDP_VP -> TODO("LDP_VP proofs not supported yet")
-            }
         }
     }
 }

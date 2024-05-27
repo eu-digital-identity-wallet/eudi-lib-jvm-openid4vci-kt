@@ -86,7 +86,8 @@ internal class RequestIssuanceImpl(
     }
 
     private fun proofFactory(proofSigner: ProofSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
-        ProofBuilder.ofType(ProofType.JWT) {
+
+        with(ProofBuilder.JwtProofBuilder()) {
             iss(config.clientId)
             aud(credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier.toString())
             publicKey(proofSigner.getBindingKey())

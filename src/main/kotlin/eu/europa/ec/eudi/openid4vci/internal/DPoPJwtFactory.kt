@@ -21,10 +21,7 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.dpop.DPoPUtils
 import com.nimbusds.oauth2.sdk.id.JWTID
 import com.nimbusds.openid.connect.sdk.Nonce
-import eu.europa.ec.eudi.openid4vci.AccessToken
-import eu.europa.ec.eudi.openid4vci.BindingKey
-import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
-import eu.europa.ec.eudi.openid4vci.ProofSigner
+import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import java.net.URL
@@ -51,7 +48,7 @@ internal class DPoPJwtFactory(
 
     private val publicJwk: JWK by lazy {
         val bk = signer.getBindingKey()
-        require(bk is BindingKey.Jwk) { "Only JWK binding key is supported" }
+        require(bk is JwtBindingKey.Jwk) { "Only JWK binding key is supported" }
         bk.jwk
     }
 
