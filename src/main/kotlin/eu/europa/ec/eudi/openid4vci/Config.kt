@@ -32,7 +32,7 @@ typealias ClientId = String
  * @param authorizeIssuanceConfig Instruction on how to assemble the authorization request. If scopes are supported
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
- * @param dPoPProofSigner a signer that if provided will enable the use of DPoP JWT
+ * @param dPoPSigner a signer that if provided will enable the use of DPoP JWT
  */
 data class OpenId4VCIConfig(
     val clientId: ClientId,
@@ -40,13 +40,14 @@ data class OpenId4VCIConfig(
     val keyGenerationConfig: KeyGenerationConfig,
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-    val dPoPProofSigner: ProofSigner? = null,
+    val dPoPSigner: PopSigner.Jwt? = null,
     val clock: Clock = Clock.systemDefaultZone(),
 ) {
+
     init {
-        if (null != dPoPProofSigner) {
-            val key = dPoPProofSigner.getBindingKey()
-            require(key is BindingKey.Jwk) {
+        if (null != dPoPSigner) {
+            val key = dPoPSigner.bindingKey
+            require(key is JwtBindingKey.Jwk) {
                 "Only JWK can be used with DPoP Proof signer"
             }
             require(!key.jwk.isPrivate) {

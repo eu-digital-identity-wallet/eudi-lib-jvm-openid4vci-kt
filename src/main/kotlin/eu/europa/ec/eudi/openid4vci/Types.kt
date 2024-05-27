@@ -178,17 +178,25 @@ value class NotificationId(val value: String) {
     }
 }
 
+@Deprecated(
+    message = "Deprecated. It will removed in a future release.",
+    replaceWith = ReplaceWith("JwtBindingKey"),
+)
+typealias BindingKey = JwtBindingKey
+
 /**
- * A sealed hierarchy that defines the different key formats to be used in order to construct a Proof of Possession.
+ * A sealed hierarchy that defines the different ways of including a PUB key
+ * in a JWT Proof
  */
-sealed interface BindingKey {
+sealed interface JwtBindingKey {
 
     /**
      * A JWK biding key
      */
-    data class Jwk(
+    @JvmInline
+    value class Jwk(
         val jwk: JWK,
-    ) : BindingKey {
+    ) : JwtBindingKey {
         init {
             require(!jwk.isPrivate) { "Binding key of type Jwk must contain a public key" }
         }
@@ -197,16 +205,18 @@ sealed interface BindingKey {
     /**
      * A Did biding key
      */
-    data class Did(
+    @JvmInline
+    value class Did(
         val identity: String,
-    ) : BindingKey
+    ) : JwtBindingKey
 
     /**
      * An X509 biding key
      */
-    data class X509(
+    @JvmInline
+    value class X509(
         val chain: List<X509Certificate>,
-    ) : BindingKey {
+    ) : JwtBindingKey {
         init {
             require(chain.isNotEmpty()) { "Certificate chain cannot be empty" }
         }

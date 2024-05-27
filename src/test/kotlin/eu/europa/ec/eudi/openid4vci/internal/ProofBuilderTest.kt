@@ -37,10 +37,9 @@ internal class ProofBuilderTest {
         assertTrue { signingAlgorithm in proofTypeMeta.algorithms }
 
         val signer = CryptoGenerator.rsaProofSigner(signingAlgorithm)
-        ProofBuilder.ofType(ProofType.JWT) {
+        with(ProofBuilder.JwtProofBuilder()) {
             iss("https://wallet")
             aud("https://issuer")
-            publicKey(signer.getBindingKey())
             credentialSpec(universityDegreeJwt())
             nonce("nonce")
             build(signer)
@@ -59,10 +58,9 @@ internal class ProofBuilderTest {
 
         val signer = CryptoGenerator.rsaProofSigner(signingAlgorithm)
         assertFailsWith(CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported::class) {
-            ProofBuilder.ofType(ProofType.JWT) {
+            with(ProofBuilder.JwtProofBuilder()) {
                 iss("https://wallet")
                 aud("https://issuer")
-                publicKey(signer.getBindingKey())
                 credentialSpec(universityDegreeJwt())
                 nonce("nonce")
                 build(signer)
