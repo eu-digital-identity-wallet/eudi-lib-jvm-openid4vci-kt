@@ -249,21 +249,6 @@ interface RequestIssuance {
         requestPayload: IssuanceRequestPayload,
     ): Result<SubmittedRequest>
 
-    @Deprecated(
-        message = "Deprecated. Will be removed in a future release.",
-        replaceWith = ReplaceWith(
-            "requestSingle(requestPayload, proofSigner.toPopSigner())",
-        ),
-    )
-    suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-        requestPayload: IssuanceRequestPayload,
-        proofSigner: ProofSigner,
-    ): Result<SubmittedRequest> =
-        requestSingle(
-            requestPayload,
-            proofSigner.toPopSigner(),
-        )
-
     /**
      *  Requests the issuance of a single credential having an [AuthorizedRequest.ProofRequired] authorization. In this
      *  case caller must provide a binding key that will be used for generating a Proof of Possession that issuer expects.
