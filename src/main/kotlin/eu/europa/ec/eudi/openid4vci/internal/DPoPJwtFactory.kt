@@ -72,7 +72,7 @@ internal class DPoPJwtFactory(
             },
             nonce?.let { Nonce(it) },
         )
-        SignedJWT(jwsHeader, jwtClaimsSet).apply { sign(signer.signer) }
+        SignedJWT(jwsHeader, jwtClaimsSet).apply { sign(signer.jwsSigner) }
     }
 
     private fun now(): Date = Date.from(clock.instant())

@@ -19,7 +19,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.JWK
-import eu.europa.ec.eudi.openid4vci.PopSigner.Companion.jwtPopSigner
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
 
@@ -354,13 +353,36 @@ fun interface NotifyIssuer {
 }
 
 sealed interface PopSigner {
-    data class Jwt(val algorithm: JWSAlgorithm, val bindingKey: JwtBindingKey, val signer: JWSSigner) : PopSigner
+    /**
+     * A signer for proof of possession JWTs
+     * @param algorithm The algorithm for signing the JWT
+     * @param bindingKey The public key to be included in the JWT
+     * @param jwsSigner A function to sign the JWT
+     */
+    data class Jwt(
+        val algorithm: JWSAlgorithm,
+        val bindingKey: JwtBindingKey,
+        val jwsSigner: JWSSigner,
+    ) : PopSigner
 
     companion object {
+
+        /**
+         * Factory method for creating a [PopSigner.Jwt]
+         *
+         * Comes handy when caller has access to [privateKey]
+         *
+         * @param privateKey the key that will be used to sign the JWT
+         * @param publicKey the pub key to be included in the JWT. It should form a pair with [privateKey].
+         * In case of [JwtBindingKey.Did] this condition is not being checked.
+         * @param algorithm The algorithm for signing the JWT
+         *
+         * @return the JWT signer
+         */
         fun jwtPopSigner(
             privateKey: JWK,
-            publicKey: JwtBindingKey,
             algorithm: JWSAlgorithm,
+            publicKey: JwtBindingKey,
         ): Jwt {
             require(privateKey.isPrivate) { "A private key is required" }
             require(
@@ -393,21 +415,6 @@ interface ProofSigner : JWSSigner {
     fun getAlgorithm(): JWSAlgorithm
 
     fun toPopSigner(): PopSigner.Jwt = PopSigner.Jwt(getAlgorithm(), getBindingKey(), this)
-
-    companion object {
-
-        fun make(
-            privateKey: JWK,
-            publicKey: JwtBindingKey,
-            algorithm: JWSAlgorithm,
-        ): ProofSigner {
-            val jwtPopSigner = jwtPopSigner(privateKey, publicKey, algorithm)
-            return object : ProofSigner, JWSSigner by jwtPopSigner.signer {
-                override fun getBindingKey(): JwtBindingKey = publicKey
-                override fun getAlgorithm(): JWSAlgorithm = algorithm
-            }
-        }
-    }
 }
 
 /**

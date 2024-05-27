@@ -84,7 +84,7 @@ internal sealed interface ProofBuilder<in POPSigner : PopSigner, out PROOF : Pro
                 claimsSet.issueTime(Date.from(Instant.now()))
                 claimsSet.build()
             }
-            val signedJWT = SignedJWT(header, claims).apply { sign(proofSigner.signer) }
+            val signedJWT = SignedJWT(header, claims).apply { sign(proofSigner.jwsSigner) }
             return Proof.Jwt(signedJWT)
         }
     }

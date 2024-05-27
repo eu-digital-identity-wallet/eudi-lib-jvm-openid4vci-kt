@@ -179,7 +179,7 @@ value class NotificationId(val value: String) {
 }
 
 @Deprecated(
-    message = "Deprecated. Use JwtBindingKey",
+    message = "Deprecated. It will removed in a future release.",
     replaceWith = ReplaceWith("JwtBindingKey"),
 )
 typealias BindingKey = JwtBindingKey
