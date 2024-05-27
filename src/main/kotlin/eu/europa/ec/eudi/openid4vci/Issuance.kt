@@ -252,7 +252,7 @@ interface RequestIssuance {
     @Deprecated(
         message = "Deprecated. Will be removed in a future release.",
         replaceWith = ReplaceWith(
-            "requestSingle(requestPayload, PopSigner.Jwt(proofSigner.getAlgorithm(),proofSigner.getBindingKey(),proofSigner)",
+            "requestSingle(requestPayload, proofSigner.toPopSigner())",
         ),
     )
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
@@ -261,11 +261,7 @@ interface RequestIssuance {
     ): Result<SubmittedRequest> =
         requestSingle(
             requestPayload,
-            PopSigner.Jwt(
-                algorithm = proofSigner.getAlgorithm(),
-                bindingKey = proofSigner.getBindingKey(),
-                signer = proofSigner,
-            ),
+            proofSigner.toPopSigner(),
         )
 
     /**
@@ -403,13 +399,15 @@ sealed interface PopSigner {
  */
 @Deprecated(
     message = "Deprecated. Will be removed in a future release.",
-    replaceWith = ReplaceWith("PopSigner.Jwt(getAlgorithm(), getBindingKey(), this)"),
+    replaceWith = ReplaceWith("this.toPopSigner()"),
 )
 interface ProofSigner : JWSSigner {
 
     fun getBindingKey(): JwtBindingKey
 
     fun getAlgorithm(): JWSAlgorithm
+
+    fun toPopSigner(): PopSigner.Jwt = PopSigner.Jwt(getAlgorithm(), getBindingKey(), this)
 
     companion object {
 
