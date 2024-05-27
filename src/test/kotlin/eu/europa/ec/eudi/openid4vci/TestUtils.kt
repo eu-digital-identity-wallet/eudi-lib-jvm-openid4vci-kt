@@ -54,7 +54,7 @@ val CredentialOfferWithJwtVcJson_NO_GRANTS = """
 """.trimIndent()
 
 val OpenId4VCIConfiguration = OpenId4VCIConfig(
-    clientId = "MyWallet_ClientId",
+    client = Client.Public("MyWallet_ClientId"),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
     credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
