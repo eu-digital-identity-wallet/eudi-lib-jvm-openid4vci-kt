@@ -38,7 +38,7 @@ internal enum class Htm {
  * https://datatracker.ietf.org/doc/rfc9449/
  */
 internal class DPoPJwtFactory(
-    private val signer: ProofSigner,
+    private val signer: PopSigner.Jwt,
     private val jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
     private val clock: Clock,
 ) {
@@ -47,7 +47,7 @@ internal class DPoPJwtFactory(
     }
 
     private val publicJwk: JWK by lazy {
-        val bk = signer.getBindingKey()
+        val bk = signer.bindingKey
         require(bk is JwtBindingKey.Jwk) { "Only JWK binding key is supported" }
         bk.jwk
     }
@@ -58,7 +58,7 @@ internal class DPoPJwtFactory(
         accessToken: AccessToken.DPoP? = null,
         nonce: String? = null,
     ): Result<SignedJWT> = runCatching {
-        val jwsHeader: JWSHeader = JWSHeader.Builder(signer.getAlgorithm())
+        val jwsHeader: JWSHeader = JWSHeader.Builder(signer.algorithm)
             .type(NimbusDPoPProofFactory.TYPE)
             .jwk(publicJwk)
             .build()
@@ -72,7 +72,7 @@ internal class DPoPJwtFactory(
             },
             nonce?.let { Nonce(it) },
         )
-        SignedJWT(jwsHeader, jwtClaimsSet).apply { sign(signer) }
+        SignedJWT(jwsHeader, jwtClaimsSet).apply { sign(signer.signer) }
     }
 
     private fun now(): Date = Date.from(clock.instant())
@@ -94,13 +94,13 @@ internal class DPoPJwtFactory(
          *
          */
         fun createForServer(
-            signer: ProofSigner,
+            signer: PopSigner.Jwt,
             jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
             clock: Clock,
             oauthServerMetadata: CIAuthorizationServerMetadata,
         ): Result<DPoPJwtFactory?> = runCatching {
             val supportDPoPAlgs = oauthServerMetadata.dPoPJWSAlgs.orEmpty()
-            val signerAlg = signer.getAlgorithm()
+            val signerAlg = signer.algorithm
             if (supportDPoPAlgs.isNotEmpty()) {
                 require(signerAlg in supportDPoPAlgs) {
                     "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportDPoPAlgs"

@@ -24,15 +24,15 @@ import eu.europa.ec.eudi.openid4vci.*
 import java.time.Instant
 import java.util.*
 
-internal sealed interface ProofBuilder<BINDING_KEY, out PROOF : Proof> {
+internal sealed interface ProofBuilder<in BINDING_KEY, in POPSigner : PopSigner, out PROOF : Proof> {
     fun iss(iss: String)
     fun aud(aud: String)
     fun nonce(nonce: String)
     fun credentialSpec(credentialSpec: CredentialConfiguration)
     fun publicKey(publicKey: BINDING_KEY)
-    fun build(proofSigner: ProofSigner): PROOF
+    fun build(proofSigner: POPSigner): PROOF
 
-    class JwtProofBuilder() : ProofBuilder<JwtBindingKey, Proof.Jwt> {
+    class JwtProofBuilder() : ProofBuilder<JwtBindingKey, PopSigner.Jwt, Proof.Jwt> {
 
         private val headerType = "openid4vci-proof+jwt"
         private val claimsSet = JWTClaimsSet.Builder()
@@ -59,7 +59,7 @@ internal sealed interface ProofBuilder<BINDING_KEY, out PROOF : Proof> {
             this.credentialSpec = credentialSpec
         }
 
-        override fun build(proofSigner: ProofSigner): Proof.Jwt {
+        override fun build(proofSigner: PopSigner.Jwt): Proof.Jwt {
             val spec = checkNotNull(credentialSpec) {
                 "No credential specification provided"
             }
@@ -69,11 +69,11 @@ internal sealed interface ProofBuilder<BINDING_KEY, out PROOF : Proof> {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
             }
             val proofTypeSigningAlgorithmsSupported = jwtProofTypeMeta.algorithms
-            ensure(proofSigner.getAlgorithm() in proofTypeSigningAlgorithmsSupported) {
+            ensure(proofSigner.algorithm in proofTypeSigningAlgorithmsSupported) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported
             }
             val header = run {
-                val algorithm = proofSigner.getAlgorithm()
+                val algorithm = proofSigner.algorithm
                 val headerBuilder = JWSHeader.Builder(algorithm)
                 headerBuilder.type(JOSEObjectType(headerType))
                 when (val key = checkNotNull(publicKey) { "No public key provided" }) {
@@ -89,7 +89,7 @@ internal sealed interface ProofBuilder<BINDING_KEY, out PROOF : Proof> {
                 claimsSet.issueTime(Date.from(Instant.now()))
                 claimsSet.build()
             }
-            val signedJWT = SignedJWT(header, claims).apply { sign(proofSigner) }
+            val signedJWT = SignedJWT(header, claims).apply { sign(proofSigner.signer) }
             return Proof.Jwt(signedJWT)
         }
     }

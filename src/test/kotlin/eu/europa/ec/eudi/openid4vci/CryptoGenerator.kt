@@ -38,19 +38,19 @@ object CryptoGenerator {
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
 
-    fun rsaProofSigner(signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256): ProofSigner {
+    fun rsaProofSigner(signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256): PopSigner.Jwt {
         val keyPair = randomRSASigningKey(2048)
         val bindingKey = JwtBindingKey.Jwk(
             jwk = keyPair.toPublicJWK(),
         )
-        return ProofSigner.make(keyPair, bindingKey, signingAlgorithm)
+        return PopSigner.jwtPopSigner(keyPair, bindingKey, signingAlgorithm)
     }
 
-    fun ecProofSigner(): ProofSigner {
+    fun ecProofSigner(): PopSigner.Jwt {
         val keyPair = randomECSigningKey(Curve.P_256)
         val bindingKey = JwtBindingKey.Jwk(
             jwk = keyPair.toPublicJWK(),
         )
-        return ProofSigner.make(keyPair, bindingKey, JWSAlgorithm.ES256)
+        return PopSigner.jwtPopSigner(keyPair, bindingKey, JWSAlgorithm.ES256)
     }
 }

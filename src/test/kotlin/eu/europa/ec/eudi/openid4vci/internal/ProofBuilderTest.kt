@@ -40,7 +40,7 @@ internal class ProofBuilderTest {
         with(ProofBuilder.JwtProofBuilder()) {
             iss("https://wallet")
             aud("https://issuer")
-            publicKey(signer.getBindingKey())
+            publicKey(signer.bindingKey)
             credentialSpec(universityDegreeJwt())
             nonce("nonce")
             build(signer)
@@ -62,7 +62,7 @@ internal class ProofBuilderTest {
             with(ProofBuilder.JwtProofBuilder()) {
                 iss("https://wallet")
                 aud("https://issuer")
-                publicKey(signer.getBindingKey())
+                publicKey(signer.bindingKey)
                 credentialSpec(universityDegreeJwt())
                 nonce("nonce")
                 build(signer)

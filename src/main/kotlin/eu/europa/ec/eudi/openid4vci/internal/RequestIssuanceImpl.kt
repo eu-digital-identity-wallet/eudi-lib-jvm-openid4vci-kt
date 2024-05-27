@@ -49,7 +49,7 @@ internal class RequestIssuanceImpl(
 
     override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
-        proofSigner: ProofSigner,
+        proofSigner: PopSigner,
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
             singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
@@ -68,7 +68,7 @@ internal class RequestIssuanceImpl(
     }
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<IssuanceRequestPayload, ProofSigner>>,
+        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner>>,
     ): Result<SubmittedRequest> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (requestPayload, proofSigner) ->
@@ -85,15 +85,17 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private fun proofFactory(proofSigner: ProofSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
+    private fun proofFactory(proofSigner: PopSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
 
-        with(ProofBuilder.JwtProofBuilder()) {
-            iss(config.clientId)
-            aud(credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier.toString())
-            publicKey(proofSigner.getBindingKey())
-            credentialSpec(credentialSupported)
-            nonce(cNonce.value)
-            build(proofSigner)
+        when (proofSigner) {
+            is PopSigner.Jwt -> with(ProofBuilder.JwtProofBuilder()) {
+                iss(config.clientId)
+                aud(credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier.toString())
+                publicKey(proofSigner.bindingKey)
+                credentialSpec(credentialSupported)
+                nonce(cNonce.value)
+                build(proofSigner)
+            }
         }
     }
 

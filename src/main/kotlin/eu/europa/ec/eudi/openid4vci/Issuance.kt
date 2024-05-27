@@ -19,6 +19,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.JWK
+import eu.europa.ec.eudi.openid4vci.PopSigner.Companion.jwtPopSigner
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
 
@@ -248,6 +249,25 @@ interface RequestIssuance {
         requestPayload: IssuanceRequestPayload,
     ): Result<SubmittedRequest>
 
+    @Deprecated(
+        message = "Deprecated. Will be removed in a future release.",
+        replaceWith = ReplaceWith(
+            "requestSingle(requestPayload, PopSigner.Jwt(proofSigner.getAlgorithm(),proofSigner.getBindingKey(),proofSigner)",
+        ),
+    )
+    suspend fun AuthorizedRequest.ProofRequired.requestSingle(
+        requestPayload: IssuanceRequestPayload,
+        proofSigner: ProofSigner,
+    ): Result<SubmittedRequest> =
+        requestSingle(
+            requestPayload,
+            PopSigner.Jwt(
+                algorithm = proofSigner.getAlgorithm(),
+                bindingKey = proofSigner.getBindingKey(),
+                signer = proofSigner,
+            ),
+        )
+
     /**
      *  Requests the issuance of a single credential having an [AuthorizedRequest.ProofRequired] authorization. In this
      *  case caller must provide a binding key that will be used for generating a Proof of Possession that issuer expects.
@@ -258,7 +278,7 @@ interface RequestIssuance {
      */
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
-        proofSigner: ProofSigner,
+        proofSigner: PopSigner,
     ): Result<SubmittedRequest>
 
     /**
@@ -279,7 +299,7 @@ interface RequestIssuance {
      *  @return The new state of request or error.
      */
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<IssuanceRequestPayload, ProofSigner>>,
+        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner>>,
     ): Result<SubmittedRequest>
 
     /**
@@ -352,11 +372,39 @@ fun interface NotifyIssuer {
     ): Result<Unit>
 }
 
+sealed interface PopSigner {
+    data class Jwt(val algorithm: JWSAlgorithm, val bindingKey: JwtBindingKey, val signer: JWSSigner) : PopSigner
+
+    companion object {
+        fun jwtPopSigner(
+            privateKey: JWK,
+            publicKey: JwtBindingKey,
+            algorithm: JWSAlgorithm,
+        ): Jwt {
+            require(privateKey.isPrivate) { "A private key is required" }
+            require(
+                when (publicKey) {
+                    is JwtBindingKey.Did -> true // Would require DID resolution which is out of scope
+                    is JwtBindingKey.Jwk -> privateKey.toPublicJWK() == publicKey.jwk
+                    is JwtBindingKey.X509 -> privateKey.toPublicJWK() == JWK.parse(publicKey.chain.first())
+                },
+            ) { "Public/private key don't match" }
+
+            val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
+            return Jwt(algorithm, publicKey, signer)
+        }
+    }
+}
+
 /**
  * Interface for implementing the signing process of a proof. It extends [JWSSigner] of nimbus.
  * Implementations should be initialized with the specifics of the proof signing, that is the binding key to be included
  * in the proof and the signing algorithm that will be used for signing.
  */
+@Deprecated(
+    message = "Deprecated. Will be removed in a future release.",
+    replaceWith = ReplaceWith("PopSigner.Jwt(getAlgorithm(), getBindingKey(), this)"),
+)
 interface ProofSigner : JWSSigner {
 
     fun getBindingKey(): JwtBindingKey
@@ -370,17 +418,8 @@ interface ProofSigner : JWSSigner {
             publicKey: JwtBindingKey,
             algorithm: JWSAlgorithm,
         ): ProofSigner {
-            require(privateKey.isPrivate) { "A private key is required" }
-            require(
-                when (publicKey) {
-                    is JwtBindingKey.Did -> true // Would require DID resolution which is out of scope
-                    is JwtBindingKey.Jwk -> privateKey.toPublicJWK() == publicKey.jwk
-                    is JwtBindingKey.X509 -> privateKey.toPublicJWK() == JWK.parse(publicKey.chain.first())
-                },
-            ) { "Public/private key don't match" }
-
-            val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
-            return object : ProofSigner, JWSSigner by signer {
+            val jwtPopSigner = jwtPopSigner(privateKey, publicKey, algorithm)
+            return object : ProofSigner, JWSSigner by jwtPopSigner.signer {
                 override fun getBindingKey(): JwtBindingKey = publicKey
                 override fun getAlgorithm(): JWSAlgorithm = algorithm
             }
@@ -554,7 +593,8 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         /**
          * Proof type signing algorithm provided for specific credential is not supported from issuance server
          */
-        data object ProofTypeSigningAlgorithmNotSupported : ProofGenerationError("ProofTypeSigningAlgorithmNotSupported") {
+        data object ProofTypeSigningAlgorithmNotSupported :
+            ProofGenerationError("ProofTypeSigningAlgorithmNotSupported") {
             private fun readResolve(): Any = ProofTypeSigningAlgorithmNotSupported
         }
     }

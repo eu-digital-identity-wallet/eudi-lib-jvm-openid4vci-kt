@@ -52,7 +52,7 @@ val DefaultOpenId4VCIConfig = OpenId4VCIConfig(
     authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
     keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
     credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
-    dPoPProofSigner = CryptoGenerator.ecProofSigner(),
+    dPoPSigner = CryptoGenerator.ecProofSigner(),
 )
 
 internal fun createHttpClient(enableLogging: Boolean = true): HttpClient = HttpClient(Apache) {
