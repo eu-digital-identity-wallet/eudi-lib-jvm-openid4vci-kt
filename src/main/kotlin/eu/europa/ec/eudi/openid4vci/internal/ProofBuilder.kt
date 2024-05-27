@@ -24,19 +24,18 @@ import eu.europa.ec.eudi.openid4vci.*
 import java.time.Instant
 import java.util.*
 
-internal sealed interface ProofBuilder<in BINDING_KEY, in POPSigner : PopSigner, out PROOF : Proof> {
+internal sealed interface ProofBuilder<in POPSigner : PopSigner, out PROOF : Proof> {
     fun iss(iss: String)
     fun aud(aud: String)
     fun nonce(nonce: String)
     fun credentialSpec(credentialSpec: CredentialConfiguration)
-    fun publicKey(publicKey: BINDING_KEY)
     fun build(proofSigner: POPSigner): PROOF
 
-    class JwtProofBuilder() : ProofBuilder<JwtBindingKey, PopSigner.Jwt, Proof.Jwt> {
+    class JwtProofBuilder() : ProofBuilder<PopSigner.Jwt, Proof.Jwt> {
 
         private val headerType = "openid4vci-proof+jwt"
         private val claimsSet = JWTClaimsSet.Builder()
-        private var publicKey: JwtBindingKey? = null
+
         private var credentialSpec: CredentialConfiguration? = null
 
         override fun iss(iss: String) {
@@ -49,10 +48,6 @@ internal sealed interface ProofBuilder<in BINDING_KEY, in POPSigner : PopSigner,
 
         override fun nonce(nonce: String) {
             claimsSet.claim("nonce", nonce)
-        }
-
-        override fun publicKey(publicKey: JwtBindingKey) {
-            this.publicKey = publicKey
         }
 
         override fun credentialSpec(credentialSpec: CredentialConfiguration) {
@@ -76,7 +71,7 @@ internal sealed interface ProofBuilder<in BINDING_KEY, in POPSigner : PopSigner,
                 val algorithm = proofSigner.algorithm
                 val headerBuilder = JWSHeader.Builder(algorithm)
                 headerBuilder.type(JOSEObjectType(headerType))
-                when (val key = checkNotNull(publicKey) { "No public key provided" }) {
+                when (val key = proofSigner.bindingKey) {
                     is JwtBindingKey.Jwk -> headerBuilder.jwk(key.jwk.toPublicJWK())
                     is JwtBindingKey.Did -> headerBuilder.keyID(key.identity)
                     is JwtBindingKey.X509 -> headerBuilder.x509CertChain(key.chain.map { Base64.encode(it.encoded) })

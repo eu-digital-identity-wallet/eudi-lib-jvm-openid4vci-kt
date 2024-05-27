@@ -91,7 +91,6 @@ internal class RequestIssuanceImpl(
             is PopSigner.Jwt -> with(ProofBuilder.JwtProofBuilder()) {
                 iss(config.clientId)
                 aud(credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier.toString())
-                publicKey(proofSigner.bindingKey)
                 credentialSpec(credentialSupported)
                 nonce(cNonce.value)
                 build(proofSigner)
