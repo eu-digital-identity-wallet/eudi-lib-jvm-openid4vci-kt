@@ -204,6 +204,10 @@ internal class AuthorizationServerClient(
                     authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
                 }
                 prompt(Prompt.Type.LOGIN)
+                buildClientAttestationIfNeeded(popJwtId = null)?.let { jwtClientAssertionIssuer ->
+                    AttestationBasedClientAuthenticationForm.assemble(clientAttestation = jwtClientAssertionIssuer)
+                        .forEach { (k, v) -> customParameter(k, v) }
+                }
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
         }
