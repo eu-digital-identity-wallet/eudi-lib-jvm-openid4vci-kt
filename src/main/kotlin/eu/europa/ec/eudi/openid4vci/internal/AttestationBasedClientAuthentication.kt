@@ -37,45 +37,13 @@ import java.time.Clock
 import java.util.*
 import kotlin.time.Duration
 
-internal class SelfAttestedIssuer(
-    supportedSigningAlgorithms: Set<JWSAlgorithm>,
-    private val attestationDuration: Duration,
-    private val headerCustomization: JWSHeader.Builder.() -> Unit = {},
-) : ClientAttestationIssuer {
-    init {
-        require(supportedSigningAlgorithms.isNotEmpty()) {
-            "supportedSigningAlgorithms cannot be empty"
-        }
-        supportedSigningAlgorithms.forEach { Client.Attested.requireIsAllowedAlgorithm(it) }
-        require(attestationDuration.isPositive()) {
-            "Attestation duration must be positive"
-        }
-    }
-
-    private val signerFactory = jwsSignerFactoryFor(supportedSigningAlgorithms)
-
-    override suspend fun issue(clock: Clock, client: Client.Attested): ClientAttestationJWT {
-        val (clientId, instanceKey, popSigningAlgorithm) = client
-        val signer = signerFactory.createJWSSigner(instanceKey, popSigningAlgorithm)
-        val builder = ClientAttestationJwtBuilder(
-            clock = clock,
-            issuer = clientId,
-            duration = attestationDuration,
-            algorithm = popSigningAlgorithm,
-            signer = signer,
-            headerCustomization = headerCustomization,
-        )
-        return builder.build(client)
-    }
-}
-
-internal class ClientAttestationJwtBuilder(
+class ClientAttestationJwtBuilder(
     private val clock: Clock,
     private val issuer: String,
     private val duration: Duration,
     private val algorithm: JWSAlgorithm,
     private val signer: JWSSigner,
-    private val headerCustomization: JWSHeader.Builder.() -> Unit = {},
+    private val headerCustomization: JWSHeader.Builder.(Client.Attested) -> Unit = {},
 ) {
     init {
         Client.Attested.requireIsAllowedAlgorithm(algorithm)
@@ -84,7 +52,7 @@ internal class ClientAttestationJwtBuilder(
 
     fun build(client: Client.Attested): ClientAttestationJWT {
         val header = JWSHeader.Builder(algorithm).apply {
-            headerCustomization()
+            headerCustomization(client)
         }.build()
 
         val claims = JWTClaimsSet.Builder().apply {
@@ -167,8 +135,8 @@ internal class DefaultClientAttestationPopBuilder(
         jwtId: String?,
     ): ClientAttestationPoPJWT {
         fun randomJwtId() = JWTID().value
-        val (clientId, instanceKey, popSigningAlgorithm) = client
-        val header = JWSHeader.Builder(popSigningAlgorithm).apply {
+        val (clientId, _, alg, jwsSigner) = client
+        val header = JWSHeader.Builder(alg).apply {
             typ?.let { type(JOSEObjectType(typ)) }
         }.build()
         val claimSet = JWTClaimsSet.Builder().apply {
@@ -181,9 +149,7 @@ internal class DefaultClientAttestationPopBuilder(
             audience(authServerId)
         }.build()
         val jwt = SignedJWT(header, claimSet).apply {
-            val signerFactory = jwsSignerFactoryFor(setOf(popSigningAlgorithm))
-            val signer = signerFactory.createJWSSigner(instanceKey, popSigningAlgorithm)
-            sign(signer)
+            sign(jwsSigner)
         }
         return ClientAttestationPoPJWT(jwt)
     }

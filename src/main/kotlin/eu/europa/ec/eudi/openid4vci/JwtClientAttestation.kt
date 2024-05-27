@@ -15,12 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.internal.DefaultClientAttestationPopBuilder
-import eu.europa.ec.eudi.openid4vci.internal.SelfAttestedIssuer
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
@@ -85,37 +82,9 @@ fun interface ClientAttestationIssuer {
     /**
      * Issues a [ClientAttestationJWT] for the wallet
      *
-     * @param clock wallet's clock. Can be used to verify [ClientAttestationJWT]
      * @param client the wallet's data to be signed by the issuer
      */
-    suspend fun issue(clock: Clock, client: Client.Attested): ClientAttestationJWT
-
-    companion object {
-
-        /**
-         * Factory method for creating a [ClientAttestationIssuer] where the wallet itself
-         * signs the [ClientAttestationJWT] (without a back-end service)
-         *
-         * @param supportedSigningAlgorithms the algorithms to be used to sign the [ClientAttestationJWT]
-         * if not provided defaults to [Client.Attested.DefaultSupportedSigningAlgorithms].
-         * Caller should make sure that the provided algorithms are compatible with [Client.Attested.instanceKey]
-         * @param attestationDuration how long the attestation could live. It will be used to calculate
-         * the expiration time of the [ClientAttestationJWT]
-         * @param headerCustomization possible customization of the JOSE header of the [ClientAttestationJWT].
-         * If not provided, only the `alg` claim will be included.
-         *
-         * @return an issuer as described above
-         */
-        fun selfAttested(
-            supportedSigningAlgorithms: Set<JWSAlgorithm> = Client.Attested.DefaultSupportedSigningAlgorithms,
-            attestationDuration: Duration,
-            headerCustomization: JWSHeader.Builder.() -> Unit = {},
-        ): ClientAttestationIssuer = SelfAttestedIssuer(
-            supportedSigningAlgorithms,
-            attestationDuration,
-            headerCustomization,
-        )
-    }
+    suspend fun issue(client: Client.Attested): ClientAttestationJWT
 }
 
 /**
@@ -203,7 +172,7 @@ class JwtClientAssertionIssuer(
         mutex.withLock {
             val current = clientAttestationJwt
             if (current == null || current.jwt.isExpired()) {
-                clientAttestationJwt = attestationIssuer.issue(clock, client)
+                clientAttestationJwt = attestationIssuer.issue(client)
             }
             checkNotNull(clientAttestationJwt)
         }

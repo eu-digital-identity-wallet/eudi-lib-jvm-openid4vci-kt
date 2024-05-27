@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.RSASSASigner
@@ -45,18 +46,18 @@ sealed interface Client {
      * Client to be authenticated to the credential issuer
      * using Attestation-Based Client Authentication
      *
-     * @param instanceKey The wallet instance key (pair). This key will be used to identify the wallet
+     * @param instanceKey The wallet instance pub key. This key will be used to identify the wallet
      * to a specific credential issuer. Should not be re-used.
-     * @param popSigningAlgorithm the algorithm to be used to sign the [ClientAttestationPoPJWT]
      */
     data class Attested(
         override val id: ClientId,
         val instanceKey: JWK,
         val popSigningAlgorithm: JWSAlgorithm,
+        val popJwsSigner: JWSSigner,
     ) : Client {
         init {
             require(id.isNotBlank() && id.isNotEmpty())
-            require(instanceKey.isPrivate) { "Instance key must be private" }
+            require(!instanceKey.isPrivate) { "InstanceKey should be public" }
             requireIsAllowedAlgorithm(popSigningAlgorithm)
         }
 
