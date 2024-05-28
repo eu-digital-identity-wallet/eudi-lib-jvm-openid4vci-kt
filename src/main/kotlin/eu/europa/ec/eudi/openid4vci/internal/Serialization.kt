@@ -81,7 +81,7 @@ internal object ProofSerializer : KSerializer<Proof> {
                 encoder,
                 ProofJson(
                     proofType = ProofType.CWT.toString().lowercase(),
-                    jwt = value.cwt,
+                    cwt = value.cwt,
                 ),
             )
 
