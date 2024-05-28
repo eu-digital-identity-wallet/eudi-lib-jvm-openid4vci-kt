@@ -202,7 +202,7 @@ internal class RequestIssuanceImpl(
 
 private fun submitRequestFromError(error: Throwable): SubmittedRequest.Errored? = when (error) {
     is CredentialIssuanceError.InvalidProof ->
-        SubmittedRequest.InvalidProof(CNonce(error.cNonce, error.cNonceExpiresIn))
+        SubmittedRequest.InvalidProof(CNonce(error.cNonce, error.cNonceExpiresIn), error.errorDescription)
 
     is CredentialIssuanceError -> SubmittedRequest.Failed(error)
     else -> null
