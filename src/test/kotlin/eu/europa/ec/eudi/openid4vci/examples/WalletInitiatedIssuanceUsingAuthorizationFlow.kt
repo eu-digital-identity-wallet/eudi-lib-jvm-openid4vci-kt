@@ -17,35 +17,23 @@ package eu.europa.ec.eudi.openid4vci.examples
 
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.ensure
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
-import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
-import org.jsoup.Jsoup
-import org.jsoup.nodes.FormElement
-import java.net.URL
-
-private const val CredentialIssuerURL = "https://dev.issuer-backend.eudiw.dev"
-private val actingUser = ActingUser("tneal", "password")
 
 fun main(): Unit = runBlocking {
-    val credentialIssuerId = CredentialIssuerId(CredentialIssuerURL).getOrThrow()
-    val credentialConfigurationIds = listOf(PID_SdJwtVC_config_id, PID_MsoMdoc_config_id, MDL_config_id)
-
-    runUseCase(credentialIssuerId, credentialConfigurationIds)
+    runUseCase(PidDevIssuer.IssuerId, PidDevIssuer.AllCredentialConfigurationIds)
 }
 
-fun runUseCase(credentialIssuerId: CredentialIssuerId, credentialConfigurationIds: List<String>): Unit = runBlocking {
+fun runUseCase(
+    credentialIssuerId: CredentialIssuerId,
+    credentialConfigurationIds: List<CredentialConfigurationIdentifier>,
+): Unit = runBlocking {
     println("[[Scenario: Issuance based on credential configuration ids: $credentialConfigurationIds]] ")
 
     val (issuerMetadata, authorizationServersMetadata) = createHttpClient().use { client ->
         Issuer.metaData(client, credentialIssuerId)
     }
 
-    val identifiers = credentialConfigurationIds.map { CredentialConfigurationIdentifier(it) }
-
-    identifiers.forEach {
+    credentialConfigurationIds.forEach {
         ensure(issuerMetadata.credentialConfigurationsSupported[it] != null) {
             error("Credential identifier $it not supported by issuer")
         }
@@ -55,125 +43,97 @@ fun runUseCase(credentialIssuerId: CredentialIssuerId, credentialConfigurationId
         credentialIssuerIdentifier = credentialIssuerId,
         credentialIssuerMetadata = issuerMetadata,
         authorizationServerMetadata = authorizationServersMetadata[0],
-        credentialConfigurationIdentifiers = identifiers,
+        credentialConfigurationIdentifiers = credentialConfigurationIds,
     )
 
     val issuer = Issuer.make(
-        config = DefaultOpenId4VCIConfig,
+        config = PidDevIssuer.Cfg,
         credentialOffer = credentialOffer,
         ktorHttpClientFactory = ::createHttpClient,
     ).getOrThrow()
 
-    authorizationLog("Using authorized code flow to authorize")
-    val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, actingUser)
-    authorizationLog("Authorization retrieved: $authorizedRequest")
-
-    credentialOffer.credentialConfigurationIdentifiers.forEach { credentialIdentifier ->
-        issuanceLog("Requesting issuance of '$credentialIdentifier'")
-        val outcome = when (authorizedRequest) {
-            is AuthorizedRequest.NoProofRequired -> submitProvidingNoProofs(issuer, authorizedRequest, credentialIdentifier)
-            is AuthorizedRequest.ProofRequired -> submitProvidingProofs(issuer, authorizedRequest, credentialIdentifier)
+    with(issuer) {
+        authorizationLog("Using authorized code flow to authorize")
+        val authorizedRequest = authorizeRequestWithAuthCodeUseCase(PidDevIssuer.TestUser).also {
+            authorizationLog("Authorization retrieved: $it")
         }
-        println("--> Issued credential: $outcome \n")
-    }
-}
 
-private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer, actingUser: ActingUser): AuthorizedRequest =
-    with(issuer) {
-        authorizationLog("Preparing authorization code request")
-
-        val prepareAuthorizationCodeRequest = issuer.prepareAuthorizationRequest().getOrThrow()
-
-        authorizationLog("Get authorization code URL is: ${prepareAuthorizationCodeRequest.authorizationCodeURL.value}")
-
-        val (authorizationCode, serverState) = loginUserAndGetAuthCode(
-            prepareAuthorizationCodeRequest.authorizationCodeURL.value,
-            actingUser,
-        ) ?: error("Could not retrieve authorization code")
-
-        authorizationLog("Authorization code retrieved: $authorizationCode")
-
-        val authorizedRequest = prepareAuthorizationCodeRequest.authorizeWithAuthorizationCode(
-            AuthorizationCode(authorizationCode),
-            serverState,
-        ).getOrThrow()
-
-        authorizationLog("Authorization code exchanged with access token : ${authorizedRequest.accessToken.accessToken}")
-
-        authorizedRequest
-    }
-
-private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): Pair<String, String>? {
-    return createHttpClient().use { client ->
-        val loginUrl = client.get(getAuthorizationCodeUrl).body<String>().extractASLoginUrl()
-
-        val formParameters = mapOf(
-            "username" to actingUser.username,
-            "password" to actingUser.password,
-        )
-        val response = client.submitForm(
-            url = loginUrl.toString(),
-            formParameters = Parameters.build {
-                formParameters.entries.forEach { append(it.key, it.value) }
-            },
-        )
-        val redirectLocation = response.headers["Location"].toString()
-        with(URLBuilder(redirectLocation)) {
-            parameters["code"] to parameters["state"]
-        }.toNullable()
-    }
-}
-internal fun <A, B> Pair<A?, B?>.toNullable(): Pair<A, B>? {
-    return if (first != null && second != null) first!! to second!!
-    else null
-}
-
-private fun String.extractASLoginUrl(): URL {
-    val form = Jsoup.parse(this).body().getElementById("kc-form-login") as FormElement
-    val action = form.attr("action")
-    return URL(action)
-}
-
-private suspend fun submitProvidingNoProofs(
-    issuer: Issuer,
-    authorized: AuthorizedRequest.NoProofRequired,
-    credentialConfigurationId: CredentialConfigurationIdentifier,
-): String {
-    with(issuer) {
-        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-        return when (val submittedRequest = authorized.requestSingle(requestPayload).getOrThrow()) {
-            is SubmittedRequest.Success -> handleSuccess(submittedRequest, issuer, authorized)
-            is SubmittedRequest.Failed -> throw submittedRequest.error
-            is SubmittedRequest.InvalidProof -> {
-                submitProvidingProofs(
-                    issuer,
-                    authorized.handleInvalidProof(submittedRequest.cNonce),
-                    credentialConfigurationId,
-                )
+        with(authorizedRequest) {
+            credentialOffer.credentialConfigurationIdentifiers.forEach { credentialIdentifier ->
+                submitCredentialRequest(this@with, credentialIdentifier).also {
+                    println("--> Issued credential: $it \n")
+                }
             }
         }
     }
 }
 
-private suspend fun submitProvidingProofs(
-    issuer: Issuer,
+private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: PidDevIssuer.ActingUser): AuthorizedRequest {
+    authorizationLog("Preparing authorization code request")
+
+    val prepareAuthorizationCodeRequest = prepareAuthorizationRequest().getOrThrow().also {
+        authorizationLog("Get authorization code URL is: ${it.authorizationCodeURL.value}")
+    }
+
+    return with(prepareAuthorizationCodeRequest) {
+        val (authorizationCode, serverState) = PidDevIssuer.loginUserAndGetAuthCode(
+            prepareAuthorizationCodeRequest,
+            actingUser,
+        ) ?: error("Could not retrieve authorization code")
+
+        authorizationLog("Authorization code retrieved: $authorizationCode")
+
+        authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState).getOrThrow().also {
+            authorizationLog("Authorization code exchanged with access token : ${it.accessToken.accessToken}")
+        }
+    }
+}
+
+private suspend fun Issuer.submitCredentialRequest(
+    authorizedRequest: AuthorizedRequest,
+    credentialConfigurationId: CredentialConfigurationIdentifier,
+): String {
+    issuanceLog("Requesting issuance of '$credentialConfigurationId'")
+    return when (authorizedRequest) {
+        is AuthorizedRequest.NoProofRequired -> submitProvidingNoProofs(authorizedRequest, credentialConfigurationId)
+
+        is AuthorizedRequest.ProofRequired -> submitProvidingProofs(authorizedRequest, credentialConfigurationId)
+    }
+}
+
+private suspend fun Issuer.submitProvidingNoProofs(
+    authorized: AuthorizedRequest.NoProofRequired,
+    credentialConfigurationId: CredentialConfigurationIdentifier,
+): String {
+    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+    return when (val submittedRequest = authorized.requestSingle(requestPayload).getOrThrow()) {
+        is SubmittedRequest.Success -> handleSuccess(submittedRequest, this@submitProvidingNoProofs, authorized)
+        is SubmittedRequest.Failed -> throw submittedRequest.error
+        is SubmittedRequest.InvalidProof -> {
+            this@submitProvidingNoProofs.submitProvidingProofs(
+                authorized.handleInvalidProof(submittedRequest.cNonce),
+                credentialConfigurationId,
+            )
+        }
+    }
+}
+
+private suspend fun Issuer.submitProvidingProofs(
     authorized: AuthorizedRequest.ProofRequired,
     credentialConfigurationId: CredentialConfigurationIdentifier,
 ): String {
-    with(issuer) {
-        val proofSigner = DefaultProofSignersMap[credentialConfigurationId.value]
-            ?: error("No signer found for credential $credentialConfigurationId")
+    val proofSigner = DefaultProofSignersMap[credentialConfigurationId]
+        ?: error("No signer found for credential $credentialConfigurationId")
 
-        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-        val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
+    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+    val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
 
-        return when (submittedRequest) {
-            is SubmittedRequest.Success -> handleSuccess(submittedRequest, issuer, authorized)
-            is SubmittedRequest.Failed -> throw submittedRequest.error
-            is SubmittedRequest.InvalidProof -> throw IllegalStateException(
-                "Although providing a proof with c_nonce the proof is still invalid",
-            )
-        }
+    return when (submittedRequest) {
+        is SubmittedRequest.Success -> handleSuccess(submittedRequest, this@submitProvidingProofs, authorized)
+        is SubmittedRequest.Failed -> throw submittedRequest.error
+        is SubmittedRequest.InvalidProof -> throw IllegalStateException(
+            "Although providing a proof with c_nonce the proof is still invalid",
+        )
     }
 }
 

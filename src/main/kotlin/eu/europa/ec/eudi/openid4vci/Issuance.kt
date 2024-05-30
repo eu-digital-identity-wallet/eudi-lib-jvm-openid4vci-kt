@@ -142,7 +142,7 @@ sealed interface SubmittedRequest : java.io.Serializable {
      * @param cNonce The c_nonce provided from issuer along the error
      * @param errorDescription Description of the error that caused the failure
      */
-    class InvalidProof(
+    data class InvalidProof(
         val cNonce: CNonce,
         val errorDescription: String? = null,
     ) : Errored
