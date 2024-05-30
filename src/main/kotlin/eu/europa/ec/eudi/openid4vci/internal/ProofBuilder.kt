@@ -21,71 +21,90 @@ import com.nimbusds.jose.util.Base64
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
-import java.time.Instant
+import java.time.Clock
 import java.util.*
 
-internal sealed interface ProofBuilder<in POPSigner : PopSigner, out PROOF : Proof> {
-    fun iss(iss: String)
-    fun aud(aud: String)
-    fun nonce(nonce: String)
-    fun credentialSpec(credentialSpec: CredentialConfiguration)
-    fun build(proofSigner: POPSigner): PROOF
+private interface CheckPopSigner<POP_SIGNER : PopSigner> {
+    fun check(popSigner: POP_SIGNER, proofTypesSupported: ProofTypesSupported)
+}
 
-    class JwtProofBuilder() : ProofBuilder<PopSigner.Jwt, Proof.Jwt> {
+internal abstract class ProofBuilder<POP_SIGNER : PopSigner, out PROOF : Proof>(
+    val clock: Clock,
+    val iss: ClientId,
+    val aud: CredentialIssuerId,
+    val nonce: CNonce,
+    val popSigner: POP_SIGNER,
+) {
 
-        private val headerType = "openid4vci-proof+jwt"
-        private val claimsSet = JWTClaimsSet.Builder()
+    abstract suspend fun build(): PROOF
 
-        private var credentialSpec: CredentialConfiguration? = null
-
-        override fun iss(iss: String) {
-            claimsSet.issuer(iss)
-        }
-
-        override fun aud(aud: String) {
-            claimsSet.audience(aud)
-        }
-
-        override fun nonce(nonce: String) {
-            claimsSet.claim("nonce", nonce)
-        }
-
-        override fun credentialSpec(credentialSpec: CredentialConfiguration) {
-            this.credentialSpec = credentialSpec
-        }
-
-        override fun build(proofSigner: PopSigner.Jwt): Proof.Jwt {
-            val spec = checkNotNull(credentialSpec) {
-                "No credential specification provided"
+    companion object {
+        operator fun invoke(
+            proofTypesSupported: ProofTypesSupported,
+            clock: Clock,
+            iss: ClientId,
+            aud: CredentialIssuerId,
+            nonce: CNonce,
+            popSigner: PopSigner,
+        ): ProofBuilder<*, *> {
+            return when (popSigner) {
+                is PopSigner.Jwt -> {
+                    JwtProofBuilder.check(popSigner, proofTypesSupported)
+                    JwtProofBuilder(clock, iss, aud, nonce, popSigner)
+                }
             }
-            val proofTypesSupported = spec.proofTypesSupported
-            val jwtProofTypeMeta = proofTypesSupported.values.filterIsInstance<ProofTypeMeta.Jwt>().firstOrNull()
-            ensureNotNull(jwtProofTypeMeta) {
+        }
+    }
+}
+
+internal class JwtProofBuilder(
+    clock: Clock,
+    iss: ClientId,
+    aud: CredentialIssuerId,
+    nonce: CNonce,
+    popSigner: PopSigner.Jwt,
+) : ProofBuilder<PopSigner.Jwt, Proof.Jwt>(clock, iss, aud, nonce, popSigner) {
+
+    override suspend fun build(): Proof.Jwt {
+        val header = header()
+        val claimSet = claimSet()
+        val jwt = SignedJWT(header, claimSet).apply { sign(popSigner.jwsSigner) }
+        return Proof.Jwt(jwt)
+    }
+
+    private fun header(): JWSHeader {
+        val algorithm = popSigner.algorithm
+        val headerBuilder = JWSHeader.Builder(algorithm)
+        headerBuilder.type(JOSEObjectType(HEADER_TYPE))
+        when (val key = popSigner.bindingKey) {
+            is JwtBindingKey.Jwk -> headerBuilder.jwk(key.jwk.toPublicJWK())
+            is JwtBindingKey.Did -> headerBuilder.keyID(key.identity)
+            is JwtBindingKey.X509 -> headerBuilder.x509CertChain(key.chain.map { Base64.encode(it.encoded) })
+        }
+        return headerBuilder.build()
+    }
+
+    private fun claimSet(): JWTClaimsSet =
+        JWTClaimsSet.Builder().apply {
+            issuer(iss)
+            audience(aud.toString())
+            claim("nonce", nonce.value)
+            issueTime(Date.from(clock.instant()))
+        }.build()
+
+    companion object : CheckPopSigner<PopSigner.Jwt> {
+
+        private const val HEADER_TYPE = "openid4vci-proof+jwt"
+
+        override fun check(popSigner: PopSigner.Jwt, proofTypesSupported: ProofTypesSupported) {
+            val spec = proofTypesSupported.values.filterIsInstance<ProofTypeMeta.Jwt>().firstOrNull()
+            ensureNotNull(spec) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
             }
-            val proofTypeSigningAlgorithmsSupported = jwtProofTypeMeta.algorithms
-            ensure(proofSigner.algorithm in proofTypeSigningAlgorithmsSupported) {
+            val proofTypeSigningAlgorithmsSupported = spec.algorithms
+            ensure(popSigner.algorithm in proofTypeSigningAlgorithmsSupported) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported
             }
-            val header = run {
-                val algorithm = proofSigner.algorithm
-                val headerBuilder = JWSHeader.Builder(algorithm)
-                headerBuilder.type(JOSEObjectType(headerType))
-                when (val key = proofSigner.bindingKey) {
-                    is JwtBindingKey.Jwk -> headerBuilder.jwk(key.jwk.toPublicJWK())
-                    is JwtBindingKey.Did -> headerBuilder.keyID(key.identity)
-                    is JwtBindingKey.X509 -> headerBuilder.x509CertChain(key.chain.map { Base64.encode(it.encoded) })
-                }
-                headerBuilder.build()
-            }
-            val claims = run {
-                checkNotNull(claimsSet.claims["aud"]) { "Claim 'aud' is missing" }
-                checkNotNull(claimsSet.claims["nonce"]) { "Claim 'nonce' is missing" }
-                claimsSet.issueTime(Date.from(Instant.now()))
-                claimsSet.build()
-            }
-            val signedJWT = SignedJWT(header, claims).apply { sign(proofSigner.jwsSigner) }
-            return Proof.Jwt(signedJWT)
         }
     }
 }

@@ -19,7 +19,7 @@ import com.nimbusds.jwt.JWT
 import eu.europa.ec.eudi.openid4vci.CredentialConfiguration
 import kotlinx.serialization.Serializable
 
-internal typealias ProofFactory = (CredentialConfiguration) -> Proof
+internal typealias ProofFactory = suspend (CredentialConfiguration) -> Proof
 
 /**
  * Sealed hierarchy of the proofs of possession that can be included in a credential issuance request. Proofs are used
