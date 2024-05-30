@@ -49,4 +49,13 @@ object CryptoGenerator {
         val bindingKey = JwtBindingKey.Jwk(keyPair.toPublicJWK())
         return PopSigner.jwtPopSigner(keyPair, JWSAlgorithm.ES256, bindingKey)
     }
+
+    // TODO make this smarter
+    //  taking into account the proofTypeMeta data
+    fun popSigner(proofTypeMeta: ProofTypeMeta): PopSigner? =
+        when (proofTypeMeta) {
+            ProofTypeMeta.Cwt -> null
+            is ProofTypeMeta.Jwt -> ecProofSigner()
+            ProofTypeMeta.LdpVp -> null
+        }
 }

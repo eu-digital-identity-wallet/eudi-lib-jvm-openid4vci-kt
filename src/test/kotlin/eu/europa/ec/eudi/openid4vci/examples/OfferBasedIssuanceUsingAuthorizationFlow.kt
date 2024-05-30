@@ -17,29 +17,20 @@ package eu.europa.ec.eudi.openid4vci.examples
 
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.ensure
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
-import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
-import org.jsoup.Jsoup
-import org.jsoup.nodes.FormElement
-import java.net.URL
-
-private val actingUser = ActingUser("tneal", "password")
 
 fun main(): Unit = runBlocking {
     val credentialOfferUrl = "eudi-openid4ci://?credential_offer=%7B%22" +
         "credential_issuer%22:%22https://dev.issuer-backend.eudiw.dev%22,%22" +
-        "credential_configuration_ids%22:[%22$PID_MsoMdoc_config_id%22," +
-        "%22$PID_SdJwtVC_config_id%22,%22$MDL_config_id%22]," +
+        "credential_configuration_ids%22:[%22${PidDevIssuer.PID_MsoMdoc_config_id.value}%22," +
+        "%22${PidDevIssuer.PID_SdJwtVC_config_id.value}%22,%22${PidDevIssuer.MDL_config_id.value}%22]," +
         "%22grants%22:%7B%22authorization_code%22:%7B%22" +
         "authorization_server%22:%22https://dev.auth.eudiw.dev/realms/pid-issuer-realm%22%7D%7D%7D"
 
     println("[[Scenario: Issuance based on credential offer url: $credentialOfferUrl]] ")
 
     val issuer = Issuer.make(
-        config = DefaultOpenId4VCIConfig,
+        config = PidDevIssuer.Cfg,
         credentialOfferUri = credentialOfferUrl,
         ktorHttpClientFactory = ::createHttpClient,
     ).getOrThrow()
@@ -50,7 +41,7 @@ fun main(): Unit = runBlocking {
     }
 
     authorizationLog("Using authorized code flow to authorize")
-    val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, actingUser)
+    val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, PidDevIssuer.TestUser)
     authorizationLog("Authorization retrieved: $authorizedRequest")
 
     val offerCredentialConfIds = credentialOffer.credentialConfigurationIdentifiers
@@ -75,7 +66,10 @@ fun main(): Unit = runBlocking {
     }
 }
 
-private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer, actingUser: ActingUser): AuthorizedRequest =
+private suspend fun authorizeRequestWithAuthCodeUseCase(
+    issuer: Issuer,
+    actingUser: PidDevIssuer.ActingUser,
+): AuthorizedRequest =
     with(issuer) {
         authorizationLog("Preparing authorization code request")
 
@@ -83,10 +77,9 @@ private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer, actingUs
 
         authorizationLog("Get authorization code URL is: ${prepareAuthorizationCodeRequest.authorizationCodeURL.value}")
 
-        val (authorizationCode, serverState) = loginUserAndGetAuthCode(
-            prepareAuthorizationCodeRequest.authorizationCodeURL.value,
-            actingUser,
-        ) ?: error("Could not retrieve authorization code")
+        val (authorizationCode, serverState) =
+            PidDevIssuer.loginUserAndGetAuthCode(prepareAuthorizationCodeRequest, actingUser)
+                ?: error("Could not retrieve authorization code")
 
         authorizationLog("Authorization code retrieved: $authorizationCode")
 
@@ -99,33 +92,6 @@ private suspend fun authorizeRequestWithAuthCodeUseCase(issuer: Issuer, actingUs
 
         authorizedRequest
     }
-
-private suspend fun loginUserAndGetAuthCode(getAuthorizationCodeUrl: URL, actingUser: ActingUser): Pair<String, String>? {
-    return createHttpClient().use { client ->
-        val loginUrl = client.get(getAuthorizationCodeUrl).body<String>().extractASLoginUrl()
-
-        val formParameters = mapOf(
-            "username" to actingUser.username,
-            "password" to actingUser.password,
-        )
-        val response = client.submitForm(
-            url = loginUrl.toString(),
-            formParameters = Parameters.build {
-                formParameters.entries.forEach { append(it.key, it.value) }
-            },
-        )
-        val redirectLocation = response.headers["Location"].toString()
-        with(URLBuilder(redirectLocation)) {
-            parameters["code"] to parameters["state"]
-        }.toNullable()
-    }
-}
-
-private fun String.extractASLoginUrl(): URL {
-    val form = Jsoup.parse(this).body().getElementById("kc-form-login") as FormElement
-    val action = form.attr("action")
-    return URL(action)
-}
 
 private suspend fun submitProvidingNoProofs(
     issuer: Issuer,
@@ -156,7 +122,7 @@ private suspend fun submitProvidingProofs(
     credentialConfigurationId: CredentialConfigurationIdentifier,
 ): String {
     with(issuer) {
-        val proofSigner = DefaultProofSignersMap[credentialConfigurationId.value]
+        val proofSigner = DefaultProofSignersMap[credentialConfigurationId]
             ?: error("No signer found for credential $credentialConfigurationId")
 
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
@@ -176,7 +142,7 @@ private suspend fun handleSuccess(
     submittedRequest: SubmittedRequest.Success,
     issuer: Issuer,
     authorized: AuthorizedRequest,
-) = when (val issuedCredential = submittedRequest.credentials[0]) {
+): String = when (val issuedCredential = submittedRequest.credentials[0]) {
     is IssuedCredential.Issued -> issuedCredential.credential
     is IssuedCredential.Deferred -> {
         handleDeferred(issuer, authorized, issuedCredential)
