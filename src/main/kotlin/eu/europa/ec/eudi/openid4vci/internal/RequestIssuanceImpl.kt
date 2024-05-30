@@ -85,20 +85,14 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private fun proofFactory(proofSigner: PopSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
-
-        when (proofSigner) {
-            is PopSigner.Jwt -> with(ProofBuilder.JwtProofBuilder()) {
-                iss(config.clientId)
-                aud(credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier.toString())
-                credentialSpec(credentialSupported)
-                nonce(cNonce.value)
-                build(proofSigner)
-            }
-        }
+    private suspend fun proofFactory(proofSigner: PopSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
+        val iss = config.clientId
+        val aud = credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier
+        val proofTypesSupported = credentialSupported.proofTypesSupported
+        ProofBuilder(proofTypesSupported, config.clock, iss, aud, cNonce, proofSigner).build()
     }
 
-    private fun singleRequest(
+    private suspend fun singleRequest(
         requestPayload: IssuanceRequestPayload,
         proofFactory: ProofFactory?,
         credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
@@ -128,7 +122,7 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private fun formatBasedRequest(
+    private suspend fun formatBasedRequest(
         credentialConfigurationId: CredentialConfigurationIdentifier,
         claimSet: ClaimSet?,
         proofFactory: ProofFactory?,
@@ -147,7 +141,7 @@ internal class RequestIssuanceImpl(
         )
     }
 
-    private fun identifierBasedRequest(
+    private suspend fun identifierBasedRequest(
         credentialConfigurationId: CredentialConfigurationIdentifier,
         credentialId: CredentialIdentifier,
         proofFactory: ProofFactory?,
@@ -174,11 +168,12 @@ internal class RequestIssuanceImpl(
 
     override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
-    ): AuthorizedRequest.ProofRequired = AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, credentialIdentifiers)
+    ): AuthorizedRequest.ProofRequired =
+        AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, credentialIdentifiers)
 
     private suspend fun placeIssuanceRequest(
         token: AccessToken,
-        issuanceRequestSupplier: () -> CredentialIssuanceRequest,
+        issuanceRequestSupplier: suspend () -> CredentialIssuanceRequest,
     ): SubmittedRequest {
         fun handleIssuanceFailure(error: Throwable): SubmittedRequest.Errored =
             submitRequestFromError(error) ?: throw error
