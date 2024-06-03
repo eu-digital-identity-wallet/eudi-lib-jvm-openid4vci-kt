@@ -64,6 +64,8 @@ private sealed interface CredentialSupportedTO {
 @Serializable
 private data class ProofSigningAlgorithmsSupportedTO(
     @SerialName("proof_signing_alg_values_supported") val algorithms: List<String> = emptyList(),
+    @SerialName("proof_alg_values_supported") val cwtAlgorithms: List<Int> = emptyList(),
+    @SerialName("proof_crv_values_supported") val cwtCurves: List<Int> = emptyList(),
 )
 
 /**
@@ -78,6 +80,8 @@ private data class MsdMdocCredentialTO(
     override val cryptographicBindingMethodsSupported: List<String>? = null,
     @SerialName("credential_signing_alg_values_supported")
     override val credentialSigningAlgorithmsSupported: List<String>? = null,
+    @SerialName("credential_alg_values_supported") val isoCredentialSigningAlgorithmsSupported: List<Int>? = null,
+    @SerialName("credential_crv_values_supported") val isoCredentialCurvesSupported: List<Int>? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
@@ -95,8 +99,9 @@ private data class MsdMdocCredentialTO(
             ?: emptyList()
         val display = display?.map { it.toDomain() } ?: emptyList()
         val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported ?: emptyList()
-
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
+        val coseAlgs = isoCredentialSigningAlgorithmsSupported.orEmpty().map { CoseAlgorithm(it).getOrThrow() }
+        val coseCurves = isoCredentialCurvesSupported.orEmpty().map { CoseCurve(it).getOrThrow() }
         fun claims(): MsoMdocClaims = claims?.mapValues { (_, claims) ->
             claims.mapValues { (_, claim) ->
                 claim.let { claimObject ->
@@ -118,6 +123,8 @@ private data class MsdMdocCredentialTO(
             scope,
             bindingMethods,
             cryptographicSuitesSupported,
+            coseAlgs,
+            coseCurves,
             proofTypesSupported,
             display,
             docType,
@@ -526,7 +533,10 @@ private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO)
             algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) },
         )
 
-        "cwt" -> ProofTypeMeta.Cwt
+        "cwt" -> ProofTypeMeta.Cwt(
+            algorithms = meta.cwtAlgorithms.map { CoseAlgorithm(it).getOrThrow() },
+            curves = meta.cwtCurves.map { CoseCurve(it).getOrThrow() },
+        )
         "ldp_vp" -> ProofTypeMeta.LdpVp
         else -> error("Unknown Proof Type '$type'")
     }
