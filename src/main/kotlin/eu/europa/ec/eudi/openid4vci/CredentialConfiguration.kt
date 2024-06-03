@@ -159,6 +159,7 @@ fun MsoMdocClaims.toClaimSet(): MsoMdocClaimSet = MsoMdocClaimSet(
     mapValues { (_, claims) -> claims.keys.toList() }
         .flatMap { (nameSpace, claims) -> claims.map { claimName -> nameSpace to claimName } },
 )
+data class MsoMdocPolicy(val oneTimeUse: Boolean, val batchSize: Int?) : Serializable
 
 /**
  * The data of a Verifiable Credentials issued as an ISO MDOC.
@@ -169,6 +170,7 @@ data class MsoMdocCredential(
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
     val isoCredentialSigningAlgorithmsSupported: List<CoseAlgorithm> = emptyList(),
     val isoCredentialCurvesSupported: List<CoseCurve> = emptyList(),
+    val isoPolicy: MsoMdocPolicy?,
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val display: List<Display> = emptyList(),
     val docType: String,

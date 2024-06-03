@@ -28,6 +28,7 @@ import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
 import java.net.URL
 import java.util.*
@@ -63,9 +64,15 @@ private sealed interface CredentialSupportedTO {
 
 @Serializable
 private data class ProofSigningAlgorithmsSupportedTO(
-    @SerialName("proof_signing_alg_values_supported") val algorithms: List<String> = emptyList(),
+    @SerialName("proof_signing_alg_values_supported") val algorithms: List<JsonPrimitive> = emptyList(),
     @SerialName("proof_alg_values_supported") val cwtAlgorithms: List<Int> = emptyList(),
     @SerialName("proof_crv_values_supported") val cwtCurves: List<Int> = emptyList(),
+)
+
+@Serializable
+private data class PolicyTO(
+    @SerialName("one_time_use") val oneTimeUse: Boolean,
+    @SerialName("batch_size") val batchSize: Int? = null,
 )
 
 /**
@@ -82,6 +89,7 @@ private data class MsdMdocCredentialTO(
     override val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("credential_alg_values_supported") val isoCredentialSigningAlgorithmsSupported: List<Int>? = null,
     @SerialName("credential_crv_values_supported") val isoCredentialCurvesSupported: List<Int>? = null,
+    @SerialName("policy") val isoPolicy: PolicyTO? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
@@ -102,6 +110,8 @@ private data class MsdMdocCredentialTO(
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
         val coseAlgs = isoCredentialSigningAlgorithmsSupported.orEmpty().map { CoseAlgorithm(it).getOrThrow() }
         val coseCurves = isoCredentialCurvesSupported.orEmpty().map { CoseCurve(it).getOrThrow() }
+        val policy = isoPolicy?.let { policy -> MsoMdocPolicy(policy.oneTimeUse, policy.batchSize) }
+
         fun claims(): MsoMdocClaims = claims?.mapValues { (_, claims) ->
             claims.mapValues { (_, claim) ->
                 claim.let { claimObject ->
@@ -125,6 +135,7 @@ private data class MsdMdocCredentialTO(
             cryptographicSuitesSupported,
             coseAlgs,
             coseCurves,
+            policy,
             proofTypesSupported,
             display,
             docType,
@@ -530,7 +541,10 @@ private fun Map<String, ProofSigningAlgorithmsSupportedTO>?.toProofTypes(): Proo
 private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta =
     when (type) {
         "jwt" -> ProofTypeMeta.Jwt(
-            algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) },
+            algorithms = meta.algorithms.map {
+                require(it.isString) { "Expecting algorithm in string" }
+                JWSAlgorithm.parse(it.content)
+            },
         )
 
         "cwt" -> ProofTypeMeta.Cwt(

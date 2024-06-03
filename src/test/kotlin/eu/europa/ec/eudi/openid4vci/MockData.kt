@@ -253,6 +253,7 @@ internal fun mobileDrivingLicense() = MsoMdocCredential(
     listOf("ES256", "ES384", "ES512"),
     emptyList(),
     emptyList(),
+    null,
     ProofTypesSupported(setOf(ProofTypeMeta.Jwt(listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256)))),
     listOf(
         Display(
