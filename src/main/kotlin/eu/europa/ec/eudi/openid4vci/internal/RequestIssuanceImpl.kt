@@ -152,7 +152,11 @@ internal class RequestIssuanceImpl(
         }
         val credentialSupported = credentialSupportedById(credentialConfigurationId)
         val proof = proofFactory?.invoke(credentialSupported)?.also { assertProofSupported(it, credentialSupported) }
-        return CredentialIssuanceRequest.IdentifierBased(credentialId, proof, responseEncryptionSpec.takeIf { includeEncryptionSpec })
+        return CredentialIssuanceRequest.IdentifierBased(
+            credentialId,
+            proof,
+            responseEncryptionSpec.takeIf { includeEncryptionSpec },
+        )
     }
 
     private fun assertProofSupported(p: Proof, credentialSupported: CredentialConfiguration) {
