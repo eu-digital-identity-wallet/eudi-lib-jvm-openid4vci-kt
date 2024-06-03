@@ -223,6 +223,28 @@ sealed interface JwtBindingKey {
     }
 }
 
+sealed interface CwtBindingKey {
+
+    @JvmInline
+    value class CoseKey(val jwk: JWK) : CwtBindingKey {
+        init {
+            require(!jwk.isPrivate) { "Binding key of type Jwk must contain a public key" }
+        }
+    }
+
+    /**
+     * An X509 biding key
+     */
+    @JvmInline
+    value class X509(
+        val chain: List<X509Certificate>,
+    ) : CwtBindingKey {
+        init {
+            require(chain.isNotEmpty()) { "Certificate chain cannot be empty" }
+        }
+    }
+}
+
 data class IssuanceResponseEncryptionSpec(
     val jwk: JWK,
     val algorithm: JWEAlgorithm,
