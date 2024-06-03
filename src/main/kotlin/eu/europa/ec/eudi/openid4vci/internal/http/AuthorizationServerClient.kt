@@ -178,7 +178,7 @@ internal class AuthorizationServerClient(
                 state(State(state))
                 issuerState?.let { customParameter("issuer_state", issuerState) }
                 if (scopes.isNotEmpty()) {
-                    scope(NimbusScope(*scopes.map { it.value }.toTypedArray() + "openid"))
+                    scope(NimbusScope(*scopes.map { it.value }.toTypedArray()))
                 }
                 if (credentialsConfigurationIds.isNotEmpty()) {
                     authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
@@ -210,7 +210,7 @@ internal class AuthorizationServerClient(
             state(State(state))
             issuerState?.let { customParameter("issuer_state", issuerState) }
             if (credentialsScopes.isNotEmpty()) {
-                scope(NimbusScope(*credentialsScopes.map { it.value }.toTypedArray() + "openid"))
+                scope(NimbusScope(*credentialsScopes.map { it.value }.toTypedArray()))
             }
             if (credentialsAuthorizationDetails.isNotEmpty()) {
                 authorizationDetails(credentialsAuthorizationDetails.map(::toNimbus))
