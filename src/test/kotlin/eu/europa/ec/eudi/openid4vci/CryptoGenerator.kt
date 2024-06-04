@@ -115,6 +115,14 @@ object CryptoGenerator {
             }
             ProofTypeMeta.LdpVp -> null
         }
+
+    fun popSigner(
+        clock: Clock = Clock.systemDefaultZone(),
+        credentialConfiguration: CredentialConfiguration,
+    ): PopSigner? =
+        credentialConfiguration.proofTypesSupported.values.asSequence().mapNotNull {
+            popSigner(clock, it)
+        }.firstOrNull()
 }
 
 fun CoseAlgorithm.toNimbus(): JWSAlgorithm? = JWSAlgorithm.parse(name())

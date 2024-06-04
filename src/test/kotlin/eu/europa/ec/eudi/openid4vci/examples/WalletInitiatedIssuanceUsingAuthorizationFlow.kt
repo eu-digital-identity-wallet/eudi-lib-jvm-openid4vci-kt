@@ -29,7 +29,7 @@ fun runUseCase(
 ): Unit = runBlocking {
     println("[[Scenario: Issuance based on credential configuration ids: $credentialConfigurationIds]] ")
 
-    val (issuerMetadata, authorizationServersMetadata) = createHttpClient().use { client ->
+    val (issuerMetadata, authorizationServersMetadata) = createHttpClient(enableLogging = false).use { client ->
         Issuer.metaData(client, credentialIssuerId)
     }
 
@@ -60,7 +60,7 @@ fun runUseCase(
 
         with(authorizedRequest) {
             credentialOffer.credentialConfigurationIdentifiers.forEach { credentialIdentifier ->
-                submitCredentialRequest(this@with, credentialIdentifier).also {
+                submitCredentialRequest(authorizedRequest, credentialIdentifier).also {
                     println("--> Issued credential: $it \n")
                 }
             }
@@ -68,7 +68,7 @@ fun runUseCase(
     }
 }
 
-private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: PidDevIssuer.ActingUser): AuthorizedRequest {
+private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: ActingUser): AuthorizedRequest {
     authorizationLog("Preparing authorization code request")
 
     val prepareAuthorizationCodeRequest = prepareAuthorizationRequest().getOrThrow().also {
@@ -79,7 +79,7 @@ private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: PidDe
         val (authorizationCode, serverState) = PidDevIssuer.loginUserAndGetAuthCode(
             prepareAuthorizationCodeRequest,
             actingUser,
-        ) ?: error("Could not retrieve authorization code")
+        )
 
         authorizationLog("Authorization code retrieved: $authorizationCode")
 
@@ -122,8 +122,7 @@ private suspend fun Issuer.submitProvidingProofs(
     authorized: AuthorizedRequest.ProofRequired,
     credentialConfigurationId: CredentialConfigurationIdentifier,
 ): String {
-    val proofSigner = DefaultProofSignersMap[credentialConfigurationId]
-        ?: error("No signer found for credential $credentialConfigurationId")
+    val proofSigner = popSigner(credentialConfigurationId)
 
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
     val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()

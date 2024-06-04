@@ -68,7 +68,7 @@ fun main(): Unit = runBlocking {
 
 private suspend fun authorizeRequestWithAuthCodeUseCase(
     issuer: Issuer,
-    actingUser: PidDevIssuer.ActingUser,
+    actingUser: ActingUser,
 ): AuthorizedRequest =
     with(issuer) {
         authorizationLog("Preparing authorization code request")
@@ -79,7 +79,6 @@ private suspend fun authorizeRequestWithAuthCodeUseCase(
 
         val (authorizationCode, serverState) =
             PidDevIssuer.loginUserAndGetAuthCode(prepareAuthorizationCodeRequest, actingUser)
-                ?: error("Could not retrieve authorization code")
 
         authorizationLog("Authorization code retrieved: $authorizationCode")
 
@@ -122,9 +121,7 @@ private suspend fun submitProvidingProofs(
     credentialConfigurationId: CredentialConfigurationIdentifier,
 ): String {
     with(issuer) {
-        val proofSigner = DefaultProofSignersMap[credentialConfigurationId]
-            ?: error("No signer found for credential $credentialConfigurationId")
-
+        val proofSigner = popSigner(credentialConfigurationId)
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
         val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
 
