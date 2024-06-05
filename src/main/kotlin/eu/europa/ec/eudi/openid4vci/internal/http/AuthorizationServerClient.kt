@@ -130,6 +130,7 @@ internal class AuthorizationServerClient(
     private val config: OpenId4VCIConfig,
     private val dPoPJwtFactory: DPoPJwtFactory?,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
+    private val parUsage: ParUsage,
 ) {
 
     private val supportsPar: Boolean
@@ -140,12 +141,18 @@ internal class AuthorizationServerClient(
         credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
         state: String,
         issuerState: String?,
-    ): Result<Pair<PKCEVerifier, HttpsUrl>> =
-        if (supportsPar) {
+    ): Result<Pair<PKCEVerifier, HttpsUrl>> {
+        val usePar = when (parUsage) {
+            ParUsage.IfSupported -> supportsPar
+            ParUsage.DonNot -> false
+            ParUsage.Always -> true
+        }
+        return if (usePar) {
             submitPushedAuthorizationRequest(scopes, credentialsConfigurationIds, state, issuerState)
         } else {
             authorizationRequestUrl(scopes, credentialsConfigurationIds, state, issuerState)
         }
+    }
 
     /**
      * Submit Pushed Authorization Request for authorizing an issuance request.

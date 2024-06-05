@@ -33,6 +33,8 @@ typealias ClientId = String
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
  * @param dPoPSigner a signer that if provided will enable the use of DPoP JWT
+ * @param parUsage whether to use PAR in case of authorization code grant
+ * @param clock Wallet's clock
  */
 data class OpenId4VCIConfig(
     val clientId: ClientId,
@@ -41,6 +43,7 @@ data class OpenId4VCIConfig(
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPSigner: PopSigner.Jwt? = null,
+    val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
 ) {
 
@@ -55,6 +58,20 @@ data class OpenId4VCIConfig(
             }
         }
     }
+}
+
+/**
+ * Wallet's policy in regard to using PAR, during a authorization code grant.
+ * - [IfSupported]: If authorization server advertises PAR endpoint it will be used. Otherwise, falls back
+ *   to usual authorization code flow
+ * - [DonNot]: Disables PAR. Wallet will use the usual authorization code flow
+ * - [Always]: Wallet always will place PAR request, regardless what if authorization server advertises the PAR
+ *   endpoint
+ */
+enum class ParUsage {
+    IfSupported,
+    DonNot,
+    Always,
 }
 
 /**
