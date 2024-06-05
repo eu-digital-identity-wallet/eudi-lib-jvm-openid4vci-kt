@@ -25,6 +25,7 @@ import com.nimbusds.oauth2.sdk.pkce.CodeVerifier
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail
 import com.nimbusds.oauth2.sdk.rar.AuthorizationType
 import com.nimbusds.oauth2.sdk.rar.Location
+import com.nimbusds.openid.connect.sdk.Prompt
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
@@ -183,6 +184,7 @@ internal class AuthorizationServerClient(
                 if (credentialsConfigurationIds.isNotEmpty()) {
                     authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
                 }
+                prompt(Prompt.Type.LOGIN)
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
         }
@@ -215,6 +217,7 @@ internal class AuthorizationServerClient(
             if (credentialsAuthorizationDetails.isNotEmpty()) {
                 authorizationDetails(credentialsAuthorizationDetails.map(::toNimbus))
             }
+            prompt(Prompt.Type.LOGIN)
         }.build()
 
         val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())
