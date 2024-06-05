@@ -144,7 +144,7 @@ internal class AuthorizationServerClient(
     ): Result<Pair<PKCEVerifier, HttpsUrl>> {
         val usePar = when (parUsage) {
             ParUsage.IfSupported -> supportsPar
-            ParUsage.DonNot -> false
+            ParUsage.Never -> false
             ParUsage.Always -> true
         }
         return if (usePar) {
