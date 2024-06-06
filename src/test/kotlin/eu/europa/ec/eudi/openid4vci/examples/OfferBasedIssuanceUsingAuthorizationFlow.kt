@@ -68,7 +68,7 @@ fun main(): Unit = runBlocking {
 
 private suspend fun authorizeRequestWithAuthCodeUseCase(
     issuer: Issuer,
-    actingUser: ActingUser,
+    actingUser: KeycloakUser,
 ): AuthorizedRequest =
     with(issuer) {
         authorizationLog("Preparing authorization code request")

@@ -17,30 +17,28 @@ package eu.europa.ec.eudi.openid4vci.examples
 
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
-import java.net.URI
-
-typealias ActingUser = KeycloakUser
 
 private const val BASE_URL = "https://dev.issuer-backend.eudiw.dev"
 private val IssuerId = CredentialIssuerId(BASE_URL).getOrThrow()
 
 internal object PidDevIssuer :
     HasIssuerId,
-    HasTestUser<ActingUser>,
-    CanAuthorizeIssuance<ActingUser> by Keycloak,
+    HasTestUser<KeycloakUser>,
+    CanAuthorizeIssuance<KeycloakUser> by Keycloak,
     CanBeUsedWithVciLib,
-    CanRequestForCredentialOffer<ActingUser> by CanRequestForCredentialOffer.onlyStatelessAuthorizationCode(IssuerId) {
+    CanRequestForCredentialOffer<KeycloakUser> by CanRequestForCredentialOffer.onlyStatelessAuthorizationCode(IssuerId) {
 
     private const val WALLET_CLIENT_ID = "wallet-dev"
-    private val WalletRedirectURI = URI.create("urn:ietf:wg:oauth:2.0:oob")
 
     override val issuerId = IssuerId
-    override val testUser: ActingUser = ActingUser("tneal", "password")
+    override val testUser = KeycloakUser("tneal", "password")
     override val cfg = OpenId4VCIConfig(
         clientId = WALLET_CLIENT_ID,
-        authFlowRedirectionURI = WalletRedirectURI,
+        authFlowRedirectionURI = Keycloak.DebugRedirectUri,
         keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
         credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+        authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+        parUsage = ParUsage.IfSupported,
         dPoPSigner = CryptoGenerator.ecProofSigner(),
     )
 

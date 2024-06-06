@@ -204,4 +204,6 @@ object Keycloak : CanAuthorizeIssuance<KeycloakUser> {
             submitForm(url = loginUrl.toString(), formParameters = formParameters())
         }
     }
+
+    val DebugRedirectUri: URI = URI.create("urn:ietf:wg:oauth:2.0:oob")
 }

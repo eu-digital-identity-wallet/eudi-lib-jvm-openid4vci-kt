@@ -49,7 +49,7 @@ fun runUseCase(
     val issuer = Issuer.make(
         config = PidDevIssuer.cfg,
         credentialOffer = credentialOffer,
-        ktorHttpClientFactory = ::createHttpClient,
+        ktorHttpClientFactory = { createHttpClient(enableLogging = false) },
     ).getOrThrow()
 
     with(issuer) {
@@ -66,7 +66,7 @@ fun runUseCase(
     }
 }
 
-private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: ActingUser): AuthorizedRequest {
+private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: KeycloakUser): AuthorizedRequest {
     authorizationLog("Preparing authorization code request")
 
     val prepareAuthorizationCodeRequest = prepareAuthorizationRequest().getOrThrow().also {
