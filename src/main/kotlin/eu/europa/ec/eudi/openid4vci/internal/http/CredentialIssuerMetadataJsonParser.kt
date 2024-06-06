@@ -66,8 +66,8 @@ private sealed interface CredentialSupportedTO {
 @Serializable
 private data class ProofSigningAlgorithmsSupportedTO(
     @SerialName("proof_signing_alg_values_supported") val algorithms: List<JsonPrimitive> = emptyList(),
-    @SerialName("proof_alg_values_supported") val cwtAlgorithms: List<Int> = emptyList(),
-    @SerialName("proof_crv_values_supported") val cwtCurves: List<Int> = emptyList(),
+    @SerialName("proof_alg_values_supported") val isoAlgorithms: List<Int> = emptyList(),
+    @SerialName("proof_crv_values_supported") val isoCurves: List<Int> = emptyList(),
 )
 
 @Serializable
@@ -544,22 +544,46 @@ private fun Map<String, ProofSigningAlgorithmsSupportedTO>?.toProofTypes(): Proo
         }
     }
 
-private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta =
-    when (type) {
+private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta {
+    fun CoseAlgorithm.correspondingCurve(): CoseCurve? = when (this) {
+        CoseAlgorithm.ES256 -> CoseCurve.P_256
+        CoseAlgorithm.ES384 -> CoseCurve.P_384
+        CoseAlgorithm.ES512 -> CoseCurve.P_521
+        else -> null
+    }
+
+    fun JsonPrimitive.toCoseAlgorithm(): CoseAlgorithm? =
+        intOrNull?.let { CoseAlgorithm(it).getOrNull() }
+
+    return when (type) {
         "jwt" -> ProofTypeMeta.Jwt(
             algorithms = meta.algorithms.map {
-                require(it.isString) { "Expecting algorithm in string" }
+                require(it.isString) { "Expecting JOSE algorithm" }
                 JWSAlgorithm.parse(it.content)
             },
         )
 
-        "cwt" -> ProofTypeMeta.Cwt(
-            algorithms = meta.cwtAlgorithms.map { CoseAlgorithm(it).getOrThrow() },
-            curves = meta.cwtCurves.map { CoseCurve(it).getOrThrow() },
-        )
+        "cwt" -> {
+            val isoAlgorithms = meta.isoAlgorithms.map { CoseAlgorithm(it).getOrThrow() }
+            val isoCurves = meta.isoCurves.map { CoseCurve(it).getOrThrow() }
+            val vciAlgorithms = meta.algorithms.map { value ->
+                requireNotNull(value.toCoseAlgorithm()) {
+                    "Expecting COSE algorithm, yet got $value"
+                }
+            }
+
+            if (isoAlgorithms.isNotEmpty() && isoCurves.isNotEmpty()) {
+                ProofTypeMeta.Cwt(isoAlgorithms, isoCurves)
+            } else {
+                val calculatedCurves = vciAlgorithms.mapNotNull { it.correspondingCurve() }
+                ProofTypeMeta.Cwt(vciAlgorithms, calculatedCurves)
+            }
+        }
+
         "ldp_vp" -> ProofTypeMeta.LdpVp
         else -> error("Unknown Proof Type '$type'")
     }
+}
 
 /**
  * Utility method to convert a list of string to a list of [CryptographicBindingMethod].
