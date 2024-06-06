@@ -30,7 +30,7 @@ fun main(): Unit = runBlocking {
     println("[[Scenario: Issuance based on credential offer url: $credentialOfferUrl]] ")
 
     val issuer = Issuer.make(
-        config = PidDevIssuer.Cfg,
+        config = PidDevIssuer.cfg,
         credentialOfferUri = credentialOfferUrl,
         ktorHttpClientFactory = ::createHttpClient,
     ).getOrThrow()
@@ -41,7 +41,7 @@ fun main(): Unit = runBlocking {
     }
 
     authorizationLog("Using authorized code flow to authorize")
-    val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, PidDevIssuer.TestUser)
+    val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, PidDevIssuer.testUser)
     authorizationLog("Authorization retrieved: $authorizedRequest")
 
     val offerCredentialConfIds = credentialOffer.credentialConfigurationIdentifiers

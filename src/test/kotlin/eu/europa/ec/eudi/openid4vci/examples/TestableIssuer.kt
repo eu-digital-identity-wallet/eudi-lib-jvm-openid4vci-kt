@@ -36,6 +36,10 @@ import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
 
+interface HasIssuerId {
+    val issuerId: CredentialIssuerId
+}
+
 interface CanBeUsedWithVciLib {
     val cfg: OpenId4VCIConfig
 
@@ -44,8 +48,8 @@ interface CanBeUsedWithVciLib {
     }
 }
 
-data class CredentialOfferForm<USER>(
-    val user: USER,
+data class CredentialOfferForm<out USER>(
+    val user: USER?,
     val credentialConfigurationIds: Set<CredentialConfigurationIdentifier>,
     val authorizationCodeGrant: AuthorizationCodeGrant?,
     val preAuthorizedCodeGrant: PreAuthorizedCodeGrant?,
@@ -53,7 +57,7 @@ data class CredentialOfferForm<USER>(
 ) {
     companion object {
         fun <USER> authorizationCodeGrant(
-            user: USER,
+            user: USER?,
             credentialConfigurationIds: Set<CredentialConfigurationIdentifier>,
             issuerStateIncluded: Boolean = true,
             credentialOfferEndpoint: String? = null,
@@ -66,7 +70,7 @@ data class CredentialOfferForm<USER>(
         )
 
         fun <USER> preAuthorizedCodeGrant(
-            user: USER,
+            user: USER?,
             credentialConfigurationIds: Set<CredentialConfigurationIdentifier>,
             txCode: String?,
             credentialOfferEndpoint: String? = null,
@@ -90,7 +94,7 @@ data class CredentialOfferForm<USER>(
     )
 }
 
-interface CanRequestForCredentialOffer<USER> {
+interface CanRequestForCredentialOffer<in USER> {
     suspend fun requestCredentialOffer(form: CredentialOfferForm<USER>): URI =
         createHttpClient(enableLogging = false).use { requestCredentialOffer(it, form) }
 
@@ -124,32 +128,30 @@ interface CanRequestForCredentialOffer<USER> {
  * An authorization server, with a known user
  * that can issue credentials
  */
-interface HasTestUser<USER> {
+data object NoUser
+interface HasTestUser<out USER> {
     val testUser: USER
+    companion object {
+        val HasNoTestUser: HasTestUser<NoUser> = object : HasTestUser<NoUser> {
+            override val testUser: NoUser = NoUser
+        }
+    }
 }
 
 /**
  * The ability of an authorization server, to allow a [USER]
  * to authorize credential issuance
  */
-interface CanAuthorizeIssuance<USER> {
+interface CanAuthorizeIssuance<in USER> {
 
     suspend fun loginUserAndGetAuthCode(
         authorizationRequestPrepared: AuthorizationRequestPrepared,
         user: USER,
         enableHttpLogging: Boolean = false,
     ): Pair<String, String> = coroutineScope {
-        suspend fun HttpClient.visitAuthorizationPage(): HttpResponse {
-            val url = authorizationRequestPrepared.authorizationCodeURL.toString()
-            return get(url)
-        }
-
         val response = createHttpClient(enableLogging = enableHttpLogging).use { httpClient ->
-
-            val loginPageResponse = httpClient.visitAuthorizationPage()
-            check(loginPageResponse.status.isSuccess()) { "Response for login page was ${loginPageResponse.status}" }
-            val loginHtml = loginPageResponse.body<String>()
-            httpClient.authorizeIssuance(loginHtml, user)
+            val loginPageResponse = httpClient.visitAuthorizationPage(authorizationRequestPrepared)
+            httpClient.authorizeIssuance(loginPageResponse, user)
         }
         response.parseCodeAndStatus()
     }
@@ -166,7 +168,17 @@ interface CanAuthorizeIssuance<USER> {
         }.toNullable() ?: error("Failed to get authorization code & state")
     }
 
-    suspend fun HttpClient.authorizeIssuance(loginHtml: String, user: USER): HttpResponse
+    suspend fun HttpClient.visitAuthorizationPage(
+        authorizationRequestPrepared: AuthorizationRequestPrepared,
+    ): HttpResponse {
+        val url = authorizationRequestPrepared.authorizationCodeURL.toString()
+        return get(url) {
+            headers {
+                append(HttpHeaders.Accept, "text/html")
+            }
+        }
+    }
+    suspend fun HttpClient.authorizeIssuance(loginResponse: HttpResponse, user: USER): HttpResponse
 }
 
 //
@@ -175,8 +187,9 @@ interface CanAuthorizeIssuance<USER> {
 data class KeycloakUser(val username: String, val password: String)
 
 object Keycloak : CanAuthorizeIssuance<KeycloakUser> {
-    override suspend fun HttpClient.authorizeIssuance(loginHtml: String, user: KeycloakUser): HttpResponse {
+    override suspend fun HttpClient.authorizeIssuance(loginResponse: HttpResponse, user: KeycloakUser): HttpResponse {
         suspend fun extractASLoginUrl(): URL = withContext(Dispatchers.IO) {
+            val loginHtml = loginResponse.body<String>()
             val form = Jsoup.parse(loginHtml).body().getElementById("kc-form-login") as FormElement
             val action = form.attr("action")
             URL(action)

@@ -29,7 +29,6 @@ import org.apache.http.conn.ssl.TrustSelfSignedStrategy
 import org.apache.http.ssl.SSLContextBuilder
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.net.URI
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.fail
 
@@ -97,7 +96,10 @@ suspend fun Issuer.submitCredentialRequest(
     }
 }
 
-suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(env: ENV): AuthorizedRequest
+suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(
+    env: ENV,
+    enableHttLogging: Boolean = false,
+): AuthorizedRequest
     where
           ENV : HasTestUser<USER>,
           ENV : CanAuthorizeIssuance<USER> =
@@ -105,7 +107,11 @@ suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(env: ENV): Au
         val authorizationRequestPrepared = prepareAuthorizationRequest(walletState = null).getOrThrow()
         with(authorizationRequestPrepared) {
             val testUser = env.testUser
-            val (authorizationCode, serverState) = env.loginUserAndGetAuthCode(authorizationRequestPrepared, testUser)
+            val (authorizationCode, serverState) = env.loginUserAndGetAuthCode(
+                authorizationRequestPrepared,
+                testUser,
+                enableHttLogging,
+            )
             authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState).getOrThrow()
         }
     }
@@ -115,6 +121,7 @@ suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(env: ENV): Au
  */
 suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
     env: ENV,
+    enableHttLogging: Boolean,
     credCfgId: CredentialConfigurationIdentifier = credentialOffer.credentialConfigurationIdentifiers.first(),
     claimSetToRequest: ClaimSet? = null,
 ) where
@@ -122,8 +129,14 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
       ENV : CanAuthorizeIssuance<USER> =
     coroutineScope {
         val outcome = run {
-            val authorizedRequest = authorizeUsingAuthorizationCodeFlow(env)
-            submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest)
+            val authorizedRequest = authorizeUsingAuthorizationCodeFlow(env, enableHttLogging)
+            val outcome = submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest)
+            // If authorization server doesn't provide c_nonce in its token response
+            // there is the chance that provides c_nonce via credential endpoint
+            if (authorizedRequest is AuthorizedRequest.NoProofRequired && outcome is SubmittedRequest.InvalidProof) {
+                val proofRequired = authorizedRequest.handleInvalidProof(outcome.cNonce)
+                submitCredentialRequest(proofRequired, credCfgId, claimSetToRequest)
+            } else outcome
         }
 
         ensureIssued(outcome)
@@ -134,16 +147,27 @@ suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
     txCode: String?,
     credCfgId: CredentialConfigurationIdentifier,
     claimSetToRequest: ClaimSet?,
-) {
-    val outcome = run {
+) = coroutineScope {
+    val (authorized, outcome) = run {
         val authorizedRequest = authorizeWithPreAuthorizationCode(txCode).getOrThrow()
-        submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest)
+        val outcome = submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest)
+        // If authorization server doesn't provide c_nonce in its token response
+        // there is the chance that provides c_nonce via credential endpoint
+        if (authorizedRequest is AuthorizedRequest.NoProofRequired && outcome is SubmittedRequest.InvalidProof) {
+            val proofRequired = authorizedRequest.handleInvalidProof(outcome.cNonce)
+            proofRequired to submitCredentialRequest(proofRequired, credCfgId, claimSetToRequest)
+        } else authorizedRequest to outcome
     }
 
-    ensureIssued(outcome)
+    val issuedCredentials = ensureIssued(outcome)
+    check(outcome is SubmittedRequest.Success)
+    issuedCredentials.filterIsInstance<IssuedCredential.Issued>().forEach { println(it) }
+    issuedCredentials.filterIsInstance<IssuedCredential.Deferred>().forEach { deferred ->
+        handleDeferred(authorized, deferred).also { println(it) }
+    }
 }
 
-fun ensureIssued(outcome: SubmittedRequest): List<String> =
+fun ensureIssued(outcome: SubmittedRequest): List<IssuedCredential> =
     when (outcome) {
         is SubmittedRequest.Failed -> {
             fail("Issuer rejected request. Reason :${outcome.error.message}")
@@ -155,12 +179,25 @@ fun ensureIssued(outcome: SubmittedRequest): List<String> =
         }
 
         is SubmittedRequest.Success -> {
-            outcome.credentials.map { issued ->
-                val issuedCredential = assertIs<IssuedCredential.Issued>(issued)
-                issuedCredential.credential.also { println(it) }
-            }
+            outcome.credentials
         }
     }
+
+suspend fun Issuer.handleDeferred(
+    authorized: AuthorizedRequest,
+    deferred: IssuedCredential.Deferred,
+): String {
+    issuanceLog(
+        "Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
+    )
+    return when (val outcome = authorized.queryForDeferredCredential(deferred).getOrThrow()) {
+        is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
+        is DeferredCredentialQueryOutcome.IssuancePending -> throw RuntimeException(
+            "Credential not ready yet. Try after ${outcome.interval}",
+        )
+        is DeferredCredentialQueryOutcome.Errored -> throw RuntimeException(outcome.error)
+    }
+}
 
 //
 // ENV extensions
@@ -194,6 +231,7 @@ suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
         assertNotNull(credCfg)
         testIssuanceWithAuthorizationCodeFlow(
             env = this@testIssuanceWithAuthorizationCodeFlow,
+            enableHttLogging = enableHttLogging,
             claimSetToRequest = claimSetToRequest.invoke(credCfg),
         )
     }
@@ -261,4 +299,14 @@ suspend fun <ENV, USER> ENV.requestPreAuthorizedCodeGrantOffer(
         credentialOfferEndpoint,
     )
     return requestCredentialOffer(form)
+}
+
+suspend fun <ENV : HasIssuerId> ENV.testMetaDataResolution(
+    enableHttLogging: Boolean = false,
+): Pair<CredentialIssuerMetadata, List<CIAuthorizationServerMetadata>> = coroutineScope {
+    createHttpClient(enableHttLogging).use { httpClient ->
+        assertDoesNotThrow {
+            Issuer.metaData(httpClient, issuerId)
+        }
+    }
 }

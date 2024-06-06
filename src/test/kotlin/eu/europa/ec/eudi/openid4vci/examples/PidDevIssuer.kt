@@ -21,12 +21,28 @@ import java.net.URI
 
 typealias ActingUser = KeycloakUser
 
-internal object PidDevIssuer : CanAuthorizeIssuance<ActingUser> by Keycloak {
-    private const val BASE_URL = "https://dev.issuer-backend.eudiw.dev"
+private const val BASE_URL = "https://dev.issuer-backend.eudiw.dev"
+private val IssuerId = CredentialIssuerId(BASE_URL).getOrThrow()
+
+internal object PidDevIssuer :
+    HasIssuerId,
+    HasTestUser<ActingUser>,
+    CanAuthorizeIssuance<ActingUser> by Keycloak,
+    CanBeUsedWithVciLib,
+    CanRequestForCredentialOffer<ActingUser> by CanRequestForCredentialOffer.onlyStatelessAuthorizationCode(IssuerId) {
+
     private const val WALLET_CLIENT_ID = "wallet-dev"
     private val WalletRedirectURI = URI.create("urn:ietf:wg:oauth:2.0:oob")
-    val IssuerId = CredentialIssuerId(BASE_URL).getOrThrow()
-    val TestUser = ActingUser("tneal", "password")
+
+    override val issuerId = IssuerId
+    override val testUser: ActingUser = ActingUser("tneal", "password")
+    override val cfg = OpenId4VCIConfig(
+        clientId = WALLET_CLIENT_ID,
+        authFlowRedirectionURI = WalletRedirectURI,
+        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
+        credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+        dPoPSigner = CryptoGenerator.ecProofSigner(),
+    )
 
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")
     val PID_MsoMdoc_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_mso_mdoc")
@@ -36,13 +52,5 @@ internal object PidDevIssuer : CanAuthorizeIssuance<ActingUser> by Keycloak {
         PID_SdJwtVC_config_id,
         PID_MsoMdoc_config_id,
         MDL_config_id,
-    )
-
-    val Cfg = OpenId4VCIConfig(
-        clientId = WALLET_CLIENT_ID,
-        authFlowRedirectionURI = WalletRedirectURI,
-        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-        credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
-        dPoPSigner = CryptoGenerator.ecProofSigner(),
     )
 }
