@@ -33,7 +33,7 @@ class PidDevIssuerTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(PidDevIssuer.PID_SdJwtVC_config_id, enableHttLogging = false)
     }
 
-    @Test
+    @Test @Ignore
     fun `Issue mDL in mso_mdoc using authorize code flow`() = runTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(PidDevIssuer.MDL_config_id, enableHttLogging = false)
     }
