@@ -64,8 +64,11 @@ sealed interface ProofTypeMeta : Serializable {
         }
     }
 
-    data object Cwt : ProofTypeMeta {
-        private fun readResolve(): Any = Cwt
+    data class Cwt(val algorithms: List<CoseAlgorithm>, val curves: List<CoseCurve>) : ProofTypeMeta {
+        init {
+            require(algorithms.isNotEmpty()) { "Supported algorithms in case of CWT cannot be empty" }
+            require(curves.isNotEmpty()) { "Supported curves in case of CWT cannot be empty" }
+        }
     }
 
     data object LdpVp : ProofTypeMeta {
@@ -152,6 +155,11 @@ data class Claim(
 typealias Namespace = String
 typealias ClaimName = String
 typealias MsoMdocClaims = Map<Namespace, Map<ClaimName, Claim>>
+fun MsoMdocClaims.toClaimSet(): MsoMdocClaimSet = MsoMdocClaimSet(
+    mapValues { (_, claims) -> claims.keys.toList() }
+        .flatMap { (nameSpace, claims) -> claims.map { claimName -> nameSpace to claimName } },
+)
+data class MsoMdocPolicy(val oneTimeUse: Boolean, val batchSize: Int?) : Serializable
 
 /**
  * The data of a Verifiable Credentials issued as an ISO MDOC.
@@ -160,6 +168,9 @@ data class MsoMdocCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
+    val isoCredentialSigningAlgorithmsSupported: List<CoseAlgorithm> = emptyList(),
+    val isoCredentialCurvesSupported: List<CoseCurve> = emptyList(),
+    val isoPolicy: MsoMdocPolicy?,
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val display: List<Display> = emptyList(),
     val docType: String,

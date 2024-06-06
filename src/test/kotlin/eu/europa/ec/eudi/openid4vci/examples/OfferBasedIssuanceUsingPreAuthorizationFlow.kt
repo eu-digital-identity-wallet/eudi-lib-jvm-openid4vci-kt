@@ -99,9 +99,7 @@ private suspend fun submitProvidingProofs(
     credentialConfigurationId: CredentialConfigurationIdentifier,
 ): String {
     with(issuer) {
-        val proofSigner = DefaultProofSignersMap[credentialConfigurationId]
-            ?: error("No signer found for credential $credentialConfigurationId")
-
+        val proofSigner = popSigner(credentialConfigurationId)
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
         val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
 

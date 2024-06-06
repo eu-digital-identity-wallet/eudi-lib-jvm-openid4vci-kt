@@ -30,7 +30,7 @@ fun main(): Unit = runBlocking {
     println("[[Scenario: Issuance based on credential offer url: $credentialOfferUrl]] ")
 
     val issuer = Issuer.make(
-        config = PidDevIssuer.Cfg,
+        config = PidDevIssuer.cfg,
         credentialOfferUri = credentialOfferUrl,
         ktorHttpClientFactory = ::createHttpClient,
     ).getOrThrow()
@@ -41,7 +41,7 @@ fun main(): Unit = runBlocking {
     }
 
     authorizationLog("Using authorized code flow to authorize")
-    val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, PidDevIssuer.TestUser)
+    val authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, PidDevIssuer.testUser)
     authorizationLog("Authorization retrieved: $authorizedRequest")
 
     val offerCredentialConfIds = credentialOffer.credentialConfigurationIdentifiers
@@ -68,7 +68,7 @@ fun main(): Unit = runBlocking {
 
 private suspend fun authorizeRequestWithAuthCodeUseCase(
     issuer: Issuer,
-    actingUser: PidDevIssuer.ActingUser,
+    actingUser: KeycloakUser,
 ): AuthorizedRequest =
     with(issuer) {
         authorizationLog("Preparing authorization code request")
@@ -79,7 +79,6 @@ private suspend fun authorizeRequestWithAuthCodeUseCase(
 
         val (authorizationCode, serverState) =
             PidDevIssuer.loginUserAndGetAuthCode(prepareAuthorizationCodeRequest, actingUser)
-                ?: error("Could not retrieve authorization code")
 
         authorizationLog("Authorization code retrieved: $authorizationCode")
 
@@ -122,9 +121,7 @@ private suspend fun submitProvidingProofs(
     credentialConfigurationId: CredentialConfigurationIdentifier,
 ): String {
     with(issuer) {
-        val proofSigner = DefaultProofSignersMap[credentialConfigurationId]
-            ?: error("No signer found for credential $credentialConfigurationId")
-
+        val proofSigner = popSigner(credentialConfigurationId)
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
         val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
 

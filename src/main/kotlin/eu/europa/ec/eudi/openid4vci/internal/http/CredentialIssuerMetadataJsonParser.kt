@@ -28,6 +28,9 @@ import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import java.net.URI
 import java.net.URL
 import java.util.*
@@ -54,7 +57,6 @@ private sealed interface CredentialSupportedTO {
     val format: String
     val scope: String?
     val cryptographicBindingMethodsSupported: List<String>?
-    val credentialSigningAlgorithmsSupported: List<String>?
     val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>?
     val display: List<CredentialSupportedDisplayTO>?
 
@@ -63,7 +65,15 @@ private sealed interface CredentialSupportedTO {
 
 @Serializable
 private data class ProofSigningAlgorithmsSupportedTO(
-    @SerialName("proof_signing_alg_values_supported") val algorithms: List<String> = emptyList(),
+    @SerialName("proof_signing_alg_values_supported") val algorithms: List<JsonPrimitive> = emptyList(),
+    @SerialName("proof_alg_values_supported") val isoAlgorithms: List<Int> = emptyList(),
+    @SerialName("proof_crv_values_supported") val isoCurves: List<Int> = emptyList(),
+)
+
+@Serializable
+private data class PolicyTO(
+    @SerialName("one_time_use") val oneTimeUse: Boolean,
+    @SerialName("batch_size") val batchSize: Int? = null,
 )
 
 /**
@@ -77,7 +87,10 @@ private data class MsdMdocCredentialTO(
     @SerialName("cryptographic_binding_methods_supported")
     override val cryptographicBindingMethodsSupported: List<String>? = null,
     @SerialName("credential_signing_alg_values_supported")
-    override val credentialSigningAlgorithmsSupported: List<String>? = null,
+    val credentialSigningAlgorithmsSupported: List<JsonPrimitive>? = null,
+    @SerialName("credential_alg_values_supported") val isoCredentialSigningAlgorithmsSupported: List<Int>? = null,
+    @SerialName("credential_crv_values_supported") val isoCredentialCurvesSupported: List<Int>? = null,
+    @SerialName("policy") val isoPolicy: PolicyTO? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
@@ -90,14 +103,23 @@ private data class MsdMdocCredentialTO(
     }
 
     override fun toDomain(): MsoMdocCredential {
-        val bindingMethods = cryptographicBindingMethodsSupported
-            ?.map { cryptographicBindingMethodOf(it) }
-            ?: emptyList()
-        val display = display?.map { it.toDomain() } ?: emptyList()
-        val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported ?: emptyList()
+        val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
+            .map { cryptographicBindingMethodOf(it) }
 
-        fun claims(): MsoMdocClaims = claims?.mapValues { (_, claims) ->
+        val display = display.orEmpty().map { it.toDomain() }
+        val proofTypesSupported = proofTypesSupported.toProofTypes()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().mapNotNull { alg ->
+            if (alg.isString) alg.contentOrNull
+            else {
+                val asInt = alg.intOrNull
+                asInt?.let { CoseAlgorithm.invoke(it).getOrNull()?.name() }
+            }
+        }
+        val coseAlgs = isoCredentialSigningAlgorithmsSupported.orEmpty().map { CoseAlgorithm(it).getOrThrow() }
+        val coseCurves = isoCredentialCurvesSupported.orEmpty().map { CoseCurve(it).getOrThrow() }
+        val policy = isoPolicy?.let { policy -> MsoMdocPolicy(policy.oneTimeUse, policy.batchSize) }
+
+        fun claims(): MsoMdocClaims = claims.orEmpty().mapValues { (_, claims) ->
             claims.mapValues { (_, claim) ->
                 claim.let { claimObject ->
                     Claim(
@@ -112,12 +134,15 @@ private data class MsdMdocCredentialTO(
                     )
                 }
             }
-        } ?: emptyMap()
+        }
 
         return MsoMdocCredential(
             scope,
             bindingMethods,
             cryptographicSuitesSupported,
+            coseAlgs,
+            coseCurves,
+            policy,
             proofTypesSupported,
             display,
             docType,
@@ -135,7 +160,7 @@ private data class SdJwtVcCredentialTO(
     @SerialName("cryptographic_binding_methods_supported")
     override val cryptographicBindingMethodsSupported: List<String>? = null,
     @SerialName("credential_signing_alg_values_supported")
-    override val credentialSigningAlgorithmsSupported: List<String>? = null,
+    val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
@@ -147,12 +172,12 @@ private data class SdJwtVcCredentialTO(
     }
 
     override fun toDomain(): SdJwtVcCredential {
-        val bindingMethods = cryptographicBindingMethodsSupported
-            ?.map { cryptographicBindingMethodOf(it) }
-            ?: emptyList()
-        val display = display?.map { it.toDomain() } ?: emptyList()
+        val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
+            .map { cryptographicBindingMethodOf(it) }
+
+        val display = display.orEmpty().map { it.toDomain() }
         val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported ?: emptyList()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
 
         return SdJwtVcCredential(
             scope,
@@ -166,12 +191,12 @@ private data class SdJwtVcCredentialTO(
                     Claim(
                         it.mandatory ?: false,
                         it.valueType,
-                        it.display?.map { displayObject ->
+                        it.display.orEmpty().map { displayObject ->
                             Claim.Display(
                                 displayObject.name,
                                 displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
                             )
-                        } ?: emptyList(),
+                        },
                     )
                 }
             },
@@ -189,7 +214,7 @@ private data class W3CJsonLdCredentialDefinitionTO(
     fun toDomain(): W3CJsonLdCredentialDefinition = W3CJsonLdCredentialDefinition(
         context = context.map { URL(it) },
         type = types,
-        credentialSubject = credentialSubject?.let { it.toDomain() },
+        credentialSubject = credentialSubject?.toDomain(),
     )
 }
 
@@ -204,7 +229,7 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
     @SerialName("cryptographic_binding_methods_supported")
     override val cryptographicBindingMethodsSupported: List<String>? = null,
     @SerialName("credential_signing_alg_values_supported")
-    override val credentialSigningAlgorithmsSupported: List<String>? = null,
+    val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
@@ -218,12 +243,11 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
     }
 
     override fun toDomain(): W3CJsonLdDataIntegrityCredential {
-        val bindingMethods = cryptographicBindingMethodsSupported
-            ?.map { cryptographicBindingMethodOf(it) }
-            ?: emptyList()
-        val display = display?.map { it.toDomain() } ?: emptyList()
+        val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
+            .map { cryptographicBindingMethodOf(it) }
+        val display = display.orEmpty().map { it.toDomain() }
         val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported ?: emptyList()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
 
         return W3CJsonLdDataIntegrityCredential(
             scope = scope,
@@ -250,7 +274,7 @@ private data class W3CJsonLdSignedJwtCredentialTO(
     @SerialName("cryptographic_binding_methods_supported")
     override val cryptographicBindingMethodsSupported: List<String>? = null,
     @SerialName("credential_signing_alg_values_supported")
-    override val credentialSigningAlgorithmsSupported: List<String>? = null,
+    val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
@@ -263,12 +287,12 @@ private data class W3CJsonLdSignedJwtCredentialTO(
     }
 
     override fun toDomain(): W3CJsonLdSignedJwtCredential {
-        val bindingMethods = cryptographicBindingMethodsSupported
-            ?.map { cryptographicBindingMethodOf(it) }
-            ?: emptyList()
-        val display = display?.map { it.toDomain() } ?: emptyList()
+        val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
+            .map { cryptographicBindingMethodOf(it) }
+
+        val display = display.orEmpty().map { it.toDomain() }
         val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported ?: emptyList()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
 
         return W3CJsonLdSignedJwtCredential(
             scope = scope,
@@ -294,7 +318,7 @@ private data class W3CSignedJwtCredentialTO(
     @SerialName("cryptographic_binding_methods_supported")
     override val cryptographicBindingMethodsSupported: List<String>? = null,
     @SerialName("credential_signing_alg_values_supported")
-    override val credentialSigningAlgorithmsSupported: List<String>? = null,
+    val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
@@ -318,12 +342,12 @@ private data class W3CSignedJwtCredentialTO(
     }
 
     override fun toDomain(): W3CSignedJwtCredential {
-        val bindingMethods = cryptographicBindingMethodsSupported
-            ?.map { cryptographicBindingMethodOf(it) }
-            ?: emptyList()
-        val display = display?.map { it.toDomain() } ?: emptyList()
+        val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
+            .map { cryptographicBindingMethodOf(it) }
+
+        val display = display.orEmpty().map { it.toDomain() }
         val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported ?: emptyList()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
 
         return W3CSignedJwtCredential(
             scope = scope,
@@ -520,16 +544,46 @@ private fun Map<String, ProofSigningAlgorithmsSupportedTO>?.toProofTypes(): Proo
         }
     }
 
-private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta =
-    when (type) {
+private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta {
+    fun CoseAlgorithm.correspondingCurve(): CoseCurve? = when (this) {
+        CoseAlgorithm.ES256 -> CoseCurve.P_256
+        CoseAlgorithm.ES384 -> CoseCurve.P_384
+        CoseAlgorithm.ES512 -> CoseCurve.P_521
+        else -> null
+    }
+
+    fun JsonPrimitive.toCoseAlgorithm(): CoseAlgorithm? =
+        intOrNull?.let { CoseAlgorithm(it).getOrNull() }
+
+    return when (type) {
         "jwt" -> ProofTypeMeta.Jwt(
-            algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) },
+            algorithms = meta.algorithms.map {
+                require(it.isString) { "Expecting JOSE algorithm" }
+                JWSAlgorithm.parse(it.content)
+            },
         )
 
-        "cwt" -> ProofTypeMeta.Cwt
+        "cwt" -> {
+            val isoAlgorithms = meta.isoAlgorithms.map { CoseAlgorithm(it).getOrThrow() }
+            val isoCurves = meta.isoCurves.map { CoseCurve(it).getOrThrow() }
+            val vciAlgorithms = meta.algorithms.map { value ->
+                requireNotNull(value.toCoseAlgorithm()) {
+                    "Expecting COSE algorithm, yet got $value"
+                }
+            }
+
+            if (isoAlgorithms.isNotEmpty() && isoCurves.isNotEmpty()) {
+                ProofTypeMeta.Cwt(isoAlgorithms, isoCurves)
+            } else {
+                val calculatedCurves = vciAlgorithms.mapNotNull { it.correspondingCurve() }
+                ProofTypeMeta.Cwt(vciAlgorithms, calculatedCurves)
+            }
+        }
+
         "ldp_vp" -> ProofTypeMeta.LdpVp
         else -> error("Unknown Proof Type '$type'")
     }
+}
 
 /**
  * Utility method to convert a list of string to a list of [CryptographicBindingMethod].

@@ -20,7 +20,7 @@ import eu.europa.ec.eudi.openid4vci.internal.ensure
 import kotlinx.coroutines.runBlocking
 
 fun main(): Unit = runBlocking {
-    runUseCase(PidDevIssuer.IssuerId, PidDevIssuer.AllCredentialConfigurationIds)
+    runUseCase(PidDevIssuer.issuerId, PidDevIssuer.AllCredentialConfigurationIds)
 }
 
 fun runUseCase(
@@ -29,7 +29,7 @@ fun runUseCase(
 ): Unit = runBlocking {
     println("[[Scenario: Issuance based on credential configuration ids: $credentialConfigurationIds]] ")
 
-    val (issuerMetadata, authorizationServersMetadata) = createHttpClient().use { client ->
+    val (issuerMetadata, authorizationServersMetadata) = createHttpClient(enableLogging = false).use { client ->
         Issuer.metaData(client, credentialIssuerId)
     }
 
@@ -47,28 +47,26 @@ fun runUseCase(
     )
 
     val issuer = Issuer.make(
-        config = PidDevIssuer.Cfg,
+        config = PidDevIssuer.cfg,
         credentialOffer = credentialOffer,
-        ktorHttpClientFactory = ::createHttpClient,
+        ktorHttpClientFactory = { createHttpClient(enableLogging = false) },
     ).getOrThrow()
 
     with(issuer) {
         authorizationLog("Using authorized code flow to authorize")
-        val authorizedRequest = authorizeRequestWithAuthCodeUseCase(PidDevIssuer.TestUser).also {
+        val authorizedRequest = authorizeRequestWithAuthCodeUseCase(PidDevIssuer.testUser).also {
             authorizationLog("Authorization retrieved: $it")
         }
 
-        with(authorizedRequest) {
-            credentialOffer.credentialConfigurationIdentifiers.forEach { credentialIdentifier ->
-                submitCredentialRequest(this@with, credentialIdentifier).also {
-                    println("--> Issued credential: $it \n")
-                }
+        credentialOffer.credentialConfigurationIdentifiers.forEach { credentialIdentifier ->
+            submitCredentialRequest(authorizedRequest, credentialIdentifier).also {
+                println("--> Issued credential: $it \n")
             }
         }
     }
 }
 
-private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: PidDevIssuer.ActingUser): AuthorizedRequest {
+private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: KeycloakUser): AuthorizedRequest {
     authorizationLog("Preparing authorization code request")
 
     val prepareAuthorizationCodeRequest = prepareAuthorizationRequest().getOrThrow().also {
@@ -79,7 +77,7 @@ private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: PidDe
         val (authorizationCode, serverState) = PidDevIssuer.loginUserAndGetAuthCode(
             prepareAuthorizationCodeRequest,
             actingUser,
-        ) ?: error("Could not retrieve authorization code")
+        )
 
         authorizationLog("Authorization code retrieved: $authorizationCode")
 
@@ -107,7 +105,7 @@ private suspend fun Issuer.submitProvidingNoProofs(
 ): String {
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
     return when (val submittedRequest = authorized.requestSingle(requestPayload).getOrThrow()) {
-        is SubmittedRequest.Success -> handleSuccess(submittedRequest, this@submitProvidingNoProofs, authorized)
+        is SubmittedRequest.Success -> handleSuccess(authorized, submittedRequest)
         is SubmittedRequest.Failed -> throw submittedRequest.error
         is SubmittedRequest.InvalidProof -> {
             this@submitProvidingNoProofs.submitProvidingProofs(
@@ -122,14 +120,13 @@ private suspend fun Issuer.submitProvidingProofs(
     authorized: AuthorizedRequest.ProofRequired,
     credentialConfigurationId: CredentialConfigurationIdentifier,
 ): String {
-    val proofSigner = DefaultProofSignersMap[credentialConfigurationId]
-        ?: error("No signer found for credential $credentialConfigurationId")
+    val proofSigner = popSigner(credentialConfigurationId)
 
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
     val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
 
     return when (submittedRequest) {
-        is SubmittedRequest.Success -> handleSuccess(submittedRequest, this@submitProvidingProofs, authorized)
+        is SubmittedRequest.Success -> handleSuccess(authorized, submittedRequest)
         is SubmittedRequest.Failed -> throw submittedRequest.error
         is SubmittedRequest.InvalidProof -> throw IllegalStateException(
             "Although providing a proof with c_nonce the proof is still invalid",
@@ -137,33 +134,13 @@ private suspend fun Issuer.submitProvidingProofs(
     }
 }
 
-private suspend fun handleSuccess(
+private suspend fun Issuer.handleSuccess(
+    authorizedRequest: AuthorizedRequest,
     submittedRequest: SubmittedRequest.Success,
-    issuer: Issuer,
-    noProofRequiredState: AuthorizedRequest,
-) = when (val issuedCredential = submittedRequest.credentials[0]) {
-    is IssuedCredential.Issued -> issuedCredential.credential
-    is IssuedCredential.Deferred -> {
-        handleDeferred(issuer, noProofRequiredState, issuedCredential)
-    }
-}
-
-private suspend fun handleDeferred(
-    issuer: Issuer,
-    authorized: AuthorizedRequest,
-    deferred: IssuedCredential.Deferred,
-): String {
-    issuanceLog(
-        "Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
-    )
-    with(issuer) {
-        return when (val outcome = authorized.queryForDeferredCredential(deferred).getOrThrow()) {
-            is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
-            is DeferredCredentialQueryOutcome.IssuancePending -> throw RuntimeException(
-                "Credential not ready yet. Try after ${outcome.interval}",
-            )
-
-            is DeferredCredentialQueryOutcome.Errored -> throw RuntimeException(outcome.error)
+) =
+    when (val issuedCredential = submittedRequest.credentials.first()) {
+        is IssuedCredential.Issued -> issuedCredential.credential
+        is IssuedCredential.Deferred -> {
+            handleDeferred(authorizedRequest, issuedCredential)
         }
     }
-}

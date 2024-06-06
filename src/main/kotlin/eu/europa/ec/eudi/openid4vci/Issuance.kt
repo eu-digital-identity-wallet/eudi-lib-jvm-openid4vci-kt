@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.authlete.cose.constants.COSEAlgorithms
+import com.authlete.cose.constants.COSEEllipticCurves
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
@@ -352,6 +354,56 @@ fun interface NotifyIssuer {
     ): Result<Unit>
 }
 
+@JvmInline
+value class CoseAlgorithm private constructor(val value: Int) {
+
+    fun name(): String =
+        checkNotNull(COSEAlgorithms.getNameByValue(value)) { "Cannot find name for COSE algorithm $value" }
+
+    companion object {
+
+        val ES256 = CoseAlgorithm(COSEAlgorithms.ES256)
+        val ES384 = CoseAlgorithm(COSEAlgorithms.ES384)
+        val ES512 = CoseAlgorithm(COSEAlgorithms.ES512)
+
+        operator fun invoke(value: Int): Result<CoseAlgorithm> = runCatching {
+            require(COSEAlgorithms.getNameByValue(value) != null) { "Unsupported COSE algorithm $value" }
+            CoseAlgorithm(value)
+        }
+
+        operator fun invoke(name: String): Result<CoseAlgorithm> = runCatching {
+            val value = COSEAlgorithms.getValueByName(name)
+            require(value != 0) { "Unsupported COSE algorithm $name" }
+            CoseAlgorithm(value)
+        }
+    }
+}
+
+@JvmInline
+value class CoseCurve private constructor(val value: Int) {
+
+    fun name(): String =
+        checkNotNull(COSEEllipticCurves.getNameByValue(value)) { "Cannot find name for COSE Curve $value" }
+
+    companion object {
+
+        val P_256 = CoseCurve(COSEEllipticCurves.P_256)
+        val P_384 = CoseCurve(COSEEllipticCurves.P_384)
+        val P_521 = CoseCurve(COSEEllipticCurves.P_521)
+
+        operator fun invoke(value: Int): Result<CoseCurve> = runCatching {
+            require(COSEEllipticCurves.getNameByValue(value) != null) { "Unsupported COSE Curve $value" }
+            CoseCurve(value)
+        }
+
+        operator fun invoke(name: String): Result<CoseCurve> = runCatching {
+            val value = COSEEllipticCurves.getValueByName(name)
+            require(value != 0) { "Unsupported COSE Curve $name" }
+            CoseCurve(value)
+        }
+    }
+}
+
 sealed interface PopSigner {
     /**
      * A signer for proof of possession JWTs
@@ -363,6 +415,13 @@ sealed interface PopSigner {
         val algorithm: JWSAlgorithm,
         val bindingKey: JwtBindingKey,
         val jwsSigner: JWSSigner,
+    ) : PopSigner
+
+    data class Cwt(
+        val algorithm: CoseAlgorithm,
+        val curve: CoseCurve,
+        val bindingKey: CwtBindingKey,
+        val sign: suspend (ByteArray) -> ByteArray,
     ) : PopSigner
 
     companion object {
@@ -586,6 +645,14 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         data object ProofTypeSigningAlgorithmNotSupported :
             ProofGenerationError("ProofTypeSigningAlgorithmNotSupported") {
             private fun readResolve(): Any = ProofTypeSigningAlgorithmNotSupported
+        }
+
+        /**
+         * Proof type curve provided for specific credential is not supported from issuance server
+         */
+        data object ProofTypeSigningCurveNotSupported :
+            ProofGenerationError("ProofTypeSigningCurveNotSupported") {
+            private fun readResolve(): Any = ProofTypeSigningCurveNotSupported
         }
     }
 

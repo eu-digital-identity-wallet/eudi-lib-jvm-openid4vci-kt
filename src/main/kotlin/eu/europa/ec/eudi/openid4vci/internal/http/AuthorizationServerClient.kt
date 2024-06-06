@@ -25,6 +25,7 @@ import com.nimbusds.oauth2.sdk.pkce.CodeVerifier
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail
 import com.nimbusds.oauth2.sdk.rar.AuthorizationType
 import com.nimbusds.oauth2.sdk.rar.Location
+import com.nimbusds.openid.connect.sdk.Prompt
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
@@ -129,6 +130,7 @@ internal class AuthorizationServerClient(
     private val config: OpenId4VCIConfig,
     private val dPoPJwtFactory: DPoPJwtFactory?,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
+    private val parUsage: ParUsage,
 ) {
 
     private val supportsPar: Boolean
@@ -139,12 +141,23 @@ internal class AuthorizationServerClient(
         credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
         state: String,
         issuerState: String?,
-    ): Result<Pair<PKCEVerifier, HttpsUrl>> =
-        if (supportsPar) {
+    ): Result<Pair<PKCEVerifier, HttpsUrl>> {
+        val usePar = when (parUsage) {
+            ParUsage.IfSupported -> supportsPar
+            ParUsage.Never -> false
+            ParUsage.Required -> {
+                require(supportsPar) {
+                    "PAR uses is required, yet authorization server doesn't advertise PAR endpoint"
+                }
+                true
+            }
+        }
+        return if (usePar) {
             submitPushedAuthorizationRequest(scopes, credentialsConfigurationIds, state, issuerState)
         } else {
             authorizationRequestUrl(scopes, credentialsConfigurationIds, state, issuerState)
         }
+    }
 
     /**
      * Submit Pushed Authorization Request for authorizing an issuance request.
@@ -169,6 +182,7 @@ internal class AuthorizationServerClient(
         }
 
         val parEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
+        checkNotNull(parEndpoint) { "PAR endpoint not advertised" }
         val clientID = ClientID(config.clientId)
         val codeVerifier = CodeVerifier()
         val pushedAuthorizationRequest = run {
@@ -178,11 +192,12 @@ internal class AuthorizationServerClient(
                 state(State(state))
                 issuerState?.let { customParameter("issuer_state", issuerState) }
                 if (scopes.isNotEmpty()) {
-                    scope(NimbusScope(*scopes.map { it.value }.toTypedArray() + "openid"))
+                    scope(NimbusScope(*scopes.map { it.value }.toTypedArray()))
                 }
                 if (credentialsConfigurationIds.isNotEmpty()) {
                     authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
                 }
+                prompt(Prompt.Type.LOGIN)
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
         }
@@ -210,11 +225,12 @@ internal class AuthorizationServerClient(
             state(State(state))
             issuerState?.let { customParameter("issuer_state", issuerState) }
             if (credentialsScopes.isNotEmpty()) {
-                scope(NimbusScope(*credentialsScopes.map { it.value }.toTypedArray() + "openid"))
+                scope(NimbusScope(*credentialsScopes.map { it.value }.toTypedArray()))
             }
             if (credentialsAuthorizationDetails.isNotEmpty()) {
                 authorizationDetails(credentialsAuthorizationDetails.map(::toNimbus))
             }
+            prompt(Prompt.Type.LOGIN)
         }.build()
 
         val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())

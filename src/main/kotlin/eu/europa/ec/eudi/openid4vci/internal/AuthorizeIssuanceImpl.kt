@@ -34,6 +34,7 @@ internal class AuthorizeIssuanceImpl(
     private val config: OpenId4VCIConfig,
     ktorHttpClientFactory: KtorHttpClientFactory,
     dPoPJwtFactory: DPoPJwtFactory?,
+    parUsage: ParUsage,
 ) : AuthorizeIssuance {
 
     private val authorizationServer: AuthorizationServerClient =
@@ -43,6 +44,7 @@ internal class AuthorizeIssuanceImpl(
             config,
             dPoPJwtFactory,
             ktorHttpClientFactory,
+            parUsage,
         )
 
     override suspend fun prepareAuthorizationRequest(walletState: String?): Result<AuthorizationRequestPrepared> =

@@ -94,6 +94,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 config,
                 ktorHttpClientFactory,
                 dPoPJwtFactory,
+                config.parUsage,
             )
             val responseEncryptionSpec =
                 responseEncryptionSpec(credentialOffer, config, responseEncryptionSpecFactory).getOrThrow()
