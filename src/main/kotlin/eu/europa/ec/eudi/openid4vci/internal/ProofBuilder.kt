@@ -152,13 +152,9 @@ internal class CwtProofBuilder(
 
     private fun payload(): CBORByteArray {
         val claims = CWTClaimsSetBuilder().apply {
-            // Claim Key 1 (iss)
             iss(iss)
-            // Claim Key 3 (aud)
             aud(aud.toString())
-            // Claim Key 6 (iat)
             iat(Date.from(clock.instant()))
-            // Claim Key 10 (Nonce)
             nonce(nonce.value)
         }.build()
         return CBORByteArray(claims.encode())
