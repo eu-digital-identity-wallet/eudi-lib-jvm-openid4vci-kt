@@ -191,7 +191,7 @@ internal class AuthorizationServerClient(
                 if (credentialsConfigurationIds.isNotEmpty()) {
                     authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
                 }
-                // prompt(Prompt.Type.LOGIN)
+                prompt(Prompt.Type.LOGIN)
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
         }
