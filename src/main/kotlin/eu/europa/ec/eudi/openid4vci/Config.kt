@@ -65,13 +65,13 @@ data class OpenId4VCIConfig(
  * - [IfSupported]: If authorization server advertises PAR endpoint it will be used. Otherwise, falls back
  *   to usual authorization code flow
  * - [Never]: Disables PAR. Wallet will use the usual authorization code flow
- * - [Always]: Wallet always will place PAR request, regardless what if authorization server advertises the PAR
- *   endpoint
+ * - [Required]: Wallet always will place PAR request, regardless what if authorization server advertises the PAR
+ *   endpoint. If PAR endpoint is not being advertised, the issuance will fail.
  */
 enum class ParUsage {
     IfSupported,
     Never,
-    Always,
+    Required,
 }
 
 /**

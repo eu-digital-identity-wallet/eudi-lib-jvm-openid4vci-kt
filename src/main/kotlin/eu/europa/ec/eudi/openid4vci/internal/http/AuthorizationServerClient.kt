@@ -145,7 +145,12 @@ internal class AuthorizationServerClient(
         val usePar = when (parUsage) {
             ParUsage.IfSupported -> supportsPar
             ParUsage.Never -> false
-            ParUsage.Always -> true
+            ParUsage.Required -> {
+                require(supportsPar) {
+                    "PAR uses is required, yet authorization server doesn't advertise PAR endpoint"
+                }
+                true
+            }
         }
         return if (usePar) {
             submitPushedAuthorizationRequest(scopes, credentialsConfigurationIds, state, issuerState)
@@ -177,6 +182,7 @@ internal class AuthorizationServerClient(
         }
 
         val parEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
+        checkNotNull(parEndpoint) { "PAR endpoint not advertised" }
         val clientID = ClientID(config.clientId)
         val codeVerifier = CodeVerifier()
         val pushedAuthorizationRequest = run {
