@@ -146,7 +146,9 @@ internal class CwtProofBuilder(
                     put("COSE_Key", key)
                 }
 
-                is CwtBindingKey.X509 -> error("Not supported yet")
+                is CwtBindingKey.X509 -> {
+                    x5chain(bindingKey.chain)
+                }
             }
         }.build()
 
