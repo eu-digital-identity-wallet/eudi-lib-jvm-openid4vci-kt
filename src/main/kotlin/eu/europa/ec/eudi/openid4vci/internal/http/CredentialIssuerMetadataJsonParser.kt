@@ -88,7 +88,7 @@ private data class MsdMdocCredentialTO(
     override val cryptographicBindingMethodsSupported: List<String>? = null,
     @SerialName("credential_signing_alg_values_supported")
     val credentialSigningAlgorithmsSupported: List<JsonPrimitive>? = null,
-    @SerialName("credential_alg_values_supported") val isoCredentialSigningAlgorithmsSupported: List<Int>? = null,
+    @SerialName("credential_alg_values_supported") val isoCredentialSigningAlgorithmsSupported: List<JsonPrimitive>? = null,
     @SerialName("credential_crv_values_supported") val isoCredentialCurvesSupported: List<Int>? = null,
     @SerialName("policy") val isoPolicy: PolicyTO? = null,
     @SerialName("proof_types_supported")
@@ -108,14 +108,11 @@ private data class MsdMdocCredentialTO(
 
         val display = display.orEmpty().map { it.toDomain() }
         val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().mapNotNull { alg ->
-            if (alg.isString) alg.contentOrNull
-            else {
-                val asInt = alg.intOrNull
-                asInt?.let { CoseAlgorithm.invoke(it).getOrNull()?.name() }
-            }
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported
+            .orEmpty().mapNotNull { it.toCoseAlgorithm()?.name() }
+        val coseAlgs = isoCredentialSigningAlgorithmsSupported.orEmpty().map {
+            requireNotNull(it.toCoseAlgorithm()) { "Expecting COSE algorithm, yet got $it" }
         }
-        val coseAlgs = isoCredentialSigningAlgorithmsSupported.orEmpty().map { CoseAlgorithm(it).getOrThrow() }
         val coseCurves = isoCredentialCurvesSupported.orEmpty().map { CoseCurve(it).getOrThrow() }
         val policy = isoPolicy?.let { policy -> MsoMdocPolicy(policy.oneTimeUse, policy.batchSize) }
 
@@ -552,9 +549,6 @@ private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO)
         else -> null
     }
 
-    fun JsonPrimitive.toCoseAlgorithm(): CoseAlgorithm? =
-        intOrNull?.let { CoseAlgorithm(it).getOrNull() }
-
     return when (type) {
         "jwt" -> ProofTypeMeta.Jwt(
             algorithms = meta.algorithms.map {
@@ -595,3 +589,11 @@ private fun cryptographicBindingMethodOf(s: String): CryptographicBindingMethod 
         s.startsWith("did") -> CryptographicBindingMethod.DID(s)
         else -> error("Unknown Cryptographic Binding Method '$s'")
     }
+
+private fun JsonPrimitive.toCoseAlgorithm(): CoseAlgorithm? {
+    fun Int.toCose() = CoseAlgorithm(this).getOrNull()
+    fun String.toCoseByName() = CoseAlgorithm(this).getOrNull()
+    fun String.toCodeByValue() = toIntOrNull()?.toCose()
+    val strOrNull by lazy { contentOrNull }
+    return intOrNull?.toCose() ?: strOrNull?.toCodeByValue() ?: strOrNull?.toCoseByName()
+}
