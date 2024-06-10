@@ -20,16 +20,18 @@ import com.authlete.cose.constants.COSEEllipticCurves
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
+import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
+import java.security.Signature
 
 /**
  * State holding the authorization request as a URL to be passed to front-channel for retrieving an authorization code in an oAuth2
  * authorization code grant type flow.
  * @param authorizationCodeURL the authorization code URL
  * Contains all the parameters
- * @param pkceVerifier the PKCE verifier which was used
+ * @param pkceVerifier the PKCE verifier, which was used
  * for preparing the authorization request
  * @param state the state which was sent with the
  * authorization request
@@ -154,7 +156,8 @@ interface AuthorizeIssuance {
 
     /**
      * Initial step to authorize an issuance request using Authorized Code Flow.
-     * If the specified authorization server supports PAR then this method executes the first step of PAR by pushing the authorization
+     * If the specified authorization server supports PAR,
+     * then this method executes the first step of PAR by pushing the authorization
      * request to authorization server's 'par endpoint'.
      * If PAR is not supported, then this method prepares the authorization request as a typical authorization code flow authorization
      * request with the request's elements as query parameters.
@@ -173,7 +176,7 @@ interface AuthorizeIssuance {
      * [AuthorizedRequest] state
      *
      * @param authorizationCode The authorization code returned from authorization server via front-channel
-     * @param serverState The state returned from  authorization server via front-channel
+     * @param serverState The state returned from authorization server via front-channel
      * @return an issuance request in authorized state
      */
     suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
@@ -288,7 +291,7 @@ interface RequestIssuance {
      * Special purpose operation to handle the case an 'invalid_proof' error response was received from issuer with
      * fresh c_nonce provided to be used with a request retry.
      *
-     * @param cNonce    The c_nonce provided from issuer along with the 'invalid_proof' error code.
+     * @param cNonce    The c_nonce provided from issuer along the 'invalid_proof' error code.
      * @return The new state of the request.
      */
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
@@ -407,8 +410,9 @@ value class CoseCurve private constructor(val value: Int) {
 sealed interface PopSigner {
     /**
      * A signer for proof of possession JWTs
-     * @param algorithm The algorithm for signing the JWT
-     * @param bindingKey The public key to be included in the JWT
+     * @param algorithm The algorithm used by the singing key
+     * @param bindingKey The public key to be included to the proof. It should correspond to the key
+     * used to sign the proof.
      * @param jwsSigner A function to sign the JWT
      */
     data class Jwt(
@@ -417,6 +421,17 @@ sealed interface PopSigner {
         val jwsSigner: JWSSigner,
     ) : PopSigner
 
+    /**
+     * A signer for proof of possession of type CWT
+     * @param algorithm The algorithm used by the singing key
+     * @param curve the curve used by the singing key
+     * @param bindingKey the public key to be included to the proof. It should correspond to the key
+     * used to sign the proof. If an instance of [CwtBindingKey.CoseKey] is provided key will be embedded
+     * to the protected header under the label "COSE_key". If an instance [CwtBindingKey.X509] the chain
+     * will be included in the protected header, as such.
+     * @param sign A suspended function to actually sign the data. It is required that implementer, uses
+     * the P1363 format
+     */
     data class Cwt(
         val algorithm: CoseAlgorithm,
         val curve: CoseCurve,
@@ -454,6 +469,39 @@ sealed interface PopSigner {
 
             val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
             return Jwt(algorithm, publicKey, signer)
+        }
+
+        /**
+         * Factory method for creating a [PopSigner.Cwt]
+         *
+         * Comes handy when caller has access to [privateKey]
+         *
+         * @param privateKey the key that will be used to sign the CWT
+         * In case of [JwtBindingKey.Did] this condition is not being checked.
+         * @return the CWT signer
+         */
+
+        fun cwtPopSigner(
+            privateKey: ECKey,
+        ): Cwt {
+            fun CoseAlgorithm.signature(): Signature =
+                when (this) {
+                    CoseAlgorithm.ES256 -> "SHA256withECDSAinP1363Format"
+                    CoseAlgorithm.ES384 -> "SHA384withECDSAinP1363Format"
+                    CoseAlgorithm.ES512 -> "SHA512withECDSAinP1363Format"
+                    else -> error("Unsupported $this")
+                }.let { Signature.getInstance(it) }
+
+            val algorithm = CoseAlgorithm(privateKey.algorithm.name).getOrThrow()
+            val curve = CoseCurve(privateKey.curve.name).getOrThrow()
+
+            return Cwt(algorithm, curve, CwtBindingKey.CoseKey(privateKey.toPublicJWK())) { data ->
+                with(algorithm.signature()) {
+                    initSign(privateKey.toECPrivateKey())
+                    update(data)
+                    sign()
+                }
+            }
         }
     }
 }
@@ -722,7 +770,7 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     )
 
     /**
-     * Batch response is not syntactically as expected.
+     * Batch response is not syntactical as expected.
      */
     data class InvalidBatchIssuanceResponse(
         val error: String,
