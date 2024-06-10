@@ -16,16 +16,13 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.KeyUse
-import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import java.security.Signature
-import java.security.interfaces.ECPrivateKey
 import java.time.Clock
 import java.util.*
+import kotlin.Comparator
 
 object CryptoGenerator {
 
@@ -41,10 +38,13 @@ object CryptoGenerator {
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
 
-    fun rsaProofSigner(signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256): PopSigner.Jwt {
+    fun rsaProofSigner(signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256): PopSigner.Jwt =
+        rsaKeyAndJwtProofSigner(signingAlgorithm).second
+
+    fun rsaKeyAndJwtProofSigner(signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256): Pair<JWK, PopSigner.Jwt> {
         val keyPair = randomRSASigningKey(2048)
         val bindingKey = JwtBindingKey.Jwk(keyPair.toPublicJWK())
-        return PopSigner.jwtPopSigner(keyPair, signingAlgorithm, bindingKey)
+        return keyPair to PopSigner.jwtPopSigner(keyPair, signingAlgorithm, bindingKey)
     }
 
     fun ecProofSigner(curve: Curve = Curve.P_256, alg: JWSAlgorithm = JWSAlgorithm.ES256): PopSigner.Jwt {
@@ -54,12 +54,19 @@ object CryptoGenerator {
         return PopSigner.jwtPopSigner(keyPair, alg, bindingKey)
     }
 
-    private fun ecCwtPopSigner(
+    fun ecKeyAndJwtProofSigner(curve: Curve = Curve.P_256, alg: JWSAlgorithm = JWSAlgorithm.ES256): Pair<JWK, PopSigner.Jwt> {
+        require(alg in JWSAlgorithm.Family.EC)
+        val keyPair = randomECSigningKey(curve)
+        val bindingKey = JwtBindingKey.Jwk(keyPair.toPublicJWK())
+        return keyPair to PopSigner.jwtPopSigner(keyPair, alg, bindingKey)
+    }
+
+    private fun ecKeyAndCwtPopSigner(
         clock: Clock,
         alg: CoseAlgorithm,
         curve: CoseCurve,
         kid: String,
-    ): PopSigner.Cwt {
+    ): Pair<JWK, PopSigner.Cwt> {
         val keyPair: ECKey = ECKeyGenerator(checkNotNull(curve.toNimbus()))
             .keyUse(KeyUse.SIGNATURE)
             .keyID(kid)
@@ -67,29 +74,32 @@ object CryptoGenerator {
             .issueTime(Date.from(clock.instant()))
             .generate()
 
-        val bindingKey = CwtBindingKey.CoseKey(keyPair.toPublicJWK())
-        return PopSigner.Cwt(
-            algorithm = alg,
-            curve = curve,
-            bindingKey = bindingKey,
-            sign = signer(keyPair.toECPrivateKey()),
-        )
+//        val publicJwk = keyPair.toPublicJWK()
+//        val bindingKey = CwtBindingKey.CoseKey(publicJwk)
+//        val popSigner = PopSigner.Cwt(alg, curve, bindingKey) { data ->
+//            with(alg.signature()) {
+//                initSign(keyPair.toECPrivateKey())
+//                update(data)
+//                sign()
+//            }
+//        }
+        val popSigner = PopSigner.cwtPopSigner(keyPair)
+        return keyPair to popSigner
     }
 
-    private fun signer(key: ECPrivateKey): suspend (ByteArray) -> ByteArray = { data ->
+    private fun CoseAlgorithm.signature(): Signature =
+        when (this) {
+            CoseAlgorithm.ES256 -> "SHA256withECDSAinP1363Format"
+            CoseAlgorithm.ES384 -> "SHA384withECDSAinP1363Format"
+            CoseAlgorithm.ES512 -> "SHA512withECDSAinP1363Format"
+            else -> error("Unsupported $this")
+        }.let { Signature.getInstance(it) }
 
-        val sig = Signature.getInstance("SHA256withECDSAinP1363Format").apply {
-            initSign(key)
-            update(data)
-        }
-        sig.sign()
-    }
-
-    fun popSigner(
+    fun keyAndPopSigner(
         clock: Clock = Clock.systemDefaultZone(),
         proofTypeMeta: ProofTypeMeta,
         kid: String = UUID.randomUUID().toString(),
-    ): PopSigner? =
+    ): Pair<JWK, PopSigner>? =
         when (proofTypeMeta) {
             is ProofTypeMeta.Cwt -> {
                 val supported: List<Pair<CoseAlgorithm, CoseCurve>> = proofTypeMeta.algorithms.zip(proofTypeMeta.curves)
@@ -98,31 +108,51 @@ object CryptoGenerator {
                     CoseAlgorithm.ES384 to CoseCurve.P_384,
                     CoseAlgorithm.ES512 to CoseCurve.P_521,
                 ).firstOrNull { it in supported }?.let { (a, c) ->
-                    ecCwtPopSigner(clock = clock, alg = a, curve = c, kid = kid)
+                    ecKeyAndCwtPopSigner(clock = clock, alg = a, curve = c, kid = kid)
                 }
             }
 
             is ProofTypeMeta.Jwt -> {
                 proofTypeMeta.algorithms.asSequence().mapNotNull { alg ->
                     when (alg) {
-                        JWSAlgorithm.ES256 -> ecProofSigner(Curve.P_256, alg)
-                        JWSAlgorithm.ES384 -> ecProofSigner(Curve.P_384, alg)
-                        JWSAlgorithm.ES512 -> ecProofSigner(Curve.P_521, alg)
-                        in JWSAlgorithm.Family.RSA -> rsaProofSigner(alg)
+                        JWSAlgorithm.ES256 -> ecKeyAndJwtProofSigner(Curve.P_256, alg)
+                        JWSAlgorithm.ES384 -> ecKeyAndJwtProofSigner(Curve.P_384, alg)
+                        JWSAlgorithm.ES512 -> ecKeyAndJwtProofSigner(Curve.P_521, alg)
+                        in JWSAlgorithm.Family.RSA -> rsaKeyAndJwtProofSigner(alg)
                         else -> null
                     }
                 }.firstOrNull()
             }
+
             ProofTypeMeta.LdpVp -> null
         }
 
     fun popSigner(
         clock: Clock = Clock.systemDefaultZone(),
         credentialConfiguration: CredentialConfiguration,
+        preference: ProofTypeMetaPreference,
     ): PopSigner? =
-        credentialConfiguration.proofTypesSupported.values.asSequence().mapNotNull {
-            popSigner(clock, it)
-        }.firstOrNull()
+        credentialConfiguration.proofTypesSupported.values.sortedWith(preference.comparator().reversed())
+            .firstNotNullOfOrNull { keyAndPopSigner(clock, it)?.second }
+}
+
+enum class ProofTypeMetaPreference {
+    FavorJWT,
+    FavorCWT,
+    ;
+
+    fun comparator(): Comparator<ProofTypeMeta> = when (this) {
+        FavorJWT -> comparatorFavoring<ProofTypeMeta.Jwt>()
+        FavorCWT -> comparatorFavoring<ProofTypeMeta.Cwt>()
+    }
+
+    private inline fun <reified T : ProofTypeMeta>comparatorFavoring(): Comparator<ProofTypeMeta> = Comparator { a, b ->
+        when {
+            a is T -> 1
+            b is T -> -1
+            else -> 0
+        }
+    }
 }
 
 fun CoseAlgorithm.toNimbus(): JWSAlgorithm? = JWSAlgorithm.parse(name())
