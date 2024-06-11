@@ -143,7 +143,8 @@ internal class CwtProofBuilder(
             when (val bindingKey = popSigner.bindingKey) {
                 is CwtBindingKey.CoseKey -> {
                     val key = COSEKey.fromJwk(bindingKey.jwk.toJSONObject())
-                    put("COSE_Key", key)
+                    val keyAsByteString = CBORByteArray(key.encode())
+                    put("COSE_Key", keyAsByteString)
                 }
 
                 is CwtBindingKey.X509 -> {
