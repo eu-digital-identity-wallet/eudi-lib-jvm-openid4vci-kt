@@ -19,6 +19,7 @@ import com.authlete.cbor.*
 import com.authlete.cose.*
 import com.authlete.cwt.CWT
 import com.authlete.cwt.CWTClaimsSet
+import com.authlete.cwt.CWTKeyProofBuilder
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
@@ -30,6 +31,7 @@ import java.security.Key
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
+import java.util.Date
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
@@ -94,6 +96,32 @@ internal class ProofBuilderTest {
             CwtProofValidator.isValid(iss, aud, cNonce, clock.instant(), cwt).getOrThrow()
         }
     }
+
+    @Test
+    fun `check cwt proof with authlete impl`() = runTest {
+        val clock = Clock.fixed(Instant.now(), ZoneId.systemDefault())
+        val proofTypeMeta = ProofTypeMeta.Cwt(listOf(CoseAlgorithm.ES256), listOf(CoseCurve.P_256))
+        val (ecKey, popSigner) = checkNotNull(CryptoGenerator.keyAndPopSigner(clock, proofTypeMeta))
+        assertIs<ECKey>(ecKey)
+        assertIs<PopSigner.Cwt>(popSigner)
+        val iss = "wallet"
+        val aud = CredentialIssuerId("https://foo").getOrThrow()
+        val cNonce = CNonce(Nonce().value)
+
+        val cwt = Proof.Cwt(
+            CWTKeyProofBuilder().apply {
+                issuer = aud.toString()
+                issuedAt = Date.from(clock.instant())
+                client = iss
+                nonce = cNonce.value
+                key = COSEEC2Key.fromJwk(ecKey.toJSONObject())
+            }.build().encodeToBase64Url(),
+        )
+
+        assertDoesNotThrow {
+            CwtProofValidator.isValid(iss, aud, cNonce, clock.instant(), cwt).getOrThrow()
+        }
+    }
 }
 
 internal object CwtProofValidator {
@@ -153,12 +181,17 @@ internal object CwtProofValidator {
         val pHeader: COSEProtectedHeader = sign1.protectedHeader
         require("openid4vci-proof+cwt" == pHeader.contentType) { "Invalid content type ${pHeader.contentType}" }
 
-        val coseKey = (
-            pHeader.pairs.firstOrNull { (key, value) ->
-                key is CBORString && key.value == "COSE_Key"
-            }?.value as? CBORPairList
-            )?.let { it ->
-            COSEEC2Key(it.pairs)
+        val coseKey = run {
+            val coseKeyAsByteString = pHeader.pairs.firstOrNull { (key, value) ->
+                key is CBORString && key.value == "COSE_Key" &&
+                    value is CBORByteArray
+            }?.value as CBORByteArray?
+            val cborItem = coseKeyAsByteString?.let { CBORDecoder(it.value).next() }
+
+            cborItem?.takeIf { it is CBORPairList }?.let { item ->
+                check(item is CBORPairList)
+                COSEEC2Key(item.pairs)
+            }
         }
 
         val x5cChain = pHeader.x5Chain.orEmpty()
