@@ -191,7 +191,7 @@ private suspend inline fun <reified ResponseTO, Response> responsePossiblyEncryp
 }
 
 private fun HttpResponse.ensureContentType(expectedContentType: ContentType) {
-    ensure(contentType() == expectedContentType) {
+    ensure(contentType()?.withoutParameters() == expectedContentType) {
         InvalidResponseContentType(
             expectedContentType = expectedContentType.toString(),
             invalidContentType = contentType().toString(),
