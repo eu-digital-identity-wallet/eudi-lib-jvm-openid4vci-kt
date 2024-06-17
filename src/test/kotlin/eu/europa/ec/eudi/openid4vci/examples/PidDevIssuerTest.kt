@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
+import eu.europa.ec.eudi.openid4vci.ProofTypeMetaPreference
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.DisplayName
 import kotlin.test.Ignore
@@ -24,17 +25,38 @@ import kotlin.test.Test
 class PidDevIssuerTest {
 
     @Test @Ignore
-    fun `Issue PID in mso_mdoc using authorize code flow`() = runTest {
-        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(PidDevIssuer.PID_MsoMdoc_config_id, enableHttLogging = false)
+    fun `Issue PID in mso_mdoc using authorize code flow and JWT proofs`() = runTest {
+        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
+            PidDevIssuer.PID_MsoMdoc_config_id,
+            enableHttLogging = false,
+            popSignerPreference = ProofTypeMetaPreference.FavorJWT,
+        )
     }
 
-    @Test @Ignore
-    fun `Issue PID in sd-jwt-vc using authorize code flow`() = runTest {
-        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(PidDevIssuer.PID_SdJwtVC_config_id, enableHttLogging = false)
+    @Test@Ignore
+    fun `Issue PID in sd-jwt-vc using authorize code flow and JWT proofs`() = runTest {
+        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
+            PidDevIssuer.PID_SdJwtVC_config_id,
+            enableHttLogging = false,
+            popSignerPreference = ProofTypeMetaPreference.FavorJWT,
+        )
     }
 
-    @Test @Ignore
-    fun `Issue mDL in mso_mdoc using authorize code flow`() = runTest {
-        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(PidDevIssuer.MDL_config_id, enableHttLogging = false)
+    @Test@Ignore
+    fun `Issue mDL in mso_mdoc using authorize code flow and JWT proofs`() = runTest {
+        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
+            PidDevIssuer.MDL_config_id,
+            enableHttLogging = false,
+            popSignerPreference = ProofTypeMetaPreference.FavorJWT,
+        )
+    }
+
+    @Test@Ignore
+    fun `Issue mDL in mso_mdoc using authorize code flow and CWT proofs`() = runTest {
+        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
+            PidDevIssuer.MDL_config_id,
+            enableHttLogging = false,
+            popSignerPreference = ProofTypeMetaPreference.FavorCWT,
+        )
     }
 }
