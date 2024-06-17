@@ -43,8 +43,8 @@ interface HasIssuerId {
 interface CanBeUsedWithVciLib {
     val cfg: OpenId4VCIConfig
 
-    suspend fun createIssuer(credentialOfferUri: String, enableHttLogging: Boolean = false): Issuer {
-        return Issuer.make(cfg, credentialOfferUri, { createHttpClient(enableHttLogging) }).getOrThrow()
+    suspend fun createIssuer(credentialOfferUri: String, enableHttpLogging: Boolean = false): Issuer {
+        return Issuer.make(cfg, credentialOfferUri, { createHttpClient(enableHttpLogging) }).getOrThrow()
     }
 }
 
