@@ -22,12 +22,12 @@ import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.AccessToken.Bearer
-import eu.europa.ec.eudi.openid4vci.AccessToken.Companion.requireNotEmpty
 import eu.europa.ec.eudi.openid4vci.AccessToken.DPoP
 import kotlinx.serialization.Serializable
 import java.net.URI
 import java.net.URL
 import java.security.cert.X509Certificate
+import java.time.Duration
 
 const val FORMAT_MSO_MDOC = "mso_mdoc"
 const val FORMAT_SD_JWT_VC = "vc+sd-jwt"
@@ -94,26 +94,32 @@ data class PKCEVerifier(
 sealed interface AccessToken : java.io.Serializable {
 
     val accessToken: String
+    val expiresIn: Duration?
 
-    @JvmInline
-    value class Bearer(override val accessToken: String) : AccessToken {
+    data class Bearer(override val accessToken: String, override val expiresIn: Duration?) : AccessToken {
         init {
             requireNotEmpty(accessToken)
+            if (expiresIn != null) {
+                require(!expiresIn.isNegative) { "Expires In should be positive" }
+            }
         }
     }
 
-    @JvmInline
-    value class DPoP(override val accessToken: String) : AccessToken {
+    data class DPoP(override val accessToken: String, override val expiresIn: Duration?) : AccessToken {
         init {
             requireNotEmpty(accessToken)
+            if (expiresIn != null) {
+                require(!expiresIn.isNegative) { "Expires In should be positive" }
+            }
         }
     }
 
     companion object {
-        operator fun invoke(accessToken: String, useDPoP: Boolean): AccessToken {
+        operator fun invoke(accessToken: String, expiresInSec: Long?, useDPoP: Boolean): AccessToken {
             requireNotEmpty(accessToken)
-            return if (useDPoP) DPoP(accessToken)
-            else Bearer(accessToken)
+            val expiresIn = expiresInSec?.let { Duration.ofSeconds(it) }
+            return if (useDPoP) DPoP(accessToken, expiresIn)
+            else Bearer(accessToken, expiresIn)
         }
 
         private fun requireNotEmpty(accessToken: String) {
@@ -122,11 +128,19 @@ sealed interface AccessToken : java.io.Serializable {
     }
 }
 
-@JvmInline
-value class RefreshToken(val refreshToken: String) {
+data class RefreshToken(
+    val refreshToken: String,
+    val expiresIn: Duration?,
+) : java.io.Serializable {
     init {
         require(refreshToken.isNotEmpty()) { "Refresh Token must not be empty" }
+        if (expiresIn != null) {
+            require(!expiresIn.isNegative) { "Expires in should be positive" }
+        }
     }
+
+    constructor(refreshToken: String, expiresInSec: Long?) :
+        this(refreshToken, expiresInSec?.let { Duration.ofSeconds(it) })
 }
 
 /**
