@@ -127,7 +127,7 @@ internal fun HttpRequestBuilder.bearerOrDPoPAuth(
                 dpop(factory, htu, htm, accessToken, nonce = null)
                 dpopAuth(accessToken)
             } else {
-                bearerAuth(AccessToken.Bearer(accessToken.accessToken))
+                bearerAuth(AccessToken.Bearer(accessToken.accessToken, accessToken.expiresIn))
             }
         }
     }

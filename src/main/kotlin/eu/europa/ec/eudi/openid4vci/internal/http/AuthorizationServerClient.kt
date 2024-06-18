@@ -89,6 +89,7 @@ internal sealed interface TokenResponseTO {
         @SerialName("access_token") val accessToken: String,
         @SerialName("refresh_token") val refreshToken: String? = null,
         @SerialName("expires_in") val expiresIn: Long? = null,
+        @SerialName("refresh_expires_in") val refreshExpiresIn: Long? = null,
         @SerialName("c_nonce") val cNonce: String? = null,
         @SerialName("c_nonce_expires_in") val cNonceExpiresIn: Long? = null,
         @Serializable(with = GrantedAuthorizationDetailsSerializer::class)
@@ -113,8 +114,12 @@ internal sealed interface TokenResponseTO {
         when (this) {
             is Success -> {
                 TokenResponse(
-                    accessToken = AccessToken(accessToken, DPoP.equals(other = tokenType, ignoreCase = true)),
-                    refreshToken = refreshToken?.let { RefreshToken(it) },
+                    accessToken = AccessToken(
+                        accessToken = accessToken,
+                        expiresInSec = expiresIn,
+                        useDPoP = DPoP.equals(other = tokenType, ignoreCase = true),
+                    ),
+                    refreshToken = refreshToken?.let { RefreshToken(it, refreshExpiresIn) },
                     cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) },
                     authorizationDetails = authorizationDetails ?: emptyMap(),
                 )
