@@ -20,6 +20,7 @@ import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.NoProofRequired
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.ProofRequired
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidAuthorizationState
 import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationServerClient
+import java.time.Instant
 import com.nimbusds.oauth2.sdk.id.State as NimbusState
 
 internal data class TokenResponse(
@@ -27,6 +28,7 @@ internal data class TokenResponse(
     val refreshToken: RefreshToken?,
     val cNonce: CNonce?,
     val authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> = emptyMap(),
+    val timestamp: Instant,
 )
 
 internal class AuthorizeIssuanceImpl(
@@ -134,14 +136,19 @@ internal fun TxCode.validate(txCode: String?) {
     }
 }
 
-internal fun authorizedRequest(offer: CredentialOffer, tokenResponse: TokenResponse): AuthorizedRequest {
+internal fun authorizedRequest(
+    offer: CredentialOffer,
+    tokenResponse: TokenResponse,
+): AuthorizedRequest {
     val offerRequiresProofs = offer.credentialConfigurationIdentifiers.any {
         val credentialConfiguration = offer.credentialIssuerMetadata.credentialConfigurationsSupported[it]
         credentialConfiguration != null && credentialConfiguration.proofTypesSupported.values.isNotEmpty()
     }
-    val (accessToken, refreshToken, cNonce, authorizationDetails) = tokenResponse
+    val (accessToken, refreshToken, cNonce, authorizationDetails, timestamp) = tokenResponse
     return when {
-        cNonce != null && offerRequiresProofs -> ProofRequired(accessToken, refreshToken, cNonce, authorizationDetails)
-        else -> NoProofRequired(accessToken, refreshToken, authorizationDetails)
+        cNonce != null && offerRequiresProofs ->
+            ProofRequired(accessToken, refreshToken, cNonce, authorizationDetails, timestamp)
+        else ->
+            NoProofRequired(accessToken, refreshToken, authorizationDetails, timestamp)
     }
 }

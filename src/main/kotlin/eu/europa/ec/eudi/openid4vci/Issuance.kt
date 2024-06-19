@@ -25,6 +25,8 @@ import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
 import java.security.Signature
+import java.time.Clock
+import java.time.Instant
 
 /**
  * State holding the authorization request as a URL to be passed to front-channel for retrieving an authorization code in an oAuth2
@@ -54,16 +56,24 @@ sealed interface AuthorizedRequest : java.io.Serializable {
     val accessToken: AccessToken
     val refreshToken: RefreshToken?
     val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?
+    val timestamp: Instant
+
+    fun isAccessTokenExpired(clock: Clock): Boolean = accessToken.isExpired(timestamp, clock.instant())
+    fun isRefreshTokenExpired(clock: Clock): Boolean? = refreshToken?.isExpired(timestamp, clock.instant())
 
     /**
      * Issuer authorized issuance
      *
      * @param accessToken Access token authorizing credential issuance
+     * @param refreshToken Refresh token to refresh the access token, if needed
+     * @param credentialIdentifiers authorization details, if provided by the token endpoint
+     * @param timestamp the point in time of the authorization (when tokens were issued)
      */
     data class NoProofRequired(
         override val accessToken: AccessToken,
         override val refreshToken: RefreshToken?,
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
+        override val timestamp: Instant,
     ) : AuthorizedRequest
 
     /**
@@ -71,13 +81,17 @@ sealed interface AuthorizedRequest : java.io.Serializable {
      * along with the request
      *
      * @param accessToken  Access token authorizing certificate issuance
+     * @param refreshToken Refresh token to refresh the access token, if needed
      * @param cNonce Nonce value provided by issuer to be included in proof of holder's binding
+     * @param credentialIdentifiers authorization details, if provided by the token endpoint
+     * @param timestamp the point in time of the authorization (when tokens were issued)
      */
     data class ProofRequired(
         override val accessToken: AccessToken,
         override val refreshToken: RefreshToken?,
         val cNonce: CNonce,
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
+        override val timestamp: Instant,
     ) : AuthorizedRequest
 }
 

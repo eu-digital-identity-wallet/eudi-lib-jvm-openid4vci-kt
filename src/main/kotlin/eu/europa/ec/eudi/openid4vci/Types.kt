@@ -28,6 +28,7 @@ import java.net.URI
 import java.net.URL
 import java.security.cert.X509Certificate
 import java.time.Duration
+import java.time.Instant
 
 const val FORMAT_MSO_MDOC = "mso_mdoc"
 const val FORMAT_SD_JWT_VC = "vc+sd-jwt"
@@ -85,16 +86,28 @@ data class PKCEVerifier(
     }
 }
 
+interface CanExpire {
+    val expiresIn: Duration?
+
+    fun isExpired(issued: Instant, at: Instant): Boolean {
+        require(issued.isBefore(at) || issued == at) { "At should be after or equal to $issued" }
+        val expiresIn = expiresIn
+        return if (expiresIn != null) {
+            val expiration = issued.plusSeconds(expiresIn.toSeconds())
+            !expiration.isAfter(at)
+        } else false
+    }
+}
+
 /**
  * Domain object to describe a valid issuance access token
  *
  * [Bearer] is the usual bearer access token
  * [DPoP] is an access token that must be used with a DPoP JWT
  */
-sealed interface AccessToken : java.io.Serializable {
+sealed interface AccessToken : CanExpire, java.io.Serializable {
 
     val accessToken: String
-    val expiresIn: Duration?
 
     data class Bearer(override val accessToken: String, override val expiresIn: Duration?) : AccessToken {
         init {
@@ -130,8 +143,8 @@ sealed interface AccessToken : java.io.Serializable {
 
 data class RefreshToken(
     val refreshToken: String,
-    val expiresIn: Duration?,
-) : java.io.Serializable {
+    override val expiresIn: Duration?,
+) : CanExpire, java.io.Serializable {
     init {
         require(refreshToken.isNotEmpty()) { "Refresh Token must not be empty" }
         if (expiresIn != null) {
