@@ -37,6 +37,7 @@ import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
+import java.time.Clock
 import com.nimbusds.oauth2.sdk.Scope as NimbusScope
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail as NimbusAuthorizationDetail
 
@@ -110,7 +111,7 @@ internal sealed interface TokenResponseTO {
         @SerialName("error_description") val errorDescription: String? = null,
     ) : TokenResponseTO
 
-    fun tokensOrFail(): TokenResponse =
+    fun tokensOrFail(clock: Clock): TokenResponse =
         when (this) {
             is Success -> {
                 TokenResponse(
@@ -122,6 +123,7 @@ internal sealed interface TokenResponseTO {
                     refreshToken = refreshToken?.let { RefreshToken(it, refreshExpiresIn) },
                     cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) },
                     authorizationDetails = authorizationDetails ?: emptyMap(),
+                    timestamp = clock.instant(),
                 )
             }
 
@@ -286,7 +288,7 @@ internal class AuthorizationServerClient(
             clientId = config.clientId,
             pkceVerifier = pkceVerifier,
         )
-        requestAccessToken(params).tokensOrFail()
+        requestAccessToken(params).tokensOrFail(config.clock)
     }
 
     /**
@@ -307,7 +309,7 @@ internal class AuthorizationServerClient(
             preAuthorizedCode = preAuthorizedCode,
             txCode = txCode,
         )
-        requestAccessToken(params).tokensOrFail()
+        requestAccessToken(params).tokensOrFail(config.clock)
     }
 
     private suspend fun requestAccessToken(
