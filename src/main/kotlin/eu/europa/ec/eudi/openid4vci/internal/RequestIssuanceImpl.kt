@@ -41,7 +41,7 @@ internal class RequestIssuanceImpl(
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
-    ): Result<SubmittedRequest> = runCatching {
+    ): Result<SubmissionOutcome> = runCatching {
         placeIssuanceRequest(accessToken) {
             singleRequest(requestPayload, null, credentialIdentifiers)
         }
@@ -50,7 +50,7 @@ internal class RequestIssuanceImpl(
     override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
         proofSigner: PopSigner,
-    ): Result<SubmittedRequest> = runCatching {
+    ): Result<SubmissionOutcome> = runCatching {
         placeIssuanceRequest(accessToken) {
             singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
         }
@@ -58,7 +58,7 @@ internal class RequestIssuanceImpl(
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<IssuanceRequestPayload>,
-    ): Result<SubmittedRequest> = runCatching {
+    ): Result<SubmissionOutcome> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map {
                 singleRequest(it, null, credentialIdentifiers, true)
@@ -69,7 +69,7 @@ internal class RequestIssuanceImpl(
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner>>,
-    ): Result<SubmittedRequest> = runCatching {
+    ): Result<SubmissionOutcome> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (requestPayload, proofSigner) ->
                 singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers, true)
@@ -169,11 +169,6 @@ internal class RequestIssuanceImpl(
             "Provided proof type $proofType is not one of supported [${credentialSupported.proofTypesSupported}]."
         }
     }
-
-    override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
-        cNonce: CNonce,
-    ): AuthorizedRequest.ProofRequired =
-        AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, credentialIdentifiers, timestamp)
 
     private suspend fun placeIssuanceRequest(
         token: AccessToken,

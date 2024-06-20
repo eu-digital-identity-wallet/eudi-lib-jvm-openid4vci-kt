@@ -74,7 +74,18 @@ sealed interface AuthorizedRequest : java.io.Serializable {
         override val refreshToken: RefreshToken?,
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
         override val timestamp: Instant,
-    ) : AuthorizedRequest
+    ) : AuthorizedRequest {
+
+        /**
+         * In case an 'invalid_proof' error response was received from issuer with
+         * fresh c_nonce
+         *
+         * @param cNonce    The c_nonce provided from issuer along the 'invalid_proof' error code.
+         * @return The new state of the request.
+         */
+        fun toProofRequired(cNonce: CNonce): ProofRequired =
+            ProofRequired(accessToken, refreshToken, cNonce, credentialIdentifiers, timestamp)
+    }
 
     /**
      * Issuer authorized issuance and required the provision of proof of holder's binding to be provided
@@ -316,7 +327,7 @@ interface RequestIssuance {
      */
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
-    ): AuthorizedRequest.ProofRequired
+    ): AuthorizedRequest.ProofRequired = toProofRequired(cNonce)
 }
 
 sealed interface DeferredCredentialQueryOutcome {
