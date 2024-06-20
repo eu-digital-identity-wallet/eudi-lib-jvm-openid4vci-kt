@@ -84,10 +84,6 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 ).getOrThrow()
             }
 
-            val notificationEndPointClient = credentialOffer.credentialIssuerMetadata.notificationEndpoint?.let {
-                NotificationEndPointClient(it, ktorHttpClientFactory, dPoPJwtFactory)
-            }
-
             val authorizationEndpointClient = AuthorizationEndpointClient(
                 credentialOffer.credentialIssuerIdentifier,
                 credentialOffer.authorizationServerMetadata,
@@ -107,6 +103,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 authorizationEndpointClient,
                 tokenEndpointClient,
             )
+
             val responseEncryptionSpec =
                 responseEncryptionSpec(credentialOffer, config, responseEncryptionSpecFactory).getOrThrow()
 
@@ -116,8 +113,8 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                     dPoPJwtFactory,
                     ktorHttpClientFactory,
                 )
-                val batchEndPointClient = credentialOffer.credentialIssuerMetadata.batchCredentialEndpoint?.let {
-                    BatchEndPointClient(it, dPoPJwtFactory, ktorHttpClientFactory)
+                val batchEndPointClient = credentialOffer.credentialIssuerMetadata.batchCredentialEndpoint?.let { batchEndPoint ->
+                    BatchEndPointClient(batchEndPoint, dPoPJwtFactory, ktorHttpClientFactory)
                 }
                 RequestIssuanceImpl(
                     credentialOffer,
@@ -127,20 +124,26 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                     responseEncryptionSpec,
                 )
             }
-            val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
 
             val queryForDeferredCredential =
-                when (val endpoint = credentialOffer.credentialIssuerMetadata.deferredCredentialEndpoint) {
+                when (val deferredEndpoint = credentialOffer.credentialIssuerMetadata.deferredCredentialEndpoint) {
                     null -> QueryForDeferredCredential.NotSupported
                     else -> {
-                        val client = DeferredEndPointClient(endpoint, ktorHttpClientFactory, dPoPJwtFactory)
-                        QueryForDeferredCredentialImpl(refreshAccessToken, client, responseEncryptionSpec)
+                        val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
+                        val deferredEndPointClient = DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, ktorHttpClientFactory)
+                        QueryForDeferredCredentialImpl(refreshAccessToken, deferredEndPointClient, responseEncryptionSpec)
                     }
                 }
 
-            val notifyIssuer = notificationEndPointClient
-                ?.let { NotifyIssuerImpl(it) }
-                ?: NotifyIssuer.NotSupported
+            val notifyIssuer =
+                when (val notificationEndpoint = credentialOffer.credentialIssuerMetadata.notificationEndpoint) {
+                    null -> NotifyIssuer.NoOp
+                    else -> {
+                        val notificationEndPointClient =
+                            NotificationEndPointClient(notificationEndpoint, dPoPJwtFactory, ktorHttpClientFactory)
+                        NotifyIssuer(notificationEndPointClient)
+                    }
+                }
 
             object :
                 Issuer,

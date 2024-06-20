@@ -29,8 +29,8 @@ import io.ktor.http.*
 
 internal class NotificationEndPointClient(
     private val notificationEndpoint: CredentialIssuerEndpoint,
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
     private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
 
     suspend fun notifyIssuer(

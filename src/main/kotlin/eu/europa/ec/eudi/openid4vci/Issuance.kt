@@ -24,6 +24,7 @@ import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.IssuerDoesNotSupportDeferredIssuance
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
+import eu.europa.ec.eudi.openid4vci.internal.http.NotificationEndPointClient
 import kotlinx.serialization.Serializable
 import java.security.Signature
 import java.time.Instant
@@ -384,7 +385,8 @@ fun interface QueryForDeferredCredential {
     ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>>
 
     companion object {
-        val NotSupported: QueryForDeferredCredential = QueryForDeferredCredential { Result.failure(IssuerDoesNotSupportDeferredIssuance) }
+        val NotSupported: QueryForDeferredCredential =
+            QueryForDeferredCredential { Result.failure(IssuerDoesNotSupportDeferredIssuance) }
     }
 }
 
@@ -416,7 +418,9 @@ fun interface NotifyIssuer {
     ): Result<Unit>
 
     companion object {
-        val NotSupported: NotifyIssuer = NotifyIssuer { Result.success(Unit) }
+        val NoOp: NotifyIssuer = NotifyIssuer { Result.success(Unit) }
+        internal operator fun invoke(notificationEndPointClient: NotificationEndPointClient): NotifyIssuer =
+            NotifyIssuer { event -> notificationEndPointClient.notifyIssuer(accessToken, event) }
     }
 }
 

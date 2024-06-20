@@ -108,8 +108,8 @@ internal class BatchEndPointClient(
 
 internal class DeferredEndPointClient(
     private val deferredCredentialEndpoint: CredentialIssuerEndpoint,
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
     private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
     /**
      * Method that submits a request to credential issuer's Deferred Credential Endpoint
