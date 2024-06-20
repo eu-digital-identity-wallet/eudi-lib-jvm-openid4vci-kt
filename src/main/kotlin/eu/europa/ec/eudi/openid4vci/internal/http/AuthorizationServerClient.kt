@@ -312,6 +312,22 @@ internal class AuthorizationServerClient(
         requestAccessToken(params).tokensOrFail(config.clock)
     }
 
+    /**
+     * Submits a request for refreshing an access token in authorization server's token endpoint passing
+     * the refresh token
+     * @param refreshToken the token to be used for refreshing the access token
+     *
+     * @return the token end point response, which will include a new [TokenResponse.accessToken] and possibly
+     * a new [TokenResponse.refreshToken]
+     */
+    suspend fun refreshAccessToken(refreshToken: RefreshToken): Result<TokenResponse> = runCatching {
+        val params = TokenEndpointForm.refreshAccessToken(
+            config.clientId,
+            refreshToken,
+        )
+        requestAccessToken(params).tokensOrFail(clock = config.clock)
+    }
+
     private suspend fun requestAccessToken(
         params: Map<String, String>,
     ): TokenResponseTO =
@@ -372,6 +388,7 @@ private object AuthorizationEndpointParams {
 internal object TokenEndpointForm {
     const val AUTHORIZATION_CODE_GRANT = "authorization_code"
     const val PRE_AUTHORIZED_CODE_GRANT = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+    const val REFRESH_TOKEN = "refresh_token"
     const val REDIRECT_URI_PARAM = "redirect_uri"
     const val CODE_VERIFIER_PARAM = "code_verifier"
     const val AUTHORIZATION_CODE_PARAM = "code"
@@ -379,6 +396,7 @@ internal object TokenEndpointForm {
     const val GRANT_TYPE_PARAM = "grant_type"
     const val TX_CODE_PARAM = "tx_code"
     const val PRE_AUTHORIZED_CODE_PARAM = "pre-authorized_code"
+    const val REFRESH_TOKEN_PARAM = "refresh_token"
 
     fun authCodeFlow(
         clientId: String,
@@ -404,4 +422,13 @@ internal object TokenEndpointForm {
             put(PRE_AUTHORIZED_CODE_PARAM, preAuthorizedCode.preAuthorizedCode)
             txCode?.let { put(TX_CODE_PARAM, it) }
         }.toMap()
+
+    fun refreshAccessToken(
+        clientId: String,
+        refreshToken: RefreshToken,
+    ): Map<String, String> = buildMap {
+        put(CLIENT_ID_PARAM, clientId)
+        put(GRANT_TYPE_PARAM, REFRESH_TOKEN)
+        put(REFRESH_TOKEN_PARAM, refreshToken.refreshToken)
+    }
 }
