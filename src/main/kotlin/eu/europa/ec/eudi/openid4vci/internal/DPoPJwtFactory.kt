@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
@@ -98,12 +99,33 @@ internal class DPoPJwtFactory(
             jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
             clock: Clock,
             oauthServerMetadata: CIAuthorizationServerMetadata,
+        ): Result<DPoPJwtFactory?> =
+            create(signer, jtiByteLength, clock, oauthServerMetadata.dPoPJWSAlgs.orEmpty())
+
+        /**
+         * Tries to create a [DPoPJwtFactory] given a [signer] and the
+         * [supportedDPopAlgorithms]
+         * of the OAUTH2 or OIDC server.
+         *
+         * The factory will be created in case the server supports DPoP (this is indicated by a not empty array
+         * ` dpop_signing_alg_values_supported` and in addition if the [signer] uses a supported algorithm
+         *
+         * @return
+         * if the OAUTH2 server doesn't support DPoP result would be `Result.Success(null)`
+         * if the OAUTH2 server supports DPoP and Signer uses a supported algorithm result would be success
+         * Otherwise a failure will be returned
+         *
+         */
+        fun create(
+            signer: PopSigner.Jwt,
+            jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
+            clock: Clock,
+            supportedDPopAlgorithms: List<JWSAlgorithm>,
         ): Result<DPoPJwtFactory?> = runCatching {
-            val supportDPoPAlgs = oauthServerMetadata.dPoPJWSAlgs.orEmpty()
             val signerAlg = signer.algorithm
-            if (supportDPoPAlgs.isNotEmpty()) {
-                require(signerAlg in supportDPoPAlgs) {
-                    "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportDPoPAlgs"
+            if (supportedDPopAlgorithms.isNotEmpty()) {
+                require(signerAlg in supportedDPopAlgorithms) {
+                    "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportedDPopAlgorithms"
                 }
                 DPoPJwtFactory(signer, jtiByteLength, clock)
             } else null

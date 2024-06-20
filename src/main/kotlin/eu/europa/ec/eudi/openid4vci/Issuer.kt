@@ -17,8 +17,9 @@ package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.*
 import eu.europa.ec.eudi.openid4vci.internal.RequestIssuanceImpl
-import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationServerClient
+import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationEndpointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
+import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
 import io.ktor.client.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -90,19 +91,24 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 ktorHttpClientFactory,
                 dPoPJwtFactory,
             )
-            val authorizationServerClient = AuthorizationServerClient(
+            val authorizationEndpointClient = AuthorizationEndpointClient(
                 credentialOffer.credentialIssuerIdentifier,
+                credentialOffer.authorizationServerMetadata,
+                config,
+                ktorHttpClientFactory,
+            )
+            val tokenEndpointClient = TokenEndpointClient(
                 credentialOffer.authorizationServerMetadata,
                 config,
                 dPoPJwtFactory,
                 ktorHttpClientFactory,
-                config.parUsage,
             )
 
             val authorizeIssuance = AuthorizeIssuanceImpl(
                 credentialOffer,
                 config,
-                authorizationServerClient,
+                authorizationEndpointClient,
+                tokenEndpointClient,
             )
             val responseEncryptionSpec =
                 responseEncryptionSpec(credentialOffer, config, responseEncryptionSpecFactory).getOrThrow()
@@ -112,7 +118,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 issuanceServerClient,
                 responseEncryptionSpec,
             )
-            val refreshAccessToken = RefreshAccessToken(config.clock, authorizationServerClient)
+            val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
 
             val queryForDeferredCredential = QueryForDeferredCredentialImpl(
                 refreshAccessToken,

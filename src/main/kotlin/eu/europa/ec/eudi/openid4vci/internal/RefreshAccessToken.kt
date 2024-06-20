@@ -16,12 +16,12 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest
-import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationServerClient
+import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
 import java.time.Clock
 
 internal class RefreshAccessToken(
     private val clock: Clock,
-    private val authorizationServerClient: AuthorizationServerClient,
+    private val tokenEndpointClient: TokenEndpointClient,
 ) {
 
     suspend fun AuthorizedRequest.refreshIfNeeded(): Result<AuthorizedRequest> = runCatching {
@@ -35,7 +35,7 @@ internal class RefreshAccessToken(
 
     private suspend fun refresh(authorizedRequest: AuthorizedRequest): AuthorizedRequest {
         val refreshToken = requireNotNull(authorizedRequest.refreshToken)
-        val tokenResponse = authorizationServerClient.refreshAccessToken(refreshToken).getOrThrow()
+        val tokenResponse = tokenEndpointClient.refreshAccessToken(refreshToken).getOrThrow()
         return authorizedRequest.withRefreshedAccessToken(
             refreshedAccessToken = tokenResponse.accessToken,
             newRefreshToken = tokenResponse.refreshToken,
