@@ -24,17 +24,12 @@ internal class RefreshAccessToken(
     private val authorizationServerClient: AuthorizationServerClient,
 ) {
 
-    suspend fun refreshIfNeeded(
-        authorizedRequest: AuthorizedRequest,
-    ): Result<AuthorizedRequest> = runCatching {
+    suspend fun AuthorizedRequest.refreshIfNeeded(): Result<AuthorizedRequest> = runCatching {
         val at = clock.instant()
         when {
-            !authorizedRequest.isAccessTokenExpired(at) -> authorizedRequest
-            authorizedRequest.isRefreshTokenExpiredOrMissing(at) -> error("Refresh token is expired or missing")
-            else -> {
-                checkNotNull(authorizedRequest.refreshToken)
-                refresh(authorizedRequest)
-            }
+            !isAccessTokenExpired(at) -> this
+            isRefreshTokenExpiredOrMissing(at) -> error("Refresh token is expired or missing")
+            else -> refresh(this)
         }
     }
 

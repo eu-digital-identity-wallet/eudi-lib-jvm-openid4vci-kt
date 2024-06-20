@@ -112,9 +112,10 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 issuanceServerClient,
                 responseEncryptionSpec,
             )
-            val queryForDeferredCredential = QueryForDeferredCredentialImpl.withRefreshableAccessToken(
-                config.clock,
-                authorizationServerClient,
+            val refreshAccessToken = RefreshAccessToken(config.clock, authorizationServerClient)
+
+            val queryForDeferredCredential = QueryForDeferredCredentialImpl(
+                refreshAccessToken,
                 issuanceServerClient,
                 responseEncryptionSpec,
             )
