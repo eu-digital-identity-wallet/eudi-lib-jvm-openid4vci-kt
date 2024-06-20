@@ -76,7 +76,8 @@ fun Issuer.popSigner(
         credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported
     val credentialConfiguration =
         checkNotNull(credentialConfigurationsSupported[credentialConfigurationIdentifier])
-    val popSigner = CryptoGenerator.popSigner(credentialConfiguration = credentialConfiguration, preference = popSignerPreference)
+    val popSigner =
+        CryptoGenerator.popSigner(credentialConfiguration = credentialConfiguration, preference = popSignerPreference)
     return checkNotNull(popSigner) { "No signer can be generated for $credentialConfigurationIdentifier" }
 }
 
@@ -104,9 +105,9 @@ suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(
     env: ENV,
     enableHttpLogging: Boolean = false,
 ): AuthorizedRequest
-    where
-          ENV : HasTestUser<USER>,
-          ENV : CanAuthorizeIssuance<USER> =
+        where
+        ENV : HasTestUser<USER>,
+        ENV : CanAuthorizeIssuance<USER> =
     coroutineScope {
         val authorizationRequestPrepared = prepareAuthorizationRequest(walletState = null).getOrThrow()
         with(authorizationRequestPrepared) {
@@ -130,8 +131,8 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
     claimSetToRequest: ClaimSet? = null,
     popSignerPreference: ProofTypeMetaPreference,
 ) where
-      ENV : HasTestUser<USER>,
-      ENV : CanAuthorizeIssuance<USER> =
+        ENV : HasTestUser<USER>,
+        ENV : CanAuthorizeIssuance<USER> =
     coroutineScope {
         val outcome = run {
             val authorizedRequest = authorizeUsingAuthorizationCodeFlow(env, enableHttpLogging)
@@ -196,11 +197,13 @@ suspend fun Issuer.handleDeferred(
     issuanceLog(
         "Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
     )
-    return when (val outcome = authorized.queryForDeferredCredential(deferred).getOrThrow()) {
+    val (_, outcome) = authorized.queryForDeferredCredential(deferred).getOrThrow()
+    return when (outcome) {
         is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
         is DeferredCredentialQueryOutcome.IssuancePending -> throw RuntimeException(
             "Credential not ready yet. Try after ${outcome.interval}",
         )
+
         is DeferredCredentialQueryOutcome.Errored -> throw RuntimeException(outcome.error)
     }
 }
@@ -224,10 +227,10 @@ suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
     popSignerPreference: ProofTypeMetaPreference = ProofTypeMetaPreference.FavorCWT,
     claimSetToRequest: (CredentialConfiguration) -> ClaimSet? = { null },
 ) where
-      ENV : HasTestUser<USER>,
-      ENV : CanAuthorizeIssuance<USER>,
-      ENV : CanBeUsedWithVciLib,
-      ENV : CanRequestForCredentialOffer<USER> {
+        ENV : HasTestUser<USER>,
+        ENV : CanAuthorizeIssuance<USER>,
+        ENV : CanBeUsedWithVciLib,
+        ENV : CanRequestForCredentialOffer<USER> {
     val credentialOfferUri = requestAuthorizationCodeGrantOffer(credCfgIds = setOf(credCfgId))
     val issuer = assertDoesNotThrow {
         createIssuer(credentialOfferUri.toString(), enableHttpLogging)
@@ -277,9 +280,9 @@ suspend fun <ENV, USER> ENV.requestAuthorizationCodeGrantOffer(
     issuerStateIncluded: Boolean = true,
     credentialOfferEndpoint: String? = null,
 ): URI
-    where
-          ENV : HasTestUser<USER>,
-          ENV : CanRequestForCredentialOffer<USER> {
+        where
+        ENV : HasTestUser<USER>,
+        ENV : CanRequestForCredentialOffer<USER> {
     val form = CredentialOfferForm.authorizationCodeGrant(
         user = testUser,
         credCfgIds,
@@ -298,9 +301,9 @@ suspend fun <ENV, USER> ENV.requestPreAuthorizedCodeGrantOffer(
     txCode: String?,
     credentialOfferEndpoint: String? = null,
 ): URI
-    where
-          ENV : HasTestUser<USER>,
-          ENV : CanRequestForCredentialOffer<USER> {
+        where
+        ENV : HasTestUser<USER>,
+        ENV : CanRequestForCredentialOffer<USER> {
     val form = CredentialOfferForm.preAuthorizedCodeGrant(
         testUser,
         credCfgIds,
@@ -319,7 +322,11 @@ suspend fun <ENV : HasIssuerId> ENV.testMetaDataResolution(
         } catch (t: Throwable) {
             when {
                 t is CredentialIssuerMetadataError -> fail("Credential Issuer Metadata error", cause = t.cause)
-                t is AuthorizationServerMetadataResolutionException -> fail("Authorization Server Metadata resolution error", t.cause)
+                t is AuthorizationServerMetadataResolutionException -> fail(
+                    "Authorization Server Metadata resolution error",
+                    t.cause
+                )
+
                 else -> fail(cause = t)
             }
         }

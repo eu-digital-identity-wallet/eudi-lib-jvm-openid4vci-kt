@@ -58,8 +58,8 @@ sealed interface AuthorizedRequest : java.io.Serializable {
     val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?
     val timestamp: Instant
 
-    fun isAccessTokenExpired(clock: Clock): Boolean = accessToken.isExpired(timestamp, clock.instant())
-    fun isRefreshTokenExpired(clock: Clock): Boolean? = refreshToken?.isExpired(timestamp, clock.instant())
+    fun isAccessTokenExpired(at: Instant): Boolean = accessToken.isExpired(timestamp, at)
+    fun isRefreshTokenExpiredOrMissing(at: Instant): Boolean = refreshToken?.isExpired(timestamp, at) ?: true
 
     /**
      * In case an 'invalid_proof' error response was received from issuer with
@@ -74,19 +74,19 @@ sealed interface AuthorizedRequest : java.io.Serializable {
     fun withRefreshedAccessToken(
         refreshedAccessToken: AccessToken,
         newRefreshToken: RefreshToken?,
-        clock: Clock,
+        at: Instant,
     ): AuthorizedRequest =
         when (this) {
             is NoProofRequired -> copy(
                 accessToken = refreshedAccessToken,
                 refreshToken = newRefreshToken ?: refreshToken,
-                timestamp = clock.instant(),
+                timestamp = at,
             )
 
             is ProofRequired -> copy(
                 accessToken = refreshedAccessToken,
                 refreshToken = newRefreshToken ?: refreshToken,
-                timestamp = clock.instant(),
+                timestamp = at,
             )
         }
 
@@ -377,11 +377,11 @@ fun interface QueryForDeferredCredential {
      * Given an authorized request submits a deferred credential request for an identifier of a Deferred Issuance transaction.
      *
      * @param deferredCredential The identifier of a Deferred Issuance transaction.
-     * @return The result of the submission.
+     * @return The result of the query and a possibly refreshed [AuthorizedRequest]
      */
     suspend fun AuthorizedRequest.queryForDeferredCredential(
         deferredCredential: IssuedCredential.Deferred,
-    ): Result<DeferredCredentialQueryOutcome>
+    ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>>
 }
 
 sealed interface CredentialIssuanceEvent {
@@ -411,6 +411,8 @@ fun interface NotifyIssuer {
         event: CredentialIssuanceEvent,
     ): Result<Unit>
 }
+
+
 
 @JvmInline
 value class CoseAlgorithm private constructor(val value: Int) {
@@ -584,7 +586,7 @@ interface ProofSigner : JWSSigner {
  * that the wallet expects in the response of its issuance request.
  */
 typealias ResponseEncryptionSpecFactory =
-    (SupportedEncryptionAlgorithmsAndMethods, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec?
+            (SupportedEncryptionAlgorithmsAndMethods, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec?
 
 /**
  * Errors that can happen in the process of issuance process

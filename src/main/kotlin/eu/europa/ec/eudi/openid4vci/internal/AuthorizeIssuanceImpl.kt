@@ -34,20 +34,8 @@ internal data class TokenResponse(
 internal class AuthorizeIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     private val config: OpenId4VCIConfig,
-    ktorHttpClientFactory: KtorHttpClientFactory,
-    dPoPJwtFactory: DPoPJwtFactory?,
-    parUsage: ParUsage,
+    private val authorizationServer: AuthorizationServerClient,
 ) : AuthorizeIssuance {
-
-    private val authorizationServer: AuthorizationServerClient =
-        AuthorizationServerClient(
-            credentialOffer.credentialIssuerIdentifier,
-            credentialOffer.authorizationServerMetadata,
-            config,
-            dPoPJwtFactory,
-            ktorHttpClientFactory,
-            parUsage,
-        )
 
     override suspend fun prepareAuthorizationRequest(walletState: String?): Result<AuthorizationRequestPrepared> =
         runCatching {
@@ -148,6 +136,7 @@ internal fun authorizedRequest(
     return when {
         cNonce != null && offerRequiresProofs ->
             ProofRequired(accessToken, refreshToken, cNonce, authorizationDetails, timestamp)
+
         else ->
             NoProofRequired(accessToken, refreshToken, authorizationDetails, timestamp)
     }

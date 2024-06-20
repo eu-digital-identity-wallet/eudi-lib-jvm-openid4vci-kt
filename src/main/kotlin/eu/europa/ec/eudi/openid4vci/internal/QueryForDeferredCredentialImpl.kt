@@ -16,7 +16,9 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationServerClient
 import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
+import java.time.Clock
 
 internal class QueryForDeferredCredentialImpl(
     private val issuanceServerClient: IssuanceServerClient,
@@ -25,6 +27,45 @@ internal class QueryForDeferredCredentialImpl(
 
     override suspend fun AuthorizedRequest.queryForDeferredCredential(
         deferredCredential: IssuedCredential.Deferred,
-    ): Result<DeferredCredentialQueryOutcome> =
-        issuanceServerClient.placeDeferredCredentialRequest(accessToken, deferredCredential, responseEncryptionSpec)
+    ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> = runCatching {
+
+        val outcome = issuanceServerClient.placeDeferredCredentialRequest(
+            accessToken,
+            deferredCredential,
+            responseEncryptionSpec
+        ).getOrThrow()
+
+        this to outcome
+    }
+
+
+
+    companion object {
+
+        fun withRefreshableAccessToken(
+            clock: Clock,
+            authorizationServerClient: AuthorizationServerClient,
+            issuanceServerClient: IssuanceServerClient,
+            responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+        ): QueryForDeferredCredential {
+            val refreshAccessToken = RefreshAccessToken(clock, authorizationServerClient)
+            val proxy = QueryForDeferredCredentialImpl(issuanceServerClient, responseEncryptionSpec)
+            return RefreshTokenIfNeededAndQueryForDeferredCredential(refreshAccessToken, proxy)
+        }
+    }
+}
+
+private class RefreshTokenIfNeededAndQueryForDeferredCredential(
+    private val refreshAccessToken: RefreshAccessToken,
+    private val proxy: QueryForDeferredCredential
+) : QueryForDeferredCredential {
+
+    override suspend fun AuthorizedRequest.queryForDeferredCredential(
+        deferredCredential: IssuedCredential.Deferred
+    ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> = runCatching{
+        val refreshed = refreshAccessToken.refreshIfNeeded(this).getOrThrow()
+        with(proxy) {
+            refreshed.queryForDeferredCredential(deferredCredential).getOrThrow()
+        }
+    }
 }
