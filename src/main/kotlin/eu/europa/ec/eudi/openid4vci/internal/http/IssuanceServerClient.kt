@@ -99,7 +99,13 @@ internal class IssuanceServerClient(
             }
         }
     }
+}
 
+internal class DeferredEndPointClient(
+    private val deferredCredentialEndpoint: CredentialIssuerEndpoint,
+    private val ktorHttpClientFactory: KtorHttpClientFactory,
+    private val dPoPJwtFactory: DPoPJwtFactory?,
+) {
     /**
      * Method that submits a request to credential issuer's Deferred Credential Endpoint
      *
@@ -115,9 +121,8 @@ internal class IssuanceServerClient(
         deferredCredential: IssuedCredential.Deferred,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<DeferredCredentialQueryOutcome> = runCatching {
-        ensureNotNull(issuerMetadata.deferredCredentialEndpoint) { IssuerDoesNotSupportDeferredIssuance }
         ktorHttpClientFactory().use { client ->
-            val url = issuerMetadata.deferredCredentialEndpoint.value.value
+            val url = deferredCredentialEndpoint.value.value
             val response = client.post(url) {
                 bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
@@ -133,27 +138,6 @@ internal class IssuanceServerClient(
             } else {
                 val responsePayload = response.body<GenericErrorResponseTO>()
                 responsePayload.toDeferredCredentialQueryOutcome()
-            }
-        }
-    }
-
-    suspend fun notifyIssuer(
-        accessToken: AccessToken,
-        event: CredentialIssuanceEvent,
-    ): Result<Unit> = runCatching {
-        ensureNotNull(issuerMetadata.notificationEndpoint) { IssuerDoesNotSupportNotifications }
-        ktorHttpClientFactory().use { client ->
-            val url = issuerMetadata.notificationEndpoint.value.value
-            val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
-                contentType(ContentType.Application.Json)
-                setBody(NotificationTO.from(event))
-            }
-            if (response.status.isSuccess()) {
-                Unit
-            } else {
-                val errorResponse = response.body<GenericErrorResponseTO>()
-                throw NotificationFailed(errorResponse.error)
             }
         }
     }

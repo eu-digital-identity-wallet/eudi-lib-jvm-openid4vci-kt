@@ -22,6 +22,7 @@ import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.IssuerDoesNotSupportDeferredIssuance
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
 import java.security.Signature
@@ -381,6 +382,10 @@ fun interface QueryForDeferredCredential {
     suspend fun AuthorizedRequest.queryForDeferredCredential(
         deferredCredential: IssuedCredential.Deferred,
     ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>>
+
+    companion object {
+        val NotSupported: QueryForDeferredCredential = QueryForDeferredCredential { Result.failure(IssuerDoesNotSupportDeferredIssuance) }
+    }
 }
 
 sealed interface CredentialIssuanceEvent {
@@ -409,6 +414,10 @@ fun interface NotifyIssuer {
     suspend fun AuthorizedRequest.notify(
         event: CredentialIssuanceEvent,
     ): Result<Unit>
+
+    companion object {
+        val NotSupported: NotifyIssuer = NotifyIssuer { Result.success(Unit) }
+    }
 }
 
 @JvmInline

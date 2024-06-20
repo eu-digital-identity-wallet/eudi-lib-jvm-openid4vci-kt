@@ -16,13 +16,13 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
+import eu.europa.ec.eudi.openid4vci.internal.http.NotificationEndPointClient
 
 internal class NotifyIssuerImpl(
-    private val issuanceServerClient: IssuanceServerClient,
+    private val notificationEndPointClient: NotificationEndPointClient,
 ) : NotifyIssuer {
 
     override suspend fun AuthorizedRequest.notify(
         event: CredentialIssuanceEvent,
-    ): Result<Unit> = issuanceServerClient.notifyIssuer(accessToken, event)
+    ): Result<Unit> = notificationEndPointClient.notifyIssuer(accessToken, event)
 }

@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
+import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
 
 /**
  * An implementation of the [QueryForDeferredCredential]
@@ -24,7 +24,7 @@ import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
  */
 internal class QueryForDeferredCredentialImpl(
     private val refreshAccessToken: RefreshAccessToken,
-    private val issuanceServerClient: IssuanceServerClient,
+    private val deferredEndPointClient: DeferredEndPointClient,
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ) : QueryForDeferredCredential {
 
@@ -45,7 +45,7 @@ internal class QueryForDeferredCredentialImpl(
         authorizedRequest: AuthorizedRequest,
         deferredCredential: IssuedCredential.Deferred,
     ): DeferredCredentialQueryOutcome =
-        issuanceServerClient.placeDeferredCredentialRequest(
+        deferredEndPointClient.placeDeferredCredentialRequest(
             authorizedRequest.accessToken,
             deferredCredential,
             responseEncryptionSpec,

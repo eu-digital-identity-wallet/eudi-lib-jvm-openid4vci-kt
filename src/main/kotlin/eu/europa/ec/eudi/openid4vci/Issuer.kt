@@ -16,10 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.*
-import eu.europa.ec.eudi.openid4vci.internal.RequestIssuanceImpl
-import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationEndpointClient
-import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
-import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
+import eu.europa.ec.eudi.openid4vci.internal.http.*
 import io.ktor.client.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -91,6 +88,11 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 ktorHttpClientFactory,
                 dPoPJwtFactory,
             )
+
+            val notificationEndPointClient = credentialOffer.credentialIssuerMetadata.notificationEndpoint?.let {
+                NotificationEndPointClient(it, ktorHttpClientFactory, dPoPJwtFactory)
+            }
+
             val authorizationEndpointClient = AuthorizationEndpointClient(
                 credentialOffer.credentialIssuerIdentifier,
                 credentialOffer.authorizationServerMetadata,
@@ -120,13 +122,18 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             )
             val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
 
-            val queryForDeferredCredential = QueryForDeferredCredentialImpl(
-                refreshAccessToken,
-                issuanceServerClient,
-                responseEncryptionSpec,
-            )
+            val queryForDeferredCredential =
+                when (val endpoint = credentialOffer.credentialIssuerMetadata.deferredCredentialEndpoint) {
+                    null -> QueryForDeferredCredential.NotSupported
+                    else -> {
+                        val client = DeferredEndPointClient(endpoint, ktorHttpClientFactory, dPoPJwtFactory)
+                        QueryForDeferredCredentialImpl(refreshAccessToken, client, responseEncryptionSpec)
+                    }
+                }
 
-            val notifyIssuer = NotifyIssuerImpl(issuanceServerClient)
+            val notifyIssuer = notificationEndPointClient
+                ?.let { NotifyIssuerImpl(it) }
+                ?: NotifyIssuer.NotSupported
 
             object :
                 Issuer,
