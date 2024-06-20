@@ -276,7 +276,7 @@ data class IssuanceResponseEncryptionSpec(
     val jwk: JWK,
     val algorithm: JWEAlgorithm,
     val encryptionMethod: EncryptionMethod,
-) {
+) : java.io.Serializable {
     init {
         // Validate algorithm provided is for asymmetric encryption
         require(JWEAlgorithm.Family.ASYMMETRIC.contains(algorithm)) {
