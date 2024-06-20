@@ -16,7 +16,9 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance
+import eu.europa.ec.eudi.openid4vci.internal.http.BatchEndPointClient
+import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
 
 /**
  * Models a response of the issuer to a successful issuance request.
@@ -35,13 +37,14 @@ internal data class CredentialIssuanceResponse(
 internal class RequestIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     private val config: OpenId4VCIConfig,
-    private val issuanceServerClient: IssuanceServerClient,
+    private val credentialEndpointClient: CredentialEndpointClient,
+    private val batchEndPointClient: BatchEndPointClient?,
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ) : RequestIssuance {
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
-    ): Result<SubmittedRequest> = runCatching {
+    ): Result<SubmissionOutcome> = runCatching {
         placeIssuanceRequest(accessToken) {
             singleRequest(requestPayload, null, credentialIdentifiers)
         }
@@ -50,7 +53,7 @@ internal class RequestIssuanceImpl(
     override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
         proofSigner: PopSigner,
-    ): Result<SubmittedRequest> = runCatching {
+    ): Result<SubmissionOutcome> = runCatching {
         placeIssuanceRequest(accessToken) {
             singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
         }
@@ -58,7 +61,7 @@ internal class RequestIssuanceImpl(
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<IssuanceRequestPayload>,
-    ): Result<SubmittedRequest> = runCatching {
+    ): Result<SubmissionOutcome> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map {
                 singleRequest(it, null, credentialIdentifiers, true)
@@ -69,7 +72,7 @@ internal class RequestIssuanceImpl(
 
     override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner>>,
-    ): Result<SubmittedRequest> = runCatching {
+    ): Result<SubmissionOutcome> = runCatching {
         placeIssuanceRequest(accessToken) {
             val credentialRequests = credentialsMetadata.map { (requestPayload, proofSigner) ->
                 singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers, true)
@@ -170,28 +173,24 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    override suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
-        cNonce: CNonce,
-    ): AuthorizedRequest.ProofRequired =
-        AuthorizedRequest.ProofRequired(accessToken, refreshToken, cNonce, credentialIdentifiers, timestamp)
-
     private suspend fun placeIssuanceRequest(
         token: AccessToken,
         issuanceRequestSupplier: suspend () -> CredentialIssuanceRequest,
-    ): SubmittedRequest {
-        fun handleIssuanceFailure(error: Throwable): SubmittedRequest.Errored =
+    ): SubmissionOutcome {
+        fun handleIssuanceFailure(error: Throwable): SubmissionOutcome.Errored =
             submitRequestFromError(error) ?: throw error
         return when (val credentialRequest = issuanceRequestSupplier()) {
             is CredentialIssuanceRequest.SingleRequest -> {
-                issuanceServerClient.placeIssuanceRequest(token, credentialRequest).fold(
-                    onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
+                credentialEndpointClient.placeIssuanceRequest(token, credentialRequest).fold(
+                    onSuccess = { SubmissionOutcome.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
                 )
             }
 
             is CredentialIssuanceRequest.BatchRequest -> {
-                issuanceServerClient.placeBatchIssuanceRequest(token, credentialRequest).fold(
-                    onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
+                ensureNotNull(batchEndPointClient) { IssuerDoesNotSupportBatchIssuance() }
+                batchEndPointClient.placeBatchIssuanceRequest(token, credentialRequest).fold(
+                    onSuccess = { SubmissionOutcome.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
                 )
             }
@@ -199,10 +198,10 @@ internal class RequestIssuanceImpl(
     }
 }
 
-private fun submitRequestFromError(error: Throwable): SubmittedRequest.Errored? = when (error) {
+private fun submitRequestFromError(error: Throwable): SubmissionOutcome.Errored? = when (error) {
     is CredentialIssuanceError.InvalidProof ->
-        SubmittedRequest.InvalidProof(CNonce(error.cNonce, error.cNonceExpiresIn), error.errorDescription)
+        SubmissionOutcome.InvalidProof(CNonce(error.cNonce, error.cNonceExpiresIn), error.errorDescription)
 
-    is CredentialIssuanceError -> SubmittedRequest.Failed(error)
+    is CredentialIssuanceError -> SubmissionOutcome.Failed(error)
     else -> null
 }

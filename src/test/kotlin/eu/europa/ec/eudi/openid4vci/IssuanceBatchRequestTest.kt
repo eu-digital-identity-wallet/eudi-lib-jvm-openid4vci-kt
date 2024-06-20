@@ -128,8 +128,8 @@ class IssuanceBatchRequestTest {
                     )
                     val submittedRequest = authorizedRequest.requestBatch(batchRequestPayload).getOrThrow()
                     when (submittedRequest) {
-                        is SubmittedRequest.InvalidProof -> {
-                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                        is SubmissionOutcome.InvalidProof -> {
+                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
 
                             val proofSigner = CryptoGenerator.rsaProofSigner()
                             val credentialMetadataTriples = listOf(
@@ -159,21 +159,21 @@ class IssuanceBatchRequestTest {
                             val response = proofRequired.requestBatch(credentialMetadataTriples).getOrThrow()
 
                             assertTrue("Second attempt should be successful") {
-                                response is SubmittedRequest.Success
+                                response is SubmissionOutcome.Success
                             }
 
                             assertTrue("Second attempt should be successful") {
-                                (response as SubmittedRequest.Success).credentials.all {
+                                (response as SubmissionOutcome.Success).credentials.all {
                                     it is IssuedCredential.Issued
                                 }
                             }
                         }
 
-                        is SubmittedRequest.Failed -> fail(
+                        is SubmissionOutcome.Failed -> fail(
                             "Failed with error ${submittedRequest.error}",
                         )
 
-                        is SubmittedRequest.Success -> fail(
+                        is SubmissionOutcome.Success -> fail(
                             "first attempt should be unsuccessful",
                         )
                     }

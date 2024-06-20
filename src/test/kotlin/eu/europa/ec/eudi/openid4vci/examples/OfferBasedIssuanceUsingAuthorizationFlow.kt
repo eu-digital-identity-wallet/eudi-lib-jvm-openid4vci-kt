@@ -102,12 +102,12 @@ private suspend fun submitProvidingNoProofs(
         val submittedRequest = authorized.requestSingle(requestPayload).getOrThrow()
 
         return when (submittedRequest) {
-            is SubmittedRequest.Success -> handleSuccess(submittedRequest, issuer, authorized)
-            is SubmittedRequest.Failed -> throw submittedRequest.error
-            is SubmittedRequest.InvalidProof -> {
+            is SubmissionOutcome.Success -> handleSuccess(submittedRequest, issuer, authorized)
+            is SubmissionOutcome.Failed -> throw submittedRequest.error
+            is SubmissionOutcome.InvalidProof -> {
                 submitProvidingProofs(
                     issuer,
-                    authorized.handleInvalidProof(submittedRequest.cNonce),
+                    authorized.withCNonce(submittedRequest.cNonce),
                     credentialConfigurationId,
                 )
             }
@@ -126,9 +126,9 @@ private suspend fun submitProvidingProofs(
         val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
 
         return when (submittedRequest) {
-            is SubmittedRequest.Success -> handleSuccess(submittedRequest, issuer, authorized)
-            is SubmittedRequest.Failed -> throw submittedRequest.error
-            is SubmittedRequest.InvalidProof -> throw IllegalStateException(
+            is SubmissionOutcome.Success -> handleSuccess(submittedRequest, issuer, authorized)
+            is SubmissionOutcome.Failed -> throw submittedRequest.error
+            is SubmissionOutcome.InvalidProof -> throw IllegalStateException(
                 "Although providing a proof with c_nonce the proof is still invalid",
             )
         }
@@ -136,7 +136,7 @@ private suspend fun submitProvidingProofs(
 }
 
 private suspend fun handleSuccess(
-    submittedRequest: SubmittedRequest.Success,
+    submittedRequest: SubmissionOutcome.Success,
     issuer: Issuer,
     authorized: AuthorizedRequest,
 ): String = when (val issuedCredential = submittedRequest.credentials[0]) {
@@ -155,7 +155,8 @@ private suspend fun handleDeferred(
         "Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
     )
     with(issuer) {
-        return when (val outcome = authorized.queryForDeferredCredential(deferred).getOrThrow()) {
+        val (_, outcome) = authorized.queryForDeferredCredential(deferred).getOrThrow()
+        return when (outcome) {
             is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
             is DeferredCredentialQueryOutcome.IssuancePending -> throw RuntimeException(
                 "Credential not ready yet. Try after ${outcome.interval}",

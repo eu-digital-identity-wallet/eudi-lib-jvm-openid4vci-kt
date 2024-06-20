@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.authlete.cose.constants.COSEAlgorithms
+import com.authlete.cose.constants.COSEEllipticCurves
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
@@ -276,7 +278,7 @@ data class IssuanceResponseEncryptionSpec(
     val jwk: JWK,
     val algorithm: JWEAlgorithm,
     val encryptionMethod: EncryptionMethod,
-) {
+) : java.io.Serializable {
     init {
         // Validate algorithm provided is for asymmetric encryption
         require(JWEAlgorithm.Family.ASYMMETRIC.contains(algorithm)) {
@@ -304,3 +306,53 @@ value class Scope(val value: String) {
 }
 
 typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata
+
+@JvmInline
+value class CoseAlgorithm private constructor(val value: Int) {
+
+    fun name(): String =
+        checkNotNull(COSEAlgorithms.getNameByValue(value)) { "Cannot find name for COSE algorithm $value" }
+
+    companion object {
+
+        val ES256 = CoseAlgorithm(COSEAlgorithms.ES256)
+        val ES384 = CoseAlgorithm(COSEAlgorithms.ES384)
+        val ES512 = CoseAlgorithm(COSEAlgorithms.ES512)
+
+        operator fun invoke(value: Int): Result<CoseAlgorithm> = runCatching {
+            require(COSEAlgorithms.getNameByValue(value) != null) { "Unsupported COSE algorithm $value" }
+            CoseAlgorithm(value)
+        }
+
+        operator fun invoke(name: String): Result<CoseAlgorithm> = runCatching {
+            val value = COSEAlgorithms.getValueByName(name)
+            require(value != 0) { "Unsupported COSE algorithm $name" }
+            CoseAlgorithm(value)
+        }
+    }
+}
+
+@JvmInline
+value class CoseCurve private constructor(val value: Int) {
+
+    fun name(): String =
+        checkNotNull(COSEEllipticCurves.getNameByValue(value)) { "Cannot find name for COSE Curve $value" }
+
+    companion object {
+
+        val P_256 = CoseCurve(COSEEllipticCurves.P_256)
+        val P_384 = CoseCurve(COSEEllipticCurves.P_384)
+        val P_521 = CoseCurve(COSEEllipticCurves.P_521)
+
+        operator fun invoke(value: Int): Result<CoseCurve> = runCatching {
+            require(COSEEllipticCurves.getNameByValue(value) != null) { "Unsupported COSE Curve $value" }
+            CoseCurve(value)
+        }
+
+        operator fun invoke(name: String): Result<CoseCurve> = runCatching {
+            val value = COSEEllipticCurves.getValueByName(name)
+            require(value != 0) { "Unsupported COSE Curve $name" }
+            CoseCurve(value)
+        }
+    }
+}

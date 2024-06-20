@@ -16,8 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.*
-import eu.europa.ec.eudi.openid4vci.internal.RequestIssuanceImpl
-import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
+import eu.europa.ec.eudi.openid4vci.internal.http.*
 import io.ktor.client.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -84,31 +83,67 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                     oauthServerMetadata = credentialOffer.authorizationServerMetadata,
                 ).getOrThrow()
             }
-            val issuanceServerClient = IssuanceServerClient(
-                credentialOffer.credentialIssuerMetadata,
+
+            val authorizationEndpointClient = AuthorizationEndpointClient(
+                credentialOffer.credentialIssuerIdentifier,
+                credentialOffer.authorizationServerMetadata,
+                config,
                 ktorHttpClientFactory,
-                dPoPJwtFactory,
             )
+            val tokenEndpointClient = TokenEndpointClient(
+                credentialOffer.authorizationServerMetadata,
+                config,
+                dPoPJwtFactory,
+                ktorHttpClientFactory,
+            )
+
             val authorizeIssuance = AuthorizeIssuanceImpl(
                 credentialOffer,
                 config,
-                ktorHttpClientFactory,
-                dPoPJwtFactory,
-                config.parUsage,
+                authorizationEndpointClient,
+                tokenEndpointClient,
             )
+
             val responseEncryptionSpec =
                 responseEncryptionSpec(credentialOffer, config, responseEncryptionSpecFactory).getOrThrow()
-            val requestIssuance = RequestIssuanceImpl(
-                credentialOffer,
-                config,
-                issuanceServerClient,
-                responseEncryptionSpec,
-            )
-            val queryForDeferredCredential = QueryForDeferredCredentialImpl(
-                issuanceServerClient,
-                responseEncryptionSpec,
-            )
-            val notifyIssuer = NotifyIssuerImpl(issuanceServerClient)
+
+            val requestIssuance = run {
+                val credentialEndpointClient = CredentialEndpointClient(
+                    credentialOffer.credentialIssuerMetadata.credentialEndpoint,
+                    dPoPJwtFactory,
+                    ktorHttpClientFactory,
+                )
+                val batchEndPointClient = credentialOffer.credentialIssuerMetadata.batchCredentialEndpoint?.let { batchEndPoint ->
+                    BatchEndPointClient(batchEndPoint, dPoPJwtFactory, ktorHttpClientFactory)
+                }
+                RequestIssuanceImpl(
+                    credentialOffer,
+                    config,
+                    credentialEndpointClient,
+                    batchEndPointClient,
+                    responseEncryptionSpec,
+                )
+            }
+
+            val queryForDeferredCredential =
+                when (val deferredEndpoint = credentialOffer.credentialIssuerMetadata.deferredCredentialEndpoint) {
+                    null -> QueryForDeferredCredential.NotSupported
+                    else -> {
+                        val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
+                        val deferredEndPointClient = DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, ktorHttpClientFactory)
+                        QueryForDeferredCredential(refreshAccessToken, deferredEndPointClient, responseEncryptionSpec)
+                    }
+                }
+
+            val notifyIssuer =
+                when (val notificationEndpoint = credentialOffer.credentialIssuerMetadata.notificationEndpoint) {
+                    null -> NotifyIssuer.NoOp
+                    else -> {
+                        val notificationEndPointClient =
+                            NotificationEndPointClient(notificationEndpoint, dPoPJwtFactory, ktorHttpClientFactory)
+                        NotifyIssuer(notificationEndPointClient)
+                    }
+                }
 
             object :
                 Issuer,

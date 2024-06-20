@@ -19,7 +19,8 @@ import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.NoProofRequired
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.ProofRequired
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidAuthorizationState
-import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationServerClient
+import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationEndpointClient
+import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
 import java.time.Instant
 import com.nimbusds.oauth2.sdk.id.State as NimbusState
 
@@ -34,20 +35,9 @@ internal data class TokenResponse(
 internal class AuthorizeIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     private val config: OpenId4VCIConfig,
-    ktorHttpClientFactory: KtorHttpClientFactory,
-    dPoPJwtFactory: DPoPJwtFactory?,
-    parUsage: ParUsage,
+    private val authorizationEndpointClient: AuthorizationEndpointClient,
+    private val tokenEndpointClient: TokenEndpointClient,
 ) : AuthorizeIssuance {
-
-    private val authorizationServer: AuthorizationServerClient =
-        AuthorizationServerClient(
-            credentialOffer.credentialIssuerIdentifier,
-            credentialOffer.authorizationServerMetadata,
-            config,
-            dPoPJwtFactory,
-            ktorHttpClientFactory,
-            parUsage,
-        )
 
     override suspend fun prepareAuthorizationRequest(walletState: String?): Result<AuthorizationRequestPrepared> =
         runCatching {
@@ -58,7 +48,7 @@ internal class AuthorizeIssuanceImpl(
             val state = walletState ?: NimbusState().value
             val issuerState = credentialOffer.grants?.authorizationCode()?.issuerState
             val (codeVerifier, authorizationCodeUrl) =
-                authorizationServer.submitParOrCreateAuthorizationRequestUrl(
+                authorizationEndpointClient.submitParOrCreateAuthorizationRequestUrl(
                     scopes,
                     configurationIds,
                     state,
@@ -93,9 +83,9 @@ internal class AuthorizeIssuanceImpl(
         serverState: String,
     ): Result<AuthorizedRequest> =
         runCatching {
-            ensure(serverState == state) { InvalidAuthorizationState }
+            ensure(serverState == state) { InvalidAuthorizationState() }
             val tokenResponse =
-                authorizationServer.requestAccessTokenAuthFlow(authorizationCode, pkceVerifier).getOrThrow()
+                tokenEndpointClient.requestAccessTokenAuthFlow(authorizationCode, pkceVerifier).getOrThrow()
             authorizedRequest(credentialOffer, tokenResponse)
         }
 
@@ -108,7 +98,7 @@ internal class AuthorizeIssuanceImpl(
         }
         with(preAuthorizedCode) { validate(txCode) }
         val tokenResponse =
-            authorizationServer.requestAccessTokenPreAuthFlow(preAuthorizedCode, txCode).getOrThrow()
+            tokenEndpointClient.requestAccessTokenPreAuthFlow(preAuthorizedCode, txCode).getOrThrow()
         authorizedRequest(credentialOffer, tokenResponse)
     }
 }
@@ -148,6 +138,7 @@ internal fun authorizedRequest(
     return when {
         cNonce != null && offerRequiresProofs ->
             ProofRequired(accessToken, refreshToken, cNonce, authorizationDetails, timestamp)
+
         else ->
             NoProofRequired(accessToken, refreshToken, authorizationDetails, timestamp)
     }

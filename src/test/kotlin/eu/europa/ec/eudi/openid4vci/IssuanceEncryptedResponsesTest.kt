@@ -319,7 +319,7 @@ class IssuanceEncryptedResponsesTest {
                 val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
                 val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
-                assertIs<SubmittedRequest.Success>(submittedRequest)
+                assertIs<SubmissionOutcome.Success>(submittedRequest)
             }
         }
 
@@ -454,7 +454,7 @@ class IssuanceEncryptedResponsesTest {
                 )
                 authorizedRequest.requestBatch(batchRequestPayload).fold(
                     onSuccess = {
-                        assertIs<SubmittedRequest.Success>(it)
+                        assertIs<SubmissionOutcome.Success>(it)
                         assertTrue("One deferred credential response expected") {
                             it.credentials.any { credential -> credential is IssuedCredential.Deferred }
                         }
@@ -503,8 +503,8 @@ class IssuanceEncryptedResponsesTest {
                     null,
                 )
                 val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
-                assertIs<SubmittedRequest.Success>(submittedRequest)
-                val deferredCredential = submittedRequest.credentials[0]
+                assertIs<SubmissionOutcome.Success>(submittedRequest)
+                val deferredCredential = submittedRequest.credentials.firstOrNull()
                 assertIs<IssuedCredential.Deferred>(deferredCredential)
 
                 assertFailsWith<CredentialIssuanceError.InvalidResponseContentType>(
@@ -572,14 +572,14 @@ class IssuanceEncryptedResponsesTest {
                 null,
             )
             val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
-            assertIs<SubmittedRequest.Success>(submittedRequest)
+            assertIs<SubmissionOutcome.Success>(submittedRequest)
 
             val deferredCredential = submittedRequest.credentials[0]
             assertIs<IssuedCredential.Deferred>(deferredCredential)
 
-            val response = authorizedRequest.queryForDeferredCredential(deferredCredential).getOrThrow()
+            val (_, οutcome) = authorizedRequest.queryForDeferredCredential(deferredCredential).getOrThrow()
 
-            assertIs<DeferredCredentialQueryOutcome.Issued>(response)
+            assertIs<DeferredCredentialQueryOutcome.Issued>(οutcome)
         }
     }
 }

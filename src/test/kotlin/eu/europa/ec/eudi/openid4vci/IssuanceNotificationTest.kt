@@ -75,12 +75,13 @@ class IssuanceNotificationTest {
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
                     val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
-                        is SubmittedRequest.InvalidProof -> {
-                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                            val response = proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                        is SubmissionOutcome.InvalidProof -> {
+                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
+                            val response = proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
+                                .getOrThrow()
 
-                            assertIs<SubmittedRequest.Success>(response, "Not a successful issuance")
-                            val issuedCredential = response.credentials[0]
+                            assertIs<SubmissionOutcome.Success>(response, "Not a successful issuance")
+                            val issuedCredential = response.credentials.firstOrNull()
                             assertIs<IssuedCredential.Issued>(issuedCredential, "Is Deferred although expecting Issued")
                             assertNotNull(issuedCredential.notificationId, "No notification id found")
 

@@ -362,11 +362,11 @@ internal data class GenericErrorResponseTO(
                 ?.let { DeferredCredentialIssuancePending(interval) }
                 ?: DeferredCredentialIssuancePending()
 
-        "invalid_token" -> InvalidToken
-        "invalid_transaction_id " -> InvalidTransactionId
-        "unsupported_credential_type " -> UnsupportedCredentialType
-        "unsupported_credential_format " -> UnsupportedCredentialFormat
-        "invalid_encryption_parameters " -> InvalidEncryptionParameters
+        "invalid_token" -> InvalidToken()
+        "invalid_transaction_id " -> InvalidTransactionId()
+        "unsupported_credential_type " -> UnsupportedCredentialType()
+        "unsupported_credential_format " -> UnsupportedCredentialFormat()
+        "invalid_encryption_parameters " -> InvalidEncryptionParameters()
         else -> IssuanceRequestFailed(error, errorDescription)
     }
 

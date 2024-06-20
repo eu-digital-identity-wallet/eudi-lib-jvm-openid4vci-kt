@@ -108,11 +108,11 @@ internal class JwtProofBuilder(
         override fun check(popSigner: PopSigner.Jwt, proofTypesSupported: ProofTypesSupported) {
             val spec = proofTypesSupported.values.filterIsInstance<ProofTypeMeta.Jwt>().firstOrNull()
             ensureNotNull(spec) {
-                CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
+                CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported()
             }
             val proofTypeSigningAlgorithmsSupported = spec.algorithms
             ensure(popSigner.algorithm in proofTypeSigningAlgorithmsSupported) {
-                CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported
+                CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported()
             }
         }
     }
@@ -189,13 +189,13 @@ internal class CwtProofBuilder(
         override fun check(popSigner: PopSigner.Cwt, proofTypesSupported: ProofTypesSupported) {
             val spec = proofTypesSupported.values.filterIsInstance<ProofTypeMeta.Cwt>().firstOrNull()
             ensureNotNull(spec) {
-                CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported
+                CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported()
             }
             ensure(popSigner.algorithm in spec.algorithms) {
-                CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported
+                CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported()
             }
             ensure(popSigner.curve in spec.curves) {
-                CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported
+                CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported()
             }
         }
     }

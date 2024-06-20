@@ -16,15 +16,3 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
-
-internal class QueryForDeferredCredentialImpl(
-    private val issuanceServerClient: IssuanceServerClient,
-    private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-) : QueryForDeferredCredential {
-
-    override suspend fun AuthorizedRequest.queryForDeferredCredential(
-        deferredCredential: IssuedCredential.Deferred,
-    ): Result<DeferredCredentialQueryOutcome> =
-        issuanceServerClient.placeDeferredCredentialRequest(accessToken, deferredCredential, responseEncryptionSpec)
-}

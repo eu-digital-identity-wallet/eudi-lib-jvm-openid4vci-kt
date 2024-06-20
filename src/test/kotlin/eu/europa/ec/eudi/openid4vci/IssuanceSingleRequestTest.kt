@@ -93,7 +93,7 @@ class IssuanceSingleRequestTest {
                         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
                         authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     }
-                    assertIs<SubmittedRequest.InvalidProof>(submittedRequest)
+                    assertIs<SubmissionOutcome.InvalidProof>(submittedRequest)
                 }
 
                 is AuthorizedRequest.ProofRequired -> fail(
@@ -146,7 +146,7 @@ class IssuanceSingleRequestTest {
                         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
                         authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     }
-                    assertIs<SubmittedRequest.Failed>(request)
+                    assertIs<SubmissionOutcome.Failed>(request)
                     assertIs<CredentialIssuanceError.ResponseUnparsable>(request.error)
                 }
 
@@ -269,19 +269,20 @@ class IssuanceSingleRequestTest {
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
                     val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
-                        is SubmittedRequest.InvalidProof -> {
-                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                        is SubmissionOutcome.InvalidProof -> {
+                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
                             val response = assertDoesNotThrow {
-                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
+                                    .getOrThrow()
                             }
-                            assertIs<SubmittedRequest.Success>(response)
+                            assertIs<SubmissionOutcome.Success>(response)
                         }
 
-                        is SubmittedRequest.Failed -> fail(
+                        is SubmissionOutcome.Failed -> fail(
                             "Failed with error ${submittedRequest.error}",
                         )
 
-                        is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
+                        is SubmissionOutcome.Success -> fail("first attempt should be unsuccessful")
                     }
                 }
 
@@ -325,16 +326,17 @@ class IssuanceSingleRequestTest {
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
                     val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
-                        is SubmittedRequest.InvalidProof -> {
-                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                        is SubmissionOutcome.InvalidProof -> {
+                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
                             val response = assertDoesNotThrow {
-                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
+                                    .getOrThrow()
                             }
-                            assertIs<SubmittedRequest.Success>(response)
+                            assertIs<SubmissionOutcome.Success>(response)
                         }
 
-                        is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
-                        is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
+                        is SubmissionOutcome.Failed -> fail("Failed with error ${submittedRequest.error}")
+                        is SubmissionOutcome.Success -> fail("first attempt should be unsuccessful")
                     }
                 }
 
@@ -377,16 +379,17 @@ class IssuanceSingleRequestTest {
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
                     val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
-                        is SubmittedRequest.InvalidProof -> {
-                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                        is SubmissionOutcome.InvalidProof -> {
+                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
                             val response = assertDoesNotThrow {
-                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
+                                    .getOrThrow()
                             }
-                            assertIs<SubmittedRequest.Success>(response)
+                            assertIs<SubmissionOutcome.Success>(response)
                         }
 
-                        is SubmittedRequest.Failed -> fail("Failed with error ${submittedRequest.error}")
-                        is SubmittedRequest.Success -> fail("first attempt should be unsuccessful")
+                        is SubmissionOutcome.Failed -> fail("Failed with error ${submittedRequest.error}")
+                        is SubmissionOutcome.Success -> fail("first attempt should be unsuccessful")
                     }
                 }
 
