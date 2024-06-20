@@ -47,7 +47,7 @@ internal class CredentialEndpointClient(
         request: CredentialIssuanceRequest.SingleRequest,
     ): Result<CredentialIssuanceResponse> = runCatching {
         ktorHttpClientFactory().use { client ->
-            val url = credentialEndpoint.value.value
+            val url = credentialEndpoint.value
             val response = client.post(url) {
                 bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
@@ -85,7 +85,7 @@ internal class BatchEndPointClient(
         request: CredentialIssuanceRequest.BatchRequest,
     ): Result<CredentialIssuanceResponse> = runCatching {
         ktorHttpClientFactory().use { client ->
-            val url = batchCredentialEndpoint.value.value
+            val url = batchCredentialEndpoint.value
             val response = client.post(url) {
                 bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
@@ -127,7 +127,7 @@ internal class DeferredEndPointClient(
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<DeferredCredentialQueryOutcome> = runCatching {
         ktorHttpClientFactory().use { client ->
-            val url = deferredCredentialEndpoint.value.value
+            val url = deferredCredentialEndpoint.value
             val response = client.post(url) {
                 bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)

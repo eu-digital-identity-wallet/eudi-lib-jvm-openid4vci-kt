@@ -38,7 +38,7 @@ internal class NotificationEndPointClient(
         event: CredentialIssuanceEvent,
     ): Result<Unit> = runCatching {
         ktorHttpClientFactory().use { client ->
-            val url = notificationEndpoint.value.value
+            val url = notificationEndpoint.value
             val response = client.post(url) {
                 bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
