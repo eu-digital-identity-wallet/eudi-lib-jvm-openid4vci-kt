@@ -62,6 +62,35 @@ sealed interface AuthorizedRequest : java.io.Serializable {
     fun isRefreshTokenExpired(clock: Clock): Boolean? = refreshToken?.isExpired(timestamp, clock.instant())
 
     /**
+     * In case an 'invalid_proof' error response was received from issuer with
+     * fresh c_nonce
+     *
+     * @param cNonce    The c_nonce provided from issuer along the 'invalid_proof' error code.
+     * @return The new state of the request.
+     */
+    fun withCNonce(cNonce: CNonce): ProofRequired =
+        ProofRequired(accessToken, refreshToken, cNonce, credentialIdentifiers, timestamp)
+
+    fun withRefreshedAccessToken(
+        refreshedAccessToken: AccessToken,
+        newRefreshToken: RefreshToken?,
+        clock: Clock,
+    ): AuthorizedRequest =
+        when (this) {
+            is NoProofRequired -> copy(
+                accessToken = refreshedAccessToken,
+                refreshToken = newRefreshToken ?: refreshToken,
+                timestamp = clock.instant(),
+            )
+
+            is ProofRequired -> copy(
+                accessToken = refreshedAccessToken,
+                refreshToken = newRefreshToken ?: refreshToken,
+                timestamp = clock.instant(),
+            )
+        }
+
+    /**
      * Issuer authorized issuance
      *
      * @param accessToken Access token authorizing credential issuance
@@ -74,18 +103,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
         override val refreshToken: RefreshToken?,
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
         override val timestamp: Instant,
-    ) : AuthorizedRequest {
-
-        /**
-         * In case an 'invalid_proof' error response was received from issuer with
-         * fresh c_nonce
-         *
-         * @param cNonce    The c_nonce provided from issuer along the 'invalid_proof' error code.
-         * @return The new state of the request.
-         */
-        fun toProofRequired(cNonce: CNonce): ProofRequired =
-            ProofRequired(accessToken, refreshToken, cNonce, credentialIdentifiers, timestamp)
-    }
+    ) : AuthorizedRequest
 
     /**
      * Issuer authorized issuance and required the provision of proof of holder's binding to be provided
@@ -268,9 +286,11 @@ sealed interface IssuanceRequestPayload {
     ) : IssuanceRequestPayload
 }
 
+typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
+
 /**
  * An interface for submitting a credential issuance request. Contains all the operation available to transition an [AuthorizedRequest]
- * to a [SubmittedRequest]
+ * to a [SubmissionOutcome]
  */
 interface RequestIssuance {
 
@@ -325,9 +345,13 @@ interface RequestIssuance {
      * @param cNonce    The c_nonce provided from issuer along the 'invalid_proof' error code.
      * @return The new state of the request.
      */
+    @Deprecated(
+        message = "Deprecated and will be removed in a future release",
+        replaceWith = ReplaceWith("withCNonce(cNonce)"),
+    )
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
-    ): AuthorizedRequest.ProofRequired = toProofRequired(cNonce)
+    ): AuthorizedRequest.ProofRequired = withCNonce(cNonce)
 }
 
 sealed interface DeferredCredentialQueryOutcome {

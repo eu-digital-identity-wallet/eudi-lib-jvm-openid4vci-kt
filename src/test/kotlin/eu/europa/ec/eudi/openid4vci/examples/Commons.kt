@@ -139,7 +139,7 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
             // If authorization server doesn't provide c_nonce in its token response
             // there is the chance that provides c_nonce via credential endpoint
             if (authorizedRequest is AuthorizedRequest.NoProofRequired && outcome is SubmissionOutcome.InvalidProof) {
-                val proofRequired = authorizedRequest.handleInvalidProof(outcome.cNonce)
+                val proofRequired = authorizedRequest.withCNonce(outcome.cNonce)
                 submitCredentialRequest(proofRequired, credCfgId, claimSetToRequest, popSignerPreference)
             } else outcome
         }
@@ -160,7 +160,7 @@ suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
         // If authorization server doesn't provide c_nonce in its token response,
         // there is the chance that provides c_nonce via credential endpoint
         if (authorizedRequest is AuthorizedRequest.NoProofRequired && outcome is SubmissionOutcome.InvalidProof) {
-            val proofRequired = authorizedRequest.handleInvalidProof(outcome.cNonce)
+            val proofRequired = authorizedRequest.withCNonce(outcome.cNonce)
             proofRequired to submitCredentialRequest(proofRequired, credCfgId, claimSetToRequest, popSignerPreference)
         } else authorizedRequest to outcome
     }

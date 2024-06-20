@@ -270,9 +270,10 @@ class IssuanceSingleRequestTest {
                     val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
                         is SubmissionOutcome.InvalidProof -> {
-                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
                             val response = assertDoesNotThrow {
-                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
+                                    .getOrThrow()
                             }
                             assertIs<SubmissionOutcome.Success>(response)
                         }
@@ -326,9 +327,10 @@ class IssuanceSingleRequestTest {
                     val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
                         is SubmissionOutcome.InvalidProof -> {
-                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
                             val response = assertDoesNotThrow {
-                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
+                                    .getOrThrow()
                             }
                             assertIs<SubmissionOutcome.Success>(response)
                         }
@@ -378,9 +380,10 @@ class IssuanceSingleRequestTest {
                     val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
                         is SubmissionOutcome.InvalidProof -> {
-                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
                             val response = assertDoesNotThrow {
-                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
+                                    .getOrThrow()
                             }
                             assertIs<SubmissionOutcome.Success>(response)
                         }

@@ -129,7 +129,7 @@ class IssuanceBatchRequestTest {
                     val submittedRequest = authorizedRequest.requestBatch(batchRequestPayload).getOrThrow()
                     when (submittedRequest) {
                         is SubmissionOutcome.InvalidProof -> {
-                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
+                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
 
                             val proofSigner = CryptoGenerator.rsaProofSigner()
                             val credentialMetadataTriples = listOf(

@@ -76,8 +76,9 @@ class IssuanceNotificationTest {
                     val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                     when (submittedRequest) {
                         is SubmissionOutcome.InvalidProof -> {
-                            val proofRequired = authorizedRequest.handleInvalidProof(submittedRequest.cNonce)
-                            val response = proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
+                            val response = proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
+                                .getOrThrow()
 
                             assertIs<SubmissionOutcome.Success>(response, "Not a successful issuance")
                             val issuedCredential = response.credentials.firstOrNull()

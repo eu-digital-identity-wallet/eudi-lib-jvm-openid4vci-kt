@@ -109,7 +109,7 @@ private suspend fun Issuer.submitProvidingNoProofs(
         is SubmissionOutcome.Failed -> throw submittedRequest.error
         is SubmissionOutcome.InvalidProof -> {
             this@submitProvidingNoProofs.submitProvidingProofs(
-                authorized.handleInvalidProof(submittedRequest.cNonce),
+                authorized.withCNonce(submittedRequest.cNonce),
                 credentialConfigurationId,
             )
         }
