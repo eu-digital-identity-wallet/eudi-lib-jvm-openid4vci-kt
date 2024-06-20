@@ -188,7 +188,7 @@ internal class RequestIssuanceImpl(
             }
 
             is CredentialIssuanceRequest.BatchRequest -> {
-                ensureNotNull(batchEndPointClient) { IssuerDoesNotSupportBatchIssuance }
+                ensureNotNull(batchEndPointClient) { IssuerDoesNotSupportBatchIssuance() }
                 batchEndPointClient.placeBatchIssuanceRequest(token, credentialRequest).fold(
                     onSuccess = { SubmissionOutcome.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },

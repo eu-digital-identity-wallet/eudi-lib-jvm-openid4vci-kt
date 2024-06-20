@@ -15,115 +15,14 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.authlete.cose.constants.COSEAlgorithms
-import com.authlete.cose.constants.COSEEllipticCurves
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.IssuerDoesNotSupportDeferredIssuance
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
-import eu.europa.ec.eudi.openid4vci.internal.http.NotificationEndPointClient
 import kotlinx.serialization.Serializable
 import java.security.Signature
-import java.time.Instant
-
-/**
- * State holding the authorization request as a URL to be passed to front-channel for retrieving an authorization code in an oAuth2
- * authorization code grant type flow.
- * @param authorizationCodeURL the authorization code URL
- * Contains all the parameters
- * @param pkceVerifier the PKCE verifier, which was used
- * for preparing the authorization request
- * @param state the state which was sent with the
- * authorization request
- */
-data class AuthorizationRequestPrepared(
-    val authorizationCodeURL: HttpsUrl,
-    val pkceVerifier: PKCEVerifier,
-    val state: String,
-) : java.io.Serializable
-
-/**
- * Sealed hierarchy of states describing an authorized issuance request. These states hold an access token issued by the
- * authorization server that protects the credential issuer.
- */
-sealed interface AuthorizedRequest : java.io.Serializable {
-
-    /**
-     * Access token authorizing the request(s) to issue credential(s)
-     */
-    val accessToken: AccessToken
-    val refreshToken: RefreshToken?
-    val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?
-    val timestamp: Instant
-
-    fun isAccessTokenExpired(at: Instant): Boolean = accessToken.isExpired(timestamp, at)
-    fun isRefreshTokenExpiredOrMissing(at: Instant): Boolean = refreshToken?.isExpired(timestamp, at) ?: true
-
-    /**
-     * In case an 'invalid_proof' error response was received from issuer with
-     * fresh c_nonce
-     *
-     * @param cNonce    The c_nonce provided from issuer along the 'invalid_proof' error code.
-     * @return The new state of the request.
-     */
-    fun withCNonce(cNonce: CNonce): ProofRequired =
-        ProofRequired(accessToken, refreshToken, cNonce, credentialIdentifiers, timestamp)
-
-    fun withRefreshedAccessToken(
-        refreshedAccessToken: AccessToken,
-        newRefreshToken: RefreshToken?,
-        at: Instant,
-    ): AuthorizedRequest =
-        when (this) {
-            is NoProofRequired -> copy(
-                accessToken = refreshedAccessToken,
-                refreshToken = newRefreshToken ?: refreshToken,
-                timestamp = at,
-            )
-
-            is ProofRequired -> copy(
-                accessToken = refreshedAccessToken,
-                refreshToken = newRefreshToken ?: refreshToken,
-                timestamp = at,
-            )
-        }
-
-    /**
-     * Issuer authorized issuance
-     *
-     * @param accessToken Access token authorizing credential issuance
-     * @param refreshToken Refresh token to refresh the access token, if needed
-     * @param credentialIdentifiers authorization details, if provided by the token endpoint
-     * @param timestamp the point in time of the authorization (when tokens were issued)
-     */
-    data class NoProofRequired(
-        override val accessToken: AccessToken,
-        override val refreshToken: RefreshToken?,
-        override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
-        override val timestamp: Instant,
-    ) : AuthorizedRequest
-
-    /**
-     * Issuer authorized issuance and required the provision of proof of holder's binding to be provided
-     * along with the request
-     *
-     * @param accessToken  Access token authorizing certificate issuance
-     * @param refreshToken Refresh token to refresh the access token, if needed
-     * @param cNonce Nonce value provided by issuer to be included in proof of holder's binding
-     * @param credentialIdentifiers authorization details, if provided by the token endpoint
-     * @param timestamp the point in time of the authorization (when tokens were issued)
-     */
-    data class ProofRequired(
-        override val accessToken: AccessToken,
-        override val refreshToken: RefreshToken?,
-        val cNonce: CNonce,
-        override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
-        override val timestamp: Instant,
-    ) : AuthorizedRequest
-}
 
 /**
  * The result of a request for issuance
@@ -200,47 +99,6 @@ sealed interface SubmissionOutcome : java.io.Serializable {
         val cNonce: CNonce,
         val errorDescription: String? = null,
     ) : Errored
-}
-
-interface AuthorizeIssuance {
-
-    /**
-     * Initial step to authorize an issuance request using Authorized Code Flow.
-     * If the specified authorization server supports PAR,
-     * then this method executes the first step of PAR by pushing the authorization
-     * request to authorization server's 'par endpoint'.
-     * If PAR is not supported, then this method prepares the authorization request as a typical authorization code flow authorization
-     * request with the request's elements as query parameters.
-     * @param walletState an optional parameter that if provided will
-     * be included in the authorization request. If it is not provided,
-     * a random value will be used
-     * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
-     * @return an HTTPS URL of the authorization request to be placed
-     */
-    suspend fun prepareAuthorizationRequest(walletState: String? = null): Result<AuthorizationRequestPrepared>
-
-    /**
-     * Using the access code retrieved after performing the authorization request prepared from a call to
-     * [AuthorizeOfferIssuance.prepareAuthorizationRequest()], it posts a request to authorization server's token endpoint to
-     * retrieve an access token. This step transitions state from [AuthorizationRequestPrepared] to an
-     * [AuthorizedRequest] state
-     *
-     * @param authorizationCode The authorization code returned from authorization server via front-channel
-     * @param serverState The state returned from authorization server via front-channel
-     * @return an issuance request in authorized state
-     */
-    suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
-        authorizationCode: AuthorizationCode,
-        serverState: String,
-    ): Result<AuthorizedRequest>
-
-    /**
-     * Action to authorize an issuance request using Pre-Authorized Code Flow.
-     *
-     * @param txCode   Optional parameter in case the credential offer specifies that a user provided pin is required for authorization
-     * @return an issuance request in authorized state
-     */
-    suspend fun authorizeWithPreAuthorizationCode(txCode: String?): Result<AuthorizedRequest>
 }
 
 /**
@@ -353,125 +211,6 @@ interface RequestIssuance {
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
     ): AuthorizedRequest.ProofRequired = withCNonce(cNonce)
-}
-
-sealed interface DeferredCredentialQueryOutcome {
-
-    data class Issued(val credential: IssuedCredential.Issued) : DeferredCredentialQueryOutcome
-
-    data class IssuancePending(
-        val interval: Long? = null,
-    ) : DeferredCredentialQueryOutcome
-
-    data class Errored(
-        val error: String,
-        val errorDescription: String? = null,
-    ) : DeferredCredentialQueryOutcome
-}
-
-/**
- * An interface for submitting a deferred credential issuance request.
- */
-fun interface QueryForDeferredCredential {
-
-    /**
-     * Given an authorized request submits a deferred credential request for an identifier of a Deferred Issuance transaction.
-     *
-     * @param deferredCredential The identifier of a Deferred Issuance transaction.
-     * @return The result of the query and a possibly refreshed [AuthorizedRequest]
-     */
-    suspend fun AuthorizedRequest.queryForDeferredCredential(
-        deferredCredential: IssuedCredential.Deferred,
-    ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>>
-
-    companion object {
-        val NotSupported: QueryForDeferredCredential =
-            QueryForDeferredCredential { Result.failure(IssuerDoesNotSupportDeferredIssuance) }
-    }
-}
-
-sealed interface CredentialIssuanceEvent {
-
-    val id: NotificationId
-    val description: String?
-
-    data class Accepted(
-        override val id: NotificationId,
-        override val description: String?,
-    ) : CredentialIssuanceEvent
-
-    data class Failed(
-        override val id: NotificationId,
-        override val description: String?,
-    ) : CredentialIssuanceEvent
-
-    data class Deleted(
-        override val id: NotificationId,
-        override val description: String?,
-    ) : CredentialIssuanceEvent
-}
-
-fun interface NotifyIssuer {
-
-    suspend fun AuthorizedRequest.notify(
-        event: CredentialIssuanceEvent,
-    ): Result<Unit>
-
-    companion object {
-        val NoOp: NotifyIssuer = NotifyIssuer { Result.success(Unit) }
-        internal operator fun invoke(notificationEndPointClient: NotificationEndPointClient): NotifyIssuer =
-            NotifyIssuer { event -> notificationEndPointClient.notifyIssuer(accessToken, event) }
-    }
-}
-
-@JvmInline
-value class CoseAlgorithm private constructor(val value: Int) {
-
-    fun name(): String =
-        checkNotNull(COSEAlgorithms.getNameByValue(value)) { "Cannot find name for COSE algorithm $value" }
-
-    companion object {
-
-        val ES256 = CoseAlgorithm(COSEAlgorithms.ES256)
-        val ES384 = CoseAlgorithm(COSEAlgorithms.ES384)
-        val ES512 = CoseAlgorithm(COSEAlgorithms.ES512)
-
-        operator fun invoke(value: Int): Result<CoseAlgorithm> = runCatching {
-            require(COSEAlgorithms.getNameByValue(value) != null) { "Unsupported COSE algorithm $value" }
-            CoseAlgorithm(value)
-        }
-
-        operator fun invoke(name: String): Result<CoseAlgorithm> = runCatching {
-            val value = COSEAlgorithms.getValueByName(name)
-            require(value != 0) { "Unsupported COSE algorithm $name" }
-            CoseAlgorithm(value)
-        }
-    }
-}
-
-@JvmInline
-value class CoseCurve private constructor(val value: Int) {
-
-    fun name(): String =
-        checkNotNull(COSEEllipticCurves.getNameByValue(value)) { "Cannot find name for COSE Curve $value" }
-
-    companion object {
-
-        val P_256 = CoseCurve(COSEEllipticCurves.P_256)
-        val P_384 = CoseCurve(COSEEllipticCurves.P_384)
-        val P_521 = CoseCurve(COSEEllipticCurves.P_521)
-
-        operator fun invoke(value: Int): Result<CoseCurve> = runCatching {
-            require(COSEEllipticCurves.getNameByValue(value) != null) { "Unsupported COSE Curve $value" }
-            CoseCurve(value)
-        }
-
-        operator fun invoke(name: String): Result<CoseCurve> = runCatching {
-            val value = COSEEllipticCurves.getValueByName(name)
-            require(value != 0) { "Unsupported COSE Curve $name" }
-            CoseCurve(value)
-        }
-    }
 }
 
 sealed interface PopSigner {
@@ -607,9 +346,7 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
      * Indicates that the state returned by the authorization server doesn't match the state
      * included which was included in the authorization request, during authorization code flow
      */
-    data object InvalidAuthorizationState : CredentialIssuanceError("InvalidAuthorizationState") {
-        private fun readResolve(): Any = InvalidAuthorizationState
-    }
+    class InvalidAuthorizationState : CredentialIssuanceError("InvalidAuthorizationState")
 
     /**
      * Failure when placing Pushed Authorization Request to Authorization Server
@@ -654,58 +391,42 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     /**
      * Invalid access token passed to issuance server
      */
-    data object InvalidToken : CredentialIssuanceError("InvalidToken") {
-        private fun readResolve(): Any = InvalidToken
-    }
+    class InvalidToken : CredentialIssuanceError("InvalidToken")
 
     /**
      * Invalid transaction id passed to issuance server in the context of deferred credential requests
      */
-    data object InvalidTransactionId : CredentialIssuanceError("InvalidTransactionId") {
-        private fun readResolve(): Any = InvalidTransactionId
-    }
+    class InvalidTransactionId : CredentialIssuanceError("InvalidTransactionId")
 
     /**
      * Invalid credential type requested to issuance server
      */
-    data object UnsupportedCredentialType : CredentialIssuanceError("UnsupportedCredentialType") {
-        private fun readResolve(): Any = UnsupportedCredentialType
-    }
+    class UnsupportedCredentialType : CredentialIssuanceError("UnsupportedCredentialType")
 
     /**
      * Un-supported credential type requested to issuance server
      */
-    data object UnsupportedCredentialFormat : CredentialIssuanceError("UnsupportedCredentialFormat") {
-        private fun readResolve(): Any = UnsupportedCredentialFormat
-    }
+    class UnsupportedCredentialFormat : CredentialIssuanceError("UnsupportedCredentialFormat")
 
     /**
      * Invalid encryption parameters passed to issuance server
      */
-    data object InvalidEncryptionParameters : CredentialIssuanceError("InvalidEncryptionParameters") {
-        private fun readResolve(): Any = InvalidEncryptionParameters
-    }
+    class InvalidEncryptionParameters : CredentialIssuanceError("InvalidEncryptionParameters")
 
     /**
      * Issuance server does not support batch credential requests
      */
-    data object IssuerDoesNotSupportBatchIssuance : CredentialIssuanceError("IssuerDoesNotSupportBatchIssuance") {
-        private fun readResolve(): Any = IssuerDoesNotSupportBatchIssuance
-    }
+    class IssuerDoesNotSupportBatchIssuance : CredentialIssuanceError("IssuerDoesNotSupportBatchIssuance")
 
     /**
      * Issuance server does not support deferred credential issuance
      */
-    data object IssuerDoesNotSupportDeferredIssuance : CredentialIssuanceError("IssuerDoesNotSupportDeferredIssuance") {
-        private fun readResolve(): Any = IssuerDoesNotSupportDeferredIssuance
-    }
+    class IssuerDoesNotSupportDeferredIssuance : CredentialIssuanceError("IssuerDoesNotSupportDeferredIssuance")
 
     /**
      * Issuance server does not support notifications
      */
-    data object IssuerDoesNotSupportNotifications : CredentialIssuanceError("IssuerDoesNotSupportNotifications") {
-        private fun readResolve(): Any = IssuerDoesNotSupportNotifications
-    }
+    class IssuerDoesNotSupportNotifications : CredentialIssuanceError("IssuerDoesNotSupportNotifications")
 
     /**
      * Generic failure during issuance request
@@ -735,40 +456,30 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         /**
          * Binding method specified is not supported from issuer server
          */
-        data object CryptographicSuiteNotSupported : ProofGenerationError("BindingMethodNotSupported") {
-            private fun readResolve(): Any = CryptographicSuiteNotSupported
-        }
+        class CryptographicSuiteNotSupported : ProofGenerationError("BindingMethodNotSupported")
 
         /**
          * Cryptographic binding method is not supported from the issuance server for a specific credential
          */
-        data object CryptographicBindingMethodNotSupported :
-            ProofGenerationError("CryptographicBindingMethodNotSupported") {
-            private fun readResolve(): Any = CryptographicBindingMethodNotSupported
-        }
+        class CryptographicBindingMethodNotSupported :
+            ProofGenerationError("CryptographicBindingMethodNotSupported")
 
         /**
          * Proof type provided for specific credential is not supported from issuance server
          */
-        data object ProofTypeNotSupported : ProofGenerationError("ProofTypeNotSupported") {
-            private fun readResolve(): Any = ProofTypeNotSupported
-        }
+        class ProofTypeNotSupported : ProofGenerationError("ProofTypeNotSupported")
 
         /**
          * Proof type signing algorithm provided for specific credential is not supported from issuance server
          */
-        data object ProofTypeSigningAlgorithmNotSupported :
-            ProofGenerationError("ProofTypeSigningAlgorithmNotSupported") {
-            private fun readResolve(): Any = ProofTypeSigningAlgorithmNotSupported
-        }
+        class ProofTypeSigningAlgorithmNotSupported :
+            ProofGenerationError("ProofTypeSigningAlgorithmNotSupported")
 
         /**
          * Proof type curve provided for specific credential is not supported from issuance server
          */
-        data object ProofTypeSigningCurveNotSupported :
-            ProofGenerationError("ProofTypeSigningCurveNotSupported") {
-            private fun readResolve(): Any = ProofTypeSigningCurveNotSupported
-        }
+        class ProofTypeSigningCurveNotSupported :
+            ProofGenerationError("ProofTypeSigningCurveNotSupported")
     }
 
     /**
@@ -779,52 +490,40 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         /**
          * Wallet requires Credential Response encryption, but it is not supported by the issuance server.
          */
-        data object ResponseEncryptionRequiredByWalletButNotSupportedByIssuer :
-            ResponseEncryptionError("ResponseEncryptionRequiredByWalletButNotSupportedByIssuer") {
-            private fun readResolve(): Any = ResponseEncryptionRequiredByWalletButNotSupportedByIssuer
-        }
+        class ResponseEncryptionRequiredByWalletButNotSupportedByIssuer :
+            ResponseEncryptionError("ResponseEncryptionRequiredByWalletButNotSupportedByIssuer")
 
         /**
          * Response encryption algorithm specified in request is not supported from issuance server
          */
-        data object ResponseEncryptionAlgorithmNotSupportedByIssuer :
-            ResponseEncryptionError("ResponseEncryptionAlgorithmNotSupportedByIssuer") {
-            private fun readResolve(): Any = ResponseEncryptionAlgorithmNotSupportedByIssuer
-        }
+        class ResponseEncryptionAlgorithmNotSupportedByIssuer :
+            ResponseEncryptionError("ResponseEncryptionAlgorithmNotSupportedByIssuer")
 
         /**
          * Response encryption method specified in request is not supported from issuance server
          */
-        data object ResponseEncryptionMethodNotSupportedByIssuer :
-            ResponseEncryptionError("ResponseEncryptionMethodNotSupportedByIssuer") {
-            private fun readResolve(): Any = ResponseEncryptionMethodNotSupportedByIssuer
-        }
+        class ResponseEncryptionMethodNotSupportedByIssuer :
+            ResponseEncryptionError("ResponseEncryptionMethodNotSupportedByIssuer")
 
         /**
          * Issuer enforces encrypted responses but encryption parameters not provided in request
          */
-        data object IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided :
-            ResponseEncryptionError("IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided") {
-            private fun readResolve(): Any = IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided
-        }
+        class IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided :
+            ResponseEncryptionError("IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided")
 
         /**
          * Wallet requires Credential Response encryption, but no crypto material can be generated for the issuance server.
          */
-        data object WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated :
-            ResponseEncryptionError("WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated") {
-            private fun readResolve(): Any = WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated
-        }
+        class WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated :
+            ResponseEncryptionError("WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated")
     }
 
     /**
      * Batch credential request syntax is incorrect. Encryption information included in individual requests while shouldn't
      */
-    data object BatchRequestHasEncryptionSpecInIndividualRequests : CredentialIssuanceError(
+    class BatchRequestHasEncryptionSpecInIndividualRequests : CredentialIssuanceError(
         "BatchRequestContainsEncryptionOnIndividualRequest",
-    ) {
-        private fun readResolve(): Any = BatchRequestHasEncryptionSpecInIndividualRequests
-    }
+    )
 
     /**
      * Wrong content-type of encrypted response. Content-type of encrypted responses must be application/jwt

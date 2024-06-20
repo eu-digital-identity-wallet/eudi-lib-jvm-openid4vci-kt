@@ -16,38 +16,3 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
-
-/**
- * An implementation of the [QueryForDeferredCredential]
- * that can refresh the access token, if needed, using [RefreshAccessToken]
- */
-internal class QueryForDeferredCredentialImpl(
-    private val refreshAccessToken: RefreshAccessToken,
-    private val deferredEndPointClient: DeferredEndPointClient,
-    private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-) : QueryForDeferredCredential {
-
-    override suspend fun AuthorizedRequest.queryForDeferredCredential(
-        deferredCredential: IssuedCredential.Deferred,
-    ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> = runCatching {
-        val refreshed = refreshIfNeeded(this)
-        val outcome = placeDeferredCredentialRequest(refreshed, deferredCredential)
-        refreshed to outcome
-    }
-
-    private suspend fun refreshIfNeeded(authorizedRequest: AuthorizedRequest): AuthorizedRequest =
-        with(refreshAccessToken) {
-            authorizedRequest.refreshIfNeeded().getOrThrow()
-        }
-
-    private suspend fun placeDeferredCredentialRequest(
-        authorizedRequest: AuthorizedRequest,
-        deferredCredential: IssuedCredential.Deferred,
-    ): DeferredCredentialQueryOutcome =
-        deferredEndPointClient.placeDeferredCredentialRequest(
-            authorizedRequest.accessToken,
-            deferredCredential,
-            responseEncryptionSpec,
-        ).getOrThrow()
-}

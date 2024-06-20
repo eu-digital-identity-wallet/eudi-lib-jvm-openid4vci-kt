@@ -83,7 +83,7 @@ internal class AuthorizeIssuanceImpl(
         serverState: String,
     ): Result<AuthorizedRequest> =
         runCatching {
-            ensure(serverState == state) { InvalidAuthorizationState }
+            ensure(serverState == state) { InvalidAuthorizationState() }
             val tokenResponse =
                 tokenEndpointClient.requestAccessTokenAuthFlow(authorizationCode, pkceVerifier).getOrThrow()
             authorizedRequest(credentialOffer, tokenResponse)

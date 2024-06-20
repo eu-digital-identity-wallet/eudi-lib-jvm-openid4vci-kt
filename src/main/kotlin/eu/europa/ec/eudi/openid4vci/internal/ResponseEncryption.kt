@@ -27,10 +27,10 @@ internal fun responseEncryptionSpec(
         supportedAlgorithmsAndMethods: SupportedEncryptionAlgorithmsAndMethods,
     ) {
         ensure(algorithm in supportedAlgorithmsAndMethods.algorithms) {
-            ResponseEncryptionAlgorithmNotSupportedByIssuer
+            ResponseEncryptionAlgorithmNotSupportedByIssuer()
         }
         ensure(encryptionMethod in supportedAlgorithmsAndMethods.encryptionMethods) {
-            ResponseEncryptionMethodNotSupportedByIssuer
+            ResponseEncryptionMethodNotSupportedByIssuer()
         }
     }
 
@@ -40,7 +40,7 @@ internal fun responseEncryptionSpec(
             // In case Wallet requires Credential Response encryption, fail.
             when (config.credentialResponseEncryptionPolicy) {
                 CredentialResponseEncryptionPolicy.SUPPORTED -> null
-                CredentialResponseEncryptionPolicy.REQUIRED -> throw ResponseEncryptionRequiredByWalletButNotSupportedByIssuer
+                CredentialResponseEncryptionPolicy.REQUIRED -> throw ResponseEncryptionRequiredByWalletButNotSupportedByIssuer()
             }
 
         is CredentialResponseEncryption.SupportedNotRequired -> {
@@ -60,7 +60,7 @@ internal fun responseEncryptionSpec(
 
                 CredentialResponseEncryptionPolicy.REQUIRED -> {
                     ensureNotNull(maybeSpec) {
-                        WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated
+                        WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated()
                     }
                 }
             }
@@ -73,7 +73,7 @@ internal fun responseEncryptionSpec(
             val supportedAlgorithmsAndMethods = encryption.encryptionAlgorithmsAndMethods
             val maybeSpec = responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)
                 ?.apply { validate(supportedAlgorithmsAndMethods) }
-            ensureNotNull(maybeSpec) { IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided }
+            ensureNotNull(maybeSpec) { IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided() }
         }
     }
 }

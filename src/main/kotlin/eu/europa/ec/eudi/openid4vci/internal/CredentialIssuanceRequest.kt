@@ -47,7 +47,7 @@ internal sealed interface CredentialIssuanceRequest {
     ) : CredentialIssuanceRequest {
         init {
             ensure(credentialRequests.all { it.encryption == null }) {
-                BatchRequestHasEncryptionSpecInIndividualRequests
+                BatchRequestHasEncryptionSpecInIndividualRequests()
             }
         }
     }

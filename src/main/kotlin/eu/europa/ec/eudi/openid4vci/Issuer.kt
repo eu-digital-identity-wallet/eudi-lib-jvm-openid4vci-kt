@@ -131,7 +131,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                     else -> {
                         val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
                         val deferredEndPointClient = DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, ktorHttpClientFactory)
-                        QueryForDeferredCredentialImpl(refreshAccessToken, deferredEndPointClient, responseEncryptionSpec)
+                        QueryForDeferredCredential(refreshAccessToken, deferredEndPointClient, responseEncryptionSpec)
                     }
                 }
 
