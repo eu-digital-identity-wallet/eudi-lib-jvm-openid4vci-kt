@@ -16,7 +16,9 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceServerClient
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance
+import eu.europa.ec.eudi.openid4vci.internal.http.BatchEndPointClient
+import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
 
 /**
  * Models a response of the issuer to a successful issuance request.
@@ -35,7 +37,8 @@ internal data class CredentialIssuanceResponse(
 internal class RequestIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     private val config: OpenId4VCIConfig,
-    private val issuanceServerClient: IssuanceServerClient,
+    private val credentialEndpointClient: CredentialEndpointClient,
+    private val batchEndPointClient: BatchEndPointClient?,
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ) : RequestIssuance {
 
@@ -178,14 +181,15 @@ internal class RequestIssuanceImpl(
             submitRequestFromError(error) ?: throw error
         return when (val credentialRequest = issuanceRequestSupplier()) {
             is CredentialIssuanceRequest.SingleRequest -> {
-                issuanceServerClient.placeIssuanceRequest(token, credentialRequest).fold(
+                credentialEndpointClient.placeIssuanceRequest(token, credentialRequest).fold(
                     onSuccess = { SubmissionOutcome.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
                 )
             }
 
             is CredentialIssuanceRequest.BatchRequest -> {
-                issuanceServerClient.placeBatchIssuanceRequest(token, credentialRequest).fold(
+                ensureNotNull(batchEndPointClient) { IssuerDoesNotSupportBatchIssuance }
+                batchEndPointClient.placeBatchIssuanceRequest(token, credentialRequest).fold(
                     onSuccess = { SubmissionOutcome.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
                 )

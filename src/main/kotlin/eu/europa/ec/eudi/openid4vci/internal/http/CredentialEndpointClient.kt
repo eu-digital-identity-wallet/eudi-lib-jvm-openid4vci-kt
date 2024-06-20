@@ -29,10 +29,10 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 
-internal class IssuanceServerClient(
-    private val issuerMetadata: CredentialIssuerMetadata,
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
+internal class CredentialEndpointClient(
+    private val credentialEndpoint: CredentialIssuerEndpoint,
     private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
 
     /**
@@ -47,7 +47,7 @@ internal class IssuanceServerClient(
         request: CredentialIssuanceRequest.SingleRequest,
     ): Result<CredentialIssuanceResponse> = runCatching {
         ktorHttpClientFactory().use { client ->
-            val url = issuerMetadata.credentialEndpoint.value.value
+            val url = credentialEndpoint.value.value
             val response = client.post(url) {
                 bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
@@ -66,7 +66,13 @@ internal class IssuanceServerClient(
             }
         }
     }
+}
 
+internal class BatchEndPointClient(
+    private val batchCredentialEndpoint: CredentialIssuerEndpoint,
+    private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val ktorHttpClientFactory: KtorHttpClientFactory,
+) {
     /**
      * Method that submits a request to credential issuer for the batch issuance of credentials.
      *
@@ -78,9 +84,8 @@ internal class IssuanceServerClient(
         accessToken: AccessToken,
         request: CredentialIssuanceRequest.BatchRequest,
     ): Result<CredentialIssuanceResponse> = runCatching {
-        ensureNotNull(issuerMetadata.batchCredentialEndpoint) { IssuerDoesNotSupportBatchIssuance }
         ktorHttpClientFactory().use { client ->
-            val url = issuerMetadata.batchCredentialEndpoint.value.value
+            val url = batchCredentialEndpoint.value.value
             val response = client.post(url) {
                 bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)

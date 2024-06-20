@@ -83,11 +83,6 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                     oauthServerMetadata = credentialOffer.authorizationServerMetadata,
                 ).getOrThrow()
             }
-            val issuanceServerClient = IssuanceServerClient(
-                credentialOffer.credentialIssuerMetadata,
-                ktorHttpClientFactory,
-                dPoPJwtFactory,
-            )
 
             val notificationEndPointClient = credentialOffer.credentialIssuerMetadata.notificationEndpoint?.let {
                 NotificationEndPointClient(it, ktorHttpClientFactory, dPoPJwtFactory)
@@ -114,12 +109,24 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             )
             val responseEncryptionSpec =
                 responseEncryptionSpec(credentialOffer, config, responseEncryptionSpecFactory).getOrThrow()
-            val requestIssuance = RequestIssuanceImpl(
-                credentialOffer,
-                config,
-                issuanceServerClient,
-                responseEncryptionSpec,
-            )
+
+            val requestIssuance = run {
+                val credentialEndpointClient = CredentialEndpointClient(
+                    credentialOffer.credentialIssuerMetadata.credentialEndpoint,
+                    dPoPJwtFactory,
+                    ktorHttpClientFactory,
+                )
+                val batchEndPointClient = credentialOffer.credentialIssuerMetadata.batchCredentialEndpoint?.let {
+                    BatchEndPointClient(it, dPoPJwtFactory, ktorHttpClientFactory)
+                }
+                RequestIssuanceImpl(
+                    credentialOffer,
+                    config,
+                    credentialEndpointClient,
+                    batchEndPointClient,
+                    responseEncryptionSpec,
+                )
+            }
             val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
 
             val queryForDeferredCredential =
