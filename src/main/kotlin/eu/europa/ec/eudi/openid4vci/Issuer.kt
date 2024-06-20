@@ -102,7 +102,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
             val authorizeIssuance = AuthorizeIssuanceImpl(
                 credentialOffer,
                 config,
-                authorizationServerClient
+                authorizationServerClient,
             )
             val responseEncryptionSpec =
                 responseEncryptionSpec(credentialOffer, config, responseEncryptionSpecFactory).getOrThrow()

@@ -28,17 +28,14 @@ internal class QueryForDeferredCredentialImpl(
     override suspend fun AuthorizedRequest.queryForDeferredCredential(
         deferredCredential: IssuedCredential.Deferred,
     ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> = runCatching {
-
         val outcome = issuanceServerClient.placeDeferredCredentialRequest(
             accessToken,
             deferredCredential,
-            responseEncryptionSpec
+            responseEncryptionSpec,
         ).getOrThrow()
 
         this to outcome
     }
-
-
 
     companion object {
 
@@ -57,12 +54,12 @@ internal class QueryForDeferredCredentialImpl(
 
 private class RefreshTokenIfNeededAndQueryForDeferredCredential(
     private val refreshAccessToken: RefreshAccessToken,
-    private val proxy: QueryForDeferredCredential
+    private val proxy: QueryForDeferredCredential,
 ) : QueryForDeferredCredential {
 
     override suspend fun AuthorizedRequest.queryForDeferredCredential(
-        deferredCredential: IssuedCredential.Deferred
-    ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> = runCatching{
+        deferredCredential: IssuedCredential.Deferred,
+    ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> = runCatching {
         val refreshed = refreshAccessToken.refreshIfNeeded(this).getOrThrow()
         with(proxy) {
             refreshed.queryForDeferredCredential(deferredCredential).getOrThrow()

@@ -105,9 +105,9 @@ suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(
     env: ENV,
     enableHttpLogging: Boolean = false,
 ): AuthorizedRequest
-        where
-        ENV : HasTestUser<USER>,
-        ENV : CanAuthorizeIssuance<USER> =
+    where
+          ENV : HasTestUser<USER>,
+          ENV : CanAuthorizeIssuance<USER> =
     coroutineScope {
         val authorizationRequestPrepared = prepareAuthorizationRequest(walletState = null).getOrThrow()
         with(authorizationRequestPrepared) {
@@ -131,8 +131,8 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
     claimSetToRequest: ClaimSet? = null,
     popSignerPreference: ProofTypeMetaPreference,
 ) where
-        ENV : HasTestUser<USER>,
-        ENV : CanAuthorizeIssuance<USER> =
+      ENV : HasTestUser<USER>,
+      ENV : CanAuthorizeIssuance<USER> =
     coroutineScope {
         val outcome = run {
             val authorizedRequest = authorizeUsingAuthorizationCodeFlow(env, enableHttpLogging)
@@ -227,10 +227,10 @@ suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
     popSignerPreference: ProofTypeMetaPreference = ProofTypeMetaPreference.FavorCWT,
     claimSetToRequest: (CredentialConfiguration) -> ClaimSet? = { null },
 ) where
-        ENV : HasTestUser<USER>,
-        ENV : CanAuthorizeIssuance<USER>,
-        ENV : CanBeUsedWithVciLib,
-        ENV : CanRequestForCredentialOffer<USER> {
+      ENV : HasTestUser<USER>,
+      ENV : CanAuthorizeIssuance<USER>,
+      ENV : CanBeUsedWithVciLib,
+      ENV : CanRequestForCredentialOffer<USER> {
     val credentialOfferUri = requestAuthorizationCodeGrantOffer(credCfgIds = setOf(credCfgId))
     val issuer = assertDoesNotThrow {
         createIssuer(credentialOfferUri.toString(), enableHttpLogging)
@@ -280,9 +280,9 @@ suspend fun <ENV, USER> ENV.requestAuthorizationCodeGrantOffer(
     issuerStateIncluded: Boolean = true,
     credentialOfferEndpoint: String? = null,
 ): URI
-        where
-        ENV : HasTestUser<USER>,
-        ENV : CanRequestForCredentialOffer<USER> {
+    where
+          ENV : HasTestUser<USER>,
+          ENV : CanRequestForCredentialOffer<USER> {
     val form = CredentialOfferForm.authorizationCodeGrant(
         user = testUser,
         credCfgIds,
@@ -301,9 +301,9 @@ suspend fun <ENV, USER> ENV.requestPreAuthorizedCodeGrantOffer(
     txCode: String?,
     credentialOfferEndpoint: String? = null,
 ): URI
-        where
-        ENV : HasTestUser<USER>,
-        ENV : CanRequestForCredentialOffer<USER> {
+    where
+          ENV : HasTestUser<USER>,
+          ENV : CanRequestForCredentialOffer<USER> {
     val form = CredentialOfferForm.preAuthorizedCodeGrant(
         testUser,
         credCfgIds,
@@ -324,7 +324,7 @@ suspend fun <ENV : HasIssuerId> ENV.testMetaDataResolution(
                 t is CredentialIssuerMetadataError -> fail("Credential Issuer Metadata error", cause = t.cause)
                 t is AuthorizationServerMetadataResolutionException -> fail(
                     "Authorization Server Metadata resolution error",
-                    t.cause
+                    t.cause,
                 )
 
                 else -> fail(cause = t)

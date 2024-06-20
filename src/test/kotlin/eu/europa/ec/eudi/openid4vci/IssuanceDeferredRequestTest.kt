@@ -63,7 +63,7 @@ class IssuanceDeferredRequestTest {
             val issuedCredential = secondSubmittedRequest.credentials[0]
             assertIs<IssuedCredential.Deferred>(issuedCredential)
 
-            val requestDeferredIssuance =
+            val (_, requestDeferredIssuance) =
                 authorizedRequest.queryForDeferredCredential(issuedCredential)
                     .getOrThrow()
 
@@ -112,7 +112,7 @@ class IssuanceDeferredRequestTest {
             val issuedCredential = secondSubmittedRequest.credentials[0]
             assertIs<IssuedCredential.Deferred>(issuedCredential)
 
-            val requestDeferredIssuance =
+            val (_, requestDeferredIssuance) =
                 authorizedRequest.queryForDeferredCredential(issuedCredential)
                     .getOrThrow()
 
@@ -180,7 +180,7 @@ class IssuanceDeferredRequestTest {
             val issuedCredential = secondSubmittedRequest.credentials[0]
             require(issuedCredential is IssuedCredential.Deferred)
 
-            val requestDeferredIssuance = authorizedRequest.queryForDeferredCredential(issuedCredential)
+            val (_, requestDeferredIssuance) = authorizedRequest.queryForDeferredCredential(issuedCredential)
                 .getOrThrow()
             assertIs<DeferredCredentialQueryOutcome.Issued>(requestDeferredIssuance)
         }

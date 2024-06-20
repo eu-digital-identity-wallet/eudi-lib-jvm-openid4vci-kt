@@ -25,7 +25,6 @@ import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
 import java.security.Signature
-import java.time.Clock
 import java.time.Instant
 
 /**
@@ -412,8 +411,6 @@ fun interface NotifyIssuer {
     ): Result<Unit>
 }
 
-
-
 @JvmInline
 value class CoseAlgorithm private constructor(val value: Int) {
 
@@ -586,7 +583,7 @@ interface ProofSigner : JWSSigner {
  * that the wallet expects in the response of its issuance request.
  */
 typealias ResponseEncryptionSpecFactory =
-            (SupportedEncryptionAlgorithmsAndMethods, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec?
+    (SupportedEncryptionAlgorithmsAndMethods, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec?
 
 /**
  * Errors that can happen in the process of issuance process

@@ -577,9 +577,9 @@ class IssuanceEncryptedResponsesTest {
             val deferredCredential = submittedRequest.credentials[0]
             assertIs<IssuedCredential.Deferred>(deferredCredential)
 
-            val response = authorizedRequest.queryForDeferredCredential(deferredCredential).getOrThrow()
+            val (_, οutcome) = authorizedRequest.queryForDeferredCredential(deferredCredential).getOrThrow()
 
-            assertIs<DeferredCredentialQueryOutcome.Issued>(response)
+            assertIs<DeferredCredentialQueryOutcome.Issued>(οutcome)
         }
     }
 }
