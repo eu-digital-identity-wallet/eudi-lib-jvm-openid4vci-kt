@@ -178,7 +178,7 @@ internal class AuthorizationServerClient(
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
      * @see <a href="https://www.rfc-editor.org/rfc/rfc9126.html">RFC9126</a>
      */
-    suspend fun submitPushedAuthorizationRequest(
+    private suspend fun submitPushedAuthorizationRequest(
         scopes: List<Scope>,
         credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
         state: String,
@@ -213,7 +213,7 @@ internal class AuthorizationServerClient(
         response.authorizationCodeUrlOrFail(clientID, codeVerifier, state)
     }
 
-    fun authorizationRequestUrl(
+    private fun authorizationRequestUrl(
         credentialsScopes: List<Scope>,
         credentialsAuthorizationDetails: List<CredentialConfigurationIdentifier>,
         state: String,
