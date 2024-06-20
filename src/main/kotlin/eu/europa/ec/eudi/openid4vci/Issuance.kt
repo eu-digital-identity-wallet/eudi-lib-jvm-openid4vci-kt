@@ -122,10 +122,16 @@ sealed interface IssuedCredential : java.io.Serializable {
     ) : IssuedCredential
 }
 
+@Deprecated(
+    message = "Deprecated and will be removed in a future release",
+    replaceWith = ReplaceWith("SubmissionOutcome"),
+)
+typealias SubmittedRequest = SubmissionOutcome
+
 /**
  * Sealed hierarchy of states describing the state of an issuance request submitted to a credential issuer.
  */
-sealed interface SubmittedRequest : java.io.Serializable {
+sealed interface SubmissionOutcome : java.io.Serializable {
 
     /**
      * State that denotes the successful submission of an issuance request
@@ -137,12 +143,12 @@ sealed interface SubmittedRequest : java.io.Serializable {
     data class Success(
         val credentials: List<IssuedCredential>,
         val cNonce: CNonce?,
-    ) : SubmittedRequest
+    ) : SubmissionOutcome
 
     /**
      * Sealed hierarchy of erroneous credential issuance request
      */
-    sealed interface Errored : SubmittedRequest
+    sealed interface Errored : SubmissionOutcome
 
     /**
      * State that denotes that the credential issuance request has failed
@@ -265,7 +271,7 @@ interface RequestIssuance {
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
-    ): Result<SubmittedRequest>
+    ): Result<SubmissionOutcome>
 
     /**
      *  Requests the issuance of a single credential having an [AuthorizedRequest.ProofRequired] authorization. In this
@@ -278,7 +284,7 @@ interface RequestIssuance {
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
         proofSigner: PopSigner,
-    ): Result<SubmittedRequest>
+    ): Result<SubmissionOutcome>
 
     /**
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.NoProofRequired] authorization.
@@ -289,7 +295,7 @@ interface RequestIssuance {
      */
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<IssuanceRequestPayload>,
-    ): Result<SubmittedRequest>
+    ): Result<SubmissionOutcome>
 
     /**
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
@@ -299,7 +305,7 @@ interface RequestIssuance {
      */
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner>>,
-    ): Result<SubmittedRequest>
+    ): Result<SubmissionOutcome>
 
     /**
      * Special purpose operation to handle the case an 'invalid_proof' error response was received from issuer with

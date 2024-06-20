@@ -105,9 +105,9 @@ private suspend fun Issuer.submitProvidingNoProofs(
 ): String {
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
     return when (val submittedRequest = authorized.requestSingle(requestPayload).getOrThrow()) {
-        is SubmittedRequest.Success -> handleSuccess(authorized, submittedRequest)
-        is SubmittedRequest.Failed -> throw submittedRequest.error
-        is SubmittedRequest.InvalidProof -> {
+        is SubmissionOutcome.Success -> handleSuccess(authorized, submittedRequest)
+        is SubmissionOutcome.Failed -> throw submittedRequest.error
+        is SubmissionOutcome.InvalidProof -> {
             this@submitProvidingNoProofs.submitProvidingProofs(
                 authorized.handleInvalidProof(submittedRequest.cNonce),
                 credentialConfigurationId,
@@ -126,9 +126,9 @@ private suspend fun Issuer.submitProvidingProofs(
     val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
 
     return when (submittedRequest) {
-        is SubmittedRequest.Success -> handleSuccess(authorized, submittedRequest)
-        is SubmittedRequest.Failed -> throw submittedRequest.error
-        is SubmittedRequest.InvalidProof -> throw IllegalStateException(
+        is SubmissionOutcome.Success -> handleSuccess(authorized, submittedRequest)
+        is SubmissionOutcome.Failed -> throw submittedRequest.error
+        is SubmissionOutcome.InvalidProof -> throw IllegalStateException(
             "Although providing a proof with c_nonce the proof is still invalid",
         )
     }
@@ -136,7 +136,7 @@ private suspend fun Issuer.submitProvidingProofs(
 
 private suspend fun Issuer.handleSuccess(
     authorizedRequest: AuthorizedRequest,
-    submittedRequest: SubmittedRequest.Success,
+    submittedRequest: SubmissionOutcome.Success,
 ) =
     when (val issuedCredential = submittedRequest.credentials.first()) {
         is IssuedCredential.Issued -> issuedCredential.credential

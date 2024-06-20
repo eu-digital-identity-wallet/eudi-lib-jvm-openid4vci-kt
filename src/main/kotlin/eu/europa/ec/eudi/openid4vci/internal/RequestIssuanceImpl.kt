@@ -178,20 +178,20 @@ internal class RequestIssuanceImpl(
     private suspend fun placeIssuanceRequest(
         token: AccessToken,
         issuanceRequestSupplier: suspend () -> CredentialIssuanceRequest,
-    ): SubmittedRequest {
-        fun handleIssuanceFailure(error: Throwable): SubmittedRequest.Errored =
+    ): SubmissionOutcome {
+        fun handleIssuanceFailure(error: Throwable): SubmissionOutcome.Errored =
             submitRequestFromError(error) ?: throw error
         return when (val credentialRequest = issuanceRequestSupplier()) {
             is CredentialIssuanceRequest.SingleRequest -> {
                 issuanceServerClient.placeIssuanceRequest(token, credentialRequest).fold(
-                    onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
+                    onSuccess = { SubmissionOutcome.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
                 )
             }
 
             is CredentialIssuanceRequest.BatchRequest -> {
                 issuanceServerClient.placeBatchIssuanceRequest(token, credentialRequest).fold(
-                    onSuccess = { SubmittedRequest.Success(it.credentials, it.cNonce) },
+                    onSuccess = { SubmissionOutcome.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
                 )
             }
@@ -199,10 +199,10 @@ internal class RequestIssuanceImpl(
     }
 }
 
-private fun submitRequestFromError(error: Throwable): SubmittedRequest.Errored? = when (error) {
+private fun submitRequestFromError(error: Throwable): SubmissionOutcome.Errored? = when (error) {
     is CredentialIssuanceError.InvalidProof ->
-        SubmittedRequest.InvalidProof(CNonce(error.cNonce, error.cNonceExpiresIn), error.errorDescription)
+        SubmissionOutcome.InvalidProof(CNonce(error.cNonce, error.cNonceExpiresIn), error.errorDescription)
 
-    is CredentialIssuanceError -> SubmittedRequest.Failed(error)
+    is CredentialIssuanceError -> SubmissionOutcome.Failed(error)
     else -> null
 }

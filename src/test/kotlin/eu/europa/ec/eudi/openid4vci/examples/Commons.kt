@@ -86,7 +86,7 @@ suspend fun Issuer.submitCredentialRequest(
         credentialOffer.credentialConfigurationIdentifiers.first(),
     claimSet: ClaimSet? = null,
     popSignerPreference: ProofTypeMetaPreference,
-): SubmittedRequest {
+): SubmissionOutcome {
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
     return when (authorizedRequest) {
         is AuthorizedRequest.ProofRequired -> {
@@ -138,7 +138,7 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
             val outcome = submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest, popSignerPreference)
             // If authorization server doesn't provide c_nonce in its token response
             // there is the chance that provides c_nonce via credential endpoint
-            if (authorizedRequest is AuthorizedRequest.NoProofRequired && outcome is SubmittedRequest.InvalidProof) {
+            if (authorizedRequest is AuthorizedRequest.NoProofRequired && outcome is SubmissionOutcome.InvalidProof) {
                 val proofRequired = authorizedRequest.handleInvalidProof(outcome.cNonce)
                 submitCredentialRequest(proofRequired, credCfgId, claimSetToRequest, popSignerPreference)
             } else outcome
@@ -157,34 +157,34 @@ suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
     val (authorized, outcome) = run {
         val authorizedRequest = authorizeWithPreAuthorizationCode(txCode).getOrThrow()
         val outcome = submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest, popSignerPreference)
-        // If authorization server doesn't provide c_nonce in its token response
+        // If authorization server doesn't provide c_nonce in its token response,
         // there is the chance that provides c_nonce via credential endpoint
-        if (authorizedRequest is AuthorizedRequest.NoProofRequired && outcome is SubmittedRequest.InvalidProof) {
+        if (authorizedRequest is AuthorizedRequest.NoProofRequired && outcome is SubmissionOutcome.InvalidProof) {
             val proofRequired = authorizedRequest.handleInvalidProof(outcome.cNonce)
             proofRequired to submitCredentialRequest(proofRequired, credCfgId, claimSetToRequest, popSignerPreference)
         } else authorizedRequest to outcome
     }
 
     val issuedCredentials = ensureIssued(outcome)
-    check(outcome is SubmittedRequest.Success)
+    check(outcome is SubmissionOutcome.Success)
     issuedCredentials.filterIsInstance<IssuedCredential.Issued>().forEach { println(it) }
     issuedCredentials.filterIsInstance<IssuedCredential.Deferred>().forEach { deferred ->
         handleDeferred(authorized, deferred).also { println(it) }
     }
 }
 
-fun ensureIssued(outcome: SubmittedRequest): List<IssuedCredential> =
+fun ensureIssued(outcome: SubmissionOutcome): List<IssuedCredential> =
     when (outcome) {
-        is SubmittedRequest.Failed -> {
+        is SubmissionOutcome.Failed -> {
             fail("Issuer rejected request. Reason :${outcome.error.message}")
         }
 
-        is SubmittedRequest.InvalidProof -> {
+        is SubmissionOutcome.InvalidProof -> {
             val (_, error) = outcome
             fail("Issuer rejected proof. Reason: ${error ?: "n/a"}")
         }
 
-        is SubmittedRequest.Success -> {
+        is SubmissionOutcome.Success -> {
             outcome.credentials
         }
     }
