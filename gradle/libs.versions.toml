@@ -1,6 +1,6 @@
 [versions]
 coroutines = "1.7.3"
-dependency-check = "9.1.0"
+dependency-check = "9.2.0"
 sonarqube = "5.0.0.4638"
 kotlin = "1.9.21"
 spotless = "6.25.0"
@@ -11,7 +11,7 @@ cbor = "0.9"
 java = "17"
 ktlint = "0.50.0"
 dokka = "1.9.20"
-maven-publish = "0.28.0"
+maven-publish = "0.29.0"
 logback = "1.5.6"
 authlete-cbor = "1.18"
 
