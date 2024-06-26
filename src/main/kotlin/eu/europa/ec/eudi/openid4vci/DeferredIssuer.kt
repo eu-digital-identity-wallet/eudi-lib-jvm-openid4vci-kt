@@ -30,7 +30,6 @@ data class IssuanceStoredContext(
     val deferredEndpoint: CredentialIssuerEndpoint,
     val tokenEndpoint: URL,
     val dPoPSigner: PopSigner.Jwt? = null,
-    val authorizationServerSupportedDPoPAlgorithms: List<JWSAlgorithm> = emptyList(),
     val responseEncryptionSpec: IssuanceResponseEncryptionSpec? = null,
 ) : Serializable
 
@@ -49,11 +48,10 @@ interface DeferredIssuer : QueryForDeferredCredential {
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): Result<DeferredIssuer> = runCatching {
             val dPoPJwtFactory = storedContext.dPoPSigner?.let { signer ->
-                DPoPJwtFactory.create(
+                DPoPJwtFactory(
                     signer = signer,
                     clock = clock,
-                    supportedDPopAlgorithms = storedContext.authorizationServerSupportedDPoPAlgorithms,
-                ).getOrThrow()
+                )
             }
 
             val tokenEndpointClient = TokenEndpointClient(
