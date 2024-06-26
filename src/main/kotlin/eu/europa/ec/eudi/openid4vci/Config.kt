@@ -45,7 +45,7 @@ data class OpenId4VCIConfig(
     val dPoPSigner: PopSigner.Jwt? = null,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
-) {
+) : java.io.Serializable {
 
     init {
         if (null != dPoPSigner) {
@@ -94,7 +94,7 @@ enum class CredentialResponseEncryptionPolicy {
 data class KeyGenerationConfig(
     val ecConfig: EcConfig?,
     val rsaConfig: RsaConfig?,
-) {
+) : java.io.Serializable {
     companion object {
         operator fun invoke(
             ecKeyCurve: Curve,
@@ -111,7 +111,7 @@ data class KeyGenerationConfig(
 data class RsaConfig(
     val rcaKeySize: Int,
     val supportedJWEAlgorithms: List<JWEAlgorithm> = JWEAlgorithm.Family.RSA.toList(),
-) {
+) : java.io.Serializable {
     init {
         require(JWEAlgorithm.Family.RSA.containsAll(supportedJWEAlgorithms)) {
             "Provided algorithms that are not part of RSA family"
@@ -122,7 +122,7 @@ data class RsaConfig(
 data class EcConfig(
     val ecKeyCurve: Curve,
     val supportedJWEAlgorithms: List<JWEAlgorithm> = JWEAlgorithm.Family.ECDH_ES.toList(),
-) {
+) : java.io.Serializable {
     init {
         require(JWEAlgorithm.Family.ECDH_ES.containsAll(supportedJWEAlgorithms)) {
             "Provided algorithms that are not part of ECDH_ES family"

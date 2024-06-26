@@ -217,7 +217,7 @@ typealias BindingKey = JwtBindingKey
  * A sealed hierarchy that defines the different ways of including a PUB key
  * in a JWT Proof
  */
-sealed interface JwtBindingKey {
+sealed interface JwtBindingKey : java.io.Serializable {
 
     /**
      * A JWK biding key
@@ -252,7 +252,7 @@ sealed interface JwtBindingKey {
     }
 }
 
-sealed interface CwtBindingKey {
+sealed interface CwtBindingKey : java.io.Serializable {
 
     @JvmInline
     value class CoseKey(val jwk: JWK) : CwtBindingKey {
