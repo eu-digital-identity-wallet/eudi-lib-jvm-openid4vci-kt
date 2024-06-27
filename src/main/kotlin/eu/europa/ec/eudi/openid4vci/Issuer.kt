@@ -22,9 +22,35 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
+/**
+ * Entry point to the issuance library
+ *
+ * Provides the following capabilities
+ * - [AuthorizeIssuance]
+ * - [RequestIssuance]
+ * - [QueryForDeferredCredential]
+ * - [NotifyIssuer]
+ *
+ * [Issuer] lifecycle is bound to serve a single [Issuer.credentialOffer]
+ *
+ * Typically, one of the factory methods found on the companion object can be used to get an instance of [Issuer].
+ *
+ */
 interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredential, NotifyIssuer {
 
     val credentialOffer: CredentialOffer
+
+    /**
+     * A convenient method for obtaining a [DeferredIssuanceContext], in case of a deferred issuance
+     * that wallet wants to query again at a later time, using [DeferredIssuer].
+     *
+     * Typically, wallet should store this [DeferredIssuanceContext] and [use it][DeferredIssuer] at a later time
+     *
+     * @receiver the state of issuance
+     * @param deferredCredential the transaction id returned by the issuer
+     * @return the context that would be needed to instantiate a [DeferredIssuer]
+     */
+    fun AuthorizedRequest.deferredContext(deferredCredential: IssuedCredential.Deferred): DeferredIssuanceContext
 
     companion object {
 
@@ -113,9 +139,10 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                     dPoPJwtFactory,
                     ktorHttpClientFactory,
                 )
-                val batchEndPointClient = credentialOffer.credentialIssuerMetadata.batchCredentialEndpoint?.let { batchEndPoint ->
-                    BatchEndPointClient(batchEndPoint, dPoPJwtFactory, ktorHttpClientFactory)
-                }
+                val batchEndPointClient =
+                    credentialOffer.credentialIssuerMetadata.batchCredentialEndpoint?.let { batchEndPoint ->
+                        BatchEndPointClient(batchEndPoint, dPoPJwtFactory, ktorHttpClientFactory)
+                    }
                 RequestIssuanceImpl(
                     credentialOffer,
                     config,
@@ -130,7 +157,8 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                     null -> QueryForDeferredCredential.NotSupported
                     else -> {
                         val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
-                        val deferredEndPointClient = DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, ktorHttpClientFactory)
+                        val deferredEndPointClient =
+                            DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, ktorHttpClientFactory)
                         QueryForDeferredCredential(refreshAccessToken, deferredEndPointClient, responseEncryptionSpec)
                     }
                 }
@@ -153,6 +181,31 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 NotifyIssuer by notifyIssuer {
                 override val credentialOffer: CredentialOffer
                     get() = credentialOffer
+
+                override fun AuthorizedRequest.deferredContext(
+                    deferredCredential: IssuedCredential.Deferred,
+                ): DeferredIssuanceContext {
+                    val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
+                    val authorizationServerMetadata = credentialOffer.authorizationServerMetadata
+                    val deferredEndpoint =
+                        checkNotNull(credentialIssuerMetadata.deferredCredentialEndpoint?.value) {
+                            "Missing deferred credential endpoint"
+                        }
+                    val tokenEndpoint = checkNotNull(authorizationServerMetadata.tokenEndpointURI?.toURL()) {
+                        "Missing token endpoint"
+                    }
+                    return DeferredIssuanceContext(
+                        DeferredIssuerConfig(
+                            clientId = config.clientId,
+                            deferredEndpoint = deferredEndpoint,
+                            tokenEndpoint = tokenEndpoint,
+                            dPoPSigner = dPoPJwtFactory?.signer,
+                            responseEncryptionSpec = responseEncryptionSpec,
+                            clock = config.clock,
+                        ),
+                        AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
+                    )
+                }
             }
         }
 

@@ -39,7 +39,7 @@ internal enum class Htm {
  * https://datatracker.ietf.org/doc/rfc9449/
  */
 internal class DPoPJwtFactory(
-    private val signer: PopSigner.Jwt,
+    val signer: PopSigner.Jwt,
     private val jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
     private val clock: Clock,
 ) {
