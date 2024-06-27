@@ -188,7 +188,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                     val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
                     val authorizationServerMetadata = credentialOffer.authorizationServerMetadata
                     val deferredEndpoint =
-                        checkNotNull(credentialIssuerMetadata.deferredCredentialEndpoint?.value?.value) {
+                        checkNotNull(credentialIssuerMetadata.deferredCredentialEndpoint?.value) {
                             "Missing deferred credential endpoint"
                         }
                     val tokenEndpoint = checkNotNull(authorizationServerMetadata.tokenEndpointURI?.toURL()) {

@@ -151,7 +151,7 @@ private suspend fun queryDeferredEndpoint(
     deferredContext: DeferredIssuanceContext,
 ): String {
     var ctx = deferredContext
-    var cred: String? = null
+    var cred: String?
     do {
         val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(ctx = ctx).getOrThrow()
         ctx = newCtx ?: ctx
