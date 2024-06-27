@@ -170,7 +170,11 @@ suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
     check(outcome is SubmissionOutcome.Success)
     issuedCredentials.filterIsInstance<IssuedCredential.Issued>().forEach { println(it) }
     issuedCredentials.filterIsInstance<IssuedCredential.Deferred>().forEach { deferred ->
-        handleDeferred(authorized, deferred).also { println(it) }
+        issuanceLog(
+            "Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
+        )
+        val deferredCtx = authorized.deferredContext(deferred)
+        handleDeferred(deferredCtx).also { println(it) }
     }
 }
 
@@ -190,22 +194,21 @@ fun ensureIssued(outcome: SubmissionOutcome): List<IssuedCredential> =
         }
     }
 
-suspend fun Issuer.handleDeferred(
-    authorized: AuthorizedRequest,
-    deferred: IssuedCredential.Deferred,
+suspend fun handleDeferred(
+    initialContext: DeferredIssuanceContext,
 ): String {
-    issuanceLog(
-        "Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
-    )
-    val (_, outcome) = authorized.queryForDeferredCredential(deferred).getOrThrow()
-    return when (outcome) {
-        is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
-        is DeferredCredentialQueryOutcome.IssuancePending -> throw RuntimeException(
-            "Credential not ready yet. Try after ${outcome.interval}",
-        )
-
-        is DeferredCredentialQueryOutcome.Errored -> throw RuntimeException(outcome.error)
-    }
+    var ctx = initialContext
+    var cred: String?
+    do {
+        val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(ctx = ctx).getOrThrow()
+        ctx = newCtx ?: ctx
+        cred = when (outcome) {
+            is DeferredCredentialQueryOutcome.Errored -> error(outcome.error)
+            is DeferredCredentialQueryOutcome.IssuancePending -> null
+            is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
+        }
+    } while (cred == null)
+    return cred
 }
 
 //

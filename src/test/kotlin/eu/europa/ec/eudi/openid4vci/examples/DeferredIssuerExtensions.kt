@@ -33,16 +33,11 @@ suspend fun DeferredIssuer.Companion.queryForDeferredCredential(
     ctxTO: DeferredIssuanceStoredContextTO,
     recreatePopSigner: ((String) -> PopSigner.Jwt)? = null,
     ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
-): Result<Pair<DeferredIssuanceStoredContextTO?, String?>> = runCatching {
+): Result<Pair<DeferredIssuanceStoredContextTO?, DeferredCredentialQueryOutcome>> = runCatching {
     val ctx = ctxTO.toDeferredIssuanceStoredContext(clock, recreatePopSigner)
     val (newCtx, outcome) = queryForDeferredCredential(ctx, ktorHttpClientFactory).getOrThrow()
-
-    val cred = when (outcome) {
-        is DeferredCredentialQueryOutcome.Errored -> null
-        is DeferredCredentialQueryOutcome.IssuancePending -> null
-        is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
-    }
-    newCtx?.let { DeferredIssuanceStoredContextTO.from(it, ctxTO.dPoPSignerKid) } to cred
+    val newCtxTO = newCtx?.let { DeferredIssuanceStoredContextTO.from(it, ctxTO.dPoPSignerKid) }
+    newCtxTO to outcome
 }
 
 //
