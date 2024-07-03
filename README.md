@@ -152,7 +152,28 @@ Furthermore, all subsequent interactions will use the correct token type (Bearer
 Execution
 
 ```kotlin
-TODO()
+import eu.europa.ec.eudi.openid4vci.*
+
+// Step 1
+val preparedAuthorizationRequest = with(issuer) {
+    prepareAuthorizationRequest().getOrThrow()
+}
+// Step 2
+// Wallet opens mobile's browser and points it to 
+
+// Step 3
+// Wallet has extracted from authorization redirect_uri
+// the code and state parameters
+val (authorizationCode, state) = ... // using url preparedAuthorizationRequest.authorizationCodeURL authenticate via front-channel on authorization server and retrieve authorization code 
+
+// Step 4
+val authorizedRequest =
+     with(issuer) {
+         with(preparedAuthorizationRequest) {
+             authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode),state).getOrThrow()
+         }
+     }
+
 ```
 
 #### Pre-authorized code flow
@@ -183,6 +204,73 @@ Steps:
 **DPoP Access token**
 The same conditions apply as described in [Authorize request via authorization code flow](#authorize-request-via-authorization-code-flow)
 
+Execution
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+val pin : Sting? = ... // Pin retrieved from another channel 
+
+val authorizedRequest =  
+    with(issuer) {
+         authorizeWithPreAuthorizationCode(pin).getOrThrow()
+    }
+```
+
+### Place a credential request
+
+Wallet/caller wants to place a request against the credential issuer
+
+Preconditions
+
+- An instance of the `Issuer` interface has been instantiated
+- [Wallet authorization](#authorize-wallet-for-issuance) has been performed and as a result
+- An instance of `AuthorizedRequest` is available
+- Wallet/Caller has decided for which `credential_configuration_id` - found in the offer - the request will be placed
+- Wallet/Caller has decided which `credential_identifier` - found in the `AuthorizedRequest` - the request will be placed
+- Wallet/Caller has decided if a subset of the clais will be requested or all.
+- Wallet/Caller is ready to provide a suitable Proof signer for JWT or CWT proofs, if applicable
+
+Successful outcome
+An instance of either`
+- SubmissionOutcome.Sucess` This could represent either the issued credential or a transaction_id in case
+of deferred issuance, or
+- `SubmissionOutcome.ProofRequired` indicating that credential issuer requires PoP or PoP provided was not valid
+
+Unsuccessful outcome
+An instance 
+- `SubmissionOutcome.Failed` indication that credential issuer rejected the request, or 
+
+Unexpected error
+Exception will be raised.
+
+Steps
+1. Using the library assemble the request
+2. Using the `Issuer` and `AuthorizedRequest` place the request
+
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+val popSigner: PopSigner? = // JWT or CWT signer,if needed.
+    
+// Step 1
+val request = 
+    IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+
+// Step 2
+val outcome =
+    with(issuer) {
+        when(authorizedRequest) {
+            is AuthorizedRequest.NoProofRequired -> {
+                authorizedRequesgt.requestSingle(request)
+            }
+            is AuthorizedRequest.ProofRequired ->  {
+                requireNotNull(popSigner)
+                authorizedRequest.requestSingle(request, proofSigner)
+            }   
+        }
+    }
+```
 
 ## How to use
 
@@ -238,36 +326,7 @@ A resolved [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Creden
 - The selected authorization server that will authorize the issuance
 - The specific credentials that will be requested
 
-#### Authorize request via Authorization Code Flow
 
-Given an `issuer` that is initialized with a specific credential offer, use [Authorization Code Flow](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-3.4) to authorize an issuance request.
-
-```kotlin
-import eu.europa.ec.eudi.openid4vci.*
-
-with(issuer) {
-    val preparedAuthorizationRequest = prepareAuthorizationRequest().getOrThrow()
-    val authorizationCode: String = ... // using url preparedAuthorizationRequest.authorizationCodeURL authenticate via front-channel on authorization server and retrieve authorization code 
-    val authorizedRequest =
-        preparedAuthorizationRequest.authorizeWithAuthorizationCode(
-            AuthorizationCode(authorizationCode),
-        ).getOrThrow()
-}
-```
-
-#### Authorize request via Pre-Authorization Code Flow
-
-Given an `issuer` that is initialized with a specific credential offer, use [Pre-Authorization Code Flow](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-wg-draft.html#section-3.5) to authorize an issuance request.
-It is expected that the credential offer will contain the pre-authorization code and defines the need to provide a pin or not.
-
-```kotlin
-import eu.europa.ec.eudi.openid4vci.*
-
-with(issuer) {
-    val pin = ... // Pin retrieved from another channel 
-    val authorizedRequest = authorizeWithPreAuthorizationCode(pin).getOrThrow()
-}
-```
 
 #### Request a single credential issuance
 
