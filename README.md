@@ -312,6 +312,23 @@ val newAuthorizedRequest =
     } ?: authorizedRequest
 ```
 
+**Important note**
+
+The ability of the token endpoint of the credential issuer to provide a `c_nonce` is an
+optional feature specified in the OpenId4VCI specification. Possibly, it will be removed.
+
+According to the specification, the wallet must be able to receive a 
+`c_nonce` primarily via the credential issuance response, which is represented by `SubmissionOutcome`
+in the library.
+
+For this reason, it is not uncommon that the first request to the credential issuance endpoint
+will have as an outcome `InvalidProof`. That's typical if credential issuer's token endpoint
+doesn't provide a `c_nonce` and proof is required for the requested credential.
+
+In this case, wallet must re-calculate the `AuthorizedRequest` (in order to include the `c_nonce`)
+and place again the request.
+
+
 ### Query for deferred credential
 
 Wallet/caller wants to query credential issuer for a deferred credential, while still holding
