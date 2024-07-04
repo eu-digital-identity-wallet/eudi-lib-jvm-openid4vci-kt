@@ -177,6 +177,24 @@ interface RequestIssuance {
     ): Result<SubmissionOutcome>
 
     /**
+     * Special purpose operation to handle the case an 'invalid_proof' error response was received from issuer with
+     * fresh c_nonce provided to be used with a request retry.
+     *
+     * @param cNonce    The c_nonce provided from issuer along the 'invalid_proof' error code.
+     * @return The new state of the request.
+     */
+    @Deprecated(
+        message = "Deprecated and will be removed in a future release",
+        replaceWith = ReplaceWith("withCNonce(cNonce)"),
+    )
+    suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
+        cNonce: CNonce,
+    ): AuthorizedRequest.ProofRequired = withCNonce(cNonce)
+}
+
+interface BatchRequestIssuance {
+
+    /**
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.NoProofRequired] authorization.
      *
      *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
@@ -196,21 +214,6 @@ interface RequestIssuance {
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner>>,
     ): Result<SubmissionOutcome>
-
-    /**
-     * Special purpose operation to handle the case an 'invalid_proof' error response was received from issuer with
-     * fresh c_nonce provided to be used with a request retry.
-     *
-     * @param cNonce    The c_nonce provided from issuer along the 'invalid_proof' error code.
-     * @return The new state of the request.
-     */
-    @Deprecated(
-        message = "Deprecated and will be removed in a future release",
-        replaceWith = ReplaceWith("withCNonce(cNonce)"),
-    )
-    suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
-        cNonce: CNonce,
-    ): AuthorizedRequest.ProofRequired = withCNonce(cNonce)
 }
 
 sealed interface PopSigner {

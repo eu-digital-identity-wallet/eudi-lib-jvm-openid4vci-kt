@@ -28,6 +28,7 @@ import kotlinx.coroutines.coroutineScope
  * Provides the following capabilities
  * - [AuthorizeIssuance]
  * - [RequestIssuance]
+ * - [BatchRequestIssuance]
  * - [QueryForDeferredCredential]
  * - [NotifyIssuer]
  *
@@ -36,7 +37,12 @@ import kotlinx.coroutines.coroutineScope
  * Typically, one of the factory methods found on the companion object can be used to get an instance of [Issuer].
  *
  */
-interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredential, NotifyIssuer {
+interface Issuer :
+    AuthorizeIssuance,
+    RequestIssuance,
+    BatchRequestIssuance,
+    QueryForDeferredCredential,
+    NotifyIssuer {
 
     val credentialOffer: CredentialOffer
 
@@ -177,6 +183,7 @@ interface Issuer : AuthorizeIssuance, RequestIssuance, QueryForDeferredCredentia
                 Issuer,
                 AuthorizeIssuance by authorizeIssuance,
                 RequestIssuance by requestIssuance,
+                BatchRequestIssuance by requestIssuance,
                 QueryForDeferredCredential by queryForDeferredCredential,
                 NotifyIssuer by notifyIssuer {
                 override val credentialOffer: CredentialOffer
