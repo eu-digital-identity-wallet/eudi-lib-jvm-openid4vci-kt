@@ -9,8 +9,10 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
 
 * [Overview](#overview)
 * [Disclaimer](#disclaimer)
-* [How to use](#how-to-use)
-* [Features supported](#features-supported)
+* [Use cases supported](#use-cases-supported)
+* [Configuration options](#configuration-options)
+* [Other features](#other-features)
+* [Features not supported](#features-not-supported)
 * [How to contribute](#how-to-contribute)
 * [License](#license)
 
@@ -27,6 +29,12 @@ In particular, the library focuses on the wallet's role in the protocol to:
 - [Query for deferred credential](#query-for-deferred-credential)
 - [Query for deferred credential at a leter time](#query-for-deferred-credential-at-later-time)
 
+OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library supports
+the following profiles:
+
+- ISO mDL,
+- IETF SD-JWT VC and
+- W3C VC DM (VC Signed as a JWT, Not Using JSON-LD)
 
 ## Disclaimer
 
@@ -54,7 +62,7 @@ this offered is compatible with wallet configuration.
 - The wallet has obtained this URI. Typically, either scanning a QR Code or in response to a custom URI.
 - The wallet has prepared an issuance configuration, describing the capabilities & policies of the wallet.
 
-This resolution includes the following steps
+This resolution includes the following
 
 - Check and validate the structure of the URI
 - Fetch the actual contents of the offer, in case URI points by reference to the offer
@@ -65,21 +73,34 @@ This resolution includes the following steps
 #### Resolve a credential offer successful outcome:
 
 An instance of the [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt)  interface (the main entry point to the library) will have been initiated.
-This instance, includes the validated credential offer and the necessary methods to proceed
-with the issuance process. 
-The validated offer contains all the metadata gathered and can be used by wallet to populate
-a view that asks user's consensus to proceed with the issuance. This includes  the authorization
+This instance, includes the resolved [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) and the necessary methods to proceed
+The resolved  offer contains the mandatory elements required for issuance.
+- The issuer's identifier
+- The selected authorization server that will authorize the issuance
+- The specific credentials that will be requested
+
+These elements  can be used to populate a wallet view that 
+asks user's consensus to proceed with the issuance. This includes  the authorization
 flow to be used (either authorization code flow, or pre-authorized code)
 
 This concern, though is out of the scope of library
 
 #### Resolve a credential offer execution
 
-```kotlin
-TODO() 
-    
-```
+In order to resolve a credential offer wallet/caller must provide [configuration options](#configuration-options)
 
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+val openId4VCIConfig = OpenId4VCIConfig(
+    clientId = "wallet-dev", // the client id of wallet (acting as an OAUTH2 client)
+    authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
+    keyGenerationConfig = KeyGenerationConfig.ecOnly(Curve.P_256), // what kind of ephemeral keys could be generated to encrypt credential issuance response
+    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses
+)
+val credentialOfferUri: String = "..."
+val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()
+```
 ### Authorize wallet for issuance
 
 As a wallet/caller use the library to obtain an `access_token`, to be able to access 
@@ -99,6 +120,7 @@ flow to use. This decision is out of the scope of the library, although pre-auth
 perhaps is more convenient since it includes fewer steps. 
 
 #### Authorize wallet for issuance successful outcome:
+
 At the end of the use case, wallet will have an `AuthorizedRequest` instance.
 
 Depending on the capabilities of the token endpoint of the credential issuer this `AuthorizedRequest` will be either 
@@ -132,25 +154,20 @@ In addition to the [common authorization preconditions](#authorize-wallet-for-is
 
 ##### Authorization code flow steps
 
-1. Using the `Issuer` instance prepare a URL where the mobile device browser needs to be pointed to.
-2. User interacts with the authorization server via mobile device agent, typically providing his authorization
-3. On success, authorization redirects to a wallet provided `redirect_uri`, providing the `authorization code` and a `state`
-4. Using the `Issuer` instance exchange the `authorization code` for an `access_token` 
+1. Wallet/caller using asks the `Issuer` instance to prepare a URL where the mobile device browser needs to be pointed to.
+Library prepares this URL as follows
+   - If PAR endpoint is advertised it will place a PAR request and assemble the URL for the authorization endpoint
+   - If PAR endpoint is not supported (or disabled), it will assemble the URL as a normally for the authorization endpoint
+   - In both case PKCE will be used
+2. Wallet/Caller opens the mobile's browser to the URL calculated in the previous step
+3. User interacts with the authorization server via mobile device agent, typically providing his authorization
+4. On success, authorization redirects to a wallet provided `redirect_uri`, providing the `authorization code` and a `state`
+5. Using the `Issuer` instance exchange the `authorization code` for an `access_token` 
 
-In the scope of the library are steps 1 and 4.
+In the scope of the library are steps 1 and 5.
 
 According to the configuration used to instantiate the `Issuer` and the capabilities of the
 credential issuer, the following features will be leveraged:
-
-**Using Pushed Authorized Request**
-To use PAR wallet configuration shouldn't exclude its use (explicit configuration option) and in 
-addition PAR endpoint should be advertised by issuer metadata
-
-**DPoP Access token**
-If wallet configuration provides a DPoP Signer and if the credential issuer advertises DPoP with
-algorithms supported by wallet's DPoP Signer, then library will transparently request 
-for a DPoP `access_token` instead of the default Bearer token.
-Furthermore, all subsequent interactions will use the correct token type (Bearer or DPoP)
 
 ##### Authorization code flow execution
 
@@ -158,18 +175,19 @@ Furthermore, all subsequent interactions will use the correct token type (Bearer
 import eu.europa.ec.eudi.openid4vci.*
 
 // Step 1
-val preparedAuthorizationRequest = with(issuer) {
-    prepareAuthorizationRequest().getOrThrow()
-}
+val preparedAuthorizationRequest = 
+    with(issuer) {
+        prepareAuthorizationRequest().getOrThrow()
+    }
 // Step 2
 // Wallet opens mobile's browser and points it to 
 
-// Step 3
+// Step 4
 // Wallet has extracted from authorization redirect_uri
 // the code and state parameters
 val (authorizationCode, state) = ... // using url preparedAuthorizationRequest.authorizationCodeURL authenticate via front-channel on authorization server and retrieve authorization code 
 
-// Step 4
+// Step 5
 val authorizedRequest =
      with(issuer) {
          with(preparedAuthorizationRequest) {
@@ -191,7 +209,6 @@ stateDiagram-v2
     c_nonce_exists --> c_nonce_returned
     c_nonce_returned --> AuthorizedRequest.ProofRequired : yes
 c_nonce_returned --> AuthorizedRequest.NoProofRequired : no
-
 ```
 
 ##### Pre-authorized code flow preconditions
@@ -205,11 +222,11 @@ In addition to the [common authorization preconditions](#authorize-wallet-for-is
  
 Steps:
 1. Using the `Issuer` instance exchange the pre-authorized code & optionally the `tx_code` with an `access_token`
+2. Library will place a adequate request the token endpoint of the credential issuer
+3. Library will receive token endpoint response and map it to a `AuthorizedRequest`
 
-**DPoP Access token**
-The same conditions apply as described in [Authorize request via authorization code flow](#authorize-request-via-authorization-code-flow)
 
-Execution
+##### Pre-authorized code flow execution
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
@@ -223,21 +240,28 @@ val authorizedRequest =
 
 ### Place a credential request
 
-Wallet/caller wants to place a request against the credential issuer
+Wallet/caller wants to place a request against the credential issuer, for one of 
+the credential configurations that were present in the offer, or alternatively for 
+a specific credential identifier in case token endpoint provided an `authorization_details`.
 
 #### Place a credential request preconditions
 
 - An instance of the `Issuer` interface has been instantiated
 - [Wallet authorization](#authorize-wallet-for-issuance) has been performed and as a result
 - An instance of `AuthorizedRequest` is available
-- Wallet/Caller has decided for which `credential_configuration_id` - found in the offer - the request will be placed
-- Wallet/Caller has decided which `credential_identifier` - found in the `AuthorizedRequest` - the request will be placed
+- Wallet/Caller has decided for which `credential_configuration_id` - found in the offer - the request will be placed for
+- Wallet/Caller has decided which `credential_identifier` - optional attribute found in the `AuthorizedRequest` - the request will be placed for
 - Wallet/Caller has decided if a subset of the claims will be requested or all.
 - Wallet/Caller is ready to provide a suitable Proof signer for JWT or CWT proofs, if applicable
 
 #### Place a credential request steps
-1. Using the library assemble the request providing a `credential_configuration_id` and optionally a `credential_identifier`
-2. Using the `Issuer` and `AuthorizedRequest` place the request and gets back a `SubmissionOutcome`
+
+1. Wallet/caller using the library assemble the request providing a `credential_configuration_id` and optionally a `credential_identifier`
+2. Wallet/caller using the `Issuer` and `AuthorizedRequest` place the request 
+3. Library places the appropriate request against the Credential Endpoint of the Credential Issuer
+4. Library receives the Credential Issuer response and maps it to a `SubmissionOutcome`
+5. Wallet/caller gets back the `SubmissionOutcome` for further processing
+6. Wallet/caller may have to introspect the outcome to assemble a fresh `AuthorizedRequest` carrying possibly a fresh `c_nonce` 
 
 #### Place a credential request outcome
 
@@ -247,6 +271,8 @@ The result of placing a request is represented by a `SubmissionOutcome` as follo
 of deferred issuance, or
 - `SubmissionOutcome.ProofRequired` indicating that credential issuer requires PoP or PoP provided was not valid
 - `SubmissionOutcome.Failed` indication that credential issuer rejected the request, or 
+
+In case of an unexpected error a runtime will be raised.
 
 #### Place a credential request execution
 
@@ -261,7 +287,7 @@ val claimSetToRequest : ClaimSet? = null // null indicates that all claims will 
 val request = 
     IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSetToRequest)
 
-// Step 2
+// Place the request
 val outcome =
     with(issuer) {
         when(authorizedRequest) {
@@ -274,20 +300,37 @@ val outcome =
             }   
         }
     }
+
+// Update if needed state
+val newAuthorizedRequest = 
+    when(outcome) {
+        is SubmissionOutcome.Sucess -> 
+            outcome.cNonce?.let { authorizedRequest.withCNonce(it) }
+        is SubmissionOutcome.InvalidProof -> 
+            outcome.cNonce?.let{ authorizedRequest.withCNonce(it) }
+        is SubmissionOutcome.Failed -> null
+    } ?: authorizedRequest
 ```
+
 ### Query for deferred credential
 
-Wallet/caller wants to query credential issuer for a deferred credential
+Wallet/caller wants to query credential issuer for a deferred credential, while still holding
+an `AuthorizedRequest` and an `Issuer` instance.
 
 #### Query for deferred credential preconditions
 
 - Wallet/caller has [placed a credential request](#place-a-credential-request)
 - Wallet/caller has received an [outcome](#place-a-credential-request-outcome) carrying a `transaction_id`
-- Wallet/caller has an instance `AuthorizedRequest`
+- Wallet/caller has an instance of `AuthorizedRequest` 
 
 #### Query for deferred credential steps
 
 1. Wallet/caller issuing the `Issuer` instance places the query providing `AuthorizedRequest` and `transaction_id`
+2. Library if `access_token` found in `AuthorizedRequest` is expired
+3. If `access_token` is expired library will automatically try to refresh it, provided that issuer has given a `refresh_token`
+4. Library places the query against the Deferred Endpoint of the credential issuer
+5. Library gets credential issuer response and maps it into `DeferredCredentialQueryOutcome`
+6. Caller gets back an `AuthorizedRequest` and `DeferredCredentialQueryOutcome`
 
 #### Query for deferred credential outcome
 
@@ -302,7 +345,13 @@ The outcome of placing this query is a pair comprised of
 #### Query for deferred credential execution
 
 ```kotlin
-TODO()
+val authorizedRequest = // has been retrieved in a previous step
+val deferredCredential = // has been retrieved in a previous step. Holds the transaction_id
+
+val (newAuthorizedRequest, outcome) =  
+    with(issuer) {
+        authorizedRequest.queryForDeferredCredential(deferredCredential).getOrThrow()
+    }    
 
 ```
 ### Query for deferred credential at later time
@@ -324,8 +373,11 @@ As per [query for deferred credential](#query-for-deferred-credential-preconditi
 
 1. Wallet/caller using the `Issuer` instance obtains a `DeferredIssuanceContext`. That's a minimum set of data (configuration options and state) that are needed to query again the credential issuer
 2. Wallet/caller stores the `DeferredIssuanceContext`. How this is done is outside the scope of the library
-3. Wallet/caller loads the `DeferredIssuanceContext`
+3. Wallet/caller loads the `DeferredIssuanceContext`. That's also outside the scope of the library
 4. Wallet/caller queries the credential issuer issuing `DeferredIssuer`
+5. Library performs all steps defined in [Query for deferred credential](#query-for-deferred-credential)
+6. Library returns to the caller the `DeferredIssuanceContxt?` and the `DeferredCredentialQueryOutcome`
+7. Depending on the outcome, wallet/caller may choose to store the new `DeferredIssuanceContxt` to query again, later on
 
 ### Query for deferred credential at later time outcome
 
@@ -349,44 +401,43 @@ val deferredIssuanceContext =
         authorizedRequest.deferredContext(deferredCredential).getOrThrough()
     }
 
+// Store context
 
+// Load context
 
 // Step 4
 val (newDeferredIssuanceContext, outcome) = 
     DeferredIssuer.queryForDeferredCredential(deferredIssuanceContext).getOrThrough()
 
 ```
-## How to use
 
-Library provides the following main api elements to facilitate consumers of this api with the operations related to verifiable credentials issuance
+## Configuration Options
 
-- **Issuer component**: A component that offers all operation required to authorize and submit a credential issuance request.
-- **Credential offer resolver**: A component that interacts with credential issuer to resolve and validate a credential offer presented by the issuer.
-- **Metadata resolvers**: Components that interact with credential issuer and its authorization server to obtain and parse their metadata.
+The options available for the `Issuer` are represented by `OpenId4VCIConfig`
 
+```kotlin
+data class OpenId4VCIConfig(
+    val clientId: ClientId,
+    val authFlowRedirectionURI: URI,
+    val keyGenerationConfig: KeyGenerationConfig,
+    val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+    val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+    val dPoPSigner: PopSigner.Jwt? = null,
+    val parUsage: ParUsage = ParUsage.IfSupported,
+    val clock: Clock = Clock.systemDefaultZone(),
+)
+```
 
-### Credential Issuance
+Options available:
 
-The process of requesting an issuance has been implemented as a stateful process whose steps are depicted as dedicated states holding the outcome of each step.
-Depending on the state of the process, specific transitions are allowed to move the process to the next step.
-
-VCI specification defines two flows of issuance;
-- Authorization Code Flow (wallet-initiated flow)
-- Pre-Authorization Code Flow. In this flow, before initiating the flow with the Wallet, the Credential Issuer first conducts the steps required to prepare the Credential issuance.
-
-The following state diagrams sketch each flow's states and their allowed transitions.
-
-
-
-
-
-[Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) is the component that facilitates the authorization and submission of a credential issuance request (batch or single).
-It is the main entry point for the functionality provided from the library
-
-#### Initialize an Issuer
-
-An [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) component is initialized against a credential offer either resolved from an issuance service credential offer URL or manually constructed.
-The [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) interface provides a factory method to construct an issuer component.
+- clientId: Wallet `client_id` in the OAUTH2 sense while interacting with the Credential Issuer
+- authFlowRedirectionURI: It is the `redirect_uri` parameter that will be included in a PAR or simple authorization request.
+- keyGenerationConfig: A way of generating ephemeral keys used for `credential_response_encryption`
+- credentialResponseEncryptionPolicy: A wallet policy in regard to whether it accepts credentials without `credential_response_encyrption` or not
+- authorizeIssuanceConfig: Preference on using `scope` or `authorization_details` during authorization code flow
+- dPoPSigner: An optional way of singing DPoP JWTs. If not provided DPoP is off. If provided it will be used only if Credential Issuer advertises this feature
+- parUsage: An indication to not use PAR endpoint or use it if advertised by the credential issuer
+- clock: Wallet/Caller clock.
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
@@ -396,95 +447,44 @@ val openId4VCIConfig = OpenId4VCIConfig(
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
     keyGenerationConfig = KeyGenerationConfig.ecOnly(Curve.P_256), // what kind of ephemeral keys could be generated to encrypt credential issuance response
     credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses
-    dPoPProofSigner = ProofSigner.make(..) // if specified, enables DPoP provided that auth. server supports it  
 )
-val credentialOffer: CredentialOffer = CredentialOfferRequestResolver().resolve(coUrl).getOrThrow()
-val issuer = Issuer.make(openId4VCIConfig, credentialOffer).getOrThrow()
-```
-Construction of an Issuer might fail in case there is some incompatibility between credential issuer service's metadata and
-the configuration OpenId4VCIConfig. Such an incompatibility can exist between the wallet's encryption requirements regarding credential
-responses and the encryption capabilities/requirements of the credential issuer service.
-
-A resolved [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) object contains the mandatory elements required for issuance.
-- The issuer's identifier
-- The selected authorization server that will authorize the issuance
-- The specific credentials that will be requested
-
-
-
-#### Request a single credential issuance
-
-Given an `authorizedRequest` and in the context of an `issuer` a single credential issuance request can be placed as follows
-
-```kotlin
-import eu.europa.ec.eudi.openid4vci.*
-
-with(issuer) {
-    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-    val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
-
-    when (submittedRequest) {
-        is SubmittedRequest.Success -> {
-            when (val issuedCredential = submittedRequest.credentials[0]) {
-                is IssuedCredential.Issued -> issuedCredential.credential
-                is IssuedCredential.Deferred -> {
-                    deferredCredentialUseCase(issuer, authorized, issuedCredential)
-                }
-            }
-        }
-        is SubmittedRequest.Failed -> // handle failed request
-        is SubmittedRequest.InvalidProof -> // handle a specific case of missing or invalid proof(s) 
-    }
-}
+val credentialOfferUri: String = "..." 
+val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()
 ```
 
-**NOTE:** Only credentials that were included in credential offer that initialized the [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) component can be passed.
+## Other features
 
-### Resolve a credential offer presented by issuer
+### PAR 
 
-A CredentialOfferRequestResolver uses internally the two metadata resolvers mentioned above to resolve metadata of issuer and its authorization server
+To use PAR endpoint 
+- wallet [configuration](#configuration-options) shouldn't exclude its use (explicit configuration option) and 
+- PAR should be advertised by credential issuer's metadata
 
-Given a credential offer url use [CredentialOfferRequestResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) the following way to validate and resolve it to [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt)
+Library will automatically use the PAR endpoint during the [authorization code flow](#authorization-code-flow), 
+otherwise it will fall back to a regular authorization request.
 
-```kotlin
-import eu.europa.ec.eudi.openid4vci.*
+### Place batch request
 
-val credentialOfferRequestResolver = CredentialOfferRequestResolver()
-val credentialOffer: CredentialOffer = credentialOfferRequestResolver.resolve(coUrl).getOrThrow()
-```
+Library supports placing request against the Batch Endpoint of the Credential Issuer.
+This functionality probably will be removed from library given that OpenId4VCI will remove it, as well.
 
-### Resolve Credential Issuer and authorization server metadata
+### Proof Types Supported
 
-To obtain the credentials issuer metadata use [CredentialIssuerMetadataResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialIssuerMetadataResolver.kt) the following way
+The current version of the library supports JWT and CWT proofs
 
-```kotlin
-import eu.europa.ec.eudi.openid4vci.*
+### Demonstrating Proof of Possession (DPoP)
 
-val credentialIssuerIdentifier = CredentialIssuerId("https://....").getOrThrow() // credential issuer id is a https url with no query or fragment components
-val resolver = CredentialIssuerMetadataResolver() // get a default implementation of the CredentialIssuerMetadataResolver interface 
-val metadata: CredentialIssuerMetadata = resolver.resolve(credentialIssuerIdentifier).getOrThrow()  // fetch and parse credential issuer metadata
-```
-In case of metadata parsing failure a `Result.failure()` will be returned to caller wrapping the exception thrown while parsing metadata.
+Library supports [RFC9449](https://datatracker.ietf.org/doc/html/rfc9449). In addition to
+bearer authentication scheme, library can be configured to use DPoP authentication provided
+that the authorization server, that protects the credential issuer, supports this feature as well.
 
-To obtain the authorization server's  metadata use [AuthorizationServerMetadataResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vci/AuthorizationServerMetadataResolver.kt) the following way
-```kotlin
-import eu.europa.ec.eudi.openid4vci.*
+If wallet [configuration](#configuration-options) provides a DPoP Signer and if the credential issuer advertises DPoP with
+algorithms supported by wallet's DPoP Signer, then library will transparently request
+for a DPoP `access_token` instead of the default Bearer token.
 
-val resolver = AuthorizationServerMetadataResolver() // get a default implementation of the AuthorizationServerMetadataResolver interface
-val metadata: CIAuthorizationServerMetadata = resolver.resolve(HttpsUrl("https://...")).getOrThrow() // fetch and parse authorization server metadata
-```
+Furthermore, all subsequent interactions will use the correct token type (Bearer or DPoP)
 
-There is also a convenient method that obtains the credential issuer metadata & the metadata of all
-authorization servers with a single call
-
-```kotlin
-import eu.europa.ec.eudi.openid4vci.*
-
-val credentialIssuerIdentifier = CredentialIssuerId("https://....").getOrThrow()
-val (issuerMetadata, authServersMetadata) = Issuer.metaData(httpClient, credentialIssuerIdentifier)
-```
-
-## Features supported
+## Features not supported
 
 ### Issuer metadata
 
@@ -502,31 +502,6 @@ Only `credential_configuration_id` attribute is supported.
 
 The same stands for the **token endpoint** when (as specified in [section 6.2](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#section-6.2)) server response includes
 `authorization_details`. In this case too, the library does not support authorization details that include `format` attribute.
-
-### Demonstrating Proof of Possession (DPoP)
-
-Library supports [RFC9449](https://datatracker.ietf.org/doc/html/rfc9449). In addition to
-bearer authentication scheme, library can be configured to use DPoP authentication provided
-that the authorization server, that protects the credential issuer, supports this feature as well.
-
-### Credential Request
-
-The current version of the library implements integrations with issuer's [Credential Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-credential-endpoint),
-[Batch Credential Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-batch-credential-endpoint),
-[Deferred Credential Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-deferred-credential-endpoin) and
-[Notification Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#name-notification-endpoint).
-
-#### Credential Format Profiles
-
-OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library fully supports
-**ISO mDL**, **IETF SD-JWT VC** and
-**W3C VC DM (VC Signed as a JWT, Not Using JSON-LD)** profiles.
-
-#### Proof Types
-
-OpenId4VCI specification (draft 13) defines two types of proofs that can be included in a credential issuance request,
-JWT proof type, and CWT proof type.
-The current version of the library supports only JWT proof types
 
 ## How to contribute
 
