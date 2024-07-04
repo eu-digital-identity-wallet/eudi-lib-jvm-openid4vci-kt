@@ -46,38 +46,40 @@ internal class RequestIssuanceImpl(
         requestPayload: IssuanceRequestPayload,
         popSigner: PopSigner?,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
-        suspend fun doExecute(
-            auth: AuthorizedRequest,
-            retryOnInvalidProof: Boolean,
-        ): AuthorizedRequestAnd<SubmissionOutcome> {
-            //
-            // Place the call
-            //
-            val outcome = when (auth) {
-                is AuthorizedRequest.NoProofRequired -> {
-                    auth.requestSingle(requestPayload).getOrThrow()
-                }
-
-                is AuthorizedRequest.ProofRequired -> {
-                    requireNotNull(popSigner) { "PopSigner is required in Authorized.ProofRequired" }
-                    auth.requestSingle(requestPayload, popSigner).getOrThrow()
-                }
+        //
+        // Place the call
+        //
+        val outcome = when (this) {
+            is AuthorizedRequest.NoProofRequired -> {
+                requestSingle(requestPayload).getOrThrow()
             }
 
-            val newAuthorizedRequest = auth.withCNonce(outcome)
-            val retry = retryOnInvalidProof &&
+            is AuthorizedRequest.ProofRequired -> {
+                requireNotNull(popSigner) { "PopSigner is required in Authorized.ProofRequired" }
+                requestSingle(requestPayload, popSigner).getOrThrow()
+            }
+        }
+        //
+        // Update state
+        //
+        val newAuthorizedRequest = this.withCNonceFrom(outcome)
+
+        //
+        // Retry on invalid proof if we begin from NoProofRequired and issuer
+        // replied with InvalidProof
+        //
+        val retryOnInvalidProof =
+            this is AuthorizedRequest.NoProofRequired &&
+                popSigner != null &&
                 newAuthorizedRequest is AuthorizedRequest.ProofRequired &&
                 outcome is SubmissionOutcome.InvalidProof
 
-            return if (retry) doExecute(newAuthorizedRequest, false) else newAuthorizedRequest to outcome
-        }
-
-        // Retry on invalid proof if called by NoProofRequired and there is a popSigner
-        val retryOnInvalidProof = this is AuthorizedRequest.NoProofRequired && popSigner != null
-        doExecute(this, retryOnInvalidProof)
+        if (retryOnInvalidProof) {
+            newAuthorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner).getOrThrow()
+        } else newAuthorizedRequest to outcome
     }
 
-    private fun AuthorizedRequest.withCNonce(outcome: SubmissionOutcome): AuthorizedRequest {
+    private fun AuthorizedRequest.withCNonceFrom(outcome: SubmissionOutcome): AuthorizedRequest {
         val updated = when (outcome) {
             is SubmissionOutcome.Failed -> null
             is SubmissionOutcome.InvalidProof -> withCNonce(outcome.cNonce)
