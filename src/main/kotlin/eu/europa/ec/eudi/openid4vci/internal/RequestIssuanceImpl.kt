@@ -47,22 +47,23 @@ internal class RequestIssuanceImpl(
         popSigner: PopSigner?,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
         //
-        // Place the call
+        // Place the request
         //
-        val outcome = when (this) {
-            is AuthorizedRequest.NoProofRequired -> {
-                requestSingle(requestPayload).getOrThrow()
+        val outcome = placeIssuanceRequest(accessToken) {
+            val proofFactory = when (this) {
+                is AuthorizedRequest.NoProofRequired -> null
+                is AuthorizedRequest.ProofRequired -> {
+                    requireNotNull(popSigner) { "PopSigner is required in Authorized.ProofRequired" }
+                    proofFactory(popSigner, cNonce)
+                }
             }
-
-            is AuthorizedRequest.ProofRequired -> {
-                requireNotNull(popSigner) { "PopSigner is required in Authorized.ProofRequired" }
-                requestSingle(requestPayload, popSigner).getOrThrow()
-            }
+            singleRequest(requestPayload, proofFactory, credentialIdentifiers)
         }
+
         //
         // Update state
         //
-        val newAuthorizedRequest = this.withCNonceFrom(outcome)
+        val updatedAuthorizedRequest = this.withCNonceFrom(outcome)
 
         //
         // Retry on invalid proof if we begin from NoProofRequired and issuer
@@ -71,12 +72,14 @@ internal class RequestIssuanceImpl(
         val retryOnInvalidProof =
             this is AuthorizedRequest.NoProofRequired &&
                 popSigner != null &&
-                newAuthorizedRequest is AuthorizedRequest.ProofRequired &&
+                updatedAuthorizedRequest is AuthorizedRequest.ProofRequired &&
                 outcome is SubmissionOutcome.InvalidProof
 
-        if (retryOnInvalidProof) {
-            newAuthorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner).getOrThrow()
-        } else newAuthorizedRequest to outcome
+        suspend fun retry() =
+            updatedAuthorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner).getOrThrow()
+
+        if (retryOnInvalidProof) retry()
+        else updatedAuthorizedRequest to outcome
     }
 
     private fun AuthorizedRequest.withCNonceFrom(outcome: SubmissionOutcome): AuthorizedRequest {
@@ -86,23 +89,6 @@ internal class RequestIssuanceImpl(
             is SubmissionOutcome.Success -> outcome.cNonce?.let { withCNonce(it) }
         }
         return updated ?: this
-    }
-
-    override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
-        requestPayload: IssuanceRequestPayload,
-    ): Result<SubmissionOutcome> = runCatching {
-        placeIssuanceRequest(accessToken) {
-            singleRequest(requestPayload, null, credentialIdentifiers)
-        }
-    }
-
-    override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-        requestPayload: IssuanceRequestPayload,
-        proofSigner: PopSigner,
-    ): Result<SubmissionOutcome> = runCatching {
-        placeIssuanceRequest(accessToken) {
-            singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
-        }
     }
 
     override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(

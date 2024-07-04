@@ -185,7 +185,8 @@ interface RequestIssuance {
     )
     suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
-    ): Result<SubmissionOutcome>
+    ): Result<SubmissionOutcome> =
+        requestSingleAndUpdateState(requestPayload, null).map { it.second }
 
     /**
      *  Requests the issuance of a single credential having an [AuthorizedRequest.ProofRequired] authorization. In this
@@ -196,13 +197,14 @@ interface RequestIssuance {
      *  @return The new state of request or error.
      */
     @Deprecated(
-        message = "Deprecated and will be removed in a future release",
+        message = "Deprecated and will be removed in a future release.",
         replaceWith = ReplaceWith("requestSingleAndUpdateState(requestPayload, proofSigner)"),
     )
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
         proofSigner: PopSigner,
-    ): Result<SubmissionOutcome>
+    ): Result<SubmissionOutcome> =
+        requestSingleAndUpdateState(requestPayload, proofSigner).map { it.second }
 
     /**
      * Special purpose operation to handle the case an 'invalid_proof' error response was received from issuer with
