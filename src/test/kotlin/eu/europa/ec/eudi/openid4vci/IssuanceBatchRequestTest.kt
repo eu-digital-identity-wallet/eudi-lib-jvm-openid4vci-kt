@@ -81,7 +81,7 @@ class IssuanceBatchRequestTest {
                 },
             ) {},
         )
-        val (_, authorizedRequest, issuer) =
+        val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
 
         val claimSet_mso_mdoc = MsoMdocClaimSet(

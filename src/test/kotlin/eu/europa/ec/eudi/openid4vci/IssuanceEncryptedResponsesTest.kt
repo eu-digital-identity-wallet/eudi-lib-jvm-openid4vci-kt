@@ -163,7 +163,7 @@ class IssuanceEncryptedResponsesTest {
                 algorithm = JWEAlgorithm.RSA_OAEP_256,
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
-            val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
@@ -171,7 +171,7 @@ class IssuanceEncryptedResponsesTest {
 
             with(issuer) {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
-                val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
                 noProofRequired.requestSingle(requestPayload).getOrThrow()
             }
@@ -200,7 +200,7 @@ class IssuanceEncryptedResponsesTest {
                 algorithm = JWEAlgorithm.RSA_OAEP_256,
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
-            val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
@@ -208,7 +208,7 @@ class IssuanceEncryptedResponsesTest {
 
             with(issuer) {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
-                val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
                 noProofRequired.requestSingle(requestPayload).getOrThrow()
             }
@@ -232,7 +232,7 @@ class IssuanceEncryptedResponsesTest {
                     },
                 ),
             )
-            val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> null },
@@ -240,7 +240,7 @@ class IssuanceEncryptedResponsesTest {
 
             with(issuer) {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
-                val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
                 noProofRequired.requestSingle(requestPayload).getOrThrow()
             }
@@ -308,7 +308,7 @@ class IssuanceEncryptedResponsesTest {
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
-            val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
@@ -316,7 +316,7 @@ class IssuanceEncryptedResponsesTest {
 
             with(issuer) {
                 assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
-                val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
                 val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
                 assertIs<SubmissionOutcome.Success>(submittedRequest)
@@ -360,7 +360,7 @@ class IssuanceEncryptedResponsesTest {
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
-            val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
@@ -429,7 +429,7 @@ class IssuanceEncryptedResponsesTest {
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
-            val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
@@ -490,7 +490,7 @@ class IssuanceEncryptedResponsesTest {
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
-            val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
@@ -559,7 +559,7 @@ class IssuanceEncryptedResponsesTest {
             ),
         )
 
-        val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             ktorHttpClientFactory = mockedKtorHttpClientFactory,
             credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
             responseEncryptionSpecFactory = { _, _ -> responseEncryption },

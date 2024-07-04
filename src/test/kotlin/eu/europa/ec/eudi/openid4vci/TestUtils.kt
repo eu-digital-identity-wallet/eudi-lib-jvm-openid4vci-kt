@@ -65,7 +65,7 @@ suspend fun authorizeRequestForCredentialOffer(
     credentialOfferStr: String,
     config: OpenId4VCIConfig? = OpenId4VCIConfiguration,
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory? = null,
-): Triple<CredentialOffer, AuthorizedRequest, Issuer> {
+): Pair<AuthorizedRequest, Issuer> {
     val offer = CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
         .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
         .getOrThrow()
@@ -89,5 +89,5 @@ suspend fun authorizeRequestForCredentialOffer(
         val serverState = authRequestPrepared.state
         authRequestPrepared.authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState).getOrThrow()
     }
-    return Triple(offer, authorizedRequest, issuer)
+    return authorizedRequest to issuer
 }

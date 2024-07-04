@@ -20,6 +20,7 @@ import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.hamcrest.MatcherAssert.assertThat
@@ -72,7 +73,7 @@ class IssuanceSingleRequestTest {
                 },
             ),
         )
-        val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CredentialOfferMsoMdoc_NO_GRANTS,
         )
@@ -88,7 +89,7 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                    val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                     val submittedRequest = assertDoesNotThrow {
                         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
                         authorizedRequest.requestSingle(requestPayload).getOrThrow()
@@ -126,7 +127,7 @@ class IssuanceSingleRequestTest {
                 },
             ),
         )
-        val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CredentialOfferMsoMdoc_NO_GRANTS,
         )
@@ -141,7 +142,7 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                    val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                     val request = assertDoesNotThrow {
                         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
                         authorizedRequest.requestSingle(requestPayload).getOrThrow()
@@ -165,7 +166,7 @@ class IssuanceSingleRequestTest {
             parPostMocker(),
             tokenPostMocker(),
         )
-        val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CREDENTIAL_OFFER_NO_GRANTS,
         )
@@ -203,7 +204,7 @@ class IssuanceSingleRequestTest {
             parPostMocker(),
             tokenPostMocker(),
         )
-        val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CREDENTIAL_OFFER_NO_GRANTS,
         )
@@ -249,7 +250,7 @@ class IssuanceSingleRequestTest {
             ),
         )
 
-        val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CredentialOfferMsoMdoc_NO_GRANTS,
         )
@@ -265,25 +266,11 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                    val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
-                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
-                    when (submittedRequest) {
-                        is SubmissionOutcome.InvalidProof -> {
-                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
-                            val response = assertDoesNotThrow {
-                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
-                                    .getOrThrow()
-                            }
-                            assertIs<SubmissionOutcome.Success>(response)
-                        }
-
-                        is SubmissionOutcome.Failed -> fail(
-                            "Failed with error ${submittedRequest.error}",
-                        )
-
-                        is SubmissionOutcome.Success -> fail("first attempt should be unsuccessful")
-                    }
+                    val popSigner = CryptoGenerator.rsaProofSigner()
+                    val (newAuthorized, outcome) = authorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner).getOrThrow()
+                    assertIs<SubmissionOutcome.Success>(outcome)
                 }
 
                 is AuthorizedRequest.ProofRequired -> fail(
@@ -294,7 +281,7 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
-    fun `successful issuance of credential in vc+sd-jwt format`() = runTest {
+    fun `successful issuance of credential in vc+sd-jwt format`() = runBlocking {
         val credential = "issued_credential_content_sd_jwt_vc"
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
             oidcWellKnownMocker(),
@@ -306,7 +293,7 @@ class IssuanceSingleRequestTest {
             ),
         )
 
-        val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CredentialOfferWithSdJwtVc_NO_GRANTS,
         )
@@ -322,28 +309,22 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                    val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
-                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
-                    when (submittedRequest) {
-                        is SubmissionOutcome.InvalidProof -> {
-                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
-                            val response = assertDoesNotThrow {
-                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
-                                    .getOrThrow()
-                            }
-                            assertIs<SubmissionOutcome.Success>(response)
-                        }
-
-                        is SubmissionOutcome.Failed -> fail("Failed with error ${submittedRequest.error}")
-                        is SubmissionOutcome.Success -> fail("first attempt should be unsuccessful")
-                    }
+                    val popSigner = CryptoGenerator.rsaProofSigner()
+                    val (newAuthorizedRequest, outcome) = authorizedRequest.requestSingleAndUpdateState(
+                        requestPayload,
+                        popSigner,
+                    ).getOrThrow()
+                    assertTrue { authorizedRequest != newAuthorizedRequest }
+                    assertIs<SubmissionOutcome.Success>(outcome)
                 }
 
                 is AuthorizedRequest.ProofRequired ->
                     fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
             }
         }
+        Unit
     }
 
     @Test
@@ -359,7 +340,7 @@ class IssuanceSingleRequestTest {
             ),
         )
 
-        val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CredentialOfferWithJwtVcJson_NO_GRANTS,
         )
@@ -375,22 +356,14 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                    val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
-                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
-                    when (submittedRequest) {
-                        is SubmissionOutcome.InvalidProof -> {
-                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
-                            val response = assertDoesNotThrow {
-                                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
-                                    .getOrThrow()
-                            }
-                            assertIs<SubmissionOutcome.Success>(response)
-                        }
-
-                        is SubmissionOutcome.Failed -> fail("Failed with error ${submittedRequest.error}")
-                        is SubmissionOutcome.Success -> fail("first attempt should be unsuccessful")
-                    }
+                    val (newAuthorizedRequest, outcome) = authorizedRequest.requestSingleAndUpdateState(
+                        requestPayload,
+                        CryptoGenerator.rsaProofSigner(),
+                    ).getOrThrow()
+                    assertTrue { authorizedRequest != newAuthorizedRequest }
+                    assertIs<SubmissionOutcome.Success>(outcome)
                 }
 
                 is AuthorizedRequest.ProofRequired ->
@@ -420,7 +393,7 @@ class IssuanceSingleRequestTest {
                 },
             ),
         )
-        val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CREDENTIAL_OFFER_NO_GRANTS,
         )
@@ -461,7 +434,7 @@ class IssuanceSingleRequestTest {
                 },
             ),
         )
-        val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CREDENTIAL_OFFER_NO_GRANTS,
         )
@@ -503,7 +476,7 @@ class IssuanceSingleRequestTest {
                 },
             ),
         )
-        val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CREDENTIAL_OFFER_NO_GRANTS,
         )
@@ -547,7 +520,7 @@ class IssuanceSingleRequestTest {
                 },
             ),
         )
-        val (_, authorizedRequest, _) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, _) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CREDENTIAL_OFFER_NO_GRANTS,
         )

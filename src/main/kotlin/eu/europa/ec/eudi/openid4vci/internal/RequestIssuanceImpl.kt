@@ -42,6 +42,50 @@ internal class RequestIssuanceImpl(
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ) : RequestIssuance, BatchRequestIssuance {
 
+    override suspend fun AuthorizedRequest.requestSingleAndUpdateState(
+        requestPayload: IssuanceRequestPayload,
+        popSigner: PopSigner?,
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
+        suspend fun doExecute(
+            auth: AuthorizedRequest,
+            retryOnInvalidProof: Boolean,
+        ): AuthorizedRequestAnd<SubmissionOutcome> {
+            //
+            // Place the call
+            //
+            val outcome = when (auth) {
+                is AuthorizedRequest.NoProofRequired -> {
+                    auth.requestSingle(requestPayload).getOrThrow()
+                }
+
+                is AuthorizedRequest.ProofRequired -> {
+                    requireNotNull(popSigner) { "PopSigner is required in Authorized.ProofRequired" }
+                    auth.requestSingle(requestPayload, popSigner).getOrThrow()
+                }
+            }
+
+            val newAuthorizedRequest = auth.withCNonce(outcome)
+            val retry = retryOnInvalidProof &&
+                newAuthorizedRequest is AuthorizedRequest.ProofRequired &&
+                outcome is SubmissionOutcome.InvalidProof
+
+            return if (retry) doExecute(newAuthorizedRequest, false) else newAuthorizedRequest to outcome
+        }
+
+        // Retry on invalid proof if called by NoProofRequired and there is a popSigner
+        val retryOnInvalidProof = this is AuthorizedRequest.NoProofRequired && popSigner != null
+        doExecute(this, retryOnInvalidProof)
+    }
+
+    private fun AuthorizedRequest.withCNonce(outcome: SubmissionOutcome): AuthorizedRequest {
+        val updated = when (outcome) {
+            is SubmissionOutcome.Failed -> null
+            is SubmissionOutcome.InvalidProof -> withCNonce(outcome.cNonce)
+            is SubmissionOutcome.Success -> outcome.cNonce?.let { withCNonce(it) }
+        }
+        return updated ?: this
+    }
+
     override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
     ): Result<SubmissionOutcome> = runCatching {
@@ -82,7 +126,8 @@ internal class RequestIssuanceImpl(
     }
 
     private fun credentialSupportedById(credentialId: CredentialConfigurationIdentifier): CredentialConfiguration {
-        val credentialSupported = credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credentialId]
+        val credentialSupported =
+            credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credentialId]
         return requireNotNull(credentialSupported) {
             "$credentialId was not found within issuer metadata"
         }

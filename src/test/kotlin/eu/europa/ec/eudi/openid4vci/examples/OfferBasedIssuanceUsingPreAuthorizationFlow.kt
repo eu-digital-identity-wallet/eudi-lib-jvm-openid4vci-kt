@@ -101,11 +101,11 @@ private suspend fun submitProvidingProofs(
     with(issuer) {
         val proofSigner = popSigner(credentialConfigurationId)
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-        val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
+        val (newAuthorized, outcome) = authorized.requestSingleAndUpdateState(requestPayload, proofSigner).getOrThrow()
 
-        return when (submittedRequest) {
-            is SubmissionOutcome.Success -> handleSuccess(submittedRequest, issuer, authorized)
-            is SubmissionOutcome.Failed -> throw submittedRequest.error
+        return when (outcome) {
+            is SubmissionOutcome.Success -> handleSuccess(outcome, issuer, newAuthorized)
+            is SubmissionOutcome.Failed -> throw outcome.error
             is SubmissionOutcome.InvalidProof -> throw IllegalStateException(
                 "Although providing a proof with c_nonce the proof is still invalid",
             )

@@ -148,10 +148,30 @@ sealed interface IssuanceRequestPayload {
 typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
 
 /**
- * An interface for submitting a credential issuance request. Contains all the operation available to transition an [AuthorizedRequest]
- * to a [SubmissionOutcome]
+ * An interface for submitting a credential issuance request.
  */
 interface RequestIssuance {
+
+    /**
+     * Places a request to the credential issuance endpoint.
+     * Method will attempt to automatically retry submission in case
+     * - Initial authorization state is [AuthorizedRequest.NoProofRequired] and
+     * - a [popSigner] has been provided
+     *
+     * @receiver the current authorization state
+     * @param requestPayload the payload of the request
+     * @param popSigner Signer component of the proof to be sent. Although this is an optional
+     * parameter, only required in case the present authorization state is [AuthorizedRequest.ProofRequired],
+     * caller is advised to provide it, in order to allow the method to automatically retry
+     * in case of [SubmissionOutcome.InvalidProof]
+     *
+     * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh c_nonce) and
+     * the [SubmissionOutcome]
+     */
+    suspend fun AuthorizedRequest.requestSingleAndUpdateState(
+        requestPayload: IssuanceRequestPayload,
+        popSigner: PopSigner?,
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 
     /**
      *  Requests the issuance of a single credential having an [AuthorizedRequest.NoProofRequired] authorization.
@@ -159,6 +179,10 @@ interface RequestIssuance {
      *  @param requestPayload   The payload of the request.
      *  @return The new state of the request or error.
      */
+    @Deprecated(
+        message = "Deprecated and will be removed in a future release",
+        replaceWith = ReplaceWith("requestSingleAndUpdateState(requestPayload, null)"),
+    )
     suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
     ): Result<SubmissionOutcome>
@@ -171,6 +195,10 @@ interface RequestIssuance {
      *  @param proofSigner  Signer component of the proof to be sent.
      *  @return The new state of request or error.
      */
+    @Deprecated(
+        message = "Deprecated and will be removed in a future release",
+        replaceWith = ReplaceWith("requestSingleAndUpdateState(requestPayload, proofSigner)"),
+    )
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
         proofSigner: PopSigner,

@@ -64,36 +64,30 @@ class IssuanceNotificationTest {
                 },
             ),
         )
-        val (offer, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CredentialOfferWithSdJwtVc_NO_GRANTS,
         )
         with(issuer) {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = offer.credentialConfigurationIdentifiers[0]
+                    val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-                    val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
-                    when (submittedRequest) {
-                        is SubmissionOutcome.InvalidProof -> {
-                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
-                            val response = proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner())
-                                .getOrThrow()
+                    val popSigner = CryptoGenerator.rsaProofSigner()
+                    val (newAuthorizedRequest, outcome) =
+                        authorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner).getOrThrow()
+                    assertIs<SubmissionOutcome.Success>(outcome, "Not a successful issuance")
 
-                            assertIs<SubmissionOutcome.Success>(response, "Not a successful issuance")
-                            val issuedCredential = response.credentials.firstOrNull()
-                            assertIs<IssuedCredential.Issued>(issuedCredential, "Is Deferred although expecting Issued")
-                            assertNotNull(issuedCredential.notificationId, "No notification id found")
+                    val issuedCredential = outcome.credentials.firstOrNull()
+                    assertIs<IssuedCredential.Issued>(issuedCredential, "Is Deferred although expecting Issued")
+                    assertNotNull(issuedCredential.notificationId, "No notification id found")
 
-                            authorizedRequest.notify(
-                                CredentialIssuanceEvent.Accepted(
-                                    id = issuedCredential.notificationId!!,
-                                    description = "Credential received and validated",
-                                ),
-                            )
-                        }
-                        else -> fail("Expected InvalidProof but was not")
-                    }
+                    newAuthorizedRequest.notify(
+                        CredentialIssuanceEvent.Accepted(
+                            id = issuedCredential.notificationId!!,
+                            description = "Credential received and validated",
+                        ),
+                    )
                 }
                 else -> fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
             }
@@ -124,7 +118,7 @@ class IssuanceNotificationTest {
                 },
             ),
         )
-        val (_, authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             mockedKtorHttpClientFactory,
             CredentialOfferWithSdJwtVc_NO_GRANTS,
         )

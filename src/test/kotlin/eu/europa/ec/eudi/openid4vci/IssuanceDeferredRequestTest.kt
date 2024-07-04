@@ -38,7 +38,7 @@ class IssuanceDeferredRequestTest {
                 responseBuilder = { defaultIssuanceResponseDataBuilder(credentialIsReady = true, transactionIdIsValid = false) },
             ),
         )
-        val (_, authorizedRequest, issuer) =
+        val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
                 CredentialOfferWithSdJwtVc_NO_GRANTS,
@@ -55,16 +55,16 @@ class IssuanceDeferredRequestTest {
             assertIs<SubmissionOutcome.InvalidProof>(submittedRequest)
 
             val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
-            val secondSubmittedRequest =
-                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+            val (newAuthorizedRequest, outcome) =
+                proofRequired.requestSingleAndUpdateState(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
 
-            assertIs<SubmissionOutcome.Success>(secondSubmittedRequest)
+            assertIs<SubmissionOutcome.Success>(outcome)
 
-            val issuedCredential = secondSubmittedRequest.credentials[0]
+            val issuedCredential = outcome.credentials[0]
             assertIs<IssuedCredential.Deferred>(issuedCredential)
 
             val (_, requestDeferredIssuance) =
-                authorizedRequest.queryForDeferredCredential(issuedCredential)
+                newAuthorizedRequest.queryForDeferredCredential(issuedCredential)
                     .getOrThrow()
 
             assertIs<DeferredCredentialQueryOutcome.Errored>(requestDeferredIssuance)
@@ -89,7 +89,7 @@ class IssuanceDeferredRequestTest {
             ),
         )
 
-        val (_, authorizedRequest, issuer) =
+        val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
                 CredentialOfferWithSdJwtVc_NO_GRANTS,
@@ -105,15 +105,15 @@ class IssuanceDeferredRequestTest {
 
             assertIs<SubmissionOutcome.InvalidProof>(submittedRequest)
             val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
-            val secondSubmittedRequest =
-                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
+            val (newAuthorizedRequest, outcome) =
+                proofRequired.requestSingleAndUpdateState(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
 
-            assertIs<SubmissionOutcome.Success>(secondSubmittedRequest)
-            val issuedCredential = secondSubmittedRequest.credentials[0]
+            assertIs<SubmissionOutcome.Success>(outcome)
+            val issuedCredential = outcome.credentials[0]
             assertIs<IssuedCredential.Deferred>(issuedCredential)
 
             val (_, requestDeferredIssuance) =
-                authorizedRequest.queryForDeferredCredential(issuedCredential)
+                newAuthorizedRequest.queryForDeferredCredential(issuedCredential)
                     .getOrThrow()
 
             assertIs<DeferredCredentialQueryOutcome.IssuancePending>(requestDeferredIssuance)
@@ -157,7 +157,7 @@ class IssuanceDeferredRequestTest {
             ),
         )
 
-        val (_, authorizedRequest, issuer) =
+        val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 mockedKtorHttpClientFactory,
                 CredentialOfferWithSdJwtVc_NO_GRANTS,
@@ -169,19 +169,16 @@ class IssuanceDeferredRequestTest {
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
                 null,
             )
-            val submittedRequest = authorizedRequest.requestSingle(requestPayload).getOrThrow()
+            val (newAuthorized, outcome) = authorizedRequest.requestSingleAndUpdateState(
+                requestPayload,
+                CryptoGenerator.rsaProofSigner(),
+            ).getOrThrow()
 
-            assertIs<SubmissionOutcome.InvalidProof>(submittedRequest)
-            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
-            val secondSubmittedRequest =
-                proofRequired.requestSingle(requestPayload, CryptoGenerator.rsaProofSigner()).getOrThrow()
-
-            assertIs<SubmissionOutcome.Success>(secondSubmittedRequest)
-            val issuedCredential = secondSubmittedRequest.credentials[0]
+            assertIs<SubmissionOutcome.Success>(outcome)
+            val issuedCredential = outcome.credentials[0]
             require(issuedCredential is IssuedCredential.Deferred)
 
-            val (_, requestDeferredIssuance) = authorizedRequest.queryForDeferredCredential(issuedCredential)
-                .getOrThrow()
+            val (_, requestDeferredIssuance) = newAuthorized.queryForDeferredCredential(issuedCredential).getOrThrow()
             assertIs<DeferredCredentialQueryOutcome.Issued>(requestDeferredIssuance)
         }
     }
