@@ -24,8 +24,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
-import kotlin.test.assertTrue
-import kotlin.test.fail
+import kotlin.test.assertIs
 
 class IssuanceBatchRequestTest {
 
@@ -84,104 +83,48 @@ class IssuanceBatchRequestTest {
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
 
-        val claimSet_mso_mdoc = MsoMdocClaimSet(
+        val requests = reqs()
+        val (_, outcome) = with(issuer) {
+            authorizedRequest.requestBatchAndUpdateState(requests).getOrThrow()
+        }
+
+        assertIs<SubmissionOutcome.Success>(outcome)
+        outcome.credentials.forEach { assertIs<IssuedCredential.Issued>(it) }
+    }
+}
+
+fun reqs() = listOf(
+    IssuanceRequestPayload.ConfigurationBased(
+        CredentialConfigurationIdentifier(PID_MsoMdoc),
+        MsoMdocClaimSet(
             claims = listOf(
                 "org.iso.18013.5.1" to "given_name",
                 "org.iso.18013.5.1" to "family_name",
                 "org.iso.18013.5.1" to "given_name",
                 "org.iso.18013.5.1" to "birth_date",
-
             ),
-        )
-        val claimSet_sd_jwt_vc = GenericClaimSet(
+        ),
+    ),
+    IssuanceRequestPayload.ConfigurationBased(
+        CredentialConfigurationIdentifier(PID_SdJwtVC),
+        GenericClaimSet(
             claims = listOf(
                 "given_name",
                 "family_name",
                 "birth_date",
             ),
-        )
+        ),
+    ),
 
-        val claimSet_w3c_signed_jwt = GenericClaimSet(
+    IssuanceRequestPayload.ConfigurationBased(
+        CredentialConfigurationIdentifier(DEGREE_JwtVcJson),
+        GenericClaimSet(
             claims = listOf(
                 "given_name",
                 "family_name",
                 "degree",
             ),
-        )
+        ),
+    ),
 
-        with(issuer) {
-            when (authorizedRequest) {
-                is AuthorizedRequest.NoProofRequired -> {
-                    val batchRequestPayload = listOf(
-                        IssuanceRequestPayload.ConfigurationBased(
-                            CredentialConfigurationIdentifier(PID_MsoMdoc),
-                            claimSet_mso_mdoc,
-                        ),
-                        IssuanceRequestPayload.ConfigurationBased(
-                            CredentialConfigurationIdentifier(PID_SdJwtVC),
-                            claimSet_sd_jwt_vc,
-                        ),
-                        IssuanceRequestPayload.ConfigurationBased(
-                            CredentialConfigurationIdentifier(DEGREE_JwtVcJson),
-                            claimSet_w3c_signed_jwt,
-                        ),
-                    )
-                    val submittedRequest = authorizedRequest.requestBatch(batchRequestPayload).getOrThrow()
-                    when (submittedRequest) {
-                        is SubmissionOutcome.InvalidProof -> {
-                            val proofRequired = authorizedRequest.withCNonce(submittedRequest.cNonce)
-
-                            val proofSigner = CryptoGenerator.rsaProofSigner()
-                            val credentialMetadataTriples = listOf(
-                                Pair(
-                                    IssuanceRequestPayload.ConfigurationBased(
-                                        CredentialConfigurationIdentifier(PID_MsoMdoc),
-                                        claimSet_mso_mdoc,
-                                    ),
-                                    proofSigner,
-                                ),
-                                Pair(
-                                    IssuanceRequestPayload.ConfigurationBased(
-                                        CredentialConfigurationIdentifier(PID_SdJwtVC),
-                                        claimSet_sd_jwt_vc,
-                                    ),
-                                    proofSigner,
-                                ),
-                                Pair(
-                                    IssuanceRequestPayload.ConfigurationBased(
-                                        CredentialConfigurationIdentifier(DEGREE_JwtVcJson),
-                                        claimSet_w3c_signed_jwt,
-                                    ),
-                                    proofSigner,
-                                ),
-                            )
-
-                            val response = proofRequired.requestBatch(credentialMetadataTriples).getOrThrow()
-
-                            assertTrue("Second attempt should be successful") {
-                                response is SubmissionOutcome.Success
-                            }
-
-                            assertTrue("Second attempt should be successful") {
-                                (response as SubmissionOutcome.Success).credentials.all {
-                                    it is IssuedCredential.Issued
-                                }
-                            }
-                        }
-
-                        is SubmissionOutcome.Failed -> fail(
-                            "Failed with error ${submittedRequest.error}",
-                        )
-
-                        is SubmissionOutcome.Success -> fail(
-                            "first attempt should be unsuccessful",
-                        )
-                    }
-                }
-
-                is AuthorizedRequest.ProofRequired ->
-                    fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
-            }
-        }
-    }
-}
+).map { it to CryptoGenerator.rsaProofSigner() }

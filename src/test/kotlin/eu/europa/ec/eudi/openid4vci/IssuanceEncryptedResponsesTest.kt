@@ -332,7 +332,29 @@ class IssuanceEncryptedResponsesTest {
                 tokenPostMocker(),
                 oidcWellKnownMocker(EncryptedResponses.REQUIRED),
                 batchIssuanceRequestMocker(
-                    responseBuilder = { TODO("Not needed") },
+                    responseBuilder = {
+                        encryptedResponseDataBuilder(it) {
+                            Json.encodeToString(
+                                BatchCredentialResponseSuccessTO(
+                                    credentialResponses = listOf(
+                                        IssuanceResponseTO(
+                                            transactionId = "jjj136kojtspbnq",
+                                        ),
+                                        IssuanceResponseTO(
+                                            credential = "${PID_MsoMdoc}_issued_credential",
+                                            notificationId = "fgh126lbHjtspVbn",
+                                        ),
+                                        IssuanceResponseTO(
+                                            credential = "${DEGREE_JwtVcJson}_issued_credential",
+                                            notificationId = "aaffbnmyw23lbHjtspVbn",
+                                        ),
+                                    ),
+                                    cNonce = "wlbQc6pCJp",
+                                    cNonceExpiresInSeconds = 86400,
+                                ),
+                            )
+                        }
+                    },
                     requestValidator = {
                         val textContent = it.body as TextContent
                         val batchRequestTO = assertDoesNotThrow("Wrong credential request type") {
@@ -366,24 +388,14 @@ class IssuanceEncryptedResponsesTest {
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
             )
 
-            with(issuer) {
-                assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
+            val batchRequestPayload = listOf(
+                PID_MsoMdoc,
+                PID_SdJwtVC,
+                DEGREE_JwtVcJson,
+            ).map { IssuanceRequestPayload.ConfigurationBased(CredentialConfigurationIdentifier(it)) to null }
 
-                val batchRequestPayload = listOf(
-                    IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(PID_MsoMdoc),
-                        null,
-                    ),
-                    IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(PID_SdJwtVC),
-                        null,
-                    ),
-                    IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(DEGREE_JwtVcJson),
-                        null,
-                    ),
-                )
-                authorizedRequest.requestBatch(batchRequestPayload)
+            with(issuer) {
+                authorizedRequest.requestBatchAndUpdateState(batchRequestPayload).getOrThrow()
             }
         }
 
@@ -435,32 +447,18 @@ class IssuanceEncryptedResponsesTest {
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
             )
 
-            with(issuer) {
-                assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
+            val batchRequestPayload = listOf(
+                PID_MsoMdoc,
+                PID_SdJwtVC,
+                DEGREE_JwtVcJson,
+            ).map { IssuanceRequestPayload.ConfigurationBased(CredentialConfigurationIdentifier(it)) to null }
 
-                val batchRequestPayload = listOf(
-                    IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(PID_MsoMdoc),
-                        null,
-                    ),
-                    IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(PID_SdJwtVC),
-                        null,
-                    ),
-                    IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(DEGREE_JwtVcJson),
-                        null,
-                    ),
-                )
-                authorizedRequest.requestBatch(batchRequestPayload).fold(
-                    onSuccess = {
-                        assertIs<SubmissionOutcome.Success>(it)
-                        assertTrue("One deferred credential response expected") {
-                            it.credentials.any { credential -> credential is IssuedCredential.Deferred }
-                        }
-                    },
-                    onFailure = { fail("Failed with error ${it.message}") },
-                )
+            val (_, outcome) = with(issuer) {
+                authorizedRequest.requestBatchAndUpdateState(batchRequestPayload).getOrThrow()
+            }
+            assertIs<SubmissionOutcome.Success>(outcome)
+            assertTrue("One deferred credential response expected") {
+                outcome.credentials.any { credential -> credential is IssuedCredential.Deferred }
             }
         }
 
@@ -500,7 +498,6 @@ class IssuanceEncryptedResponsesTest {
                 assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                     CredentialConfigurationIdentifier(PID_SdJwtVC),
-                    null,
                 )
                 val (newAuthorizedRequest, outcome) = authorizedRequest.requestSingleAndUpdateState(requestPayload, null).getOrThrow()
                 assertIs<SubmissionOutcome.Success>(outcome)

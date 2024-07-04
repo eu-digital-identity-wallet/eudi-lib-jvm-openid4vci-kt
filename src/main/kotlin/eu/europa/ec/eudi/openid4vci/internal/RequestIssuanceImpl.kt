@@ -91,26 +91,45 @@ internal class RequestIssuanceImpl(
         return updated ?: this
     }
 
-    override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-        credentialsMetadata: List<IssuanceRequestPayload>,
-    ): Result<SubmissionOutcome> = runCatching {
-        placeIssuanceRequest(accessToken) {
-            val credentialRequests = credentialsMetadata.map {
-                singleRequest(it, null, credentialIdentifiers, true)
+    override suspend fun AuthorizedRequest.requestBatchAndUpdateState(
+        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
+        //
+        // Place the request
+        //
+        val outcome = placeIssuanceRequest(accessToken) {
+            val credentialRequests = credentialsMetadata.map { (requestPayload, popSigner) ->
+                val proofFactory = when (this) {
+                    is AuthorizedRequest.NoProofRequired -> null
+                    is AuthorizedRequest.ProofRequired -> {
+                        requireNotNull(popSigner) { "PopSigner is required in Authorized.ProofRequired" }
+                        proofFactory(popSigner, cNonce)
+                    }
+                }
+                singleRequest(requestPayload, proofFactory, credentialIdentifiers, true)
             }
             CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
         }
-    }
 
-    override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner>>,
-    ): Result<SubmissionOutcome> = runCatching {
-        placeIssuanceRequest(accessToken) {
-            val credentialRequests = credentialsMetadata.map { (requestPayload, proofSigner) ->
-                singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers, true)
-            }
-            CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
-        }
+        //
+        // Update state
+        //
+        val updatedAuthorizedRequest = this.withCNonceFrom(outcome)
+
+        //
+        // Retry on invalid proof if we begin from NoProofRequired and issuer
+        // replied with InvalidProof
+        //
+        val retryOnInvalidProof =
+            this is AuthorizedRequest.NoProofRequired &&
+                updatedAuthorizedRequest is AuthorizedRequest.ProofRequired &&
+                outcome is SubmissionOutcome.InvalidProof
+
+        suspend fun retry() =
+            updatedAuthorizedRequest.requestBatchAndUpdateState(credentialsMetadata).getOrThrow()
+
+        if (retryOnInvalidProof) retry()
+        else updatedAuthorizedRequest to outcome
     }
 
     private fun credentialSupportedById(credentialId: CredentialConfigurationIdentifier): CredentialConfiguration {

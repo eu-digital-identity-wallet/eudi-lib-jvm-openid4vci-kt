@@ -347,9 +347,10 @@ class IssuanceSingleRequestTest {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
+                    val popSigner = CryptoGenerator.rsaProofSigner()
                     val (newAuthorizedRequest, outcome) = authorizedRequest.requestSingleAndUpdateState(
                         requestPayload,
-                        CryptoGenerator.rsaProofSigner(),
+                        popSigner,
                     ).getOrThrow()
                     assertTrue { authorizedRequest != newAuthorizedRequest }
                     assertIs<SubmissionOutcome.Success>(outcome)

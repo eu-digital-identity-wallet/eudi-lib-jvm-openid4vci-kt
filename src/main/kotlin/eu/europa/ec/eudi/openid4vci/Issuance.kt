@@ -141,7 +141,7 @@ sealed interface IssuanceRequestPayload {
      */
     data class ConfigurationBased(
         val credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
-        val claimSet: ClaimSet?,
+        val claimSet: ClaimSet? = null,
     ) : IssuanceRequestPayload
 }
 
@@ -225,15 +225,33 @@ interface RequestIssuance {
 interface BatchRequestIssuance {
 
     /**
+     *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
+     *
+     *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
+     *  @return The new state of request or error.
+     */
+    suspend fun AuthorizedRequest.requestBatchAndUpdateState(
+        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
+
+    /**
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.NoProofRequired] authorization.
      *
      *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
 
      *  @return The new state of request or error.
      */
+    @Deprecated(
+        message = "Deprecated and will be removed in a future release",
+        replaceWith = ReplaceWith("requestBatchAndUpdateState(credentialsMetadata.map{it to null})"),
+    )
     suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
         credentialsMetadata: List<IssuanceRequestPayload>,
-    ): Result<SubmissionOutcome>
+    ): Result<SubmissionOutcome> = runCatching {
+        val credentialsMetadataWithNoProofs = credentialsMetadata.map { it to null }
+        val (_, outcome) = requestBatchAndUpdateState(credentialsMetadataWithNoProofs).getOrThrow()
+        outcome
+    }
 
     /**
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
@@ -241,9 +259,14 @@ interface BatchRequestIssuance {
      *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
      *  @return The new state of request or error.
      */
+    @Deprecated(
+        message = "Deprecated and will be removed in a future release",
+        replaceWith = ReplaceWith("requestBatchAndUpdateState(credentialsMetadata)"),
+    )
     suspend fun AuthorizedRequest.ProofRequired.requestBatch(
         credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner>>,
-    ): Result<SubmissionOutcome>
+    ): Result<SubmissionOutcome> =
+        requestBatchAndUpdateState(credentialsMetadata).map { it.second }
 }
 
 sealed interface PopSigner {
