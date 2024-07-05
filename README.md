@@ -27,6 +27,7 @@ In particular, the library focuses on the wallet's role in and provides the foll
 
 | Feature                                                                                       | Coverage                                                                                                               |
 |-----------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| [Wallet-initiated issuance](#wallet-initiated-issuance)                                                                 | ✅                                                                                                                        |
 | [Resolve a credential offer](#resolve-a-credential-offer)                                     | ✅ Unsigned metadata ❌ [accept-language](#issuer-metadata-accept-language) ❌ [signed metadata](#issuer-signed-metadata) |
 | [Authorization code flow](#authorization-code-flow)                                           | ✅                                                                                                                      |
 | [Pre-authorized code flow](#pre-authorized-code-flow)                                         | ✅                                                                                                                      |
@@ -147,10 +148,6 @@ This concern, though is out of the scope of library
 
 In order to resolve a credential offer wallet/caller must provide [configuration options](#configuration-options)
 
-#### Resolve a credential offer next steps
-
-- [Authorize wallet for issuance](#authorize-wallet-for-issuance)
-
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
@@ -158,6 +155,11 @@ val openId4VCIConfig = ...
 val credentialOfferUri: String = "..."
 val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()
 ```
+
+#### Resolve a credential offer next steps
+
+- [Authorize wallet for issuance](#authorize-wallet-for-issuance)
+
 ### Authorize wallet for issuance
 
 As a wallet/caller use the library to obtain an `access_token`, to be able to access 
@@ -362,6 +364,7 @@ val (updatedAuthorizedRequest, outcome) =
 - [Query for credential](#query-for-deferred-credential), or
 - [Query for credential at later time](#query-for-deferred-credential-at-later-time), or
 - [Notify credential issuer](#notify-credential-issuer)
+
 
 **Important note**
 
