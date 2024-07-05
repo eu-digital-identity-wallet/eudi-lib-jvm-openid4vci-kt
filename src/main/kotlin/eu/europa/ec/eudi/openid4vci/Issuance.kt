@@ -71,6 +71,7 @@ sealed interface SubmissionOutcome : java.io.Serializable {
      */
     data class Success(
         val credentials: List<IssuedCredential>,
+        @Deprecated(message = "Deprecated and will be removed in a future release")
         val cNonce: CNonce?,
     ) : SubmissionOutcome
 
@@ -95,6 +96,7 @@ sealed interface SubmissionOutcome : java.io.Serializable {
      * @param cNonce The c_nonce provided from issuer along the error
      * @param errorDescription Description of the error that caused the failure
      */
+    @Deprecated(message = "Deprecated and will be removed in a future release")
     data class InvalidProof(
         val cNonce: CNonce,
         val errorDescription: String? = null,

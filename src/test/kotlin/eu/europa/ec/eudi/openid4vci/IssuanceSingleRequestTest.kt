@@ -90,11 +90,12 @@ class IssuanceSingleRequestTest {
             when (authorizedRequest) {
                 is AuthorizedRequest.NoProofRequired -> {
                     val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-                    val (_, outcome) = assertDoesNotThrow {
+                    val (updatedAuthorizedRequest, outcome) = assertDoesNotThrow {
                         val requestPayload =
                             IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
                         authorizedRequest.requestSingleAndUpdateState(requestPayload, null).getOrThrow()
                     }
+                    assertIs<AuthorizedRequest.ProofRequired>(updatedAuthorizedRequest)
                     assertIs<SubmissionOutcome.InvalidProof>(outcome)
                 }
 

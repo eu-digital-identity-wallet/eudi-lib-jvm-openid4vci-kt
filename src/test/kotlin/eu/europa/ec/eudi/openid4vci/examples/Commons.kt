@@ -130,7 +130,7 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
       ENV : CanAuthorizeIssuance<USER> =
     coroutineScope {
         val authorizedRequest = authorizeUsingAuthorizationCodeFlow(env, enableHttpLogging)
-        val (newAuthorizedRequest, outcome) =
+        val (_, outcome) =
             submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest, popSignerPreference)
 
         ensureIssued(outcome)
