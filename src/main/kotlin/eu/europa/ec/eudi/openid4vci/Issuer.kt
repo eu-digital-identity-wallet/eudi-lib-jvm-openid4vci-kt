@@ -116,35 +116,40 @@ interface Issuer :
                 ).getOrThrow()
             }
 
-            val authorizationEndpointClient = AuthorizationEndpointClient(
-                credentialOffer.credentialIssuerIdentifier,
-                credentialOffer.authorizationServerMetadata,
-                config,
-                ktorHttpClientFactory,
-            )
-            val tokenEndpointClient = TokenEndpointClient(
-                credentialOffer.authorizationServerMetadata,
-                config,
-                dPoPJwtFactory,
-                ktorHttpClientFactory,
-            )
+            val authorizationEndpointClient =
+                AuthorizationEndpointClient(
+                    credentialOffer.credentialIssuerIdentifier,
+                    credentialOffer.authorizationServerMetadata,
+                    config,
+                    ktorHttpClientFactory,
+                )
 
-            val authorizeIssuance = AuthorizeIssuanceImpl(
-                credentialOffer,
-                config,
-                authorizationEndpointClient,
-                tokenEndpointClient,
-            )
+            val tokenEndpointClient =
+                TokenEndpointClient(
+                    credentialOffer.authorizationServerMetadata,
+                    config,
+                    dPoPJwtFactory,
+                    ktorHttpClientFactory,
+                )
+
+            val authorizeIssuance =
+                AuthorizeIssuanceImpl(
+                    credentialOffer,
+                    config,
+                    authorizationEndpointClient,
+                    tokenEndpointClient,
+                )
 
             val responseEncryptionSpec =
                 responseEncryptionSpec(credentialOffer, config, responseEncryptionSpecFactory).getOrThrow()
 
             val requestIssuance = run {
-                val credentialEndpointClient = CredentialEndpointClient(
-                    credentialOffer.credentialIssuerMetadata.credentialEndpoint,
-                    dPoPJwtFactory,
-                    ktorHttpClientFactory,
-                )
+                val credentialEndpointClient =
+                    CredentialEndpointClient(
+                        credentialOffer.credentialIssuerMetadata.credentialEndpoint,
+                        dPoPJwtFactory,
+                        ktorHttpClientFactory,
+                    )
                 val batchEndPointClient =
                     credentialOffer.credentialIssuerMetadata.batchCredentialEndpoint?.let { batchEndPoint ->
                         BatchEndPointClient(batchEndPoint, dPoPJwtFactory, ktorHttpClientFactory)
@@ -194,13 +199,17 @@ interface Issuer :
                 ): DeferredIssuanceContext {
                     val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
                     val authorizationServerMetadata = credentialOffer.authorizationServerMetadata
+
                     val deferredEndpoint =
                         checkNotNull(credentialIssuerMetadata.deferredCredentialEndpoint?.value) {
                             "Missing deferred credential endpoint"
                         }
-                    val tokenEndpoint = checkNotNull(authorizationServerMetadata.tokenEndpointURI?.toURL()) {
-                        "Missing token endpoint"
-                    }
+
+                    val tokenEndpoint =
+                        checkNotNull(authorizationServerMetadata.tokenEndpointURI?.toURL()) {
+                            "Missing token endpoint"
+                        }
+
                     return DeferredIssuanceContext(
                         DeferredIssuerConfig(
                             clientId = config.clientId,
@@ -237,6 +246,49 @@ interface Issuer :
         ): Result<Issuer> = runCatching {
             val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory)
             val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUri).getOrThrow()
+            make(config, credentialOffer, ktorHttpClientFactory, responseEncryptionSpecFactory).getOrThrow()
+        }
+
+        /**
+         * Factory method for creating an instance of [Issuer] with a credential offer (Wallet initiated)
+         * This requires out-of-band knowledge of [issuer][credentialIssuerId] and one or more
+         * [credentialConfigurationIdentifiers].
+         *
+         * This is equivalent to instantiating a credential offer, using authorization code grant,
+         * without `issuer_state`.
+         *
+         * @param config wallet's configuration options
+         * @param credentialIssuerId the id of the credential issuer
+         * @param credentialConfigurationIdentifiers a list of credential configuration identifiers
+         * @param ktorHttpClientFactory a factory for obtaining http clients, used while interacting with issuer
+         * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
+         *
+         * @return if wallet's [config] can satisfy the requirements of credential issuer, an [Issuer] will be
+         * created. Otherwise, there would be a failed result
+         */
+        suspend fun makeWalletInitiated(
+            config: OpenId4VCIConfig,
+            credentialIssuerId: CredentialIssuerId,
+            credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
+            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+        ): Result<Issuer> = runCatching {
+            require(credentialConfigurationIdentifiers.isNotEmpty()) {
+                "At least one credential configuration identifier must be specified"
+            }
+
+            val (credentialIssuerMetadata, authServersMetadata) =
+                ktorHttpClientFactory().use { httpClient -> metaData(httpClient, credentialIssuerId) }
+
+            val credentialOffer =
+                CredentialOffer(
+                    credentialIssuerId,
+                    credentialIssuerMetadata,
+                    authServersMetadata.first(),
+                    credentialConfigurationIdentifiers,
+                    Grants.AuthorizationCode(issuerState = null),
+                )
+
             make(config, credentialOffer, ktorHttpClientFactory, responseEncryptionSpecFactory).getOrThrow()
         }
 

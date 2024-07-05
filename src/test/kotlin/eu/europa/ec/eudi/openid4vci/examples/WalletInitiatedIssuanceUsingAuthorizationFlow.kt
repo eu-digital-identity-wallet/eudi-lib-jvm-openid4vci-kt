@@ -16,40 +16,24 @@
 package eu.europa.ec.eudi.openid4vci.examples
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.internal.ensure
 import kotlinx.coroutines.runBlocking
 
 fun main(): Unit = runBlocking {
-    runUseCase(PidDevIssuer.issuerId, PidDevIssuer.AllCredentialConfigurationIds)
+    runUseCase(PidDevIssuer.cfg, PidDevIssuer.issuerId, PidDevIssuer.AllCredentialConfigurationIds)
 }
 
 fun runUseCase(
+    config: OpenId4VCIConfig,
     credentialIssuerId: CredentialIssuerId,
     credentialConfigurationIds: List<CredentialConfigurationIdentifier>,
 ): Unit = runBlocking {
     println("[[Scenario: Issuance based on credential configuration ids: $credentialConfigurationIds]] ")
 
-    val (issuerMetadata, authorizationServersMetadata) = createHttpClient(enableLogging = true).use { client ->
-        Issuer.metaData(client, credentialIssuerId)
-    }
-
-    credentialConfigurationIds.forEach {
-        ensure(issuerMetadata.credentialConfigurationsSupported[it] != null) {
-            error("Credential identifier $it not supported by issuer")
-        }
-    }
-
-    val credentialOffer = CredentialOffer(
-        credentialIssuerIdentifier = credentialIssuerId,
-        credentialIssuerMetadata = issuerMetadata,
-        authorizationServerMetadata = authorizationServersMetadata[0],
-        credentialConfigurationIdentifiers = credentialConfigurationIds,
-    )
-
-    val issuer = Issuer.make(
-        config = PidDevIssuer.cfg,
-        credentialOffer = credentialOffer,
-        ktorHttpClientFactory = { createHttpClient(enableLogging = false) },
+    val issuer = Issuer.makeWalletInitiated(
+        config,
+        credentialIssuerId,
+        credentialConfigurationIds,
+        { createHttpClient(enableLogging = false) },
     ).getOrThrow()
 
     with(issuer) {
@@ -60,7 +44,10 @@ fun runUseCase(
 
         credentialOffer.credentialConfigurationIdentifiers.forEach { credentialIdentifier ->
 
-            submitCredentialRequest(authorizedRequest, credentialIdentifier).also { (newAuthorizedRequest, credential) ->
+            submitCredentialRequest(
+                authorizedRequest,
+                credentialIdentifier,
+            ).also { (newAuthorizedRequest, credential) ->
                 println("--> Issued credential: $credential \n")
                 authorizedRequest = newAuthorizedRequest
             }
@@ -96,7 +83,8 @@ private suspend fun Issuer.submitCredentialRequest(
     issuanceLog("Requesting issuance of '$credentialConfigurationId'")
     val proofSigner = popSigner(credentialConfigurationId)
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-    val (newAuthorized, outcome) = authorizedRequest.requestSingleAndUpdateState(requestPayload, proofSigner).getOrThrow()
+    val (newAuthorized, outcome) = authorizedRequest.requestSingleAndUpdateState(requestPayload, proofSigner)
+        .getOrThrow()
 
     return when (outcome) {
         is SubmissionOutcome.Success -> newAuthorized to handleSuccess(newAuthorized, outcome)
