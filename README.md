@@ -62,14 +62,15 @@ The released software is an initial development release version:
 
 ### Resolve a credential offer
 
-As a wallet/caller use the library to process a URI that represents a credential offer to make sure that
-it is a valid offer, that comes from an issuer which advertises properly its metadata and that
-this offered is compatible with wallet configuration.
+As a wallet/caller use the library to process a URI that represents a credential offer 
+- to make sure that it is a valid offer, 
+- comes from an issuer which advertises properly its metadata and that
+- this offer is compatible with wallet configuration.
 
 #### Resolve a credential offer preconditions
 
 - The wallet has obtained this URI. Typically, either scanning a QR Code or in response to a custom URI.
-- The wallet has prepared an issuance configuration, describing the capabilities & policies of the wallet.
+- The wallet has prepared an issuance [configuration](#configuration-options), describing the capabilities & policies of the wallet.
 
 This resolution includes the following
 
@@ -136,7 +137,7 @@ Depending on the capabilities of the token endpoint of the credential issuer thi
 - `ProofRequired` : That's the case where Token Endpoint provided a `c_nonce` attribute
 - `NoProofRequired` : Otherwise.
 
-`AuthorizedRequest` will contain the `access_token` (bearer or DPoP), if provided
+`AuthorizedRequest` will contain the `access_token` (bearer or [DPoP](#demonstrating-proof-of-possession-dpop)), and, if provided,
 the `refresh_token` and `c_nonce`
 
 #### Authorization code flow
@@ -165,18 +166,15 @@ In addition to the [common authorization preconditions](#authorize-wallet-for-is
 
 1. Wallet/caller using asks the `Issuer` instance to prepare a URL where the mobile device browser needs to be pointed to.
 Library prepares this URL as follows
-   - If PAR endpoint is advertised it will place a PAR request and assemble the URL for the authorization endpoint
-   - If PAR endpoint is not supported (or disabled), it will assemble the URL as a normally for the authorization endpoint
-   - In both case PKCE will be used
+   - If [PAR](#pushed-authorization-requests) endpoint is advertised it will place a PAR request and assemble the URL for the authorization endpoint
+   - If PAR endpoint is not supported (or disabled), it will assemble the URL, as normally, for the authorization endpoint
+   - In both case [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce) will be used
 2. Wallet/Caller opens the mobile's browser to the URL calculated in the previous step
 3. User interacts with the authorization server via mobile device agent, typically providing his authorization
-4. On success, authorization redirects to a wallet provided `redirect_uri`, providing the `authorization code` and a `state`
+4. On success, authorization redirects to a wallet provided `redirect_uri`, providing the `code` and a `state` parameters
 5. Using the `Issuer` instance exchange the `authorization code` for an `access_token` 
 
 In the scope of the library are steps 1 and 5.
-
-According to the configuration used to instantiate the `Issuer` and the capabilities of the
-credential issuer, the following features will be leveraged:
 
 ##### Authorization code flow execution
 
@@ -227,19 +225,20 @@ In addition to the [common authorization preconditions](#authorize-wallet-for-is
 - The credential offer specifies pre-authorized code flow or 
 - Wallet/caller decided to use this flow
 - Optionally, wallet has received via another channel a `tx_code`  
-- Wallet has gathered from the user the `tx_code` value, if needed
+- Wallet has gathered from the user this `tx_code` value, if needed
  
 Steps:
 1. Using the `Issuer` instance exchange the pre-authorized code & optionally the `tx_code` with an `access_token`
-2. Library will place a adequate request the token endpoint of the credential issuer
+2. Library will place an adequate request the token endpoint of the credential issuer
 3. Library will receive token endpoint response and map it to a `AuthorizedRequest`
 
 
 ##### Pre-authorized code flow execution
+
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
-val txCode : Sting? = ... // Pin retrieved from another channel 
+val txCode : Sting? = ... // Pin retrieved from another channel, if needed
 
 val authorizedRequest =  
     with(issuer) {
