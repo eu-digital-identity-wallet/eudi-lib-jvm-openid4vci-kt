@@ -194,7 +194,7 @@ the `refresh_token` and `c_nonce`
 - [Place credential request](#place-credential-request), or
 - [Place batch credential request](#place-batch-credential-request)
 
-#### Authorization code flow
+### Authorization code flow
 
 ```mermaid 
 ---
@@ -209,14 +209,14 @@ stateDiagram-v2
 c_nonce_returned --> AuthorizedRequest.NoProofRequired : no
 ```
 
-##### Authorization code flow preconditions
+#### Authorization code flow preconditions
 
 In addition to the [common authorization preconditions](#authorize-wallet-for-issuance-preconditions)
 
 - The credential offer specifies authorization code flow, or
 - Wallet/Caller decides to use this flow
 
-##### Authorization code flow steps
+#### Authorization code flow steps
 
 1. Wallet/caller using asks the `Issuer` instance to prepare a URL where the mobile device browser needs to be pointed to.
 Library prepares this URL as follows
@@ -230,7 +230,7 @@ Library prepares this URL as follows
 
 In the scope of the library are steps 1 and 5.
 
-##### Authorization code flow execution
+#### Authorization code flow execution
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
@@ -255,10 +255,9 @@ val authorizedRequest =
              authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode),state).getOrThrow()
          }
      }
-
 ```
 
-#### Pre-authorized code flow
+### Pre-authorized code flow
 
 ```mermaid 
 ---
@@ -272,7 +271,7 @@ stateDiagram-v2
 c_nonce_returned --> AuthorizedRequest.NoProofRequired : no
 ```
 
-##### Pre-authorized code flow preconditions
+#### Pre-authorized code flow preconditions
 
 In addition to the [common authorization preconditions](#authorize-wallet-for-issuance-preconditions)
 
@@ -287,7 +286,7 @@ Steps:
 3. Library will receive token endpoint response and map it to a `AuthorizedRequest`
 
 
-##### Pre-authorized code flow execution
+#### Pre-authorized code flow execution
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
@@ -358,13 +357,6 @@ val (updatedAuthorizedRequest, outcome) =
     }
 
 ```
-#### Place credential request next steps
-
-- Validate credential and store it. That's out of library scope, or
-- [Query for credential](#query-for-deferred-credential), or
-- [Query for credential at later time](#query-for-deferred-credential-at-later-time), or
-- [Notify credential issuer](#notify-credential-issuer)
-
 
 **Important note**
 
@@ -383,6 +375,13 @@ The library will automatically try to handle the invalid proof response and plac
 which includes proofs. This can be done only if caller has provided a `popSigner` while 
 invoking `requestSingleAndUpdateState()`. In case, that this second request fails with `invalid_proof` 
 library will not retry the request and an error will be reported to caller.
+
+#### Place credential request next steps
+
+- Validate credential and store it. That's out of library scope, or
+- [Query for credential](#query-for-deferred-credential), or
+- [Query for credential at later time](#query-for-deferred-credential-at-later-time), or
+- [Notify credential issuer](#notify-credential-issuer)
 
 ### Query for deferred credential
 
@@ -414,7 +413,6 @@ The outcome of placing this query is a pair comprised of
   - `IssuancePending`: Deferred credential was not ready
   - `Errored`: Credential issuer doesn't recognize the `transaction_id`
 
-
 #### Query for deferred credential execution
 
 ```kotlin
@@ -429,6 +427,11 @@ val (updatedAuthorizedRequest, outcome) =
     }    
 
 ```
+#### Query for deferred credential next steps
+
+- Validate credential and store it. That's out of library scope, or
+- [Query for credential](#query-for-deferred-credential)
+
 ### Query for deferred credential at later time
 
 Wallet/caller wants to suspend issuance process, store its context and query issuer at a later time.
