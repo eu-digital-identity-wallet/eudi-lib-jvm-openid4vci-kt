@@ -434,8 +434,48 @@ that serializes the context as a JSON object.
 
 ### Notify Credential Issuer
 
-TBD
+Wallet/caller wants to notify the credential issuer, about the overall 
+outcome of the issuance, using one of the defined notifications:
 
+- Accepted : Credential was successfully stored in the Wallet
+- Deleted: Unsuccessful Credential issuance was caused by a user action.
+- Failed:  Other unsuccessful cases
+
+#### Notify Credential Issuer preconditions
+
+- Credential issuer advertises the optional Notification Endpoint
+- Wallet/caller has received a [IssuedCredential.Issued](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuance.kt) with a `notificationId`  
+  (via credential, deferred or batch endpoint)  
+- Wallet/caller has processed the issued credential (verification & storage)
+- Wallet/caller still has a reference to the `Issuer` and `AuthorizedRequest` instances
+
+#### Notify Credential Issuer outcome
+
+The use case always succeeds, even in the case of an unexpected error.
+
+#### Notify Credential Issuer steps
+
+1. Wallet/caller using the library creates a notification event
+2. Wallet/caller using the `Issuer` instance places the notification to the credential issuer
+
+#### Notify Credential Issuer execution
+
+```kotlin
+val authorizedRequest = // has been retrieved in a previous step
+val notificationId = // has been provided by the issuer
+
+// Step 1
+// Other events are Deleted and Failed    
+val event = 
+    CredentialIssuanceEvent.Accepted(notificationId, "Got it!")
+
+// Step 2
+with(issuer){
+    with(authorizedRequest){
+        notify(event).getOrNull()
+    }
+}
+```
 
 ## Configuration Options
 
