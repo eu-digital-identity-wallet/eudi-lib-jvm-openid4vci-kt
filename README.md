@@ -24,25 +24,26 @@ the [OpenId4VCI (draft 13)](https://openid.net/specs/openid-4-verifiable-credent
 
 In particular, the library focuses on the wallet's role in and provides the following features:
 
-| Feature                                                                                       | Coverage                                          |
-|-----------------------------------------------------------------------------------------------|---------------------------------------------------|
-| [Resolve a credential offer](#resolve-a-credential-offer)                                     | ✅                                                |
-| [Authorization code flow](#authorization-code-flow)                                           | ✅                                                |
-| [Pre-authorized code flow](#pre-authorized-code-flow)                                         | ✅                                                |
-| mso_mdoc format                                                                               | ✅                                                |
-| SD-JWT-VC format                                                                              | ✅                                                |
-| W3C VC DM                                                                                     | VC Signed as a JWT, Not Using JSON-LD             |
-| [Place a credential request](#place-a-credential-request)                                     | ✅ Including automatic handling of `invalid_proof`|
-| [Place batch credential request](#place-a-batch-credential-request)                           | ✅                                                | 
-| [Query for deferred credential](#query-for-deferred-credential)                               | ✅ Including automatic refresh of `access_token`  |
-| [Query for deferred credential at a later time](#query-for-deferred-credential-at-later-time) | ✅ Including automatic refresh of `access_token`  |
-| [Notify credential issuer](#notify-credential-issuer)                                         | ✅                                                | 
-| Proof                                                                                         | ✅ JWT ✅ CWT                                     |
-| Credential response encryption                                                                | ✅                                                |
-| [Pushed authorization requests](#pushed-authorization-requests)                               | ✅ Used by default, if supported by issuer        |
-| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)           | ✅                                                |
-| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                             | ✅                                                |
-| Wallet authentication                                                                         | currently, only public client                     |
+
+| Feature                                                                                       | Coverage                                                                                                               |
+|-----------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| [Resolve a credential offer](#resolve-a-credential-offer)                                     | ✅ Unsigned metadata ❌ [accept-language](#issuer-metadata-accept-language) ❌ [signed metadata](#issuer-signed-metadata) |
+| [Authorization code flow](#authorization-code-flow)                                           | ✅                                                                                                                      |
+| [Pre-authorized code flow](#pre-authorized-code-flow)                                         | ✅                                                                                                                      |
+| mso_mdoc format                                                                               | ✅                                                                                                                      |
+| SD-JWT-VC format                                                                              | ✅                                                                                                                      |
+| W3C VC DM                                                                                     | VC Signed as a JWT, Not Using JSON-LD                                                                                  |
+| [Place a credential request](#place-a-credential-request)                                     | ✅ Including automatic handling of `invalid_proof`                                                                      |
+| [Place batch credential request](#place-a-batch-credential-request)                           | ✅                                                                                                                      | 
+| [Query for deferred credential](#query-for-deferred-credential)                               | ✅ Including automatic refresh of `access_token`                                                                        |
+| [Query for deferred credential at a later time](#query-for-deferred-credential-at-later-time) | ✅ Including automatic refresh of `access_token`                                                                        |
+| [Notify credential issuer](#notify-credential-issuer)                                         | ✅                                                                                                                      | 
+| Proof                                                                                         | ✅ JWT ✅ CWT                                                                                                            |
+| Credential response encryption                                                                | ✅                                                                                                                      |
+| [Pushed authorization requests](#pushed-authorization-requests)                               | ✅ Used by default, if supported by issuer                                                                              |
+| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)           | ✅                                                                                                                      |
+| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                             | ✅                                                                                                                      |
+| Wallet authentication                                                                         | currently, only public client                                                                                          |
 
 
 ## Disclaimer
@@ -320,7 +321,8 @@ doesn't provide a `c_nonce` and proof is required for the requested credential.
 
 The library will automatically try to handle the invalid proof response and place a second request 
 which includes proofs. This can be done only if caller has provided a `popSigner` while 
-invoking `requestSingleAndUpdateState()`
+invoking `requestSingleAndUpdateState()`. In case, that this second request fails with `invalid_proof` 
+library will not retry the request and an error will be reported to caller.
 
 ### Query for deferred credential
 
@@ -336,8 +338,8 @@ an `AuthorizedRequest` and an `Issuer` instance.
 #### Query for deferred credential steps
 
 1. Wallet/caller issuing the `Issuer` instance places the query providing `AuthorizedRequest` and `transaction_id`
-2. Library if `access_token` found in `AuthorizedRequest` is expired
-3. If `access_token` is expired library will automatically try to refresh it, provided that issuer has given a `refresh_token`
+2. Library checks if `access_token`  in `AuthorizedRequest` is expired
+3. If `access_token` is expired it will automatically be refreshed, provided that credential issuer has given a `refresh_token`
 4. Library places the query against the Deferred Endpoint of the credential issuer
 5. Library gets credential issuer response and maps it into `DeferredCredentialQueryOutcome`
 6. Caller gets back an `AuthorizedRequest` and `DeferredCredentialQueryOutcome`
@@ -345,7 +347,8 @@ an `AuthorizedRequest` and an `Issuer` instance.
 #### Query for deferred credential outcome
 
 The outcome of placing this query is a pair comprised of  
-- `AuthorizedRequest` : This represents a possibly new state of authorization carrying a refreshed `access_token`
+
+- `AuthorizedRequest` : This represents a possibly updated `AuthorizedRequest` with a refreshed `access_token`
 - `DeferredCredentialQueryOutcome`: This is the response of the deferred endpoint and it could be one of
   - `Issued` : Deferred credential was issued 
   - `IssuancePending`: Deferred credential was not ready
@@ -559,10 +562,13 @@ This feature cannot be disabled.
 
 ## Features not supported
 
-### Issuer metadata
+### Issuer metadata accept-language
 
 In [section 11.2.2](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#section-11.2.2) specification recommends the use of header `Accept-Language` to indicate the language(s) preferred for display.
 Current version of the library does not support this.
+
+### Issuer signed metadata
+
 In [section 11.2.3](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html#section-11.2.3) specification details the metadata an issuer advertises through its metadata endpoint.
 Current version of the library supports all metadata specified there except `signed_metadata` attribute.
 
