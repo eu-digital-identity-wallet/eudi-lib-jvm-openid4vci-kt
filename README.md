@@ -32,10 +32,9 @@ In particular, the library focuses on the wallet's role in and provides the foll
 | mso_mdoc format                                                                               | ✅                                                 |
 | SD-JWT-VC format                                                                              | ✅                                                 |
 | W3C VC DM                                                                                     | VC Signed as a JWT, Not Using JSON-LD             |
-| Credential Offer                                                                              | ✅                                                 |
 | [Place a credential request](#place-a-credential-request)                                     | ✅ Including automatic handling of `invalid_proof` |
-| Place a batch credential request                                                              | ✅                                                 | 
-| [Query for deferred credential](#query-for-deferred-credential)                               | ✅ Including automatic refresh of `access_token`   | 
+| [Place batch credential request](#place-a-batch-credential-request)                           | ✅                                                 | 
+| [Query for deferred credential](#query-for-deferred-credential)                               | ✅ Including automatic refresh of `access_token`   |
 | [Query for deferred credential at a later time](#query-for-deferred-credential-at-later-time) | ✅ Including automatic refresh of `access_token`   |
 | [Notify credential issuer](#notify-credential-issuer)                                         | ✅                                                 | 
 | Proof                                                                                         | ✅ JWT ✅ CWT                                       |
@@ -43,6 +42,7 @@ In particular, the library focuses on the wallet's role in and provides the foll
 | [Pushed authorization requests](#pushed-authorization-requests)                               | ✅ Used by default, if supported by issuer         |
 | [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)           | ✅                                                 |
 | [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                             | ✅                                                 |
+| Wallet authentication                                                                         | currently, only public client                     |
 
 
 ## Disclaimer
@@ -530,7 +530,7 @@ To use the PAR endpoint
 Library will automatically use the PAR endpoint during the [authorization code flow](#authorization-code-flow), 
 otherwise it will fall back to a regular authorization request.
 
-### Place batch request
+### Place batch credential request
 
 Library supports placing request against the Batch Endpoint of the Credential Issuer.
 This functionality probably will be removed from library given that OpenId4VCI will remove it, as well.
