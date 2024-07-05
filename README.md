@@ -21,20 +21,29 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
 
 This is a Kotlin library, targeting JVM, that supports
 the [OpenId4VCI (draft 13)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html) protocol.
-In particular, the library focuses on the wallet's role in the protocol to:
 
-- [Resolve a credential offer](#resolve-a-credential-offer)
-- [Authorize wallet for issuance](#authorize-wallet-for-issuance)
-- [Place a credential request](#place-a-credential-request)
-- [Query for deferred credential](#query-for-deferred-credential)
-- [Query for deferred credential at a leter time](#query-for-deferred-credential-at-later-time)
+In particular, the library focuses on the wallet's role in and provides the following features:
 
-OpenId4VCI specification defines several extension points to accommodate the differences across Credential formats. The current version of the library supports
-the following profiles:
+| Feature                                                                                       | Coverage                                          |
+|-----------------------------------------------------------------------------------------------|---------------------------------------------------|
+| [Resolve a credential offer](#resolve-a-credential-offer)                                     | ✅                                                 |
+| [Authorization code flow](#authorization-code-flow)                                           | ✅                                                 |
+| [Pre-authorized code flow](#pre-authorized-code-flow)                                         | ✅                                                 |
+| mso_mdoc format                                                                               | ✅                                                 |
+| SD-JWT-VC format                                                                              | ✅                                                 |
+| W3C VC DM                                                                                     | VC Signed as a JWT, Not Using JSON-LD             |
+| Credential Offer                                                                              | ✅                                                 |
+| [Place a credential request](#place-a-credential-request)                                     | ✅ Including automatic handling of `invalid_proof` |
+| Place a batch credential request                                                              | ✅                                                 | 
+| [Query for deferred credential](#query-for-deferred-credential)                               | ✅ Including automatic refresh of `access_token`   | 
+| [Query for deferred credential at a later time](#query-for-deferred-credential-at-later-time) | ✅ Including automatic refresh of `access_token`   |
+| [Notify credential issuer](#notify-credential-issuer)                                         | ✅                                                 | 
+| Proof                                                                                         | ✅ JWT ✅ CWT                                       |
+| Credential response encryption                                                                | ✅                                                 |
+| [Pushed authorization requests](#pushed-authorization-requests)                               | ✅ Used by default, if supported by issuer         |
+| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)           | ✅                                                 |
+| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                             | ✅                                                 |
 
-- ISO mDL,
-- IETF SD-JWT VC and
-- W3C VC DM (VC Signed as a JWT, Not Using JSON-LD)
 
 ## Disclaimer
 
@@ -383,7 +392,7 @@ As per [query for deferred credential](#query-for-deferred-credential-preconditi
 6. Library returns to the caller the `DeferredIssuanceContxt?` and the `DeferredCredentialQueryOutcome`
 7. Depending on the outcome, wallet/caller may choose to store the new `DeferredIssuanceContxt` to query again, later on
 
-### Query for deferred credential at later time outcome
+#### Query for deferred credential at later time outcome
 
 The outcome of placing this query is a pair comprised of
 - `DeferredIssuanceContext` : This represents a possibly new state of authorization carrying a refreshed `access_token`
@@ -392,7 +401,7 @@ The outcome of placing this query is a pair comprised of
     - `IssuancePending`: Deferred credential was not ready
     - `Errored`: Credential issuer doesn't recognize the `transaction_id`
 
-### Query for deferred credential at later time execution
+#### Query for deferred credential at later time execution
 
 ```kotlin
 
@@ -415,13 +424,19 @@ val deferredCtx =
 val (updatedDeferredCtx, outcome) = 
     DeferredIssuer.queryForDeferredCredential(deferredCtx).getOrThrough()
 ```
-### Serializing `DeferredIssuanceContext`
+#### Serializing `DeferredIssuanceContext`
 
 How waller/caller stores and loads the `DeferredIssuanceContext` is out of scope
 of the library. 
 
 There is though an [indicative implementation](src/test/kotlin/eu/europa/ec/eudi/openid4vci/examples/DeferredIssuerExtensions.kt) 
 that serializes the context as a JSON object.
+
+
+### Notify Credential Issuer
+
+TBD
+
 
 ## Configuration Options
 
@@ -466,9 +481,10 @@ val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()
 
 ## Other features
 
-### PAR 
+### Pushed authorization requests
 
-To use PAR endpoint 
+Library supports [RFC 9126 OAuth 2.0 Pushed Authorization Requests](https://www.rfc-editor.org/rfc/rfc9126)
+To use the PAR endpoint 
 - wallet [configuration](#configuration-options) shouldn't exclude its use (explicit configuration option) and 
 - PAR should be advertised by credential issuer's metadata
 
@@ -495,6 +511,12 @@ algorithms supported by wallet's DPoP Signer, then library will transparently re
 for a DPoP `access_token` instead of the default Bearer token.
 
 Furthermore, all subsequent interactions will use the correct token type (Bearer or DPoP)
+
+###  Proof Key for Code Exchange by OAuth Public Clients (PKCE)
+
+Library supports [RFC7636](https://www.rfc-editor.org/rfc/rfc7636.html) by default 
+while performing [Authorization code flow](#authorization-code-flow). 
+This feature cannot be disabled.
 
 ## Features not supported
 
