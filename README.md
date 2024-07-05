@@ -61,6 +61,53 @@ The released software is an initial development release version:
 
 ## Use cases supported
 
+### Wallet-initiated issuance
+
+As a wallet/caller having an out-of-band knowledge of a credential issuer,
+use the library to initiate issuance:
+
+- Fetch and validate the Credential Issuer Metadata
+- Fetch and validate the OAUTH2 or OIDC metadata used by the Credential Issuer
+- Ensure that out-of-band knowledge is valid
+
+This is equivalent as [resolving a credential offer](#resolve-a-credential-offer), having authorization code grant, without issuer state.
+
+#### Wallet-initiated issuance preconditions
+
+- The wallet knows the credential issuer id
+- The wallet knows one or more credential configuration ids 
+- The wallet has prepared an issuance [configuration](#configuration-options), describing the capabilities & policies of the wallet.
+
+#### Wallet-initiated issuance successful outcome
+
+Same as [outcome](#resolve-a-credential-offer-successful-outcome), as if a 
+equivalent offer was resolved.
+
+#### Wallet-initiated issuance steps
+
+1. Wallet/caller using the library to instantiate an [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt)
+2. If checks pass, an `Issuer` will be returned to the caller.
+
+#### Wallet-initiated issuance execution 
+
+```kotlin
+import eu.europa.ec.eudi.openid4vci.*
+
+val openId4VCIConfig = ...
+val credentialIssuerId: CredentialIssuerId = //known 
+val credentialConfigurationIds: List<CredentialConfigurationIdentifier> = // known
+
+val issuer = 
+    Issuer.makeWalletInitiated(
+        config,
+        credentialIssuerId,
+        credentialConfigurationIds
+    ).getOrThrow()
+```
+#### Wallet-initiated issuance next steps
+
+- [Authorize wallet for issuance](#authorize-wallet-for-issuance) 
+
 ### Resolve a credential offer
 
 As a wallet/caller use the library to process a URI that represents a credential offer 
@@ -100,15 +147,14 @@ This concern, though is out of the scope of library
 
 In order to resolve a credential offer wallet/caller must provide [configuration options](#configuration-options)
 
+#### Resolve a credential offer next steps
+
+- [Authorize wallet for issuance](#authorize-wallet-for-issuance)
+
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
-val openId4VCIConfig = OpenId4VCIConfig(
-    clientId = "wallet-dev", // the client id of wallet (acting as an OAUTH2 client)
-    authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
-    keyGenerationConfig = KeyGenerationConfig.ecOnly(Curve.P_256), // what kind of ephemeral keys could be generated to encrypt credential issuance response
-    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses
-)
+val openId4VCIConfig = ...
 val credentialOfferUri: String = "..."
 val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()
 ```
@@ -140,6 +186,11 @@ Depending on the capabilities of the token endpoint of the credential issuer thi
 
 `AuthorizedRequest` will contain the `access_token` (bearer or [DPoP](#demonstrating-proof-of-possession-dpop)), and, if provided,
 the `refresh_token` and `c_nonce`
+
+#### Authorize wallet for issuance next steps
+
+- [Place credential request](#place-credential-request), or
+- [Place batch credential request](#place-batch-credential-request)
 
 #### Authorization code flow
 
@@ -305,6 +356,12 @@ val (updatedAuthorizedRequest, outcome) =
     }
 
 ```
+#### Place credential request next steps
+
+- Validate credential and store it. That's out of library scope, or
+- [Query for credential](#query-for-deferred-credential), or
+- [Query for credential at later time](#query-for-deferred-credential-at-later-time), or
+- [Notify credential issuer](#notify-credential-issuer)
 
 **Important note**
 
