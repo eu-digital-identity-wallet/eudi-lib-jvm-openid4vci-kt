@@ -53,9 +53,9 @@ class IssuanceEncryptedResponsesTest {
             assertFailsWith<ResponseEncryptionAlgorithmNotSupportedByIssuer>(
                 block = {
                     authorizeRequestForCredentialOffer(
-                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
                         credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                         responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
+                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
                     )
                 },
             )
@@ -79,9 +79,9 @@ class IssuanceEncryptedResponsesTest {
             assertFailsWith<ResponseEncryptionMethodNotSupportedByIssuer>(
                 block = {
                     authorizeRequestForCredentialOffer(
-                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
                         credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                         responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
+                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
                     )
                 },
             )
@@ -105,12 +105,12 @@ class IssuanceEncryptedResponsesTest {
             assertFailsWith<ResponseEncryptionRequiredByWalletButNotSupportedByIssuer>(
                 block = {
                     authorizeRequestForCredentialOffer(
-                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
-                        credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-                        responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
                         config = OpenId4VCIConfiguration.copy(
                             credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.REQUIRED,
                         ),
+                        credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                        responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
+                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
                     )
                 },
             )
@@ -129,12 +129,12 @@ class IssuanceEncryptedResponsesTest {
             assertFailsWith<WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated>(
                 block = {
                     authorizeRequestForCredentialOffer(
-                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
-                        credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-                        responseEncryptionSpecFactory = { _, _ -> null },
                         config = OpenId4VCIConfiguration.copy(
                             credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.REQUIRED,
                         ),
+                        credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                        responseEncryptionSpecFactory = { _, _ -> null },
+                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
                     )
                 },
             )
@@ -164,9 +164,9 @@ class IssuanceEncryptedResponsesTest {
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
@@ -201,9 +201,9 @@ class IssuanceEncryptedResponsesTest {
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
@@ -233,9 +233,9 @@ class IssuanceEncryptedResponsesTest {
                 ),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> null },
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
@@ -309,9 +309,9 @@ class IssuanceEncryptedResponsesTest {
             )
 
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
@@ -383,9 +383,9 @@ class IssuanceEncryptedResponsesTest {
             )
 
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             val batchRequestPayload = listOf(
@@ -442,9 +442,9 @@ class IssuanceEncryptedResponsesTest {
             )
 
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             val batchRequestPayload = listOf(
@@ -489,9 +489,9 @@ class IssuanceEncryptedResponsesTest {
             )
 
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
                 credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
@@ -557,9 +557,9 @@ class IssuanceEncryptedResponsesTest {
         )
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
             credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
             responseEncryptionSpecFactory = { _, _ -> responseEncryption },
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
         with(issuer) {

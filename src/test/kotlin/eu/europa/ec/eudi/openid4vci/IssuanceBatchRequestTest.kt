@@ -81,7 +81,10 @@ class IssuanceBatchRequestTest {
             ) {},
         )
         val (authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
+            authorizeRequestForCredentialOffer(
+                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            )
 
         val requests = reqs()
         val (_, outcome) = with(issuer) {

@@ -65,8 +65,8 @@ class IssuanceNotificationTest {
             ),
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            mockedKtorHttpClientFactory,
-            CredentialOfferWithSdJwtVc_NO_GRANTS,
+            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
         with(issuer) {
             when (authorizedRequest) {
@@ -119,8 +119,8 @@ class IssuanceNotificationTest {
             ),
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            mockedKtorHttpClientFactory,
-            CredentialOfferWithSdJwtVc_NO_GRANTS,
+            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
         with(issuer) {
             val result = authorizedRequest.notify(

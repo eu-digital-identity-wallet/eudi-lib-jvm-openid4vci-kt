@@ -40,8 +40,8 @@ class IssuanceDeferredRequestTest {
         )
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CredentialOfferWithSdJwtVc_NO_GRANTS,
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
         with(issuer) {
@@ -87,8 +87,8 @@ class IssuanceDeferredRequestTest {
 
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CredentialOfferWithSdJwtVc_NO_GRANTS,
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
         with(issuer) {
@@ -151,8 +151,8 @@ class IssuanceDeferredRequestTest {
 
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CredentialOfferWithSdJwtVc_NO_GRANTS,
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
         with(issuer) {

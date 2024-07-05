@@ -74,8 +74,8 @@ class IssuanceSingleRequestTest {
             ),
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            mockedKtorHttpClientFactory,
-            CredentialOfferMsoMdoc_NO_GRANTS,
+            credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
         val claimSet = MsoMdocClaimSet(
@@ -130,8 +130,8 @@ class IssuanceSingleRequestTest {
                 ),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CredentialOfferMsoMdoc_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             val claimSet = MsoMdocClaimSet(
@@ -171,8 +171,8 @@ class IssuanceSingleRequestTest {
                 tokenPostMocker(),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
@@ -206,8 +206,8 @@ class IssuanceSingleRequestTest {
                 tokenPostMocker(),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
@@ -246,8 +246,8 @@ class IssuanceSingleRequestTest {
         )
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            mockedKtorHttpClientFactory,
-            CredentialOfferMsoMdoc_NO_GRANTS,
+            credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
         val claimSet = MsoMdocClaimSet(
@@ -283,8 +283,8 @@ class IssuanceSingleRequestTest {
         )
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            mockedKtorHttpClientFactory,
-            CredentialOfferWithSdJwtVc_NO_GRANTS,
+            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
         val claimSet = GenericClaimSet(
@@ -330,8 +330,8 @@ class IssuanceSingleRequestTest {
         )
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            mockedKtorHttpClientFactory,
-            CredentialOfferWithJwtVcJson_NO_GRANTS,
+            credentialOfferStr = CredentialOfferWithJwtVcJson_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
         val claimSet = GenericClaimSet(
@@ -385,8 +385,8 @@ class IssuanceSingleRequestTest {
                 ),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             val requestPayload =
@@ -426,8 +426,8 @@ class IssuanceSingleRequestTest {
                 ),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             val requestPayload = IssuanceRequestPayload.IdentifierBased(
@@ -462,8 +462,8 @@ class IssuanceSingleRequestTest {
                 ),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                mockedKtorHttpClientFactory,
-                CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             val requestPayload = IssuanceRequestPayload.IdentifierBased(
@@ -499,8 +499,8 @@ class IssuanceSingleRequestTest {
             ),
         )
         val (authorizedRequest, _) = authorizeRequestForCredentialOffer(
-            mockedKtorHttpClientFactory,
-            CREDENTIAL_OFFER_NO_GRANTS,
+            credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
         assertTrue("Identifiers expected to be parsed") {
