@@ -89,10 +89,7 @@ suspend fun Issuer.submitCredentialRequest(
     popSignerPreference: ProofTypeMetaPreference,
 ): AuthorizedRequestAnd<SubmissionOutcome> {
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
-    val popSigner =
-        if (authorizedRequest is AuthorizedRequest.ProofRequired) {
-            popSigner(credentialConfigurationId, popSignerPreference)
-        } else null
+    val popSigner = popSigner(credentialConfigurationId, popSignerPreference)
     return authorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner).getOrThrow()
 }
 
