@@ -26,22 +26,22 @@ In particular, the library focuses on the wallet's role in and provides the foll
 
 | Feature                                                                                       | Coverage                                          |
 |-----------------------------------------------------------------------------------------------|---------------------------------------------------|
-| [Resolve a credential offer](#resolve-a-credential-offer)                                     | ✅                                                 |
-| [Authorization code flow](#authorization-code-flow)                                           | ✅                                                 |
-| [Pre-authorized code flow](#pre-authorized-code-flow)                                         | ✅                                                 |
-| mso_mdoc format                                                                               | ✅                                                 |
-| SD-JWT-VC format                                                                              | ✅                                                 |
+| [Resolve a credential offer](#resolve-a-credential-offer)                                     | ✅                                                |
+| [Authorization code flow](#authorization-code-flow)                                           | ✅                                                |
+| [Pre-authorized code flow](#pre-authorized-code-flow)                                         | ✅                                                |
+| mso_mdoc format                                                                               | ✅                                                |
+| SD-JWT-VC format                                                                              | ✅                                                |
 | W3C VC DM                                                                                     | VC Signed as a JWT, Not Using JSON-LD             |
-| [Place a credential request](#place-a-credential-request)                                     | ✅ Including automatic handling of `invalid_proof` |
-| [Place batch credential request](#place-a-batch-credential-request)                           | ✅                                                 | 
-| [Query for deferred credential](#query-for-deferred-credential)                               | ✅ Including automatic refresh of `access_token`   |
-| [Query for deferred credential at a later time](#query-for-deferred-credential-at-later-time) | ✅ Including automatic refresh of `access_token`   |
-| [Notify credential issuer](#notify-credential-issuer)                                         | ✅                                                 | 
-| Proof                                                                                         | ✅ JWT ✅ CWT                                       |
-| Credential response encryption                                                                | ✅                                                 |
-| [Pushed authorization requests](#pushed-authorization-requests)                               | ✅ Used by default, if supported by issuer         |
-| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)           | ✅                                                 |
-| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                             | ✅                                                 |
+| [Place a credential request](#place-a-credential-request)                                     | ✅ Including automatic handling of `invalid_proof`|
+| [Place batch credential request](#place-a-batch-credential-request)                           | ✅                                                | 
+| [Query for deferred credential](#query-for-deferred-credential)                               | ✅ Including automatic refresh of `access_token`  |
+| [Query for deferred credential at a later time](#query-for-deferred-credential-at-later-time) | ✅ Including automatic refresh of `access_token`  |
+| [Notify credential issuer](#notify-credential-issuer)                                         | ✅                                                | 
+| Proof                                                                                         | ✅ JWT ✅ CWT                                     |
+| Credential response encryption                                                                | ✅                                                |
+| [Pushed authorization requests](#pushed-authorization-requests)                               | ✅ Used by default, if supported by issuer        |
+| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)           | ✅                                                |
+| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                             | ✅                                                |
 | Wallet authentication                                                                         | currently, only public client                     |
 
 
