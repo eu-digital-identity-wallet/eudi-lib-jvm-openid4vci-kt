@@ -33,8 +33,8 @@ In particular, the library focuses on the wallet's role in and provides the foll
 | mso_mdoc format                                                                               | ✅                                                                                                                      |
 | SD-JWT-VC format                                                                              | ✅                                                                                                                      |
 | W3C VC DM                                                                                     | VC Signed as a JWT, Not Using JSON-LD                                                                                  |
-| [Place a credential request](#place-a-credential-request)                                     | ✅ Including automatic handling of `invalid_proof`                                                                      |
-| [Place batch credential request](#place-a-batch-credential-request)                           | ✅                                                                                                                      | 
+| [Place credential request](#place-credential-request)                                         | ✅ Including automatic handling of `invalid_proof`                                                                      |
+| [Place batch credential request](#place-batch-credential-request)                             | ✅                                                                                                                      | 
 | [Query for deferred credential](#query-for-deferred-credential)                               | ✅ Including automatic refresh of `access_token`                                                                        |
 | [Query for deferred credential at a later time](#query-for-deferred-credential-at-later-time) | ✅ Including automatic refresh of `access_token`                                                                        |
 | [Notify credential issuer](#notify-credential-issuer)                                         | ✅                                                                                                                      | 
@@ -247,13 +247,13 @@ val authorizedRequest =
     }
 ```
 
-### Place a credential request
+### Place credential request
 
 Wallet/caller wants to place a request against the credential issuer, for one of 
 the credential configurations that were present in the offer, or alternatively for 
 a specific credential identifier in case token endpoint provided an `authorization_details`.
 
-#### Place a credential request preconditions
+#### Place credential request preconditions
 
 - An instance of the `Issuer` interface has been instantiated
 - [Wallet authorization](#authorize-wallet-for-issuance) has been performed and as a result
@@ -263,7 +263,7 @@ a specific credential identifier in case token endpoint provided an `authorizati
 - Wallet/Caller has decided if a subset of the claims will be requested or all.
 - Wallet/Caller is ready to provide a suitable Proof signer for JWT or CWT proofs, if applicable
 
-#### Place a credential request steps
+#### Place credential request steps
 
 1. Wallet/caller using the library assemble the request providing a `credential_configuration_id` and optionally a `credential_identifier`
 2. Wallet/caller using the `Issuer` and `AuthorizedRequest` place the request 
@@ -272,7 +272,7 @@ a specific credential identifier in case token endpoint provided an `authorizati
 5. Wallet/caller gets back the `SubmissionOutcome` for further processing
 6. Wallet/caller may have to introspect the outcome to assemble a fresh `AuthorizedRequest` carrying possibly a fresh `c_nonce` 
 
-#### Place a credential request outcome
+#### Place credential request outcome
 
 The result of placing a request is represented by a `SubmissionOutcome` as follows:
 
@@ -283,7 +283,7 @@ of deferred issuance, or
 
 In case of an unexpected error a runtime will be raised.
 
-#### Place a credential request execution
+#### Place credential request execution
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
@@ -332,7 +332,7 @@ an `AuthorizedRequest` and an `Issuer` instance.
 #### Query for deferred credential preconditions
 
 - Wallet/caller has [placed a credential request](#place-a-credential-request)
-- Wallet/caller has received an [outcome](#place-a-credential-request-outcome) carrying a `transaction_id`
+- Wallet/caller has received an [outcome](#place-credential-request-outcome) carrying a `transaction_id`
 - Wallet/caller has an instance of `AuthorizedRequest` 
 
 #### Query for deferred credential steps
