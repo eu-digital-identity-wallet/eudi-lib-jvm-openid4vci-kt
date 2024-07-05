@@ -87,18 +87,13 @@ suspend fun Issuer.submitCredentialRequest(
         credentialOffer.credentialConfigurationIdentifiers.first(),
     claimSet: ClaimSet? = null,
     popSignerPreference: ProofTypeMetaPreference,
-): SubmissionOutcome {
+): AuthorizedRequestAnd<SubmissionOutcome> {
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
-    return when (authorizedRequest) {
-        is AuthorizedRequest.ProofRequired -> {
-            with(authorizedRequest) {
-                val popSigner = popSigner(credentialConfigurationId, popSignerPreference)
-                requestSingle(requestPayload, popSigner).getOrThrow()
-            }
-        }
-
-        is AuthorizedRequest.NoProofRequired -> with(authorizedRequest) { requestSingle(requestPayload).getOrThrow() }
-    }
+    val popSigner =
+        if (authorizedRequest is AuthorizedRequest.ProofRequired) {
+            popSigner(credentialConfigurationId, popSignerPreference)
+        } else null
+    return authorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner).getOrThrow()
 }
 
 suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(
@@ -134,16 +129,9 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
       ENV : HasTestUser<USER>,
       ENV : CanAuthorizeIssuance<USER> =
     coroutineScope {
-        val outcome = run {
-            val authorizedRequest = authorizeUsingAuthorizationCodeFlow(env, enableHttpLogging)
-            val outcome = submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest, popSignerPreference)
-            // If authorization server doesn't provide c_nonce in its token response
-            // there is the chance that provides c_nonce via credential endpoint
-            if (authorizedRequest is AuthorizedRequest.NoProofRequired && outcome is SubmissionOutcome.InvalidProof) {
-                val proofRequired = authorizedRequest.withCNonce(outcome.cNonce)
-                submitCredentialRequest(proofRequired, credCfgId, claimSetToRequest, popSignerPreference)
-            } else outcome
-        }
+        val authorizedRequest = authorizeUsingAuthorizationCodeFlow(env, enableHttpLogging)
+        val (_, outcome) =
+            submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest, popSignerPreference)
 
         ensureIssued(outcome)
         Unit
@@ -157,13 +145,7 @@ suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
 ) = coroutineScope {
     val (authorized, outcome) = run {
         val authorizedRequest = authorizeWithPreAuthorizationCode(txCode).getOrThrow()
-        val outcome = submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest, popSignerPreference)
-        // If authorization server doesn't provide c_nonce in its token response,
-        // there is the chance that provides c_nonce via credential endpoint
-        if (authorizedRequest is AuthorizedRequest.NoProofRequired && outcome is SubmissionOutcome.InvalidProof) {
-            val proofRequired = authorizedRequest.withCNonce(outcome.cNonce)
-            proofRequired to submitCredentialRequest(proofRequired, credCfgId, claimSetToRequest, popSignerPreference)
-        } else authorizedRequest to outcome
+        submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest, popSignerPreference)
     }
 
     val issuedCredentials = ensureIssued(outcome)

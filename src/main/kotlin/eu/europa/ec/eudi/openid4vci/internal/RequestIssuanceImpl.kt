@@ -40,49 +40,102 @@ internal class RequestIssuanceImpl(
     private val credentialEndpointClient: CredentialEndpointClient,
     private val batchEndPointClient: BatchEndPointClient?,
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-) : RequestIssuance {
+) : RequestIssuance, RequestBatchIssuance {
 
-    override suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
+    override suspend fun AuthorizedRequest.requestSingleAndUpdateState(
         requestPayload: IssuanceRequestPayload,
-    ): Result<SubmissionOutcome> = runCatching {
-        placeIssuanceRequest(accessToken) {
-            singleRequest(requestPayload, null, credentialIdentifiers)
+        popSigner: PopSigner?,
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
+        //
+        // Place the request
+        //
+        val outcome = placeIssuanceRequest(accessToken) {
+            val proofFactory = when (this) {
+                is AuthorizedRequest.NoProofRequired -> null
+                is AuthorizedRequest.ProofRequired -> {
+                    requireNotNull(popSigner) { "PopSigner is required in Authorized.ProofRequired" }
+                    proofFactory(popSigner, cNonce)
+                }
+            }
+            singleRequest(requestPayload, proofFactory, credentialIdentifiers)
         }
+
+        //
+        // Update state
+        //
+        val updatedAuthorizedRequest = this.withCNonceFrom(outcome)
+
+        //
+        // Retry on invalid proof if we begin from NoProofRequired and issuer
+        // replied with InvalidProof
+        //
+        val retryOnInvalidProof =
+            this is AuthorizedRequest.NoProofRequired &&
+                popSigner != null &&
+                updatedAuthorizedRequest is AuthorizedRequest.ProofRequired &&
+                outcome is SubmissionOutcomeInternal.InvalidProof
+
+        suspend fun retry() =
+            updatedAuthorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner).getOrThrow()
+
+        if (retryOnInvalidProof) retry()
+        else updatedAuthorizedRequest to outcome.toPub()
     }
 
-    override suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-        requestPayload: IssuanceRequestPayload,
-        proofSigner: PopSigner,
-    ): Result<SubmissionOutcome> = runCatching {
-        placeIssuanceRequest(accessToken) {
-            singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers)
-        }
+    private fun AuthorizedRequest.withCNonceFrom(outcome: SubmissionOutcomeInternal): AuthorizedRequest {
+        val updated =
+            when (outcome) {
+                is SubmissionOutcomeInternal.Failed -> null
+                is SubmissionOutcomeInternal.InvalidProof -> withCNonce(outcome.cNonce)
+                is SubmissionOutcomeInternal.Success -> outcome.cNonce?.let { withCNonce(it) }
+            }
+        return updated ?: this
     }
 
-    override suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-        credentialsMetadata: List<IssuanceRequestPayload>,
-    ): Result<SubmissionOutcome> = runCatching {
-        placeIssuanceRequest(accessToken) {
-            val credentialRequests = credentialsMetadata.map {
-                singleRequest(it, null, credentialIdentifiers, true)
+    override suspend fun AuthorizedRequest.requestBatchAndUpdateState(
+        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
+        //
+        // Place the request
+        //
+        val outcome = placeIssuanceRequest(accessToken) {
+            val credentialRequests = credentialsMetadata.map { (requestPayload, popSigner) ->
+                val proofFactory = when (this) {
+                    is AuthorizedRequest.NoProofRequired -> null
+                    is AuthorizedRequest.ProofRequired -> {
+                        requireNotNull(popSigner) { "PopSigner is required in Authorized.ProofRequired" }
+                        proofFactory(popSigner, cNonce)
+                    }
+                }
+                singleRequest(requestPayload, proofFactory, credentialIdentifiers, true)
             }
             CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
         }
-    }
 
-    override suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner>>,
-    ): Result<SubmissionOutcome> = runCatching {
-        placeIssuanceRequest(accessToken) {
-            val credentialRequests = credentialsMetadata.map { (requestPayload, proofSigner) ->
-                singleRequest(requestPayload, proofFactory(proofSigner, cNonce), credentialIdentifiers, true)
-            }
-            CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
-        }
+        //
+        // Update state
+        //
+        val updatedAuthorizedRequest = this.withCNonceFrom(outcome)
+
+        //
+        // Retry on invalid proof if we begin from NoProofRequired and issuer
+        // replied with InvalidProof
+        //
+        val retryOnInvalidProof =
+            this is AuthorizedRequest.NoProofRequired &&
+                updatedAuthorizedRequest is AuthorizedRequest.ProofRequired &&
+                outcome is SubmissionOutcomeInternal.InvalidProof
+
+        suspend fun retry() =
+            updatedAuthorizedRequest.requestBatchAndUpdateState(credentialsMetadata).getOrThrow()
+
+        if (retryOnInvalidProof) retry()
+        else updatedAuthorizedRequest to outcome.toPub()
     }
 
     private fun credentialSupportedById(credentialId: CredentialConfigurationIdentifier): CredentialConfiguration {
-        val credentialSupported = credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credentialId]
+        val credentialSupported =
+            credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credentialId]
         return requireNotNull(credentialSupported) {
             "$credentialId was not found within issuer metadata"
         }
@@ -176,13 +229,13 @@ internal class RequestIssuanceImpl(
     private suspend fun placeIssuanceRequest(
         token: AccessToken,
         issuanceRequestSupplier: suspend () -> CredentialIssuanceRequest,
-    ): SubmissionOutcome {
-        fun handleIssuanceFailure(error: Throwable): SubmissionOutcome.Errored =
+    ): SubmissionOutcomeInternal {
+        fun handleIssuanceFailure(error: Throwable): SubmissionOutcomeInternal.Errored =
             submitRequestFromError(error) ?: throw error
         return when (val credentialRequest = issuanceRequestSupplier()) {
             is CredentialIssuanceRequest.SingleRequest -> {
                 credentialEndpointClient.placeIssuanceRequest(token, credentialRequest).fold(
-                    onSuccess = { SubmissionOutcome.Success(it.credentials, it.cNonce) },
+                    onSuccess = { SubmissionOutcomeInternal.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
                 )
             }
@@ -190,7 +243,7 @@ internal class RequestIssuanceImpl(
             is CredentialIssuanceRequest.BatchRequest -> {
                 ensureNotNull(batchEndPointClient) { IssuerDoesNotSupportBatchIssuance() }
                 batchEndPointClient.placeBatchIssuanceRequest(token, credentialRequest).fold(
-                    onSuccess = { SubmissionOutcome.Success(it.credentials, it.cNonce) },
+                    onSuccess = { SubmissionOutcomeInternal.Success(it.credentials, it.cNonce) },
                     onFailure = { handleIssuanceFailure(it) },
                 )
             }
@@ -198,10 +251,35 @@ internal class RequestIssuanceImpl(
     }
 }
 
-private fun submitRequestFromError(error: Throwable): SubmissionOutcome.Errored? = when (error) {
+private fun submitRequestFromError(error: Throwable): SubmissionOutcomeInternal.Errored? = when (error) {
     is CredentialIssuanceError.InvalidProof ->
-        SubmissionOutcome.InvalidProof(CNonce(error.cNonce, error.cNonceExpiresIn), error.errorDescription)
+        SubmissionOutcomeInternal.InvalidProof(CNonce(error.cNonce, error.cNonceExpiresIn), error.errorDescription)
 
-    is CredentialIssuanceError -> SubmissionOutcome.Failed(error)
+    is CredentialIssuanceError -> SubmissionOutcomeInternal.Failed(error)
     else -> null
+}
+
+private sealed interface SubmissionOutcomeInternal {
+
+    data class Success(
+        val credentials: List<IssuedCredential>,
+        val cNonce: CNonce?,
+    ) : SubmissionOutcomeInternal
+
+    sealed interface Errored : SubmissionOutcomeInternal
+    data class Failed(
+        val error: CredentialIssuanceError,
+    ) : Errored
+
+    data class InvalidProof(
+        val cNonce: CNonce,
+        val errorDescription: String? = null,
+    ) : Errored
+
+    fun toPub(): SubmissionOutcome =
+        when (this) {
+            is Success -> SubmissionOutcome.Success(credentials, cNonce)
+            is Failed -> SubmissionOutcome.Failed(error)
+            is InvalidProof -> SubmissionOutcome.InvalidProof(cNonce, errorDescription)
+        }
 }

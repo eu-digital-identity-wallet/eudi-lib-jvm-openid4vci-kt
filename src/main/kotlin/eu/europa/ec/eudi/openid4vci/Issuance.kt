@@ -71,6 +71,7 @@ sealed interface SubmissionOutcome : java.io.Serializable {
      */
     data class Success(
         val credentials: List<IssuedCredential>,
+        @Deprecated(message = "Deprecated and will be removed in a future release")
         val cNonce: CNonce?,
     ) : SubmissionOutcome
 
@@ -95,6 +96,7 @@ sealed interface SubmissionOutcome : java.io.Serializable {
      * @param cNonce The c_nonce provided from issuer along the error
      * @param errorDescription Description of the error that caused the failure
      */
+    @Deprecated(message = "Deprecated and will be removed in a future release")
     data class InvalidProof(
         val cNonce: CNonce,
         val errorDescription: String? = null,
@@ -141,17 +143,37 @@ sealed interface IssuanceRequestPayload {
      */
     data class ConfigurationBased(
         val credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
-        val claimSet: ClaimSet?,
+        val claimSet: ClaimSet? = null,
     ) : IssuanceRequestPayload
 }
 
 typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
 
 /**
- * An interface for submitting a credential issuance request. Contains all the operation available to transition an [AuthorizedRequest]
- * to a [SubmissionOutcome]
+ * An interface for submitting a credential issuance request.
  */
 interface RequestIssuance {
+
+    /**
+     * Places a request to the credential issuance endpoint.
+     * Method will attempt to automatically retry submission in case
+     * - Initial authorization state is [AuthorizedRequest.NoProofRequired] and
+     * - a [popSigner] has been provided
+     *
+     * @receiver the current authorization state
+     * @param requestPayload the payload of the request
+     * @param popSigner Signer component of the proof to be sent. Although this is an optional
+     * parameter, only required in case the present authorization state is [AuthorizedRequest.ProofRequired],
+     * caller is advised to provide it, in order to allow the method to automatically retry
+     * in case of [SubmissionOutcome.InvalidProof]
+     *
+     * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh c_nonce) and
+     * the [SubmissionOutcome]
+     */
+    suspend fun AuthorizedRequest.requestSingleAndUpdateState(
+        requestPayload: IssuanceRequestPayload,
+        popSigner: PopSigner?,
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 
     /**
      *  Requests the issuance of a single credential having an [AuthorizedRequest.NoProofRequired] authorization.
@@ -159,9 +181,14 @@ interface RequestIssuance {
      *  @param requestPayload   The payload of the request.
      *  @return The new state of the request or error.
      */
+    @Deprecated(
+        message = "Deprecated and will be removed in a future release",
+        replaceWith = ReplaceWith("requestSingleAndUpdateState(requestPayload, null)"),
+    )
     suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
-    ): Result<SubmissionOutcome>
+    ): Result<SubmissionOutcome> =
+        requestSingleAndUpdateState(requestPayload, null).map { it.second }
 
     /**
      *  Requests the issuance of a single credential having an [AuthorizedRequest.ProofRequired] authorization. In this
@@ -171,31 +198,15 @@ interface RequestIssuance {
      *  @param proofSigner  Signer component of the proof to be sent.
      *  @return The new state of request or error.
      */
+    @Deprecated(
+        message = "Deprecated and will be removed in a future release.",
+        replaceWith = ReplaceWith("requestSingleAndUpdateState(requestPayload, proofSigner)"),
+    )
     suspend fun AuthorizedRequest.ProofRequired.requestSingle(
         requestPayload: IssuanceRequestPayload,
         proofSigner: PopSigner,
-    ): Result<SubmissionOutcome>
-
-    /**
-     *  Batch request for issuing multiple credentials having an [AuthorizedRequest.NoProofRequired] authorization.
-     *
-     *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-
-     *  @return The new state of request or error.
-     */
-    suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-        credentialsMetadata: List<IssuanceRequestPayload>,
-    ): Result<SubmissionOutcome>
-
-    /**
-     *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
-     *
-     *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-     *  @return The new state of request or error.
-     */
-    suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner>>,
-    ): Result<SubmissionOutcome>
+    ): Result<SubmissionOutcome> =
+        requestSingleAndUpdateState(requestPayload, proofSigner).map { it.second }
 
     /**
      * Special purpose operation to handle the case an 'invalid_proof' error response was received from issuer with
@@ -211,6 +222,53 @@ interface RequestIssuance {
     suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
         cNonce: CNonce,
     ): AuthorizedRequest.ProofRequired = withCNonce(cNonce)
+}
+
+interface RequestBatchIssuance {
+
+    /**
+     *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
+     *
+     *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
+     *  @return The new state of request or error.
+     */
+    suspend fun AuthorizedRequest.requestBatchAndUpdateState(
+        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
+
+    /**
+     *  Batch request for issuing multiple credentials having an [AuthorizedRequest.NoProofRequired] authorization.
+     *
+     *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
+
+     *  @return The new state of request or error.
+     */
+    @Deprecated(
+        message = "Deprecated and will be removed in a future release",
+        replaceWith = ReplaceWith("requestBatchAndUpdateState(credentialsMetadata.map{it to null})"),
+    )
+    suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
+        credentialsMetadata: List<IssuanceRequestPayload>,
+    ): Result<SubmissionOutcome> = runCatching {
+        val credentialsMetadataWithNoProofs = credentialsMetadata.map { it to null }
+        val (_, outcome) = requestBatchAndUpdateState(credentialsMetadataWithNoProofs).getOrThrow()
+        outcome
+    }
+
+    /**
+     *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
+     *
+     *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
+     *  @return The new state of request or error.
+     */
+    @Deprecated(
+        message = "Deprecated and will be removed in a future release",
+        replaceWith = ReplaceWith("requestBatchAndUpdateState(credentialsMetadata)"),
+    )
+    suspend fun AuthorizedRequest.ProofRequired.requestBatch(
+        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner>>,
+    ): Result<SubmissionOutcome> =
+        requestBatchAndUpdateState(credentialsMetadata).map { it.second }
 }
 
 sealed interface PopSigner {

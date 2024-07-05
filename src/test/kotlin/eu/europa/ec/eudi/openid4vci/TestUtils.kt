@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.Issuer.Companion.DefaultResponseEncryptionSpecFactory
 import java.net.URI
 import java.util.*
 
@@ -61,33 +62,26 @@ val OpenId4VCIConfiguration = OpenId4VCIConfig(
 )
 
 suspend fun authorizeRequestForCredentialOffer(
-    ktorHttpClientFactory: KtorHttpClientFactory,
-    credentialOfferStr: String,
     config: OpenId4VCIConfig? = OpenId4VCIConfiguration,
-    responseEncryptionSpecFactory: ResponseEncryptionSpecFactory? = null,
-): Triple<CredentialOffer, AuthorizedRequest, Issuer> {
-    val offer = CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
-        .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
-        .getOrThrow()
-
-    val issuer = responseEncryptionSpecFactory?.let {
-        Issuer.make(
-            config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
-            credentialOffer = offer,
-            ktorHttpClientFactory = ktorHttpClientFactory,
-            responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-        ).getOrThrow()
-    } ?: Issuer.make(
+    credentialOfferStr: String,
+    responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+    ktorHttpClientFactory: KtorHttpClientFactory,
+): Pair<AuthorizedRequest, Issuer> {
+    val issuer = Issuer.make(
         config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
-        credentialOffer = offer,
+        credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
         ktorHttpClientFactory = ktorHttpClientFactory,
+        responseEncryptionSpecFactory = responseEncryptionSpecFactory,
     ).getOrThrow()
 
-    val authorizedRequest = with(issuer) {
-        val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
-        val authorizationCode = UUID.randomUUID().toString()
-        val serverState = authRequestPrepared.state
-        authRequestPrepared.authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState).getOrThrow()
-    }
-    return Triple(offer, authorizedRequest, issuer)
+    val authorizedRequest =
+        with(issuer) {
+            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
+            with(authRequestPrepared) {
+                val authorizationCode = AuthorizationCode(UUID.randomUUID().toString())
+                val serverState = authRequestPrepared.state
+                authorizeWithAuthorizationCode(authorizationCode, serverState).getOrThrow()
+            }
+        }
+    return authorizedRequest to issuer
 }

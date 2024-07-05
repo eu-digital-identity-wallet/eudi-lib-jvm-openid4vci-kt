@@ -29,7 +29,7 @@ fun runUseCase(
 ): Unit = runBlocking {
     println("[[Scenario: Issuance based on credential configuration ids: $credentialConfigurationIds]] ")
 
-    val (issuerMetadata, authorizationServersMetadata) = createHttpClient(enableLogging = false).use { client ->
+    val (issuerMetadata, authorizationServersMetadata) = createHttpClient(enableLogging = true).use { client ->
         Issuer.metaData(client, credentialIssuerId)
     }
 
@@ -54,13 +54,15 @@ fun runUseCase(
 
     with(issuer) {
         authorizationLog("Using authorized code flow to authorize")
-        val authorizedRequest = authorizeRequestWithAuthCodeUseCase(PidDevIssuer.testUser).also {
+        var authorizedRequest = authorizeRequestWithAuthCodeUseCase(PidDevIssuer.testUser).also {
             authorizationLog("Authorization retrieved: $it")
         }
 
         credentialOffer.credentialConfigurationIdentifiers.forEach { credentialIdentifier ->
-            submitCredentialRequest(authorizedRequest, credentialIdentifier).also {
-                println("--> Issued credential: $it \n")
+
+            submitCredentialRequest(authorizedRequest, credentialIdentifier).also { (newAuthorizedRequest, credential) ->
+                println("--> Issued credential: $credential \n")
+                authorizedRequest = newAuthorizedRequest
             }
         }
     }
@@ -90,44 +92,15 @@ private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: Keycl
 private suspend fun Issuer.submitCredentialRequest(
     authorizedRequest: AuthorizedRequest,
     credentialConfigurationId: CredentialConfigurationIdentifier,
-): String {
+): AuthorizedRequestAnd<String> {
     issuanceLog("Requesting issuance of '$credentialConfigurationId'")
-    return when (authorizedRequest) {
-        is AuthorizedRequest.NoProofRequired -> submitProvidingNoProofs(authorizedRequest, credentialConfigurationId)
-
-        is AuthorizedRequest.ProofRequired -> submitProvidingProofs(authorizedRequest, credentialConfigurationId)
-    }
-}
-
-private suspend fun Issuer.submitProvidingNoProofs(
-    authorized: AuthorizedRequest.NoProofRequired,
-    credentialConfigurationId: CredentialConfigurationIdentifier,
-): String {
-    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-    return when (val submittedRequest = authorized.requestSingle(requestPayload).getOrThrow()) {
-        is SubmissionOutcome.Success -> handleSuccess(authorized, submittedRequest)
-        is SubmissionOutcome.Failed -> throw submittedRequest.error
-        is SubmissionOutcome.InvalidProof -> {
-            this@submitProvidingNoProofs.submitProvidingProofs(
-                authorized.withCNonce(submittedRequest.cNonce),
-                credentialConfigurationId,
-            )
-        }
-    }
-}
-
-private suspend fun Issuer.submitProvidingProofs(
-    authorized: AuthorizedRequest.ProofRequired,
-    credentialConfigurationId: CredentialConfigurationIdentifier,
-): String {
     val proofSigner = popSigner(credentialConfigurationId)
-
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-    val submittedRequest = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
+    val (newAuthorized, outcome) = authorizedRequest.requestSingleAndUpdateState(requestPayload, proofSigner).getOrThrow()
 
-    return when (submittedRequest) {
-        is SubmissionOutcome.Success -> handleSuccess(authorized, submittedRequest)
-        is SubmissionOutcome.Failed -> throw submittedRequest.error
+    return when (outcome) {
+        is SubmissionOutcome.Success -> newAuthorized to handleSuccess(newAuthorized, outcome)
+        is SubmissionOutcome.Failed -> throw outcome.error
         is SubmissionOutcome.InvalidProof -> throw IllegalStateException(
             "Although providing a proof with c_nonce the proof is still invalid",
         )
