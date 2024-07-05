@@ -361,7 +361,7 @@ val (updatedAuthorizedRequest, outcome) =
 **Important note**
 
 The ability of the token endpoint of the credential issuer to provide a `c_nonce` is an
-optional feature specified in the OpenId4VCI specification. Possibly, it will be removed.
+optional feature specified in the OpenId4VCI specification. 
 
 According to the specification, the wallet must be able to receive a 
 `c_nonce` primarily via the credential issuance response, which is represented by `SubmissionOutcome`
@@ -599,7 +599,8 @@ otherwise it will fall back to a regular authorization request.
 ### Place batch credential request
 
 Library supports placing request against the Batch Endpoint of the Credential Issuer.
-This functionality probably will be removed from library given that OpenId4VCI will remove it, as well.
+Usage of this feature is not recommended since future release of OpenId4VCI 
+will include to the Credential Issuance endpoint for some of the Batch Endpoint capabilities.
 
 ### Proof Types Supported
 
