@@ -269,7 +269,7 @@ The result of placing a request is represented by a `SubmissionOutcome` as follo
 
 - `SubmissionOutcome.Sucess` This could represent either the issued credential or a transaction_id in case
 of deferred issuance, or
-- `SubmissionOutcome.ProofRequired` indicating that credential issuer requires PoP or PoP provided was not valid
+- `SubmissionOutcome.InvalidProof` indicating that credential issuer requires PoP or PoP provided was not valid
 - `SubmissionOutcome.Failed` indication that credential issuer rejected the request, or 
 
 In case of an unexpected error a runtime will be raised.
@@ -288,28 +288,13 @@ val request =
     IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSetToRequest)
 
 // Place the request
-val outcome =
+val (updatedAuthorizedRequest, outcome) =
     with(issuer) {
-        when(authorizedRequest) {
-            is AuthorizedRequest.NoProofRequired -> {
-                authorizedRequesgt.requestSingle(request)
-            }
-            is AuthorizedRequest.ProofRequired ->  {
-                requireNotNull(popSigner)
-                authorizedRequest.requestSingle(request, popSigner)
-            }   
+        with(authorizedRequest) {
+            requestSingleAndUpdateState(request, popSigner)
         }
     }
 
-// Update if needed state
-val newAuthorizedRequest = 
-    when(outcome) {
-        is SubmissionOutcome.Sucess -> 
-            outcome.cNonce?.let { authorizedRequest.withCNonce(it) }
-        is SubmissionOutcome.InvalidProof -> 
-            outcome.cNonce?.let{ authorizedRequest.withCNonce(it) }
-        is SubmissionOutcome.Failed -> null
-    } ?: authorizedRequest
 ```
 
 **Important note**
@@ -325,9 +310,9 @@ For this reason, it is not uncommon that the first request to the credential iss
 will have as an outcome `InvalidProof`. That's typical if credential issuer's token endpoint
 doesn't provide a `c_nonce` and proof is required for the requested credential.
 
-In this case, wallet must re-calculate the `AuthorizedRequest` (in order to include the `c_nonce`)
-and place again the request.
-
+The library will automatically try to handle the invalid proof response and place a second request 
+which includes proofs. This can be done only if caller has provided a `popSigner` while 
+invoking `requestSingleAndUpdateState()`
 
 ### Query for deferred credential
 
@@ -365,9 +350,11 @@ The outcome of placing this query is a pair comprised of
 val authorizedRequest = // has been retrieved in a previous step
 val deferredCredential = // has been retrieved in a previous step. Holds the transaction_id
 
-val (newAuthorizedRequest, outcome) =  
+val (updatedAuthorizedRequest, outcome) =  
     with(issuer) {
-        authorizedRequest.queryForDeferredCredential(deferredCredential).getOrThrow()
+        with(authorizedRequest) {
+            queryForDeferredCredential(deferredCredential).getOrThrow()
+        }
     }    
 
 ```
@@ -413,9 +400,11 @@ val authorizedRequest = // has been retrieved in a previous step
 val deferredCredential = // has been retrieved in a previous step. Holds the transaction_id
     
 // Step 1
-val deferredIssuanceContext = 
+val deferredCtx = 
     with(issuer) {
-        authorizedRequest.deferredContext(deferredCredential).getOrThrough()
+        with(authorizedRequest) {
+            deferredContext(deferredCredential).getOrThrough()    
+        }
     }
 
 // Store context
@@ -423,10 +412,16 @@ val deferredIssuanceContext =
 // Load context
 
 // Step 4
-val (newDeferredIssuanceContext, outcome) = 
-    DeferredIssuer.queryForDeferredCredential(deferredIssuanceContext).getOrThrough()
-
+val (updatedDeferredCtx, outcome) = 
+    DeferredIssuer.queryForDeferredCredential(deferredCtx).getOrThrough()
 ```
+### Serializing `DeferredIssuanceContext`
+
+How waller/caller stores and loads the `DeferredIssuanceContext` is out of scope
+of the library. 
+
+There is though an [indicative implementation](src/test/kotlin/eu/europa/ec/eudi/openid4vci/examples/DeferredIssuerExtensions.kt) 
+that serializes the context as a JSON object.
 
 ## Configuration Options
 
@@ -533,6 +528,7 @@ involved, follow the guidelines found in [CONTRIBUTING.md](CONTRIBUTING.md).
 * URI parsing: [Uri KMP](https://github.com/eygraber/uri-kmp)
 * Http Client: [Ktor](https://ktor.io/)
 * Json: [Kotlinx Serialization](https://github.com/Kotlin/kotlinx.serialization)
+* CBOR: [Authlete CBOR](https://github.com/authlete/cbor)
 
 ### License details
 
