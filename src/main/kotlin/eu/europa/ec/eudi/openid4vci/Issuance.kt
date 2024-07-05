@@ -222,7 +222,7 @@ interface RequestIssuance {
     ): AuthorizedRequest.ProofRequired = withCNonce(cNonce)
 }
 
-interface BatchRequestIssuance {
+interface RequestBatchIssuance {
 
     /**
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.

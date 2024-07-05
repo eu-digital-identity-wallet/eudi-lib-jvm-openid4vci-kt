@@ -28,7 +28,7 @@ import kotlinx.coroutines.coroutineScope
  * Provides the following capabilities
  * - [AuthorizeIssuance]
  * - [RequestIssuance]
- * - [BatchRequestIssuance]
+ * - [RequestBatchIssuance]
  * - [QueryForDeferredCredential]
  * - [NotifyIssuer]
  *
@@ -40,7 +40,7 @@ import kotlinx.coroutines.coroutineScope
 interface Issuer :
     AuthorizeIssuance,
     RequestIssuance,
-    BatchRequestIssuance,
+    RequestBatchIssuance,
     QueryForDeferredCredential,
     NotifyIssuer {
 
@@ -183,7 +183,7 @@ interface Issuer :
                 Issuer,
                 AuthorizeIssuance by authorizeIssuance,
                 RequestIssuance by requestIssuance,
-                BatchRequestIssuance by requestIssuance,
+                RequestBatchIssuance by requestIssuance,
                 QueryForDeferredCredential by queryForDeferredCredential,
                 NotifyIssuer by notifyIssuer {
                 override val credentialOffer: CredentialOffer

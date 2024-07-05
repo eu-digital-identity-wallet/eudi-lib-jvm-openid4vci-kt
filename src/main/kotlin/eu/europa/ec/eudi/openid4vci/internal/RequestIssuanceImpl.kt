@@ -40,7 +40,7 @@ internal class RequestIssuanceImpl(
     private val credentialEndpointClient: CredentialEndpointClient,
     private val batchEndPointClient: BatchEndPointClient?,
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-) : RequestIssuance, BatchRequestIssuance {
+) : RequestIssuance, RequestBatchIssuance {
 
     override suspend fun AuthorizedRequest.requestSingleAndUpdateState(
         requestPayload: IssuanceRequestPayload,
