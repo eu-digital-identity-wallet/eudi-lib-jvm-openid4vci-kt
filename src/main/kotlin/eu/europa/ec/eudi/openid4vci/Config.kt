@@ -16,11 +16,60 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSSigner
+import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.MACSigner
+import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.Curve
 import java.net.URI
 import java.time.Clock
 
 typealias ClientId = String
+
+/**
+ * Wallet's OAUTH2 client view
+ */
+sealed interface Client : java.io.Serializable {
+    /**
+     * The client_id of the Wallet, issued when interacting with a credential issuer
+     */
+    val id: ClientId
+
+    /**
+     * Public Client
+     */
+    data class Public(override val id: ClientId) : Client
+
+    data class Attested(
+        val jwt: ClientAttestationJWT,
+        val popSigningAlgorithm: JWSAlgorithm,
+        val popJwsSigner: JWSSigner,
+    ) : Client {
+        init {
+            val id = jwt.clientId
+            require(id.isNotBlank() && id.isNotEmpty())
+            val pubKey = jwt.pubKey
+            require(!pubKey.isPrivate) { "InstanceKey should be public" }
+            requireIsAllowedAlgorithm(popSigningAlgorithm)
+        }
+
+        override val id: ClientId = jwt.clientId
+
+        companion object {
+            /**
+             * [ECDSASigner.SUPPORTED_ALGORITHMS] & [RSASSASigner.SUPPORTED_ALGORITHMS]
+             */
+            val DefaultSupportedSigningAlgorithms =
+                ECDSASigner.SUPPORTED_ALGORITHMS + RSASSASigner.SUPPORTED_ALGORITHMS
+
+            internal fun requireIsAllowedAlgorithm(alg: JWSAlgorithm) =
+                require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
+
+            private fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
+        }
+    }
+}
 
 /**
  * Configuration object to pass configuration properties to the issuance components.

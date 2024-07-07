@@ -38,6 +38,7 @@ import java.time.Clock
 data class DeferredIssuerConfig(
     val clientId: ClientId,
     val deferredEndpoint: URL,
+    val authServerId: URL,
     val tokenEndpoint: URL,
     val dPoPSigner: PopSigner.Jwt? = null,
     val responseEncryptionSpec: IssuanceResponseEncryptionSpec? = null,
@@ -153,8 +154,9 @@ interface DeferredIssuer : QueryForDeferredCredential {
 
             val tokenEndpointClient = TokenEndpointClient(
                 config.clock,
-                config.clientId,
+                Client.Public(config.clientId),
                 URI.create("https://willNotBeUsed"), // this will not be used
+                config.authServerId,
                 config.tokenEndpoint,
                 dPoPJwtFactory,
                 ktorHttpClientFactory,

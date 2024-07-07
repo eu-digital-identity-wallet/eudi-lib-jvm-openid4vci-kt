@@ -21,6 +21,7 @@ import io.ktor.client.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import java.net.URL
 
 /**
  * Entry point to the issuance library
@@ -218,6 +219,7 @@ interface Issuer :
                         DeferredIssuerConfig(
                             clientId = config.clientId,
                             deferredEndpoint = deferredEndpoint,
+                            authServerId = URL(authorizationServerMetadata.issuer.value),
                             tokenEndpoint = tokenEndpoint,
                             dPoPSigner = dPoPJwtFactory?.signer,
                             responseEncryptionSpec = responseEncryptionSpec,
