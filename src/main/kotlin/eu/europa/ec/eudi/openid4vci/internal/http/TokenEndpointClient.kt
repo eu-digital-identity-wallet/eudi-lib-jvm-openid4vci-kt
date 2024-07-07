@@ -15,11 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
+import com.nimbusds.oauth2.sdk.id.JWTID
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.Grants.PreAuthorizedCode
-import eu.europa.ec.eudi.openid4vci.internal.GrantedAuthorizationDetailsSerializer
-import eu.europa.ec.eudi.openid4vci.internal.TokenResponse
+import eu.europa.ec.eudi.openid4vci.internal.*
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -28,6 +28,7 @@ import kotlinx.serialization.Serializable
 import java.net.URI
 import java.net.URL
 import java.time.Clock
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Sealed hierarchy of possible responses to an Access Token request.
@@ -91,8 +92,9 @@ internal sealed interface TokenResponseTO {
 
 internal class TokenEndpointClient(
     private val clock: Clock,
-    private val clientId: ClientId,
+    private val client: Client,
     private val authFlowRedirectionURI: URI,
+    private val authServerId: URL,
     private val tokenEndpoint: URL,
     private val dPoPJwtFactory: DPoPJwtFactory?,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
@@ -105,8 +107,9 @@ internal class TokenEndpointClient(
         ktorHttpClientFactory: KtorHttpClientFactory,
     ) : this(
         config.clock,
-        config.clientId,
+        Client.Public(config.clientId),
         config.authFlowRedirectionURI,
+        URL(authorizationServerMetadata.issuer.value),
         authorizationServerMetadata.tokenEndpointURI.toURL(),
         dPoPJwtFactory,
         ktorHttpClientFactory,
@@ -125,13 +128,15 @@ internal class TokenEndpointClient(
         authorizationCode: AuthorizationCode,
         pkceVerifier: PKCEVerifier,
     ): Result<TokenResponse> = runCatching {
-        val params = TokenEndpointForm.authCodeFlow(
-            authorizationCode = authorizationCode,
-            redirectionURI = authFlowRedirectionURI,
-            clientId = clientId,
-            pkceVerifier = pkceVerifier,
-        )
-        requestAccessToken(params).tokensOrFail(clock)
+        val params =
+            TokenEndpointForm.authCodeFlow(
+                clientId = client.id,
+                clientAttestation = clientAttestation(client),
+                authorizationCode = authorizationCode,
+                redirectionURI = authFlowRedirectionURI,
+                pkceVerifier = pkceVerifier,
+            )
+        requestAccessToken(params)
     }
 
     /**
@@ -147,12 +152,14 @@ internal class TokenEndpointClient(
         preAuthorizedCode: PreAuthorizedCode,
         txCode: String?,
     ): Result<TokenResponse> = runCatching {
-        val params = TokenEndpointForm.preAuthCodeFlow(
-            clientId = clientId,
-            preAuthorizedCode = preAuthorizedCode,
-            txCode = txCode,
-        )
-        requestAccessToken(params).tokensOrFail(clock)
+        val params =
+            TokenEndpointForm.preAuthCodeFlow(
+                clientId = client.id,
+                clientAttestation = clientAttestation(client),
+                preAuthorizedCode = preAuthorizedCode,
+                txCode = txCode,
+            )
+        requestAccessToken(params)
     }
 
     /**
@@ -164,26 +171,46 @@ internal class TokenEndpointClient(
      * a new [TokenResponse.refreshToken]
      */
     suspend fun refreshAccessToken(refreshToken: RefreshToken): Result<TokenResponse> = runCatching {
-        val params = TokenEndpointForm.refreshAccessToken(clientId, refreshToken)
-        requestAccessToken(params).tokensOrFail(clock = clock)
+        val params = TokenEndpointForm.refreshAccessToken(client.id, refreshToken)
+        requestAccessToken(params)
     }
 
     private suspend fun requestAccessToken(
         params: Map<String, String>,
-    ): TokenResponseTO =
-        ktorHttpClientFactory().use { client ->
+    ): TokenResponse {
+        val response = ktorHttpClientFactory().use { client ->
             val formParameters = Parameters.build {
                 params.entries.forEach { (k, v) -> append(k, v) }
             }
-            val response = client.submitForm(tokenEndpoint.toString(), formParameters) {
+            client.submitForm(tokenEndpoint.toString(), formParameters) {
                 dPoPJwtFactory?.let { factory ->
                     dpop(factory, tokenEndpoint, Htm.POST, accessToken = null, nonce = null)
                 }
             }
-            if (response.status.isSuccess()) response.body<TokenResponseTO.Success>()
-            else response.body<TokenResponseTO.Failure>()
         }
+        val responseTO = if (response.status.isSuccess()) response.body<TokenResponseTO.Success>()
+        else response.body<TokenResponseTO.Failure>()
+        return responseTO.tokensOrFail(clock)
+    }
+
+    private suspend fun clientAttestation(client: Client): JwtClientAttestation? =
+        when (client) {
+            is Client.Public -> null
+            is Client.Attested -> {
+                val popJwt =
+                    clientAttestationBuilder.build(
+                        clock,
+                        client,
+                        authServerId = authServerId.toString(),
+                        jwtId = JWTID().value,
+                    )
+                JwtClientAttestation(client.jwt, popJwt)
+            }
+        }
+
+    private val clientAttestationBuilder = DefaultClientAttestationPopJWTBuilder(5.minutes, null)
 }
+
 internal object TokenEndpointForm {
     const val AUTHORIZATION_CODE_GRANT = "authorization_code"
     const val PRE_AUTHORIZED_CODE_GRANT = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
@@ -198,25 +225,30 @@ internal object TokenEndpointForm {
     const val REFRESH_TOKEN_PARAM = "refresh_token"
 
     fun authCodeFlow(
-        clientId: String,
+        clientId: ClientId,
+        clientAttestation: JwtClientAttestation?,
         authorizationCode: AuthorizationCode,
         redirectionURI: URI,
         pkceVerifier: PKCEVerifier,
-    ): Map<String, String> = buildMap<String, String> {
-        put(CLIENT_ID_PARAM, clientId)
-        put(GRANT_TYPE_PARAM, AUTHORIZATION_CODE_GRANT)
-        put(AUTHORIZATION_CODE_PARAM, authorizationCode.code)
-        put(REDIRECT_URI_PARAM, redirectionURI.toString())
-        put(CODE_VERIFIER_PARAM, pkceVerifier.codeVerifier)
-    }.toMap()
+    ): Map<String, String> =
+        buildMap {
+            put(CLIENT_ID_PARAM, clientId)
+            clientAttestation?.let { putAll(AttestationBasedClientAuthenticationForm.assemble(it)) }
+            put(GRANT_TYPE_PARAM, AUTHORIZATION_CODE_GRANT)
+            put(AUTHORIZATION_CODE_PARAM, authorizationCode.code)
+            put(REDIRECT_URI_PARAM, redirectionURI.toString())
+            put(CODE_VERIFIER_PARAM, pkceVerifier.codeVerifier)
+        }.toMap()
 
     fun preAuthCodeFlow(
-        clientId: String,
+        clientId: ClientId,
+        clientAttestation: JwtClientAttestation?,
         preAuthorizedCode: PreAuthorizedCode,
         txCode: String?,
     ): Map<String, String> =
         buildMap {
             put(CLIENT_ID_PARAM, clientId)
+            clientAttestation?.let { putAll(AttestationBasedClientAuthenticationForm.assemble(it)) }
             put(GRANT_TYPE_PARAM, PRE_AUTHORIZED_CODE_GRANT)
             put(PRE_AUTHORIZED_CODE_PARAM, preAuthorizedCode.preAuthorizedCode)
             txCode?.let { put(TX_CODE_PARAM, it) }
@@ -225,9 +257,24 @@ internal object TokenEndpointForm {
     fun refreshAccessToken(
         clientId: String,
         refreshToken: RefreshToken,
-    ): Map<String, String> = buildMap {
-        put(CLIENT_ID_PARAM, clientId)
-        put(GRANT_TYPE_PARAM, REFRESH_TOKEN)
-        put(REFRESH_TOKEN_PARAM, refreshToken.refreshToken)
-    }
+    ): Map<String, String> =
+        buildMap {
+            put(CLIENT_ID_PARAM, clientId)
+            put(GRANT_TYPE_PARAM, REFRESH_TOKEN)
+            put(REFRESH_TOKEN_PARAM, refreshToken.refreshToken)
+        }
+}
+
+internal object AttestationBasedClientAuthenticationForm {
+
+    private const val CLIENT_ASSERTION_TYPE_PARAM = "client_assertion_type"
+    private const val CLIENT_ASSERTION_PARAM = "client_assertion"
+    private const val CLIENT_ASSERTION_TYPE_JWT_CLIENT_ATTESTATION =
+        "urn:ietf:params:oauth:client-assertion-type:jwt-client-attestation"
+
+    fun assemble(clientAttestation: JwtClientAttestation): Map<String, String> =
+        buildMap {
+            put(CLIENT_ASSERTION_TYPE_PARAM, CLIENT_ASSERTION_TYPE_JWT_CLIENT_ATTESTATION)
+            put(CLIENT_ASSERTION_PARAM, clientAttestation.serialize())
+        }
 }

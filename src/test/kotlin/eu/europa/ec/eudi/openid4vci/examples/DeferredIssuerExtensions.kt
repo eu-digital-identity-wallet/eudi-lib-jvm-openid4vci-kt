@@ -101,6 +101,7 @@ data class AccessTokenTO(
 data class DeferredIssuanceStoredContextTO(
     @Required @SerialName("client_id") val clientId: String,
     @Required @SerialName("deferred_endpoint") val deferredEndpoint: String,
+    @Required @SerialName("auth_server_id") val authServerId: String,
     @Required @SerialName("token_endpoint") val tokenEndpoint: String,
     @SerialName("dpop_key_id") val dPoPSignerKid: String? = null,
     @SerialName("credential_response_encryption_spec") val responseEncryptionSpec: JsonObject? = null,
@@ -119,6 +120,7 @@ data class DeferredIssuanceStoredContextTO(
                 clock = clock,
                 clientId = clientId,
                 deferredEndpoint = URL(deferredEndpoint),
+                authServerId = URL(authServerId),
                 tokenEndpoint = URL(tokenEndpoint),
                 dPoPSigner = dPoPSignerKid?.let { requireNotNull(recreatePopSigner).invoke(it) },
                 responseEncryptionSpec = responseEncryptionSpec?.let { responseEncryption(it) },
@@ -145,6 +147,7 @@ data class DeferredIssuanceStoredContextTO(
             return DeferredIssuanceStoredContextTO(
                 clientId = dCtx.config.clientId,
                 deferredEndpoint = dCtx.config.deferredEndpoint.toString(),
+                authServerId = dCtx.config.authServerId.toString(),
                 tokenEndpoint = dCtx.config.tokenEndpoint.toString(),
                 dPoPSignerKid = dPoPSignerKid,
                 responseEncryptionSpec = dCtx.config.responseEncryptionSpec?.let { responseEncryptionSpecTO(it) },
