@@ -97,6 +97,9 @@ internal class AuthorizationEndpointClient(
     private val supportsPar: Boolean
         get() = pushedAuthorizationRequestEndpoint != null
 
+    private val clientAttestationBuilder: ClientAttestationBuilder? =
+        ClientAttestationBuilder(config.clock, Client.Public(config.clientId), URL(authorizationIssuer))
+
     suspend fun submitParOrCreateAuthorizationRequestUrl(
         scopes: List<Scope>,
         credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
@@ -162,6 +165,13 @@ internal class AuthorizationEndpointClient(
                     authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
                 }
                 prompt(Prompt.Type.LOGIN)
+
+                val clientAttestation = clientAttestationBuilder?.clientAttestation()
+                if (null != clientAttestation) {
+                    AttestationBasedClientAuthenticationForm.assemble(clientAttestation).forEach { (k, v) ->
+                        customParameter(k, v)
+                    }
+                }
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
         }
@@ -223,26 +233,26 @@ internal class AuthorizationEndpointClient(
             pkceVerifier to authorizationCodeUrl
         }
 
-        is PushedAuthorizationRequestResponseTO.Failure -> throw PushedAuthorizationRequestFailed(
-            error,
-            errorDescription,
-        )
+        is PushedAuthorizationRequestResponseTO.Failure ->
+            throw PushedAuthorizationRequestFailed(error, errorDescription)
     }
 
     private suspend fun pushAuthorizationRequest(
         parEndpoint: URI,
         pushedAuthorizationRequest: PushedAuthorizationRequest,
-    ): PushedAuthorizationRequestResponseTO = ktorHttpClientFactory().use { client ->
-        val url = parEndpoint.toURL()
-        val formParameters = pushedAuthorizationRequest.asFormPostParams()
+    ): PushedAuthorizationRequestResponseTO {
+        val response = ktorHttpClientFactory().use { client ->
+            val url = parEndpoint.toURL()
+            val formParameters = pushedAuthorizationRequest.asFormPostParams()
 
-        val response = client.submitForm(
-            url = url.toString(),
-            formParameters = Parameters.build {
-                formParameters.entries.forEach { (k, v) -> append(k, v) }
-            },
-        )
-        if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponseTO.Success>()
+            client.submitForm(
+                url = url.toString(),
+                formParameters = Parameters.build {
+                    formParameters.entries.forEach { (k, v) -> append(k, v) }
+                },
+            )
+        }
+        return if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponseTO.Success>()
         else response.body<PushedAuthorizationRequestResponseTO.Failure>()
     }
 

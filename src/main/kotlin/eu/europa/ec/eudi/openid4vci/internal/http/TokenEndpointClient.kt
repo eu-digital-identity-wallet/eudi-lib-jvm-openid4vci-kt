@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
-import com.nimbusds.oauth2.sdk.id.JWTID
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.Grants.PreAuthorizedCode
@@ -28,7 +27,6 @@ import kotlinx.serialization.Serializable
 import java.net.URI
 import java.net.URL
 import java.time.Clock
-import kotlin.time.Duration.Companion.minutes
 
 /**
  * Sealed hierarchy of possible responses to an Access Token request.
@@ -94,7 +92,7 @@ internal class TokenEndpointClient(
     private val clock: Clock,
     private val client: Client,
     private val authFlowRedirectionURI: URI,
-    private val authServerId: URL,
+    private val authServerId: URL? = null,
     private val tokenEndpoint: URL,
     private val dPoPJwtFactory: DPoPJwtFactory?,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
@@ -115,6 +113,9 @@ internal class TokenEndpointClient(
         ktorHttpClientFactory,
     )
 
+    private val clientAttestationBuilder: ClientAttestationBuilder? =
+        ClientAttestationBuilder(clock, client, authServerId)
+
     /**
      * Submits a request for access token in authorization server's token endpoint passing parameters specific to the
      * authorization code flow
@@ -131,7 +132,7 @@ internal class TokenEndpointClient(
         val params =
             TokenEndpointForm.authCodeFlow(
                 clientId = client.id,
-                clientAttestation = clientAttestation(client),
+                clientAttestation = clientAttestationBuilder?.clientAttestation(),
                 authorizationCode = authorizationCode,
                 redirectionURI = authFlowRedirectionURI,
                 pkceVerifier = pkceVerifier,
@@ -155,7 +156,7 @@ internal class TokenEndpointClient(
         val params =
             TokenEndpointForm.preAuthCodeFlow(
                 clientId = client.id,
-                clientAttestation = clientAttestation(client),
+                clientAttestation = clientAttestationBuilder?.clientAttestation(),
                 preAuthorizedCode = preAuthorizedCode,
                 txCode = txCode,
             )
@@ -192,23 +193,6 @@ internal class TokenEndpointClient(
         else response.body<TokenResponseTO.Failure>()
         return responseTO.tokensOrFail(clock)
     }
-
-    private suspend fun clientAttestation(client: Client): JwtClientAttestation? =
-        when (client) {
-            is Client.Public -> null
-            is Client.Attested -> {
-                val popJwt =
-                    clientAttestationBuilder.build(
-                        clock,
-                        client,
-                        authServerId = authServerId.toString(),
-                        jwtId = JWTID().value,
-                    )
-                JwtClientAttestation(client.jwt, popJwt)
-            }
-        }
-
-    private val clientAttestationBuilder = DefaultClientAttestationPopJWTBuilder(5.minutes, null)
 }
 
 internal object TokenEndpointForm {
