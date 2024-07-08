@@ -16,12 +16,8 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSSigner
-import com.nimbusds.jose.crypto.ECDSASigner
-import com.nimbusds.jose.crypto.MACSigner
-import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.ParUsage.*
 import java.net.URI
 import java.time.Clock
 
@@ -43,31 +39,16 @@ sealed interface Client : java.io.Serializable {
 
     data class Attested(
         val jwt: ClientAttestationJWT,
-        val popSigningAlgorithm: JWSAlgorithm,
-        val popJwsSigner: JWSSigner,
+        val popJwtSpec: ClientAttestationPoPJWTSpec,
     ) : Client {
         init {
             val id = jwt.clientId
             require(id.isNotBlank() && id.isNotEmpty())
             val pubKey = jwt.pubKey
             require(!pubKey.isPrivate) { "InstanceKey should be public" }
-            requireIsAllowedAlgorithm(popSigningAlgorithm)
         }
 
         override val id: ClientId = jwt.clientId
-
-        companion object {
-            /**
-             * [ECDSASigner.SUPPORTED_ALGORITHMS] & [RSASSASigner.SUPPORTED_ALGORITHMS]
-             */
-            val DefaultSupportedSigningAlgorithms =
-                ECDSASigner.SUPPORTED_ALGORITHMS + RSASSASigner.SUPPORTED_ALGORITHMS
-
-            internal fun requireIsAllowedAlgorithm(alg: JWSAlgorithm) =
-                require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
-
-            private fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
-        }
     }
 }
 

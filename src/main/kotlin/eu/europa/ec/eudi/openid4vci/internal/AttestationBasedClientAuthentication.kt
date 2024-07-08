@@ -19,13 +19,11 @@ import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSSigner
-import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
 import com.nimbusds.jose.proc.JOSEObjectTypeVerifier
 import com.nimbusds.jose.proc.JWSKeySelector
 import com.nimbusds.jose.proc.SecurityContext
-import com.nimbusds.jose.produce.JWSSignerFactory
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
@@ -33,7 +31,9 @@ import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import com.nimbusds.jwt.proc.JWTProcessor
 import com.nimbusds.oauth2.sdk.id.JWTID
 import eu.europa.ec.eudi.openid4vci.*
+import java.net.URL
 import java.time.Clock
+import java.time.Instant
 import java.util.*
 import kotlin.time.Duration
 
@@ -46,7 +46,7 @@ class ClientAttestationJwtBuilder(
     private val headerCustomization: JWSHeader.Builder.(ClientAttestationIssuerRequest) -> Unit = {},
 ) {
     init {
-        Client.Attested.requireIsAllowedAlgorithm(algorithm)
+        ClientAttestationPoPJWTSpec.requireIsAllowedAlgorithm(algorithm)
         require(duration.isPositive()) { "Duration must be positive" }
     }
 
@@ -76,7 +76,7 @@ class ClientAttestationJwtBuilder(
     }
 }
 
-internal object ClientAttestationJWTProcessorFactory {
+object ClientAttestationJWTProcessorFactory {
 
     private class ClaimsSetVerifier private constructor(
         private val clock: Clock,
@@ -118,6 +118,7 @@ internal object ClientAttestationJWTProcessorFactory {
 
 private fun cnf(jwk: JWK): Map<String, Any> =
     mapOf("jwk" to jwk.toJSONObject())
+
 internal fun JWTClaimsSet.cnfJwk(): JWK? {
     return getJSONObjectClaim("cnf")?.get("jwk")?.let {
         @Suppress("UNCHECKED_CAST")
@@ -130,51 +131,33 @@ internal fun JWTClaimsSet.cnfJwk(): JWK? {
  * Populates only the mandatory claims : `iss`, `exp`, `jit`, `aud` and the optional `iat`
  * In regard to JOSE header, only `alg` claim is being populated
  */
-internal class DefaultClientAttestationPopJWTBuilder(
-    private val duration: Duration,
-    private val typ: String?,
-) : ClientAttestationPoPJWTBuilder {
-    init {
-        require(duration.isPositive()) { "duration must be positive" }
-    }
+internal object DefaultClientAttestationPopJWTBuilder : ClientAttestationPoPJWTBuilder {
 
-    override suspend fun build(
+    override suspend fun buildClientAttestationPoPJWT(
         clock: Clock,
         client: Client.Attested,
-        authServerId: String,
-        jwtId: String?,
+        authServerId: URL,
     ): ClientAttestationPoPJWT {
-        fun randomJwtId() = JWTID().value
-
-        val header =
-            JWSHeader.Builder(client.popSigningAlgorithm).apply {
-                typ?.let { type(JOSEObjectType(typ)) }
-            }.build()
-
-        val claimSet =
-            JWTClaimsSet.Builder().apply {
-                val now = clock.instant()
-                val exp = now.plusSeconds(duration.inWholeSeconds)
-                issuer(client.id)
-                jwtID(jwtId ?: randomJwtId())
-                issueTime(Date.from(now))
-                expirationTime(Date.from(exp))
-                audience(authServerId)
-            }.build()
-
-        val jwt = SignedJWT(header, claimSet).apply { sign(client.popJwsSigner) }
-
+        val header = client.popJwtHeader()
+        val claimSet = client.popJwtClaimSet(authServerId, clock.instant())
+        val jwt = SignedJWT(header, claimSet).apply { sign(client.popJwtSpec.jwsSigner) }
         return ClientAttestationPoPJWT(jwt)
     }
-}
 
-private fun jwsSignerFactoryFor(supportedAlgorithms: Set<JWSAlgorithm>): JWSSignerFactory {
-    require(supportedAlgorithms.isNotEmpty())
-    val default = DefaultJWSSignerFactory()
-    require(default.supportedJWSAlgorithms().containsAll(supportedAlgorithms)) {
-        "There algorithms not supported. You can define at most ${default.supportedJWSAlgorithms()}"
-    }
-    return object : JWSSignerFactory by default {
-        override fun supportedJWSAlgorithms(): MutableSet<JWSAlgorithm> = supportedAlgorithms.toMutableSet()
+    private fun Client.Attested.popJwtHeader(): JWSHeader =
+        JWSHeader.Builder(popJwtSpec.signingAlgorithm).apply {
+            popJwtSpec.typ?.let { type(JOSEObjectType(it)) }
+        }.build()
+
+    private fun Client.Attested.popJwtClaimSet(authServerId: URL, now: Instant): JWTClaimsSet {
+        fun randomJwtId() = JWTID().value
+        return JWTClaimsSet.Builder().apply {
+            val exp = now.plusSeconds(popJwtSpec.duration.inWholeSeconds)
+            issuer(id)
+            jwtID(randomJwtId())
+            issueTime(Date.from(now))
+            expirationTime(Date.from(exp))
+            audience(authServerId.toString())
+        }.build()
     }
 }

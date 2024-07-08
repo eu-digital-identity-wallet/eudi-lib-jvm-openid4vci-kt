@@ -15,13 +15,20 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
+import com.nimbusds.jose.JWSSigner
+import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.MACSigner
+import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.internal.DefaultClientAttestationPopJWTBuilder
 import eu.europa.ec.eudi.openid4vci.internal.cnfJwk
+import java.net.URL
 import java.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Qualification of a JWT that adheres to client attestation JWT
@@ -110,6 +117,31 @@ fun interface ClientAttestationIssuer {
     suspend fun issue(request: ClientAttestationIssuerRequest): ClientAttestationJWT
 }
 
+data class ClientAttestationPoPJWTSpec(
+    val signingAlgorithm: JWSAlgorithm,
+    val duration: Duration = 5.minutes,
+    val typ: String? = null,
+    val jwsSigner: JWSSigner,
+) {
+    init {
+        requireIsAllowedAlgorithm(signingAlgorithm)
+        require(duration.isPositive()) { "popJwtDuration must be positive" }
+    }
+
+    companion object {
+        /**
+         * [ECDSASigner.SUPPORTED_ALGORITHMS] & [RSASSASigner.SUPPORTED_ALGORITHMS]
+         */
+        val DefaultSupportedSigningAlgorithms =
+            ECDSASigner.SUPPORTED_ALGORITHMS + RSASSASigner.SUPPORTED_ALGORITHMS
+
+        internal fun requireIsAllowedAlgorithm(alg: JWSAlgorithm) =
+            require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
+
+        private fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
+    }
+}
+
 /**
  * A function for building a [ClientAttestationPoPJWT]
  */
@@ -122,29 +154,45 @@ fun interface ClientAttestationPoPJWTBuilder {
      * @param authServerId the issuer claim of the OAUTH2/OIDC server to which
      * the attestation will be presented for authentication.
      *
-     * @param jwtId an option identifier to be included a `jit` claim. If not provided,
-     * a random value will be used
      * @return the PoP JWT
      */
-    suspend fun build(
+    suspend fun buildClientAttestationPoPJWT(
         clock: Clock,
         client: Client.Attested,
-        authServerId: String,
-        jwtId: String?,
+        authServerId: URL,
     ): ClientAttestationPoPJWT
+}
+
+fun interface ClientAttestationBuilder {
+
+    suspend fun clientAttestation(): JwtClientAttestation
 
     companion object {
-        /**
-         * Default implementation
-         * @param typ the `typ` claims of the JOSE header. If not provided, the claim will not be
-         *      * populated
-         * @param duration the time to live of the PoP JWT. It will be used to calculate
-         * the expiration time (`exp` claim)
-         */
-        fun default(
-            duration: Duration,
-            typ: String?,
-        ): ClientAttestationPoPJWTBuilder = DefaultClientAttestationPopJWTBuilder(duration, typ)
+
+        operator fun invoke(
+            clock: Clock,
+            client: Client.Attested,
+            authServerId: URL,
+            clientAttestationPoPJWTBuilder: ClientAttestationPoPJWTBuilder = DefaultClientAttestationPopJWTBuilder,
+        ): ClientAttestationBuilder =
+            ClientAttestationBuilder {
+                val popJwt = clientAttestationPoPJWTBuilder.buildClientAttestationPoPJWT(clock, client, authServerId)
+                JwtClientAttestation(client.jwt, popJwt)
+            }
+
+        operator fun invoke(
+            clock: Clock,
+            client: Client,
+            authServerId: URL?,
+        ): ClientAttestationBuilder? = when (client) {
+            is Client.Attested -> {
+                requireNotNull(authServerId) {
+                    "In case of attestation-based client authentication, authServerId is required"
+                }
+                invoke(clock, client, authServerId)
+            }
+            is Client.Public -> null
+        }
     }
 }
 
