@@ -18,12 +18,8 @@ package eu.europa.ec.eudi.openid4vci.internal.http
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.Grants.PreAuthorizedCode
-import eu.europa.ec.eudi.openid4vci.internal.DPoP
-import eu.europa.ec.eudi.openid4vci.internal.DPoPJwtFactory
 import eu.europa.ec.eudi.openid4vci.internal.GrantedAuthorizationDetailsSerializer
-import eu.europa.ec.eudi.openid4vci.internal.Htm
 import eu.europa.ec.eudi.openid4vci.internal.TokenResponse
-import eu.europa.ec.eudi.openid4vci.internal.dpop
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vci.internal
+package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
@@ -22,7 +22,6 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.dpop.DPoPUtils
 import com.nimbusds.oauth2.sdk.id.JWTID
 import com.nimbusds.openid.connect.sdk.Nonce
-import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import java.net.URL
@@ -31,14 +30,16 @@ import java.util.*
 import com.nimbusds.oauth2.sdk.dpop.DPoPProofFactory as NimbusDPoPProofFactory
 import com.nimbusds.oauth2.sdk.token.DPoPAccessToken as NimbusDPoPAccessToken
 
-internal enum class Htm {
+const val DPoP = "DPoP"
+
+enum class Htm {
     GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE
 }
 
 /**
- * https://datatracker.ietf.org/doc/rfc9449/
+ * Factory class to generate DPoP JWTs to be added as a request header `DPoP` based on spec https://datatracker.ietf.org/doc/rfc9449/
  */
-internal class DPoPJwtFactory(
+class DPoPJwtFactory(
     val signer: PopSigner.Jwt,
     private val jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
     private val clock: Clock,
@@ -133,7 +134,11 @@ internal class DPoPJwtFactory(
     }
 }
 
-internal fun HttpRequestBuilder.bearerOrDPoPAuth(
+/**
+ * Utility method to be used to set properly the DPoP header on the request under construction, targeted on the URL passed as [htu].
+ * Based on the passed [accessToken] DPoP header will be added if it is of type DPoP.
+ */
+fun HttpRequestBuilder.bearerOrDPoPAuth(
     factory: DPoPJwtFactory?,
     htu: URL,
     htm: Htm,
@@ -143,7 +148,6 @@ internal fun HttpRequestBuilder.bearerOrDPoPAuth(
         is AccessToken.Bearer -> {
             bearerAuth(accessToken)
         }
-
         is AccessToken.DPoP -> {
             if (factory != null) {
                 dpop(factory, htu, htm, accessToken, nonce = null)
@@ -155,7 +159,10 @@ internal fun HttpRequestBuilder.bearerOrDPoPAuth(
     }
 }
 
-internal fun HttpRequestBuilder.dpop(
+/**
+ * Adds header `DPoP` on the request under construction,  utilizing the passed [DPoPJwtFactory]
+ */
+fun HttpRequestBuilder.dpop(
     factory: DPoPJwtFactory,
     htu: URL,
     htm: Htm,
@@ -173,5 +180,3 @@ private fun HttpRequestBuilder.dpopAuth(accessToken: AccessToken.DPoP) {
 private fun HttpRequestBuilder.bearerAuth(accessToken: AccessToken.Bearer) {
     bearerAuth(accessToken.accessToken)
 }
-
-internal const val DPoP = "DPoP"

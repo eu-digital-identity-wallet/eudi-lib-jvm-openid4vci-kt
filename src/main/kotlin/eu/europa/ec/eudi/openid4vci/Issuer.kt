@@ -45,6 +45,7 @@ interface Issuer :
     NotifyIssuer {
 
     val credentialOffer: CredentialOffer
+    val dPoPJwtFactory: DPoPJwtFactory?
 
     /**
      * A convenient method for obtaining a [DeferredIssuanceContext], in case of a deferred issuance
@@ -193,6 +194,9 @@ interface Issuer :
                 NotifyIssuer by notifyIssuer {
                 override val credentialOffer: CredentialOffer
                     get() = credentialOffer
+
+                override val dPoPJwtFactory: DPoPJwtFactory?
+                    get() = dPoPJwtFactory
 
                 override fun AuthorizedRequest.deferredContext(
                     deferredCredential: IssuedCredential.Deferred,
