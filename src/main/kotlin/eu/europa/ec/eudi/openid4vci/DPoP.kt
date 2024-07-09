@@ -30,7 +30,9 @@ import java.util.*
 import com.nimbusds.oauth2.sdk.dpop.DPoPProofFactory as NimbusDPoPProofFactory
 import com.nimbusds.oauth2.sdk.token.DPoPAccessToken as NimbusDPoPAccessToken
 
-const val DPoP = "DPoP"
+enum class Htm {
+    GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE
+}
 
 /**
  * Factory class to generate DPoP JWTs to be added as a request header `DPoP` based on spec https://datatracker.ietf.org/doc/rfc9449/
@@ -176,3 +178,5 @@ private fun HttpRequestBuilder.dpopAuth(accessToken: AccessToken.DPoP) {
 private fun HttpRequestBuilder.bearerAuth(accessToken: AccessToken.Bearer) {
     bearerAuth(accessToken.accessToken)
 }
+
+private const val DPoP = "DPoP"
