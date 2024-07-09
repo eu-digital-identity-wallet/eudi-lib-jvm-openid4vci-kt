@@ -71,14 +71,21 @@ internal fun issuanceLog(message: String) {
 fun Issuer.popSigner(
     credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
     popSignerPreference: ProofTypeMetaPreference = ProofTypeMetaPreference.FavorJWT,
-): PopSigner {
+): PopSigner? {
     val credentialConfigurationsSupported =
         credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported
     val credentialConfiguration =
         checkNotNull(credentialConfigurationsSupported[credentialConfigurationIdentifier])
-    val popSigner =
-        CryptoGenerator.popSigner(credentialConfiguration = credentialConfiguration, preference = popSignerPreference)
-    return checkNotNull(popSigner) { "No signer can be generated for $credentialConfigurationIdentifier" }
+
+    return if (credentialConfiguration.proofTypesSupported.values.isEmpty()) null
+    else {
+        val popSigner =
+            CryptoGenerator.popSigner(
+                credentialConfiguration = credentialConfiguration,
+                preference = popSignerPreference,
+            )
+        checkNotNull(popSigner) { "No signer can be generated for $credentialConfigurationIdentifier" }
+    }
 }
 
 suspend fun Issuer.submitCredentialRequest(
