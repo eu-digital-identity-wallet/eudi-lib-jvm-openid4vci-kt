@@ -30,6 +30,8 @@ import java.util.*
 import com.nimbusds.oauth2.sdk.dpop.DPoPProofFactory as NimbusDPoPProofFactory
 import com.nimbusds.oauth2.sdk.token.DPoPAccessToken as NimbusDPoPAccessToken
 
+const val DPoP = "DPoP"
+
 enum class Htm {
     GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE
 }
@@ -178,5 +180,3 @@ private fun HttpRequestBuilder.dpopAuth(accessToken: AccessToken.DPoP) {
 private fun HttpRequestBuilder.bearerAuth(accessToken: AccessToken.Bearer) {
     bearerAuth(accessToken.accessToken)
 }
-
-private const val DPoP = "DPoP"
