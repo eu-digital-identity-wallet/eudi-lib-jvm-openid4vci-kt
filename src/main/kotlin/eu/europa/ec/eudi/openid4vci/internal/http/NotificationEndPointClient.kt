@@ -19,10 +19,10 @@ import eu.europa.ec.eudi.openid4vci.AccessToken
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.NotificationFailed
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceEvent
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerEndpoint
+import eu.europa.ec.eudi.openid4vci.DPoPJwtFactory
+import eu.europa.ec.eudi.openid4vci.Htm
 import eu.europa.ec.eudi.openid4vci.KtorHttpClientFactory
-import eu.europa.ec.eudi.openid4vci.internal.DPoPJwtFactory
-import eu.europa.ec.eudi.openid4vci.internal.Htm
-import eu.europa.ec.eudi.openid4vci.internal.bearerOrDPoPAuth
+import eu.europa.ec.eudi.openid4vci.bearerOrDPoPAuth
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*

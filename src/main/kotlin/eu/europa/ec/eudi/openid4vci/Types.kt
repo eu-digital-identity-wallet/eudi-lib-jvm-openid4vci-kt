@@ -356,3 +356,7 @@ value class CoseCurve private constructor(val value: Int) {
         }
     }
 }
+
+enum class Htm {
+    GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE
+}
