@@ -17,7 +17,10 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
+import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
+import com.nimbusds.jose.crypto.opts.UserAuthenticationRequired
+import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
@@ -184,6 +187,21 @@ interface RequestIssuance {
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 }
 
+/**
+ * A function that represents a user's authentication using
+ * biometrics or PIN to authorize the use of a key by [Signature]
+ */
+fun interface UnlockSignature {
+    /**
+     * Implement this method with a user action that authorize the
+     * use of the [signature] by biometrics or PIN
+     *
+     * @param signature The signature that needs user's authentication.
+     * It will have initialized with the private key
+     */
+    suspend operator fun invoke(signature: Signature)
+}
+
 sealed interface PopSigner {
     /**
      * A signer for proof of possession JWTs
@@ -191,11 +209,14 @@ sealed interface PopSigner {
      * @param bindingKey The public key to be included to the proof. It should correspond to the key
      * used to sign the proof.
      * @param jwsSigner A function to sign the JWT
+     * @param unlockSignature the ability to unlock the [Signature] using PIN or biometric. If provided, you must
+     * also set to the [jwsSigner] the [UserAuthenticationRequired] option in order to be taken into account.
      */
     data class Jwt(
         val algorithm: JWSAlgorithm,
         val bindingKey: JwtBindingKey,
         val jwsSigner: JWSSigner,
+        val unlockSignature: UnlockSignature?,
     ) : PopSigner
 
     companion object {
@@ -212,6 +233,7 @@ sealed interface PopSigner {
          *
          * @return the JWT signer
          */
+        @Deprecated(message = "Deprecated and will be removed. Use Nimbus to create PopSigner.Jwt")
         fun jwtPopSigner(
             privateKey: JWK,
             algorithm: JWSAlgorithm,
@@ -226,8 +248,8 @@ sealed interface PopSigner {
                 },
             ) { "Public/private key don't match" }
 
-            val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
-            return Jwt(algorithm, publicKey, signer)
+            val signer: JWSSigner = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
+            return Jwt(algorithm, publicKey, signer, unlockSignature = null)
         }
     }
 }

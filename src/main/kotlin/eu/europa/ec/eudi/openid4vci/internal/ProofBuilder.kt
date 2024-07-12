@@ -21,6 +21,7 @@ import com.nimbusds.jose.util.Base64
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
+import kotlinx.coroutines.coroutineScope
 import java.time.Clock
 import java.util.*
 
@@ -70,6 +71,16 @@ internal class JwtProofBuilder(
         val claimSet = claimSet()
         val jwt = SignedJWT(header, claimSet).apply { sign(popSigner.jwsSigner) }
         return Proof.Jwt(jwt)
+    }
+
+    private suspend fun SignedJWT.sign(popSigner: PopSigner.Jwt) = coroutineScope {
+        try {
+            sign(popSigner.jwsSigner)
+        } catch (actionRequired: ActionRequiredForJWSCompletionException) {
+            popSigner.unlockSignature
+                ?.let { userAction -> actionRequired.recoverUsing(userAction) }
+                ?: throw actionRequired
+        }
     }
 
     private fun header(): JWSHeader {
