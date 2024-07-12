@@ -351,7 +351,7 @@ val request =
 val (updatedAuthorizedRequest, outcome) =
     with(issuer) {
         with(authorizedRequest) {
-            requestSingleAndUpdateState(request, popSigner)
+            requestSingle(request, popSigner)
         }
     }
 

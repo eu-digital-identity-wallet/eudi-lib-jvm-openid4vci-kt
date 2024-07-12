@@ -42,7 +42,7 @@ internal class RequestIssuanceImpl(
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ) : RequestIssuance, RequestBatchIssuance {
 
-    override suspend fun AuthorizedRequest.requestSingleAndUpdateState(
+    override suspend fun AuthorizedRequest.requestSingle(
         requestPayload: IssuanceRequestPayload,
         popSigner: PopSigner?,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
@@ -76,7 +76,7 @@ internal class RequestIssuanceImpl(
                 outcome.isInvalidProof()
 
         suspend fun retry() =
-            updatedAuthorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner)
+            updatedAuthorizedRequest.requestSingle(requestPayload, popSigner)
                 .getOrThrow()
                 .markInvalidProofIrrecoverable()
 
@@ -96,7 +96,7 @@ internal class RequestIssuanceImpl(
         return updated ?: this
     }
 
-    override suspend fun AuthorizedRequest.requestBatchAndUpdateState(
+    override suspend fun AuthorizedRequest.requestBatch(
         credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
         //
@@ -131,7 +131,7 @@ internal class RequestIssuanceImpl(
                 outcome.isInvalidProof()
 
         suspend fun retry() =
-            updatedAuthorizedRequest.requestBatchAndUpdateState(credentialsMetadata)
+            updatedAuthorizedRequest.requestBatch(credentialsMetadata)
                 .getOrThrow()
                 .markInvalidProofIrrecoverable()
 

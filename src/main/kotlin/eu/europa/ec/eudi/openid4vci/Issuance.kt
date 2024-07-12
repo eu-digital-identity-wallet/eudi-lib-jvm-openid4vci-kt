@@ -123,6 +123,15 @@ typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
  */
 interface RequestIssuance {
 
+    @Deprecated(
+        message = "Deprecated and will be removed",
+        replaceWith = ReplaceWith("requestSingle(requestPayload, popSigner)"),
+    )
+    suspend fun AuthorizedRequest.requestSingleAndUpdateState(
+        requestPayload: IssuanceRequestPayload,
+        popSigner: PopSigner?,
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = requestSingle(requestPayload, popSigner)
+
     /**
      * Places a request to the credential issuance endpoint.
      * Method will attempt to automatically retry submission in case
@@ -139,7 +148,7 @@ interface RequestIssuance {
      * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh c_nonce) and
      * the [SubmissionOutcome]
      */
-    suspend fun AuthorizedRequest.requestSingleAndUpdateState(
+    suspend fun AuthorizedRequest.requestSingle(
         requestPayload: IssuanceRequestPayload,
         popSigner: PopSigner?,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
@@ -147,13 +156,21 @@ interface RequestIssuance {
 
 interface RequestBatchIssuance {
 
+    @Deprecated(
+        message = "Deprecated and will be removed",
+        replaceWith = ReplaceWith("requestBatch(credentialsMetadata)"),
+    )
+    suspend fun AuthorizedRequest.requestBatchAndUpdateState(
+        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = requestBatch(credentialsMetadata)
+
     /**
      *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
      *
      *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
      *  @return The new state of request or error.
      */
-    suspend fun AuthorizedRequest.requestBatchAndUpdateState(
+    suspend fun AuthorizedRequest.requestBatch(
         credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 }

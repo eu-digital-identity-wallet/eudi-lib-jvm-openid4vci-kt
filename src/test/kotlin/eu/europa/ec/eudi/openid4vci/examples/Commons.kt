@@ -97,7 +97,7 @@ suspend fun Issuer.submitCredentialRequest(
 ): AuthorizedRequestAnd<SubmissionOutcome> {
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
     val popSigner = popSigner(credentialConfigurationId, popSignerPreference)
-    return authorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner).getOrThrow()
+    return authorizedRequest.requestSingle(requestPayload, popSigner).getOrThrow()
 }
 
 suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(

@@ -83,7 +83,7 @@ private suspend fun Issuer.submitCredentialRequest(
     issuanceLog("Requesting issuance of '$credentialConfigurationId'")
     val proofSigner = popSigner(credentialConfigurationId)
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-    val (newAuthorized, outcome) = authorizedRequest.requestSingleAndUpdateState(requestPayload, proofSigner)
+    val (newAuthorized, outcome) = authorizedRequest.requestSingle(requestPayload, proofSigner)
         .getOrThrow()
 
     return when (outcome) {

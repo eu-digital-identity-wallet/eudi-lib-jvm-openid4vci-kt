@@ -93,7 +93,7 @@ private suspend fun submit(
     with(issuer) {
         val proofSigner = popSigner(credentialConfigurationId)
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-        val (newAuthorized, outcome) = authorized.requestSingleAndUpdateState(requestPayload, proofSigner).getOrThrow()
+        val (newAuthorized, outcome) = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
         return when (outcome) {
             is SubmissionOutcome.Success -> newAuthorized to handleSuccess(outcome, issuer, newAuthorized)
             is SubmissionOutcome.Failed ->
