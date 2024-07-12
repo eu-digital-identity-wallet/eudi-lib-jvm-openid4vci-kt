@@ -73,7 +73,7 @@ internal class RequestIssuanceImpl(
             this is AuthorizedRequest.NoProofRequired &&
                 popSigner != null &&
                 updatedAuthorizedRequest is AuthorizedRequest.ProofRequired &&
-                outcome is SubmissionOutcomeInternal.InvalidProof
+                outcome.isInvalidProof()
 
         suspend fun retry() =
             updatedAuthorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner).getOrThrow()
@@ -85,9 +85,11 @@ internal class RequestIssuanceImpl(
     private fun AuthorizedRequest.withCNonceFrom(outcome: SubmissionOutcomeInternal): AuthorizedRequest {
         val updated =
             when (outcome) {
-                is SubmissionOutcomeInternal.Failed -> null
-                is SubmissionOutcomeInternal.InvalidProof -> withCNonce(outcome.cNonce)
-                is SubmissionOutcomeInternal.Success -> outcome.cNonce?.let { withCNonce(it) }
+                is SubmissionOutcomeInternal.Failed ->
+                    outcome.cNonceFromInvalidProof()?.let { newCNonce -> withCNonce(newCNonce) }
+
+                is SubmissionOutcomeInternal.Success ->
+                    outcome.cNonce?.let { withCNonce(it) }
             }
         return updated ?: this
     }
@@ -124,7 +126,7 @@ internal class RequestIssuanceImpl(
         val retryOnInvalidProof =
             this is AuthorizedRequest.NoProofRequired &&
                 updatedAuthorizedRequest is AuthorizedRequest.ProofRequired &&
-                outcome is SubmissionOutcomeInternal.InvalidProof
+                outcome.isInvalidProof()
 
         suspend fun retry() =
             updatedAuthorizedRequest.requestBatchAndUpdateState(credentialsMetadata).getOrThrow()
@@ -230,8 +232,8 @@ internal class RequestIssuanceImpl(
         token: AccessToken,
         issuanceRequestSupplier: suspend () -> CredentialIssuanceRequest,
     ): SubmissionOutcomeInternal {
-        fun handleIssuanceFailure(error: Throwable): SubmissionOutcomeInternal.Errored =
-            submitRequestFromError(error) ?: throw error
+        fun handleIssuanceFailure(error: Throwable): SubmissionOutcomeInternal.Failed =
+            SubmissionOutcomeInternal.fromThrowable(error) ?: throw error
         return when (val credentialRequest = issuanceRequestSupplier()) {
             is CredentialIssuanceRequest.SingleRequest -> {
                 credentialEndpointClient.placeIssuanceRequest(token, credentialRequest).fold(
@@ -251,14 +253,6 @@ internal class RequestIssuanceImpl(
     }
 }
 
-private fun submitRequestFromError(error: Throwable): SubmissionOutcomeInternal.Errored? = when (error) {
-    is CredentialIssuanceError.InvalidProof ->
-        SubmissionOutcomeInternal.InvalidProof(CNonce(error.cNonce, error.cNonceExpiresIn), error.errorDescription)
-
-    is CredentialIssuanceError -> SubmissionOutcomeInternal.Failed(error)
-    else -> null
-}
-
 private sealed interface SubmissionOutcomeInternal {
 
     data class Success(
@@ -266,20 +260,29 @@ private sealed interface SubmissionOutcomeInternal {
         val cNonce: CNonce?,
     ) : SubmissionOutcomeInternal
 
-    sealed interface Errored : SubmissionOutcomeInternal
     data class Failed(
         val error: CredentialIssuanceError,
-    ) : Errored
-
-    data class InvalidProof(
-        val cNonce: CNonce,
-        val errorDescription: String? = null,
-    ) : Errored
+    ) : SubmissionOutcomeInternal
 
     fun toPub(): SubmissionOutcome =
         when (this) {
-            is Success -> SubmissionOutcome.Success(credentials, cNonce)
+            is Success -> SubmissionOutcome.Success(credentials)
             is Failed -> SubmissionOutcome.Failed(error)
-            is InvalidProof -> SubmissionOutcome.InvalidProof(cNonce, errorDescription)
         }
+
+    fun isInvalidProof(): Boolean =
+        null != cNonceFromInvalidProof()
+
+    fun cNonceFromInvalidProof(): CNonce? =
+        if (this is Failed && error is CredentialIssuanceError.InvalidProof) {
+            CNonce(error.cNonce, error.cNonceExpiresIn)
+        } else null
+
+    companion object {
+        fun fromThrowable(error: Throwable): Failed? =
+            when (error) {
+                is CredentialIssuanceError -> Failed(error)
+                else -> null
+            }
+    }
 }

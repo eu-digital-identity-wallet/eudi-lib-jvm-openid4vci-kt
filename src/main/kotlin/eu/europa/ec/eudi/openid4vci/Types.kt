@@ -207,12 +207,6 @@ value class NotificationId(val value: String) {
     }
 }
 
-@Deprecated(
-    message = "Deprecated. It will removed in a future release.",
-    replaceWith = ReplaceWith("JwtBindingKey"),
-)
-typealias BindingKey = JwtBindingKey
-
 /**
  * A sealed hierarchy that defines the different ways of including a PUB key
  * in a JWT Proof

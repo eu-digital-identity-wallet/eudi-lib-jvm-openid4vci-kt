@@ -51,12 +51,6 @@ sealed interface IssuedCredential : java.io.Serializable {
     ) : IssuedCredential
 }
 
-@Deprecated(
-    message = "Deprecated and will be removed in a future release",
-    replaceWith = ReplaceWith("SubmissionOutcome"),
-)
-typealias SubmittedRequest = SubmissionOutcome
-
 /**
  * Sealed hierarchy of states describing the state of an issuance request submitted to a credential issuer.
  */
@@ -69,38 +63,14 @@ sealed interface SubmissionOutcome : java.io.Serializable {
      * If it was a single issuance request list will contain only one result.
      * @param cNonce Nonce information sent back from the issuance server.
      */
-    data class Success(
-        val credentials: List<IssuedCredential>,
-        @Deprecated(message = "Deprecated and will be removed in a future release")
-        val cNonce: CNonce?,
-    ) : SubmissionOutcome
-
-    /**
-     * Sealed hierarchy of erroneous credential issuance request
-     */
-    sealed interface Errored : SubmissionOutcome
+    data class Success(val credentials: List<IssuedCredential>) : SubmissionOutcome
 
     /**
      * State that denotes that the credential issuance request has failed
      *
      * @param error The error that caused the failure of the request
      */
-    data class Failed(
-        val error: CredentialIssuanceError,
-    ) : Errored
-
-    /**
-     * State denoting a special case of request failure. Issuer has responded that the proof of possession provided in
-     * the request was invalid. Along with the error, issuer responds with a new c_nonce to be used in the request retry.
-     *
-     * @param cNonce The c_nonce provided from issuer along the error
-     * @param errorDescription Description of the error that caused the failure
-     */
-    @Deprecated(message = "Deprecated and will be removed in a future release")
-    data class InvalidProof(
-        val cNonce: CNonce,
-        val errorDescription: String? = null,
-    ) : Errored
+    data class Failed(val error: CredentialIssuanceError) : SubmissionOutcome
 }
 
 /**
@@ -174,54 +144,6 @@ interface RequestIssuance {
         requestPayload: IssuanceRequestPayload,
         popSigner: PopSigner?,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
-
-    /**
-     *  Requests the issuance of a single credential having an [AuthorizedRequest.NoProofRequired] authorization.
-     *
-     *  @param requestPayload   The payload of the request.
-     *  @return The new state of the request or error.
-     */
-    @Deprecated(
-        message = "Deprecated and will be removed in a future release",
-        replaceWith = ReplaceWith("requestSingleAndUpdateState(requestPayload, null)"),
-    )
-    suspend fun AuthorizedRequest.NoProofRequired.requestSingle(
-        requestPayload: IssuanceRequestPayload,
-    ): Result<SubmissionOutcome> =
-        requestSingleAndUpdateState(requestPayload, null).map { it.second }
-
-    /**
-     *  Requests the issuance of a single credential having an [AuthorizedRequest.ProofRequired] authorization. In this
-     *  case caller must provide a binding key that will be used for generating a Proof of Possession that issuer expects.
-     *
-     *  @param requestPayload   The payload of the request.
-     *  @param proofSigner  Signer component of the proof to be sent.
-     *  @return The new state of request or error.
-     */
-    @Deprecated(
-        message = "Deprecated and will be removed in a future release.",
-        replaceWith = ReplaceWith("requestSingleAndUpdateState(requestPayload, proofSigner)"),
-    )
-    suspend fun AuthorizedRequest.ProofRequired.requestSingle(
-        requestPayload: IssuanceRequestPayload,
-        proofSigner: PopSigner,
-    ): Result<SubmissionOutcome> =
-        requestSingleAndUpdateState(requestPayload, proofSigner).map { it.second }
-
-    /**
-     * Special purpose operation to handle the case an 'invalid_proof' error response was received from issuer with
-     * fresh c_nonce provided to be used with a request retry.
-     *
-     * @param cNonce    The c_nonce provided from issuer along the 'invalid_proof' error code.
-     * @return The new state of the request.
-     */
-    @Deprecated(
-        message = "Deprecated and will be removed in a future release",
-        replaceWith = ReplaceWith("withCNonce(cNonce)"),
-    )
-    suspend fun AuthorizedRequest.NoProofRequired.handleInvalidProof(
-        cNonce: CNonce,
-    ): AuthorizedRequest.ProofRequired = withCNonce(cNonce)
 }
 
 interface RequestBatchIssuance {
@@ -235,40 +157,6 @@ interface RequestBatchIssuance {
     suspend fun AuthorizedRequest.requestBatchAndUpdateState(
         credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
-
-    /**
-     *  Batch request for issuing multiple credentials having an [AuthorizedRequest.NoProofRequired] authorization.
-     *
-     *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-
-     *  @return The new state of request or error.
-     */
-    @Deprecated(
-        message = "Deprecated and will be removed in a future release",
-        replaceWith = ReplaceWith("requestBatchAndUpdateState(credentialsMetadata.map{it to null})"),
-    )
-    suspend fun AuthorizedRequest.NoProofRequired.requestBatch(
-        credentialsMetadata: List<IssuanceRequestPayload>,
-    ): Result<SubmissionOutcome> = runCatching {
-        val credentialsMetadataWithNoProofs = credentialsMetadata.map { it to null }
-        val (_, outcome) = requestBatchAndUpdateState(credentialsMetadataWithNoProofs).getOrThrow()
-        outcome
-    }
-
-    /**
-     *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
-     *
-     *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-     *  @return The new state of request or error.
-     */
-    @Deprecated(
-        message = "Deprecated and will be removed in a future release",
-        replaceWith = ReplaceWith("requestBatchAndUpdateState(credentialsMetadata)"),
-    )
-    suspend fun AuthorizedRequest.ProofRequired.requestBatch(
-        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner>>,
-    ): Result<SubmissionOutcome> =
-        requestBatchAndUpdateState(credentialsMetadata).map { it.second }
 }
 
 sealed interface PopSigner {
@@ -368,24 +256,6 @@ sealed interface PopSigner {
             }
         }
     }
-}
-
-/**
- * Interface for implementing the signing process of a proof. It extends [JWSSigner] of nimbus.
- * Implementations should be initialized with the specifics of the proof signing, that is the binding key to be included
- * in the proof and the signing algorithm that will be used for signing.
- */
-@Deprecated(
-    message = "Deprecated. Will be removed in a future release.",
-    replaceWith = ReplaceWith("this.toPopSigner()"),
-)
-interface ProofSigner : JWSSigner {
-
-    fun getBindingKey(): JwtBindingKey
-
-    fun getAlgorithm(): JWSAlgorithm
-
-    fun toPopSigner(): PopSigner.Jwt = PopSigner.Jwt(getAlgorithm(), getBindingKey(), this)
 }
 
 /**

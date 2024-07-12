@@ -96,7 +96,8 @@ class IssuanceSingleRequestTest {
                         authorizedRequest.requestSingleAndUpdateState(requestPayload, null).getOrThrow()
                     }
                     assertIs<AuthorizedRequest.ProofRequired>(updatedAuthorizedRequest)
-                    assertIs<SubmissionOutcome.InvalidProof>(outcome)
+                    assertIs<SubmissionOutcome.Failed>(outcome)
+                    assertIs<CredentialIssuanceError.InvalidProof>(outcome.error)
                 }
 
                 is AuthorizedRequest.ProofRequired -> fail(
