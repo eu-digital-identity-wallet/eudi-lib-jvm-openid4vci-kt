@@ -217,7 +217,7 @@ interface Issuer :
 
                     return DeferredIssuanceContext(
                         DeferredIssuerConfig(
-                            clientId = config.clientId,
+                            client = config.client,
                             deferredEndpoint = deferredEndpoint,
                             authServerId = URL(authorizationServerMetadata.issuer.value),
                             tokenEndpoint = tokenEndpoint,

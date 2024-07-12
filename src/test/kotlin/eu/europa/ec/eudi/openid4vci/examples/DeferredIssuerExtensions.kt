@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci.examples
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
@@ -100,6 +101,8 @@ data class AccessTokenTO(
 @Serializable
 data class DeferredIssuanceStoredContextTO(
     @Required @SerialName("client_id") val clientId: String,
+    @SerialName("client_attestation_jwt") val clientAttestationJwt: String? = null,
+    @SerialName("client_attestation_pop_duration") val clientAttestationPopDuration: Int? = null,
     @Required @SerialName("deferred_endpoint") val deferredEndpoint: String,
     @Required @SerialName("auth_server_id") val authServerId: String,
     @Required @SerialName("token_endpoint") val tokenEndpoint: String,
@@ -118,7 +121,21 @@ data class DeferredIssuanceStoredContextTO(
         return DeferredIssuanceContext(
             config = DeferredIssuerConfig(
                 clock = clock,
-                clientId = clientId,
+                client = run {
+                    if (clientAttestationJwt == null) Client.Public(clientId)
+                    else {
+                        val jwt = runCatching {
+                            ClientAttestationJWT(SignedJWT.parse(clientAttestationJwt))
+                        }.getOrNull() ?: error("Invalid client attestation JWT")
+                        val poPJWTSpec: ClientAttestationPoPJWTSpec =
+                            TODO()
+
+                        Client.Attested(
+                            jwt,
+                            poPJWTSpec,
+                        )
+                    }
+                },
                 deferredEndpoint = URL(deferredEndpoint),
                 authServerId = URL(authServerId),
                 tokenEndpoint = URL(tokenEndpoint),
@@ -145,7 +162,7 @@ data class DeferredIssuanceStoredContextTO(
         ): DeferredIssuanceStoredContextTO {
             val authorizedTransaction = dCtx.authorizedTransaction
             return DeferredIssuanceStoredContextTO(
-                clientId = dCtx.config.clientId,
+                clientId = dCtx.config.client.id,
                 deferredEndpoint = dCtx.config.deferredEndpoint.toString(),
                 authServerId = dCtx.config.authServerId.toString(),
                 tokenEndpoint = dCtx.config.tokenEndpoint.toString(),
