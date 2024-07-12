@@ -310,6 +310,13 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     ) : CredentialIssuanceError("Invalid Proof")
 
     /**
+     * Issuer rejected the issuance request because considered the proof erroneous.
+     * It is marked as irrecoverable because it is raised only after the library
+     * has automatically retried to recover from an [InvalidProof] error and failed
+     */
+    data class IrrecoverableInvalidProof(val errorDescription: String? = null) : CredentialIssuanceError("Irrecoverable invalid proof ")
+
+    /**
      * Issuer has not issued yet deferred credential. Retry interval (in seconds) is provided to caller
      */
     data class DeferredCredentialIssuancePending(

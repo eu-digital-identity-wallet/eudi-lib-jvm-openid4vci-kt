@@ -76,7 +76,9 @@ internal class RequestIssuanceImpl(
                 outcome.isInvalidProof()
 
         suspend fun retry() =
-            updatedAuthorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner).getOrThrow()
+            updatedAuthorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner)
+                .getOrThrow()
+                .markInvalidProofIrrecoverable()
 
         if (retryOnInvalidProof) retry()
         else updatedAuthorizedRequest to outcome.toPub()
@@ -129,7 +131,9 @@ internal class RequestIssuanceImpl(
                 outcome.isInvalidProof()
 
         suspend fun retry() =
-            updatedAuthorizedRequest.requestBatchAndUpdateState(credentialsMetadata).getOrThrow()
+            updatedAuthorizedRequest.requestBatchAndUpdateState(credentialsMetadata)
+                .getOrThrow()
+                .markInvalidProofIrrecoverable()
 
         if (retryOnInvalidProof) retry()
         else updatedAuthorizedRequest to outcome.toPub()
@@ -286,3 +290,15 @@ private sealed interface SubmissionOutcomeInternal {
             }
     }
 }
+
+private fun AuthorizedRequestAnd<SubmissionOutcome>.markInvalidProofIrrecoverable() =
+    first to when (val outcome = second) {
+        is SubmissionOutcome.Failed ->
+            if (outcome.error is CredentialIssuanceError.InvalidProof) {
+                SubmissionOutcome.Failed(outcome.error.irrecoverbale())
+            } else outcome
+        is SubmissionOutcome.Success -> outcome
+    }
+
+private fun CredentialIssuanceError.InvalidProof.irrecoverbale() =
+    CredentialIssuanceError.IrrecoverableInvalidProof(errorDescription)
