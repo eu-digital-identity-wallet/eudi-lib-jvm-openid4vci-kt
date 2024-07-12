@@ -98,7 +98,7 @@ internal class AuthorizationEndpointClient(
         get() = pushedAuthorizationRequestEndpoint != null
 
     private val clientAttestationBuilder: ClientAttestationBuilder? =
-        ClientAttestationBuilder(config.clock, Client.Public(config.clientId), URL(authorizationIssuer))
+        ClientAttestationBuilder(config.clock, config.client, URL(authorizationIssuer))
 
     suspend fun submitParOrCreateAuthorizationRequestUrl(
         scopes: List<Scope>,
@@ -147,7 +147,7 @@ internal class AuthorizationEndpointClient(
 
         val parEndpoint = pushedAuthorizationRequestEndpoint?.toURI()
         checkNotNull(parEndpoint) { "PAR endpoint not advertised" }
-        val clientID = ClientID(config.clientId)
+        val clientID = ClientID(config.client.id)
         val codeVerifier = CodeVerifier()
         val pushedAuthorizationRequest = run {
             val request = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
@@ -190,7 +190,7 @@ internal class AuthorizationEndpointClient(
             "No scopes or authorization details provided. Cannot prepare authorization request."
         }
 
-        val clientID = ClientID(config.clientId)
+        val clientID = ClientID(config.client.id)
         val codeVerifier = CodeVerifier()
         val authorizationRequest = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
             endpointURI(authorizationEndpoint.toURI())
