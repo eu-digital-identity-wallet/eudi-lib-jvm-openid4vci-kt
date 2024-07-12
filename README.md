@@ -330,8 +330,7 @@ The result of placing a request is represented by a `SubmissionOutcome` as follo
 
 - `SubmissionOutcome.Sucess` This could represent either the issued credential or a transaction_id in case
 of deferred issuance, or
-- `SubmissionOutcome.InvalidProof` indicating that credential issuer requires PoP or PoP provided was not valid
-- `SubmissionOutcome.Failed` indication that credential issuer rejected the request, or 
+- `SubmissionOutcome.Failed` indication that credential issuer rejected the request, including the `invalid_proof` case.
 
 In case of an unexpected error a runtime will be raised.
 
@@ -368,8 +367,9 @@ According to the specification, the wallet must be able to receive a
 in the library.
 
 For this reason, it is not uncommon that the first request to the credential issuance endpoint
-will have as an outcome `InvalidProof`. That's typical if credential issuer's token endpoint
-doesn't provide a `c_nonce` and proof is required for the requested credential.
+will have as an outcome `Failed` with an error `InvalidProof`. 
+That's typical if credential issuer's token endpoint doesn't provide a `c_nonce` and 
+proof is required for the requested credential.
 
 The library will automatically try to handle the invalid proof response and place a second request 
 which includes proofs. This can be done only if caller has provided a `popSigner` while 
