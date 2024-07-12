@@ -55,7 +55,7 @@ sealed interface Client : java.io.Serializable {
 /**
  * Configuration object to pass configuration properties to the issuance components.
  *
- * @param clientId  The authorization client's identifier.
+ * @param client the OAUTH2 client kind of the wallet
  * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
  * @param keyGenerationConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
  * @param credentialResponseEncryptionPolicy Wallet's policy for Credential Response encryption
@@ -67,7 +67,7 @@ sealed interface Client : java.io.Serializable {
  * @param clock Wallet's clock
  */
 data class OpenId4VCIConfig(
-    val clientId: ClientId,
+    val client: Client,
     val authFlowRedirectionURI: URI,
     val keyGenerationConfig: KeyGenerationConfig,
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
@@ -76,6 +76,26 @@ data class OpenId4VCIConfig(
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
 ) {
+
+    constructor(
+        clientId: ClientId,
+        authFlowRedirectionURI: URI,
+        keyGenerationConfig: KeyGenerationConfig,
+        credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+        authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+        dPoPSigner: PopSigner.Jwt? = null,
+        parUsage: ParUsage = ParUsage.IfSupported,
+        clock: Clock = Clock.systemDefaultZone(),
+    ) : this (
+        Client.Public(clientId),
+        authFlowRedirectionURI,
+        keyGenerationConfig,
+        credentialResponseEncryptionPolicy,
+        authorizeIssuanceConfig,
+        dPoPSigner,
+        parUsage,
+        clock,
+    )
 
     init {
         if (null != dPoPSigner) {
@@ -88,6 +108,13 @@ data class OpenId4VCIConfig(
             }
         }
     }
+
+    @Deprecated(
+        message = "Deprecated in favor of openId4VCIConfig client.id",
+        replaceWith = ReplaceWith("client.id"),
+    )
+    val clientId: ClientId
+        get() = client.id
 }
 
 /**

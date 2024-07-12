@@ -36,7 +36,7 @@ import java.time.Clock
  * @param clock Wallet's clock
  */
 data class DeferredIssuerConfig(
-    val clientId: ClientId,
+    val client: Client,
     val deferredEndpoint: URL,
     val authServerId: URL,
     val tokenEndpoint: URL,
@@ -154,7 +154,7 @@ interface DeferredIssuer : QueryForDeferredCredential {
 
             val tokenEndpointClient = TokenEndpointClient(
                 config.clock,
-                Client.Public(config.clientId),
+                config.client,
                 URI.create("https://willNotBeUsed"), // this will not be used
                 config.authServerId,
                 config.tokenEndpoint,

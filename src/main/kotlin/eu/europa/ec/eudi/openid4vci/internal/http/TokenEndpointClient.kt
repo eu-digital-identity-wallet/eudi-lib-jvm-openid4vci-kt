@@ -92,7 +92,7 @@ internal class TokenEndpointClient(
     private val clock: Clock,
     private val client: Client,
     private val authFlowRedirectionURI: URI,
-    private val authServerId: URL? = null,
+    authServerId: URL? = null,
     private val tokenEndpoint: URL,
     private val dPoPJwtFactory: DPoPJwtFactory?,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
@@ -105,7 +105,7 @@ internal class TokenEndpointClient(
         ktorHttpClientFactory: KtorHttpClientFactory,
     ) : this(
         config.clock,
-        Client.Public(config.clientId),
+        config.client,
         config.authFlowRedirectionURI,
         URL(authorizationServerMetadata.issuer.value),
         authorizationServerMetadata.tokenEndpointURI.toURL(),
