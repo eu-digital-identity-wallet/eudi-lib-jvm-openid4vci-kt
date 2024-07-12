@@ -88,7 +88,7 @@ class IssuanceBatchRequestTest {
 
         val requests = reqs()
         val (_, outcome) = with(issuer) {
-            authorizedRequest.requestBatchAndUpdateState(requests).getOrThrow()
+            authorizedRequest.requestBatch(requests).getOrThrow()
         }
 
         assertIs<SubmissionOutcome.Success>(outcome)

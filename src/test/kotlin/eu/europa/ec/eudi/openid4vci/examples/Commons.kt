@@ -97,7 +97,7 @@ suspend fun Issuer.submitCredentialRequest(
 ): AuthorizedRequestAnd<SubmissionOutcome> {
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
     val popSigner = popSigner(credentialConfigurationId, popSignerPreference)
-    return authorizedRequest.requestSingleAndUpdateState(requestPayload, popSigner).getOrThrow()
+    return authorizedRequest.requestSingle(requestPayload, popSigner).getOrThrow()
 }
 
 suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(
@@ -166,18 +166,8 @@ suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
 
 fun ensureIssued(outcome: SubmissionOutcome): List<IssuedCredential> =
     when (outcome) {
-        is SubmissionOutcome.Failed -> {
-            fail("Issuer rejected request. Reason :${outcome.error.message}")
-        }
-
-        is SubmissionOutcome.InvalidProof -> {
-            val (_, error) = outcome
-            fail("Issuer rejected proof. Reason: ${error ?: "n/a"}")
-        }
-
-        is SubmissionOutcome.Success -> {
-            outcome.credentials
-        }
+        is SubmissionOutcome.Failed -> fail("Issuer rejected request. Reason :${outcome.error.message}")
+        is SubmissionOutcome.Success -> outcome.credentials
     }
 
 suspend fun handleDeferred(

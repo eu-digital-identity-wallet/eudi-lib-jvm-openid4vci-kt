@@ -72,14 +72,14 @@ private suspend fun submit(
     with(issuer) {
         val proofSigner = popSigner(credentialConfigurationId)
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-        val (newAuthorized, outcome) = authorized.requestSingleAndUpdateState(requestPayload, proofSigner).getOrThrow()
+        val (newAuthorized, outcome) = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
 
         return when (outcome) {
             is SubmissionOutcome.Success -> newAuthorized to handleSuccess(outcome, issuer, newAuthorized)
-            is SubmissionOutcome.Failed -> throw outcome.error
-            is SubmissionOutcome.InvalidProof -> throw IllegalStateException(
-                "Although providing a proof with c_nonce the proof is still invalid",
-            )
+            is SubmissionOutcome.Failed ->
+                throw if (outcome.error is CredentialIssuanceError.InvalidProof) {
+                    IllegalStateException("Although providing a proof with c_nonce the proof is still invalid")
+                } else outcome.error
         }
     }
 }
