@@ -128,7 +128,7 @@ data class DeferredIssuanceStoredContextTO(
                             ClientAttestationJWT(SignedJWT.parse(clientAttestationJwt))
                         }.getOrNull() ?: error("Invalid client attestation JWT")
                         val poPJWTSpec: ClientAttestationPoPJWTSpec =
-                            TODO()
+                            TODO("Implement this mapping")
 
                         Client.Attested(
                             jwt,
