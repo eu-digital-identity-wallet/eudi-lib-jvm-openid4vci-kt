@@ -20,15 +20,8 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
-import com.nimbusds.jose.proc.JOSEObjectTypeVerifier
-import com.nimbusds.jose.proc.JWSKeySelector
-import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
-import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
-import com.nimbusds.jwt.proc.DefaultJWTProcessor
-import com.nimbusds.jwt.proc.JWTProcessor
 import com.nimbusds.oauth2.sdk.id.JWTID
 import eu.europa.ec.eudi.openid4vci.*
 import java.net.URL
@@ -39,84 +32,48 @@ import kotlin.time.Duration
 
 class ClientAttestationJwtBuilder(
     private val clock: Clock,
-    private val issuer: String,
     private val duration: Duration,
+    private val issuer: String,
     private val algorithm: JWSAlgorithm,
     private val signer: JWSSigner,
-    private val headerCustomization: JWSHeader.Builder.(ClientAttestationIssuerRequest) -> Unit = {},
+    private val claims: ClientAttestationClaims,
+    private val headerCustomization: JWSHeader.Builder.() -> Unit = {},
 ) {
     init {
-        ClientAttestationPoPJWTSpec.requireIsAllowedAlgorithm(algorithm)
         require(duration.isPositive()) { "Duration must be positive" }
+        require(issuer.isNotBlank() && issuer.isNotEmpty()) { "issuer cannot be blank." }
+        ClientAttestationPoPJWTSpec.requireIsAllowedAlgorithm(algorithm)
     }
 
-    fun build(client: ClientAttestationIssuerRequest): ClientAttestationJWT {
-        val header =
-            JWSHeader.Builder(algorithm).apply {
-                headerCustomization(client)
-            }.build()
-
-        val claims =
-            JWTClaimsSet.Builder().apply {
-                val now = clock.instant()
-                val exp = now.plusSeconds(duration.inWholeSeconds)
-                issuer(issuer)
-                subject(client.id)
-                claim("cnf", cnf(client.pubKey.toPublicJWK()))
-                issueTime(Date.from(now))
-                expirationTime(Date.from(exp))
-            }.build()
-
+    fun build(): ClientAttestationJWT {
+        val header = jwsHeader()
+        val jwtClaimSet = claimSetForm(claims)
         val jwt =
-            SignedJWT(header, claims).apply {
+            SignedJWT(header, jwtClaimSet).apply {
                 sign(signer)
             }
 
         return ClientAttestationJWT(jwt)
     }
+
+    private fun jwsHeader(): JWSHeader =
+        JWSHeader.Builder(algorithm).apply {
+            headerCustomization
+        }.build()
+
+    private fun claimSetForm(claims: ClientAttestationClaims): JWTClaimsSet =
+        JWTClaimsSet.Builder().apply {
+            val now = clock.instant()
+            val exp = now.plusSeconds(duration.inWholeSeconds)
+            issuer(issuer)
+            subject(claims.clientId)
+            claim("cnf", cnf(claims.pubKey.toPublicJWK()))
+            issueTime(Date.from(now))
+            expirationTime(Date.from(exp))
+        }.build()
 }
 
-object ClientAttestationJWTProcessorFactory {
-
-    private class ClaimsSetVerifier private constructor(
-        private val clock: Clock,
-        exactMatchClaims: JWTClaimsSet,
-    ) : DefaultJWTClaimsVerifier<SecurityContext>(exactMatchClaims, requiredClaims) {
-
-        override fun currentTime(): Date = Date.from(clock.instant())
-
-        companion object {
-
-            private val requiredClaims = setOf("iss", "sub", "exp", "cnf")
-            operator fun invoke(
-                clock: Clock,
-                request: ClientAttestationIssuerRequest,
-                attestationIssuerId: ClientId,
-            ): ClaimsSetVerifier {
-                val exactMatchClaims = JWTClaimsSet.Builder()
-                    .issuer(attestationIssuerId)
-                    .subject(request.id)
-                    .claim("cnf", cnf(request.pubKey.toPublicJWK()))
-                    .build()
-                return ClaimsSetVerifier(clock, exactMatchClaims)
-            }
-        }
-    }
-
-    fun create(
-        clock: Clock,
-        client: ClientAttestationIssuerRequest,
-        attestationIssuerId: ClientId,
-        jwsTypeJWSVerifier: JOSEObjectTypeVerifier<SecurityContext> = DefaultJOSEObjectTypeVerifier.JWT,
-        attestationIssuerKeySelector: JWSKeySelector<SecurityContext>,
-    ): JWTProcessor<SecurityContext> = DefaultJWTProcessor<SecurityContext>().apply {
-        jwsTypeVerifier = jwsTypeJWSVerifier
-        jwsKeySelector = attestationIssuerKeySelector
-        jwtClaimsSetVerifier = ClaimsSetVerifier(clock, client, attestationIssuerId)
-    }
-}
-
-private fun cnf(jwk: JWK): Map<String, Any> =
+internal fun cnf(jwk: JWK): Map<String, Any> =
     mapOf("jwk" to jwk.toJSONObject())
 
 internal fun JWTClaimsSet.cnfJwk(): JWK? {

@@ -22,11 +22,21 @@ import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
+import com.nimbusds.jose.proc.JOSEObjectTypeVerifier
+import com.nimbusds.jose.proc.JWSKeySelector
+import com.nimbusds.jose.proc.SecurityContext
+import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
+import com.nimbusds.jwt.proc.DefaultJWTProcessor
+import com.nimbusds.jwt.proc.JWTProcessor
 import eu.europa.ec.eudi.openid4vci.internal.DefaultClientAttestationPopJWTBuilder
+import eu.europa.ec.eudi.openid4vci.internal.cnf
 import eu.europa.ec.eudi.openid4vci.internal.cnfJwk
 import java.net.URL
 import java.time.Clock
+import java.util.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -84,38 +94,63 @@ data class JwtClientAttestation(
 }
 
 //
-// Issuance
+// Validation of ClientAttestationJWT
 //
-/**
- * Client to be authenticated to the credential issuer
- * using Attestation-Based Client Authentication
- *
- * @param pubKey The wallet instance pub key. This key will be used to identify the wallet
- * to a specific credential issuer. Should not be re-used.
- */
-data class ClientAttestationIssuerRequest(
-    val id: ClientId,
+
+data class ClientAttestationClaims(
+    val clientId: ClientId,
     val pubKey: JWK,
 ) {
 
     init {
-        require(id.isNotBlank() && id.isNotEmpty())
+        require(clientId.isNotBlank() && clientId.isNotEmpty()) { "clientId cannot be blank" }
         require(!pubKey.isPrivate) { "InstanceKey should be public" }
     }
 }
 
-/**
- * A function for issuing a [ClientAttestationJWT]
- */
-fun interface ClientAttestationIssuer {
+object ClientAttestationJWTProcessorFactory {
 
-    /**
-     * Issues a [ClientAttestationJWT] for the wallet
-     *
-     * @param request the wallet's data to be signed by the issuer
-     */
-    suspend fun issue(request: ClientAttestationIssuerRequest): ClientAttestationJWT
+    private class ClaimsSetVerifier private constructor(
+        private val clock: Clock,
+        exactMatchClaims: JWTClaimsSet,
+    ) : DefaultJWTClaimsVerifier<SecurityContext>(exactMatchClaims, requiredClaims) {
+
+        override fun currentTime(): Date = Date.from(clock.instant())
+
+        companion object {
+
+            private val requiredClaims = setOf("iss", "sub", "exp", "cnf")
+            operator fun invoke(
+                clock: Clock,
+                expectedClaims: ClientAttestationClaims,
+                issuer: String,
+            ): ClaimsSetVerifier {
+                val exactMatchClaims = JWTClaimsSet.Builder()
+                    .issuer(issuer)
+                    .subject(expectedClaims.clientId)
+                    .claim("cnf", cnf(expectedClaims.pubKey.toPublicJWK()))
+                    .build()
+                return ClaimsSetVerifier(clock, exactMatchClaims)
+            }
+        }
+    }
+
+    fun create(
+        clock: Clock,
+        expectedClaims: ClientAttestationClaims,
+        jwsTypeJWSVerifier: JOSEObjectTypeVerifier<SecurityContext> = DefaultJOSEObjectTypeVerifier.JWT,
+        issuer: String,
+        issuerKeySelector: JWSKeySelector<SecurityContext>,
+    ): JWTProcessor<SecurityContext> = DefaultJWTProcessor<SecurityContext>().apply {
+        jwsTypeVerifier = jwsTypeJWSVerifier
+        jwsKeySelector = issuerKeySelector
+        jwtClaimsSetVerifier = ClaimsSetVerifier(clock, expectedClaims, issuer)
+    }
 }
+
+//
+// Creation of ClientAttestationPoPJWT
+//
 
 data class ClientAttestationPoPJWTSpec(
     val signingAlgorithm: JWSAlgorithm,
@@ -163,12 +198,35 @@ fun interface ClientAttestationPoPJWTBuilder {
     ): ClientAttestationPoPJWT
 }
 
+//
+// Creation of Client Attestation
+//
+
+/**
+ * A function for creating a [JwtClientAttestation]
+ *
+ * An instance may be obtained via [invoke]
+ */
 fun interface ClientAttestationBuilder {
 
     suspend fun clientAttestation(): JwtClientAttestation
 
     companion object {
 
+        /**
+         * Creates a builder which assumes that wallet has already obtained [ClientAttestationJWT],
+         * that it is of type [Client.Attested]
+         *
+         * @param clock wallet's clock
+         * @param client wallet which has already obtained [ClientAttestationJWT]
+         * @param authServerId the URL of the authorization server (issuer of authorization server metadata) to
+         * which the [JwtClientAttestation] will be presented.
+         * It will be used to populate the aud claim of the [ClientAttestationPoPJWT]
+         * @param clientAttestationPoPJWTBuilder the builder of the [ClientAttestationPoPJWT].
+         * If not specified defaults to [DefaultClientAttestationPopJWTBuilder]
+         *
+         * @return a builder as described above
+         */
         operator fun invoke(
             clock: Clock,
             client: Client.Attested,
@@ -180,7 +238,7 @@ fun interface ClientAttestationBuilder {
                 JwtClientAttestation(client.jwt, popJwt)
             }
 
-        operator fun invoke(
+        internal operator fun invoke(
             clock: Clock,
             client: Client,
             authServerId: URL?,
