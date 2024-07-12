@@ -19,12 +19,14 @@ import com.authlete.cbor.CBORByteArray
 import com.authlete.cose.*
 import com.authlete.cwt.CWT
 import com.authlete.cwt.CWTClaimsSetBuilder
+import com.nimbusds.jose.ActionRequiredForJWSCompletionException
 import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.util.Base64
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
+import kotlinx.coroutines.coroutineScope
 import java.time.Clock
 import java.util.*
 
@@ -77,8 +79,18 @@ internal class JwtProofBuilder(
     override suspend fun build(): Proof.Jwt {
         val header = header()
         val claimSet = claimSet()
-        val jwt = SignedJWT(header, claimSet).apply { sign(popSigner.jwsSigner) }
+        val jwt = SignedJWT(header, claimSet).apply { sign(popSigner) }
         return Proof.Jwt(jwt)
+    }
+
+    private suspend fun SignedJWT.sign(popSigner: PopSigner.Jwt) = coroutineScope {
+        try {
+            sign(popSigner.jwsSigner)
+        } catch (actionRequired: ActionRequiredForJWSCompletionException) {
+            popSigner.unlockSignature
+                ?.let { userAction -> actionRequired.recoverUsing(userAction) }
+                ?: throw actionRequired
+        }
     }
 
     private fun header(): JWSHeader {
