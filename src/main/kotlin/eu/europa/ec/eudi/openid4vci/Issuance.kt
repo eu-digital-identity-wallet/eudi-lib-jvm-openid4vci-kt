@@ -61,7 +61,6 @@ sealed interface SubmissionOutcome : java.io.Serializable {
      * @param credentials The outcome of the issuance request.
      * If the issuance request was a batch request, it will contain the results of each issuance request.
      * If it was a single issuance request list will contain only one result.
-     * @param cNonce Nonce information sent back from the issuance server.
      */
     data class Success(val credentials: List<IssuedCredential>) : SubmissionOutcome
 
@@ -135,7 +134,7 @@ interface RequestIssuance {
      * @param popSigner Signer component of the proof to be sent. Although this is an optional
      * parameter, only required in case the present authorization state is [AuthorizedRequest.ProofRequired],
      * caller is advised to provide it, in order to allow the method to automatically retry
-     * in case of [SubmissionOutcome.InvalidProof]
+     * in case of [CredentialIssuanceError.InvalidProof]
      *
      * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh c_nonce) and
      * the [SubmissionOutcome]
@@ -359,11 +358,6 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     class IssuerDoesNotSupportDeferredIssuance : CredentialIssuanceError("IssuerDoesNotSupportDeferredIssuance")
 
     /**
-     * Issuance server does not support notifications
-     */
-    class IssuerDoesNotSupportNotifications : CredentialIssuanceError("IssuerDoesNotSupportNotifications")
-
-    /**
      * Generic failure during issuance request
      */
     data class IssuanceRequestFailed(
@@ -389,17 +383,6 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     sealed class ProofGenerationError(message: String) : CredentialIssuanceError(message) {
 
         /**
-         * Binding method specified is not supported from issuer server
-         */
-        class CryptographicSuiteNotSupported : ProofGenerationError("BindingMethodNotSupported")
-
-        /**
-         * Cryptographic binding method is not supported from the issuance server for a specific credential
-         */
-        class CryptographicBindingMethodNotSupported :
-            ProofGenerationError("CryptographicBindingMethodNotSupported")
-
-        /**
          * Proof type provided for specific credential is not supported from issuance server
          */
         class ProofTypeNotSupported : ProofGenerationError("ProofTypeNotSupported")
@@ -409,12 +392,6 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
          */
         class ProofTypeSigningAlgorithmNotSupported :
             ProofGenerationError("ProofTypeSigningAlgorithmNotSupported")
-
-        /**
-         * Proof type curve provided for specific credential is not supported from issuance server
-         */
-        class ProofTypeSigningCurveNotSupported :
-            ProofGenerationError("ProofTypeSigningCurveNotSupported")
     }
 
     /**
