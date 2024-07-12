@@ -148,7 +148,7 @@ internal class RequestIssuanceImpl(
     }
 
     private suspend fun proofFactory(proofSigner: PopSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
-        val iss = config.clientId
+        val iss = config.client.id
         val aud = credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier
         val proofTypesSupported = credentialSupported.proofTypesSupported
         ProofBuilder(proofTypesSupported, config.clock, iss, aud, cNonce, proofSigner).build()
