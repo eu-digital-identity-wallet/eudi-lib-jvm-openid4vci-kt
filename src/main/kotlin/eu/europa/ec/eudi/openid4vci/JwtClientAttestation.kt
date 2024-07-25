@@ -31,14 +31,110 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import com.nimbusds.jwt.proc.JWTProcessor
+import eu.europa.ec.eudi.openid4vci.ClientAttestationBuilder.Companion.invoke
 import eu.europa.ec.eudi.openid4vci.internal.DefaultClientAttestationPopJWTBuilder
 import eu.europa.ec.eudi.openid4vci.internal.cnf
 import eu.europa.ec.eudi.openid4vci.internal.cnfJwk
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import java.net.URL
 import java.time.Clock
 import java.util.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+
+/**
+ * Asserts the security mechanism the Wallet uses to manage the private key associated
+ * with the public key given in the cnf claim.
+ * This mechanism is based on the capabilities of the execution environment of the Wallet,
+ * this might be a secure element (in case of a wallet residing on a smartphone)
+ * or a Cloud-HSM (in case of a cloud Wallet)
+ */
+@Serializable
+enum class KeyType {
+    /**
+     * Wallet uses software-based key management
+     */
+    @SerialName("software")
+    Software,
+
+    /**
+     * Wallet uses hardware-based key management
+     */
+    @SerialName("hardware")
+    Hardware,
+
+    /**
+     * Wallet uses the Trusted Execution Environment for key management
+     */
+    @SerialName("tee")
+    TEE,
+
+    /**
+     * Wallet uses the Secure Enclave for key management
+     */
+    @SerialName("secure_enclave")
+    SecureEnclave,
+
+    /**
+     * Wallet uses the Strongbox for key management
+     */
+    @SerialName("strong_box")
+    StrongBox,
+
+    /**
+     * Wallet uses a Secure Element for key management
+     */
+    @SerialName("secure_element")
+    SecureElement,
+
+    /**
+     * Wallet uses Hardware Security Module (HSM)
+     */
+    @SerialName("hsm")
+    HSM,
+}
+
+/**
+ *  Asserts the security mechanism the Wallet uses to authenticate the user
+ *  to authorize access to the private key associated with the public key given in the cnf claim.
+ *
+ */
+@Serializable
+enum class UserAuthentication {
+    /**
+     * The key usage is authorized by the mobile operating system using a biometric factor
+     */
+    @SerialName("system_biometry")
+    SystemBiometry,
+
+    /**
+     * The key usage is authorized by the mobile operating system using personal identification number (PIN).
+     */
+    @SerialName("system_pin")
+    SystemPin,
+
+    /**
+     * The key usage is authorized by the Wallet using a biometric factor.
+     */
+    @SerialName("internal_biometry")
+    InternalBiometry,
+
+    /**
+     * The key usage is authorized by the Wallet using PIN.
+     */
+    @SerialName("internal_pin")
+    InternalPin,
+
+    /**
+     * The key usage is authorized by the secure element managing the key itself using PIN
+     */
+    @SerialName("secure_element_pin")
+    SecureElementPin,
+}
 
 /**
  * Qualification of a JWT that adheres to client attestation JWT
@@ -54,10 +150,29 @@ data class ClientAttestationJWT(val jwt: SignedJWT) {
         checkNotNull(jwt.jwtClaimsSet.subject) { "Invalid JWT misses subject claim" }
     }
 
-    val pubKey: JWK by lazy {
-        val jwk = jwt.jwtClaimsSet.cnfJwk()
-        checkNotNull(jwk) { "Invalid JWT misses cnf jwk" }
+    val cnf: JsonObject by lazy {
+        checkNotNull(jwt.jwtClaimsSet.cnf()) { "Invalid JWT misses cnf claim" }
     }
+    val pubKey: JWK by lazy {
+        checkNotNull(cnf.cnfJwk()) { "Invalid JWT misses jwk claim from cnf" }
+    }
+
+    /**
+     * Asserts the security mechanism the Wallet uses to manage the private key associated
+     * with the public key given in the cnf claim.
+     */
+    val keyType: KeyType?
+        get() = cnf["key_type"]?.let(Json::decodeFromJsonElement)
+
+    /**
+     * Asserts the security mechanism the Wallet uses to authenticate the user
+     * to authorize access to the private key associated with the public key given in the cnf claim.
+     */
+    val userAuthentication: UserAuthentication?
+        get() = cnf["user_authentication"]?.let(Json::decodeFromJsonElement)
+
+    val aal: String?
+        get() = jwt.jwtClaimsSet.getStringClaim("aal")
 }
 
 /**
@@ -249,6 +364,7 @@ fun interface ClientAttestationBuilder {
                 }
                 invoke(clock, client, authServerId)
             }
+
             is Client.Public -> null
         }
     }
