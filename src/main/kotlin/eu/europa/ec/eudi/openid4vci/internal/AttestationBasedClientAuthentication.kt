@@ -20,10 +20,14 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.JWTID
 import eu.europa.ec.eudi.openid4vci.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import java.net.URL
 import java.time.Clock
 import java.time.Instant
@@ -76,11 +80,19 @@ class ClientAttestationJwtBuilder(
 internal fun cnf(jwk: JWK): Map<String, Any> =
     mapOf("jwk" to jwk.toJSONObject())
 
-internal fun JWTClaimsSet.cnfJwk(): JWK? {
-    return getJSONObjectClaim("cnf")?.get("jwk")?.let {
-        @Suppress("UNCHECKED_CAST")
-        runCatching { JWK.parse(it as Map<String, *>) }.getOrNull()
+internal fun JsonObject.cnfJwk(): JWK? {
+    return this["jwk"]?.let {
+        val jsonString = Json.encodeToString(it)
+        JWK.parse(jsonString)
     }
+}
+
+internal fun Map<String, Any?>.toJsonObject(): JsonObject {
+    val jsonString = JSONObjectUtils.toJSONString(this)
+    return Json.decodeFromString(jsonString)
+}
+fun JWTClaimsSet.cnf(): JsonObject? {
+    return getJSONObjectClaim("cnf")?.toJsonObject()
 }
 
 /**
