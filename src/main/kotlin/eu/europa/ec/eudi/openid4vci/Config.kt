@@ -17,15 +17,45 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.ParUsage.*
 import java.net.URI
 import java.time.Clock
 
 typealias ClientId = String
 
 /**
+ * Wallet's OAUTH2 client view
+ */
+sealed interface Client : java.io.Serializable {
+    /**
+     * The client_id of the Wallet, issued when interacting with a credential issuer
+     */
+    val id: ClientId
+
+    /**
+     * Public Client
+     */
+    data class Public(override val id: ClientId) : Client
+
+    data class Attested(
+        val jwt: ClientAttestationJWT,
+        val popJwtSpec: ClientAttestationPoPJWTSpec,
+    ) : Client {
+        init {
+            val id = jwt.clientId
+            require(id.isNotBlank() && id.isNotEmpty())
+            val pubKey = jwt.pubKey
+            require(!pubKey.isPrivate) { "InstanceKey should be public" }
+        }
+
+        override val id: ClientId = jwt.clientId
+    }
+}
+
+/**
  * Configuration object to pass configuration properties to the issuance components.
  *
- * @param clientId  The authorization client's identifier.
+ * @param client the OAUTH2 client kind of the wallet
  * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
  * @param keyGenerationConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
  * @param credentialResponseEncryptionPolicy Wallet's policy for Credential Response encryption
@@ -37,7 +67,7 @@ typealias ClientId = String
  * @param clock Wallet's clock
  */
 data class OpenId4VCIConfig(
-    val clientId: ClientId,
+    val client: Client,
     val authFlowRedirectionURI: URI,
     val keyGenerationConfig: KeyGenerationConfig,
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
@@ -46,6 +76,26 @@ data class OpenId4VCIConfig(
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
 ) {
+
+    constructor(
+        clientId: ClientId,
+        authFlowRedirectionURI: URI,
+        keyGenerationConfig: KeyGenerationConfig,
+        credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+        authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+        dPoPSigner: PopSigner.Jwt? = null,
+        parUsage: ParUsage = ParUsage.IfSupported,
+        clock: Clock = Clock.systemDefaultZone(),
+    ) : this (
+        Client.Public(clientId),
+        authFlowRedirectionURI,
+        keyGenerationConfig,
+        credentialResponseEncryptionPolicy,
+        authorizeIssuanceConfig,
+        dPoPSigner,
+        parUsage,
+        clock,
+    )
 
     init {
         if (null != dPoPSigner) {
@@ -58,6 +108,13 @@ data class OpenId4VCIConfig(
             }
         }
     }
+
+    @Deprecated(
+        message = "Deprecated in favor of openId4VCIConfig client.id",
+        replaceWith = ReplaceWith("client.id"),
+    )
+    val clientId: ClientId
+        get() = client.id
 }
 
 /**
