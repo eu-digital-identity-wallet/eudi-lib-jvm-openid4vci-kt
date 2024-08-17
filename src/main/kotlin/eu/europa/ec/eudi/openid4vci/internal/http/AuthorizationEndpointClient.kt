@@ -151,6 +151,7 @@ internal class AuthorizationEndpointClient(
                 issuerState?.let { customParameter("issuer_state", issuerState) }
                 if (scopes.isNotEmpty()) {
                     scope(NimbusScope(*scopes.map { it.value }.toTypedArray()))
+                    resource(credentialIssuerId.value.value.toURI())
                 }
                 if (credentialsConfigurationIds.isNotEmpty()) {
                     authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
@@ -241,7 +242,7 @@ internal class AuthorizationEndpointClient(
         credentialConfigurationId: CredentialConfigurationIdentifier,
     ): AuthorizationDetail =
         with(NimbusAuthorizationDetail.Builder(AuthorizationType(OPENID_CREDENTIAL))) {
-            if (credentialIssuerId.toString() != authorizationIssuer.toString()) {
+            if (credentialIssuerId.toString() != authorizationIssuer) {
                 val locations = listOf(Location(credentialIssuerId.value.value.toURI()))
                 locations(locations)
             }
