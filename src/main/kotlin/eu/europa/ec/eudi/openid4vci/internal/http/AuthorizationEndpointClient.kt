@@ -91,6 +91,9 @@ internal class AuthorizationEndpointClient(
         ktorHttpClientFactory,
     )
 
+    private val isCredentialIssuerAuthorizationServer: Boolean
+        get() = credentialIssuerId.toString() == authorizationIssuer
+
     private val supportsPar: Boolean
         get() = pushedAuthorizationRequestEndpoint != null
 
@@ -151,6 +154,9 @@ internal class AuthorizationEndpointClient(
                 issuerState?.let { customParameter("issuer_state", issuerState) }
                 if (scopes.isNotEmpty()) {
                     scope(NimbusScope(*scopes.map { it.value }.toTypedArray()))
+                    if (!isCredentialIssuerAuthorizationServer) {
+                        resource(credentialIssuerId.value.value.toURI())
+                    }
                 }
                 if (credentialsConfigurationIds.isNotEmpty()) {
                     authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
@@ -184,6 +190,9 @@ internal class AuthorizationEndpointClient(
             issuerState?.let { customParameter("issuer_state", issuerState) }
             if (credentialsScopes.isNotEmpty()) {
                 scope(NimbusScope(*credentialsScopes.map { it.value }.toTypedArray()))
+                if (!isCredentialIssuerAuthorizationServer) {
+                    resource(credentialIssuerId.value.value.toURI())
+                }
             }
             if (credentialsAuthorizationDetails.isNotEmpty()) {
                 authorizationDetails(credentialsAuthorizationDetails.map(::toNimbus))
@@ -241,7 +250,7 @@ internal class AuthorizationEndpointClient(
         credentialConfigurationId: CredentialConfigurationIdentifier,
     ): AuthorizationDetail =
         with(NimbusAuthorizationDetail.Builder(AuthorizationType(OPENID_CREDENTIAL))) {
-            if (credentialIssuerId.toString() != authorizationIssuer.toString()) {
+            if (!isCredentialIssuerAuthorizationServer) {
                 val locations = listOf(Location(credentialIssuerId.value.value.toURI()))
                 locations(locations)
             }
