@@ -38,17 +38,17 @@ sealed interface Client : java.io.Serializable {
     data class Public(override val id: ClientId) : Client
 
     data class Attested(
-        val jwt: ClientAttestationJWT,
+        val attestation: ClientAttestationJWT,
         val popJwtSpec: ClientAttestationPoPJWTSpec,
     ) : Client {
         init {
-            val id = jwt.clientId
+            val id = attestation.clientId
             require(id.isNotBlank() && id.isNotEmpty())
-            val pubKey = jwt.pubKey
+            val pubKey = attestation.pubKey
             require(!pubKey.isPrivate) { "InstanceKey should be public" }
         }
 
-        override val id: ClientId = jwt.clientId
+        override val id: ClientId = attestation.clientId
     }
 }
 

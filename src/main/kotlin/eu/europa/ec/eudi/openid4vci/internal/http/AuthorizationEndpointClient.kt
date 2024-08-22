@@ -28,6 +28,7 @@ import com.nimbusds.oauth2.sdk.rar.Location
 import com.nimbusds.openid.connect.sdk.Prompt
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
+import eu.europa.ec.eudi.openid4vci.internal.clientAttestationAndPoP
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -97,8 +98,14 @@ internal class AuthorizationEndpointClient(
     private val supportsPar: Boolean
         get() = pushedAuthorizationRequestEndpoint != null
 
+    private val clientAttestationJwts: Pair<ClientAttestationJWT, ClientAttestationPoPJWT>? by lazy {
+        ClientAttestationBuilder
+            .createIfNeeded(config.clock, config.client, URL(authorizationIssuer))
+            ?.clientAttestation()
+    }
+
     private val clientAttestationBuilder: ClientAttestationBuilder? =
-        ClientAttestationBuilder(config.clock, config.client, URL(authorizationIssuer))
+        ClientAttestationBuilder.createIfNeeded(config.clock, config.client, URL(authorizationIssuer))
 
     suspend fun submitParOrCreateAuthorizationRequestUrl(
         scopes: List<Scope>,
@@ -163,14 +170,6 @@ internal class AuthorizationEndpointClient(
                 }
                 if (credentialsConfigurationIds.isNotEmpty()) {
                     authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
-                }
-                prompt(Prompt.Type.LOGIN)
-
-                val clientAttestation = clientAttestationBuilder?.clientAttestation()
-                if (null != clientAttestation) {
-                    AttestationBasedClientAuthenticationForm.assemble(clientAttestation).forEach { (k, v) ->
-                        customParameter(k, v)
-                    }
                 }
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
@@ -250,7 +249,11 @@ internal class AuthorizationEndpointClient(
                 formParameters = Parameters.build {
                     formParameters.entries.forEach { (k, v) -> append(k, v) }
                 },
-            )
+            ) {
+                clientAttestationJwts?.let { (attestation, pop) ->
+                    clientAttestationAndPoP(attestation, pop)
+                }
+            }
         }
         return if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponseTO.Success>()
         else response.body<PushedAuthorizationRequestResponseTO.Failure>()

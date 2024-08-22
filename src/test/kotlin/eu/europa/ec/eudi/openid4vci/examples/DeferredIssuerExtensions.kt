@@ -178,7 +178,7 @@ data class DeferredIssuanceStoredContextTO(
             val authorizedTransaction = dCtx.authorizedTransaction
             return DeferredIssuanceStoredContextTO(
                 clientId = dCtx.config.client.id,
-                clientAttestationJwt = dCtx.config.client.ifAttested { jwt.jwt.serialize() },
+                clientAttestationJwt = dCtx.config.client.ifAttested { attestation.jwt.serialize() },
                 clientAttestationPopType = dCtx.config.client.ifAttested { popJwtSpec.typ.toString() },
                 clientAttestationPopDuration = dCtx.config.client.ifAttested { popJwtSpec.duration.inWholeSeconds },
                 clientAttestationPopAlgorithm = dCtx.config.client.ifAttested { popJwtSpec.signingAlgorithm.toJSONString() },
