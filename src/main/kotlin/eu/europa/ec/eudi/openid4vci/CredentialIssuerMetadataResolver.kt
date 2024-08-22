@@ -62,6 +62,9 @@ data class CredentialIssuerMetadata(
     val credentialIssuerIdentifier: CredentialIssuerId,
     val authorizationServers: List<HttpsUrl> = listOf(credentialIssuerIdentifier.value),
     val credentialEndpoint: CredentialIssuerEndpoint,
+    @Deprecated(
+        message = "Batch credential endpoint has been removed from OpenId4VCI",
+    )
     val batchCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val notificationEndpoint: CredentialIssuerEndpoint? = null,

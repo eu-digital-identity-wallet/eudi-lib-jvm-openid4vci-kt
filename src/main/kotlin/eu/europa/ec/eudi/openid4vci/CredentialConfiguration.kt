@@ -64,6 +64,9 @@ sealed interface ProofTypeMeta : Serializable {
         }
     }
 
+    @Deprecated(
+        message = "CWT proofs have been removed from OpenId4VCI",
+    )
     data class Cwt(val algorithms: List<CoseAlgorithm>, val curves: List<CoseCurve>) : ProofTypeMeta {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of CWT cannot be empty" }

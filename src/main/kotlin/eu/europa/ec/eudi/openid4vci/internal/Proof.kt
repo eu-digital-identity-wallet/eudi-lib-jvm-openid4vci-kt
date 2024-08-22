@@ -42,6 +42,9 @@ internal sealed interface Proof {
      *
      * @param cwt The proof CWT
      */
+    @Deprecated(
+        message = "CWT proofs have been removed from OpenId4VCI",
+    )
     @JvmInline
     value class Cwt(val cwt: String) : Proof
 
