@@ -79,6 +79,9 @@ internal class ProofBuilderTest {
         }
     }
 
+    @Deprecated(
+        message = "CWT Proofs have been removed from OpenId4VCI",
+    )
     @Test
     fun `check cwt proof`() = runTest {
         val clock = Clock.fixed(Instant.now(), ZoneId.systemDefault())
@@ -97,6 +100,9 @@ internal class ProofBuilderTest {
         }
     }
 
+    @Deprecated(
+        message = "CWT Proofs have been removed from OpenId4VCI",
+    )
     @Test
     fun `check cwt proof with authlete impl`() = runTest {
         val clock = Clock.fixed(Instant.now(), ZoneId.systemDefault())
@@ -124,6 +130,9 @@ internal class ProofBuilderTest {
     }
 }
 
+@Deprecated(
+    message = "CWT Proofs have been removed from OpenId4VCI",
+)
 internal object CwtProofValidator {
 
     fun isValid(

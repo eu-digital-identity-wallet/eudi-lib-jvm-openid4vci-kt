@@ -118,6 +118,9 @@ internal class JwtProofBuilder(
     }
 }
 
+@Deprecated(
+    message = "CWT proofs have been removed from OpenId4VCI",
+)
 internal class CwtProofBuilder(
     clock: Clock,
     iss: ClientId,

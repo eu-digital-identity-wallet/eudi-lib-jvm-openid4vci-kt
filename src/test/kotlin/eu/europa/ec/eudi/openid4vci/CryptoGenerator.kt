@@ -61,6 +61,9 @@ object CryptoGenerator {
         return keyPair to PopSigner.jwtPopSigner(keyPair, alg, bindingKey)
     }
 
+    @Deprecated(
+        message = "CWT proofs have been removed from OpenId4VCI",
+    )
     private fun ecKeyAndCwtPopSigner(
         clock: Clock,
         alg: CoseAlgorithm,

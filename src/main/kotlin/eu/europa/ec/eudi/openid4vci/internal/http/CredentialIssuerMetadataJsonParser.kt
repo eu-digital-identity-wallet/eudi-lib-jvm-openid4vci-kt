@@ -334,7 +334,7 @@ private data class W3CSignedJwtCredentialTO(
         fun toDomain(): W3CSignedJwtCredential.CredentialDefinition =
             W3CSignedJwtCredential.CredentialDefinition(
                 type = types,
-                credentialSubject = credentialSubject?.let { it.toDomain() },
+                credentialSubject = credentialSubject?.toDomain(),
             )
     }
 
@@ -366,6 +366,9 @@ private data class CredentialIssuerMetadataTO(
     @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
     @SerialName("authorization_servers") val authorizationServers: List<String>? = null,
     @SerialName("credential_endpoint") @Required val credentialEndpoint: String,
+    @Deprecated(
+        message = "Batch credential endpoint has been removed from OpenId4VCI",
+    )
     @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
     @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
     @SerialName("notification_endpoint") val notificationEndpoint: String? = null,

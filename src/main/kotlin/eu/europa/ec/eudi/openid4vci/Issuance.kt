@@ -154,6 +154,9 @@ interface RequestIssuance {
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 }
 
+@Deprecated(
+    message = "Batch endpoint has been removed from OpenId4VCI",
+)
 interface RequestBatchIssuance {
 
     @Deprecated(
@@ -200,6 +203,9 @@ sealed interface PopSigner {
      * @param sign A suspended function to actually sign the data. It is required that implementer, uses
      * the P1363 format
      */
+    @Deprecated(
+        message = "CWT proofs have been removed from OpenId4VCI",
+    )
     data class Cwt(
         val algorithm: CoseAlgorithm,
         val curve: CoseCurve,
@@ -248,7 +254,9 @@ sealed interface PopSigner {
          * In case of [JwtBindingKey.Did] this condition is not being checked.
          * @return the CWT signer
          */
-
+        @Deprecated(
+            message = "CWT proofs have been removed from OpenId4VCI",
+        )
         fun cwtPopSigner(
             privateKey: ECKey,
         ): Cwt {
