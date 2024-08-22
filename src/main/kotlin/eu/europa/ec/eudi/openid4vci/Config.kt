@@ -38,7 +38,7 @@ sealed interface Client : java.io.Serializable {
     data class Public(override val id: ClientId) : Client
 
     data class Attested(
-        val attestation: ClientAttestationJWT,
+        val attestation: ClientAttestation,
         val popJwtSpec: ClientAttestationPoPJWTSpec,
     ) : Client {
         init {

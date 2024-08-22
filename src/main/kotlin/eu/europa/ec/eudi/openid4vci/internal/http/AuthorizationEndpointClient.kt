@@ -98,14 +98,15 @@ internal class AuthorizationEndpointClient(
     private val supportsPar: Boolean
         get() = pushedAuthorizationRequestEndpoint != null
 
-    private val clientAttestationJwts: Pair<ClientAttestationJWT, ClientAttestationPoPJWT>? by lazy {
-        ClientAttestationBuilder
-            .createIfNeeded(config.clock, config.client, URL(authorizationIssuer))
-            ?.clientAttestation()
+    private val clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>? by lazy {
+        with(config) {
+            client.clientAttestationAndPoP(
+                clock = clock,
+                clientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
+                authServerId = URL(authorizationIssuer),
+            )
+        }
     }
-
-    private val clientAttestationBuilder: ClientAttestationBuilder? =
-        ClientAttestationBuilder.createIfNeeded(config.clock, config.client, URL(authorizationIssuer))
 
     suspend fun submitParOrCreateAuthorizationRequestUrl(
         scopes: List<Scope>,
@@ -250,7 +251,7 @@ internal class AuthorizationEndpointClient(
                     formParameters.entries.forEach { (k, v) -> append(k, v) }
                 },
             ) {
-                clientAttestationJwts?.let { (attestation, pop) ->
+                clientAttestationAndPoP?.let { (attestation, pop) ->
                     clientAttestationAndPoP(attestation, pop)
                 }
             }

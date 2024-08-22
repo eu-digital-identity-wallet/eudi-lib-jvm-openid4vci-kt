@@ -18,15 +18,12 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.JWSSigner
-import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.ClientAttestationBuilder.Companion.createIfNeeded
-import eu.europa.ec.eudi.openid4vci.internal.DefaultClientAttestationPopJWTBuilder
+import eu.europa.ec.eudi.openid4vci.internal.DefaultClientAttestationPoPBuilder
 import eu.europa.ec.eudi.openid4vci.internal.cnf
 import eu.europa.ec.eudi.openid4vci.internal.cnfJwk
-import io.ktor.client.request.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -132,7 +129,7 @@ enum class UserAuthentication {
  * as described in Attestation-Based Client authentication
  * @param jwt the actual JWT
  */
-data class ClientAttestationJWT(val jwt: SignedJWT) {
+data class ClientAttestation(val jwt: SignedJWT) {
     init {
         jwt.ensureSigned()
     }
@@ -171,7 +168,7 @@ data class ClientAttestationJWT(val jwt: SignedJWT) {
  * as described in Attestation-Based Client authentication
  */
 @JvmInline
-value class ClientAttestationPoPJWT(val jwt: SignedJWT) {
+value class ClientAttestationPoP(val jwt: SignedJWT) {
     init {
         jwt.ensureSigned()
     }
@@ -193,10 +190,6 @@ data class ClientAttestationPoPJWTSpec(
     }
 
     companion object {
-        /**
-         * [ECDSASigner.SUPPORTED_ALGORITHMS]
-         */
-        val DefaultSupportedSigningAlgorithms = ECDSASigner.SUPPORTED_ALGORITHMS
 
         internal fun requireIsAllowedAlgorithm(alg: JWSAlgorithm) =
             require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
@@ -205,10 +198,15 @@ data class ClientAttestationPoPJWTSpec(
     }
 }
 
+// TODO
+//  Currently, we don't have a way to allow the Wallet to
+//  pass another instance of ClientAttestationPoPBuilder
+//  Either mark the interface as internal (or better keep just the Default)
+//  or find a way to configure it.
 /**
- * A function for building a [ClientAttestationPoPJWT]
+ * A function for building a [ClientAttestationPoP]
  */
-fun interface ClientAttestationPoPJWTBuilder {
+fun interface ClientAttestationPoPBuilder {
 
     /**
      * Builds a PoP JWT
@@ -219,68 +217,10 @@ fun interface ClientAttestationPoPJWTBuilder {
      *
      * @return the PoP JWT
      */
-    fun buildClientAttestationPoPJWT(
-        clock: Clock,
-        client: Client.Attested,
-        authServerId: URL,
-    ): ClientAttestationPoPJWT
-}
-
-//
-// Creation of Client Attestation
-//
-typealias JwtClientAttestation = Pair<ClientAttestationJWT, ClientAttestationPoPJWT>
-
-/**
- * A function for creating a [JwtClientAttestation]
- *
- * An instance may be obtained via [createIfNeeded]
- */
-internal fun interface ClientAttestationBuilder {
-
-    fun clientAttestation(): JwtClientAttestation
+    fun Client.Attested.attestationPoP(clock: Clock, authServerId: URL): ClientAttestationPoP
 
     companion object {
-
-        /**
-         * Creates a builder which assumes that wallet has already obtained [ClientAttestationJWT],
-         * that it is of type [Client.Attested]
-         *
-         * @param clock wallet's clock
-         * @param client wallet which has already obtained [ClientAttestationJWT]
-         * @param authServerId the URL of the authorization server (issuer of authorization server metadata) to
-         * which the [JwtClientAttestation] will be presented.
-         * It will be used to populate the aud claim of the [ClientAttestationPoPJWT]
-         * @param clientAttestationPoPJWTBuilder the builder of the [ClientAttestationPoPJWT].
-         * If not specified defaults to [DefaultClientAttestationPopJWTBuilder]
-         *
-         * @return a builder as described above
-         */
-        operator fun invoke(
-            clock: Clock,
-            client: Client.Attested,
-            authServerId: URL,
-            clientAttestationPoPJWTBuilder: ClientAttestationPoPJWTBuilder = DefaultClientAttestationPopJWTBuilder,
-        ): ClientAttestationBuilder =
-            ClientAttestationBuilder {
-                val popJwt = clientAttestationPoPJWTBuilder.buildClientAttestationPoPJWT(clock, client, authServerId)
-                client.attestation to popJwt
-            }
-
-        internal fun createIfNeeded(
-            clock: Clock,
-            client: Client,
-            authServerId: URL?,
-        ): ClientAttestationBuilder? = when (client) {
-            is Client.Attested -> {
-                requireNotNull(authServerId) {
-                    "In case of attestation-based client authentication, authServerId is required"
-                }
-                invoke(clock, client, authServerId)
-            }
-
-            is Client.Public -> null
-        }
+        val Default: ClientAttestationPoPBuilder = DefaultClientAttestationPoPBuilder
     }
 }
 

@@ -133,7 +133,7 @@ data class DeferredIssuanceStoredContextTO(
                     if (clientAttestationJwt == null) Client.Public(clientId)
                     else {
                         val jwt = runCatching {
-                            ClientAttestationJWT(SignedJWT.parse(clientAttestationJwt))
+                            ClientAttestation(SignedJWT.parse(clientAttestationJwt))
                         }.getOrNull() ?: error("Invalid client attestation JWT")
                         val poPJWTSpec = ClientAttestationPoPJWTSpec(
                             signingAlgorithm = JWSAlgorithm.parse(checkNotNull(clientAttestationPopAlgorithm)),

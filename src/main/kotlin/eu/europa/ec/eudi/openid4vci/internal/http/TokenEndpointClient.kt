@@ -115,10 +115,12 @@ internal class TokenEndpointClient(
         ktorHttpClientFactory,
     )
 
-    private val clientAttestationJWTs: Pair<ClientAttestationJWT, ClientAttestationPoPJWT>? by lazy {
-        ClientAttestationBuilder
-            .createIfNeeded(clock, client, authServerId)
-            ?.clientAttestation()
+    private val clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>? by lazy {
+        client.clientAttestationAndPoP(
+            clock = clock,
+            clientAttestationPoPBuilder = eu.europa.ec.eudi.openid4vci.ClientAttestationPoPBuilder.Default,
+            authServerId = authServerId,
+        )
     }
 
     /**
@@ -190,7 +192,7 @@ internal class TokenEndpointClient(
                 dPoPJwtFactory?.let { factory ->
                     dpop(factory, tokenEndpoint, Htm.POST, accessToken = null, nonce = null)
                 }
-                clientAttestationJWTs?.let { (attestation, pop) ->
+                clientAttestationAndPoP?.let { (attestation, pop) ->
                     clientAttestationAndPoP(attestation, pop)
                 }
             }

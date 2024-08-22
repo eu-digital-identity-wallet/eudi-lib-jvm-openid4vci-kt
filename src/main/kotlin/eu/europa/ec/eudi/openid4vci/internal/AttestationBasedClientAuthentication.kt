@@ -42,22 +42,40 @@ import java.time.Instant
 import java.util.*
 import kotlin.time.Duration
 
+internal fun Client.clientAttestationAndPoP(
+    clock: Clock,
+    clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
+    authServerId: URL?,
+): Pair<ClientAttestation, ClientAttestationPoP>? =
+    when (this) {
+        is Client.Attested -> {
+            requireNotNull(authServerId) {
+                "In case of attestation-based client authentication, authServerId is required"
+            }
+            with(clientAttestationPoPBuilder) {
+                val pop = this@clientAttestationAndPoP.attestationPoP(clock, authServerId)
+                attestation to pop
+            }
+        }
+
+        is Client.Public -> null
+    }
+
 /**
- * Default implementation of [ClientAttestationPoPJWTBuilder]
+ * Default implementation of [ClientAttestationPoPBuilder]
  * Populates only the mandatory claims : `iss`, `exp`, `jit`, `aud` and the optional `iat`
  * In regard to JOSE header, only `alg` claim is being populated
  */
-internal object DefaultClientAttestationPopJWTBuilder : ClientAttestationPoPJWTBuilder {
+internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder {
 
-    override fun buildClientAttestationPoPJWT(
+    override fun Client.Attested.attestationPoP(
         clock: Clock,
-        client: Client.Attested,
         authServerId: URL,
-    ): ClientAttestationPoPJWT {
-        val header = client.popJwtHeader()
-        val claimSet = client.popJwtClaimSet(authServerId, clock.instant())
-        val jwt = SignedJWT(header, claimSet).apply { sign(client.popJwtSpec.jwsSigner) }
-        return ClientAttestationPoPJWT(jwt)
+    ): ClientAttestationPoP {
+        val header = popJwtHeader()
+        val claimSet = popJwtClaimSet(authServerId, clock.instant())
+        val jwt = SignedJWT(header, claimSet).apply { sign(popJwtSpec.jwsSigner) }
+        return ClientAttestationPoP(jwt)
     }
 
     private fun Client.Attested.popJwtHeader(): JWSHeader =
@@ -89,19 +107,17 @@ internal fun Map<String, Any?>.toJsonObject(): JsonObject {
     val jsonString = JSONObjectUtils.toJSONString(this)
     return Json.decodeFromString(jsonString)
 }
+
 fun JWTClaimsSet.cnf(): JsonObject? {
     return getJSONObjectClaim("cnf")?.toJsonObject()
 }
 
-/**
- * Adds header `DPoP` on the request under construction,  utilizing the passed [DPoPJwtFactory]
- */
 internal fun HttpRequestBuilder.clientAttestationAndPoP(
-    clientAttestationJWT: ClientAttestationJWT,
-    clientAttestationPoPJWT: ClientAttestationPoPJWT,
+    attestation: ClientAttestation,
+    attestationPoP: ClientAttestationPoP,
 ) {
-    header("OAuth-Client-Attestation", clientAttestationJWT.jwt.serialize())
-    header("OAuth-Client-Attestation-PoP", clientAttestationPoPJWT.jwt.serialize())
+    header("OAuth-Client-Attestation", attestation.jwt.serialize())
+    header("OAuth-Client-Attestation-PoP", attestationPoP.jwt.serialize())
 }
 
 //
@@ -183,7 +199,7 @@ internal class ClientAttestationJwtBuilder(
         ClientAttestationPoPJWTSpec.requireIsAllowedAlgorithm(algorithm)
     }
 
-    fun build(): ClientAttestationJWT {
+    fun build(): ClientAttestation {
         val header = jwsHeader()
         val jwtClaimSet = claimSetForm(claims)
         val jwt =
@@ -191,7 +207,7 @@ internal class ClientAttestationJwtBuilder(
                 sign(signer)
             }
 
-        return ClientAttestationJWT(jwt)
+        return ClientAttestation(jwt)
     }
 
     private fun jwsHeader(): JWSHeader =
