@@ -157,9 +157,9 @@ interface DeferredIssuer : QueryForDeferredCredential {
                 config.clock,
                 config.client,
                 URI.create("https://willNotBeUsed"), // this will not be used
+                config.authServerId,
                 config.tokenEndpoint,
                 dPoPJwtFactory,
-                config.authServerId,
                 config.clientAttestationPoPBuilder,
                 ktorHttpClientFactory,
             )

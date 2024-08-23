@@ -131,7 +131,6 @@ interface Issuer :
                     credentialOffer.authorizationServerMetadata,
                     config,
                     dPoPJwtFactory,
-                    URL(credentialOffer.authorizationServerMetadata.issuer.value),
                     ktorHttpClientFactory,
                 )
 

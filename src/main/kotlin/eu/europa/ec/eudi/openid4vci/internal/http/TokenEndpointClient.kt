@@ -94,9 +94,9 @@ internal class TokenEndpointClient(
     private val clock: Clock,
     private val client: Client,
     private val authFlowRedirectionURI: URI,
+    private val authServerId: URL,
     private val tokenEndpoint: URL,
     private val dPoPJwtFactory: DPoPJwtFactory?,
-    private val authServerId: URL?,
     private val clientAttestationPoPBuilder: ClientAttestationPoPBuilder,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
@@ -105,24 +105,17 @@ internal class TokenEndpointClient(
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
         dPoPJwtFactory: DPoPJwtFactory?,
-        authServerId: URL?,
         ktorHttpClientFactory: KtorHttpClientFactory,
     ) : this(
         config.clock,
         config.client,
         config.authFlowRedirectionURI,
+        URL(authorizationServerMetadata.issuer.value),
         authorizationServerMetadata.tokenEndpointURI.toURL(),
         dPoPJwtFactory,
-        authServerId,
         config.clientAttestationPoPBuilder,
         ktorHttpClientFactory,
     )
-
-    init {
-        if (client is Client.Attested) {
-            requireNotNull(authServerId) { "For Attested client, authServerId is required" }
-        }
-    }
 
     /**
      * Submits a request for access token in authorization server's token endpoint passing parameters specific to the
@@ -193,19 +186,24 @@ internal class TokenEndpointClient(
                 dPoPJwtFactory?.let { factory ->
                     dpop(factory, tokenEndpoint, Htm.POST, accessToken = null, nonce = null)
                 }
-                if (client is Client.Attested) {
-                    val pop = with(clientAttestationPoPBuilder) {
-                        checkNotNull(authServerId)
-                        client.attestationPoPJWT(clock, authServerId)
-                    }
-                    clientAttestationHeaders(client.attestationJWT to pop)
-                }
+                generateClientAttestationIfNeeded()?.let(::clientAttestationHeaders)
             }
         }
         val responseTO = if (response.status.isSuccess()) response.body<TokenResponseTO.Success>()
         else response.body<TokenResponseTO.Failure>()
         return responseTO.tokensOrFail(clock)
     }
+
+    private fun generateClientAttestationIfNeeded(): ClientAttestation? =
+        when (client) {
+            is Client.Attested ->
+                with(clientAttestationPoPBuilder) {
+                    val popJWT = client.attestationPoPJWT(clock, authServerId)
+                    client.attestationJWT to popJWT
+                }
+
+            else -> null
+        }
 }
 
 internal object TokenEndpointForm {
