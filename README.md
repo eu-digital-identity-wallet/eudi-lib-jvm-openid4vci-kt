@@ -373,7 +373,7 @@ proof is required for the requested credential.
 
 The library will automatically try to handle the invalid proof response and place a second request 
 which includes proofs. This can be done only if caller has provided a `popSigner` while 
-invoking `requestSingleAndUpdateState()`. In case, that this second request fails with `invalid_proof` 
+invoking `requestSingle()`. In case, that this second request fails with `invalid_proof` 
 library will report as `IrrecoverableInvalidProof`.
 
 #### Place credential request next steps
