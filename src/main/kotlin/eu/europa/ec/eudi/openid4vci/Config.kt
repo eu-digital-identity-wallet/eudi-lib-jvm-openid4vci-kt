@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.ParUsage.*
 import java.net.URI
 import java.time.Clock
 
@@ -63,6 +62,7 @@ sealed interface Client : java.io.Serializable {
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
  * @param dPoPSigner a signer that if provided will enable the use of DPoP JWT
+ * @param clientAttestationPoPBuilder a way to build a [ClientAttestationPoP]. Required in case of [Client.Attested]
  * @param parUsage whether to use PAR in case of authorization code grant
  * @param clock Wallet's clock
  */
@@ -73,29 +73,10 @@ data class OpenId4VCIConfig(
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPSigner: PopSigner.Jwt? = null,
+    val clientAttestationPoPBuilder: ClientAttestationPoPBuilder? = ClientAttestationPoPBuilder.Default,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
 ) {
-
-    constructor(
-        clientId: ClientId,
-        authFlowRedirectionURI: URI,
-        keyGenerationConfig: KeyGenerationConfig,
-        credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
-        authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-        dPoPSigner: PopSigner.Jwt? = null,
-        parUsage: ParUsage = ParUsage.IfSupported,
-        clock: Clock = Clock.systemDefaultZone(),
-    ) : this (
-        Client.Public(clientId),
-        authFlowRedirectionURI,
-        keyGenerationConfig,
-        credentialResponseEncryptionPolicy,
-        authorizeIssuanceConfig,
-        dPoPSigner,
-        parUsage,
-        clock,
-    )
 
     init {
         if (null != dPoPSigner) {
@@ -105,6 +86,11 @@ data class OpenId4VCIConfig(
             }
             require(!key.jwk.isPrivate) {
                 "JWK in binding key must be public"
+            }
+        }
+        if (client is Client.Attested) {
+            requireNotNull(clientAttestationPoPBuilder) {
+                "Client attestation PoP builder is required"
             }
         }
     }

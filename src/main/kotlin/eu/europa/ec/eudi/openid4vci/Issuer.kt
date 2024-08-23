@@ -47,6 +47,7 @@ interface Issuer :
 
     val credentialOffer: CredentialOffer
     val dPoPJwtFactory: DPoPJwtFactory?
+    val clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>?
 
     /**
      * A convenient method for obtaining a [DeferredIssuanceContext], in case of a deferred issuance
@@ -118,10 +119,14 @@ interface Issuer :
                 ).getOrThrow()
             }
 
+            val clientAttestationAndPop =
+                config.clientAttestationAndPoP(URL(credentialOffer.authorizationServerMetadata.issuer.value))
+
             val authorizationEndpointClient =
                 AuthorizationEndpointClient(
                     credentialOffer.credentialIssuerIdentifier,
                     credentialOffer.authorizationServerMetadata,
+                    clientAttestationAndPop,
                     config,
                     ktorHttpClientFactory,
                 )
@@ -131,6 +136,7 @@ interface Issuer :
                     credentialOffer.authorizationServerMetadata,
                     config,
                     dPoPJwtFactory,
+                    clientAttestationAndPop,
                     ktorHttpClientFactory,
                 )
 
@@ -198,6 +204,9 @@ interface Issuer :
 
                 override val dPoPJwtFactory: DPoPJwtFactory?
                     get() = dPoPJwtFactory
+
+                override val clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>?
+                    get() = clientAttestationAndPop
 
                 override fun AuthorizedRequest.deferredContext(
                     deferredCredential: IssuedCredential.Deferred,

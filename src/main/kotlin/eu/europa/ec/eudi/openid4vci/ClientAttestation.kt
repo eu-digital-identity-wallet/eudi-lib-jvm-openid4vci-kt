@@ -198,11 +198,6 @@ data class ClientAttestationPoPJWTSpec(
     }
 }
 
-// TODO
-//  Currently, we don't have a way to allow the Wallet to
-//  pass another instance of ClientAttestationPoPBuilder
-//  Either mark the interface as internal (or better keep just the Default)
-//  or find a way to configure it.
 /**
  * A function for building a [ClientAttestationPoP]
  */

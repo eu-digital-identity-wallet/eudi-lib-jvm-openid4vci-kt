@@ -42,7 +42,20 @@ import java.time.Instant
 import java.util.*
 import kotlin.time.Duration
 
-internal fun Client.clientAttestationAndPoP(
+internal fun OpenId4VCIConfig.clientAttestationAndPoP(
+    authServerId: URL?,
+): Pair<ClientAttestation, ClientAttestationPoP>? =
+    clientAttestationPoPBuilder?.let { builder ->
+        client.clientAttestationAndPoP(clock, builder, authServerId)
+    }
+
+internal fun DeferredIssuerConfig.clientAttestationAndPoP(): Pair<ClientAttestation, ClientAttestationPoP>? =
+    if (client is Client.Attested) {
+        requireNotNull(clientAttestationPoPBuilder)
+        client.clientAttestationAndPoP(clock, clientAttestationPoPBuilder, authServerId)
+    } else null
+
+private fun Client.clientAttestationAndPoP(
     clock: Clock,
     clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     authServerId: URL?,

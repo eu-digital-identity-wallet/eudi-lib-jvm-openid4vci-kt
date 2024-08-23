@@ -74,6 +74,7 @@ internal class AuthorizationEndpointClient(
     private val authorizationIssuer: String,
     private val authorizationEndpoint: URL,
     private val pushedAuthorizationRequestEndpoint: URL?,
+    private val clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>?,
     private val config: OpenId4VCIConfig,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
@@ -81,6 +82,7 @@ internal class AuthorizationEndpointClient(
     constructor(
         credentialIssuerId: CredentialIssuerId,
         authorizationServerMetadata: CIAuthorizationServerMetadata,
+        clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>?,
         config: OpenId4VCIConfig,
         ktorHttpClientFactory: KtorHttpClientFactory,
     ) : this(
@@ -88,6 +90,7 @@ internal class AuthorizationEndpointClient(
         authorizationServerMetadata.issuer.value,
         authorizationServerMetadata.authorizationEndpointURI.toURL(),
         authorizationServerMetadata.pushedAuthorizationRequestEndpointURI?.toURL(),
+        clientAttestationAndPoP,
         config,
         ktorHttpClientFactory,
     )
@@ -97,16 +100,6 @@ internal class AuthorizationEndpointClient(
 
     private val supportsPar: Boolean
         get() = pushedAuthorizationRequestEndpoint != null
-
-    private val clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>? by lazy {
-        with(config) {
-            client.clientAttestationAndPoP(
-                clock = clock,
-                clientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
-                authServerId = URL(authorizationIssuer),
-            )
-        }
-    }
 
     suspend fun submitParOrCreateAuthorizationRequestUrl(
         scopes: List<Scope>,

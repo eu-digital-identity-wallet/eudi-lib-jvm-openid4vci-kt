@@ -97,6 +97,7 @@ internal class TokenEndpointClient(
     authServerId: URL? = null,
     private val tokenEndpoint: URL,
     private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>?,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
 
@@ -104,6 +105,7 @@ internal class TokenEndpointClient(
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
         dPoPJwtFactory: DPoPJwtFactory?,
+        clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>?,
         ktorHttpClientFactory: KtorHttpClientFactory,
     ) : this(
         config.clock,
@@ -112,16 +114,9 @@ internal class TokenEndpointClient(
         URL(authorizationServerMetadata.issuer.value),
         authorizationServerMetadata.tokenEndpointURI.toURL(),
         dPoPJwtFactory,
+        clientAttestationAndPoP,
         ktorHttpClientFactory,
     )
-
-    private val clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>? by lazy {
-        client.clientAttestationAndPoP(
-            clock = clock,
-            clientAttestationPoPBuilder = eu.europa.ec.eudi.openid4vci.ClientAttestationPoPBuilder.Default,
-            authServerId = authServerId,
-        )
-    }
 
     /**
      * Submits a request for access token in authorization server's token endpoint passing parameters specific to the
