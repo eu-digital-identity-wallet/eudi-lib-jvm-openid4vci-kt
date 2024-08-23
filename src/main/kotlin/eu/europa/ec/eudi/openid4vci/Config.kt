@@ -78,6 +78,28 @@ data class OpenId4VCIConfig(
     val clock: Clock = Clock.systemDefaultZone(),
 ) {
 
+    constructor(
+        clientId: ClientId,
+        authFlowRedirectionURI: URI,
+        keyGenerationConfig: KeyGenerationConfig,
+        credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+        authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+        dPoPSigner: PopSigner.Jwt? = null,
+        clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
+        parUsage: ParUsage = ParUsage.IfSupported,
+        clock: Clock = Clock.systemDefaultZone(),
+    ) : this(
+        Client.Public(clientId),
+        authFlowRedirectionURI,
+        keyGenerationConfig,
+        credentialResponseEncryptionPolicy,
+        authorizeIssuanceConfig,
+        dPoPSigner,
+        clientAttestationPoPBuilder,
+        parUsage,
+        clock,
+    )
+
     init {
         if (null != dPoPSigner) {
             val key = dPoPSigner.bindingKey
