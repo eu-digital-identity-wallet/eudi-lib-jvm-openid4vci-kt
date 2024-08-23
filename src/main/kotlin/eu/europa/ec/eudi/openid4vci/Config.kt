@@ -37,17 +37,17 @@ sealed interface Client : java.io.Serializable {
     data class Public(override val id: ClientId) : Client
 
     data class Attested(
-        val attestation: ClientAttestation,
+        val attestationJWT: ClientAttestationJWT,
         val popJwtSpec: ClientAttestationPoPJWTSpec,
     ) : Client {
         init {
-            val id = attestation.clientId
+            val id = attestationJWT.clientId
             require(id.isNotBlank() && id.isNotEmpty())
-            val pubKey = attestation.pubKey
+            val pubKey = attestationJWT.pubKey
             require(!pubKey.isPrivate) { "InstanceKey should be public" }
         }
 
-        override val id: ClientId = attestation.clientId
+        override val id: ClientId = attestationJWT.clientId
     }
 }
 
@@ -62,7 +62,7 @@ sealed interface Client : java.io.Serializable {
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
  * @param dPoPSigner a signer that if provided will enable the use of DPoP JWT
- * @param clientAttestationPoPBuilder a way to build a [ClientAttestationPoP]
+ * @param clientAttestationPoPBuilder a way to build a [ClientAttestationPoPJWT]
  * @param parUsage whether to use PAR in case of authorization code grant
  * @param clock Wallet's clock
  */
@@ -86,11 +86,6 @@ data class OpenId4VCIConfig(
             }
             require(!key.jwk.isPrivate) {
                 "JWK in binding key must be public"
-            }
-        }
-        if (client is Client.Attested) {
-            requireNotNull(clientAttestationPoPBuilder) {
-                "Client attestation PoP builder is required"
             }
         }
     }

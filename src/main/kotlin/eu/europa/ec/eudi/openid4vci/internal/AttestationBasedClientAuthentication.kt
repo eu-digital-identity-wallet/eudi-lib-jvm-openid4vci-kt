@@ -32,24 +32,6 @@ import java.time.Clock
 import java.time.Instant
 import java.util.*
 
-internal fun OpenId4VCIConfig.attestationAndPopIfNeeded(
-    authServerId: URL,
-): Pair<ClientAttestation, ClientAttestationPoP>? =
-    clientAttestationPoPBuilder.attestationPopIfNeeded(clock, client, authServerId)
-
-internal fun DeferredIssuerConfig.attestationAndPopIfNeeded(): Pair<ClientAttestation, ClientAttestationPoP>? =
-    clientAttestationPoPBuilder.attestationPopIfNeeded(clock, client, authServerId)
-
-private fun ClientAttestationPoPBuilder.attestationPopIfNeeded(
-    clock: Clock,
-    client: Client,
-    authServerId: URL,
-): Pair<ClientAttestation, ClientAttestationPoP>? =
-    when (client) {
-        is Client.Attested -> client.attestation to client.attestationPoP(clock, authServerId)
-        else -> null
-    }
-
 /**
  * Default implementation of [ClientAttestationPoPBuilder]
  * Populates only the mandatory claims : `iss`, `exp`, `jit`, `aud` and the optional `iat`
@@ -57,14 +39,14 @@ private fun ClientAttestationPoPBuilder.attestationPopIfNeeded(
  */
 internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder {
 
-    override fun Client.Attested.attestationPoP(
+    override fun Client.Attested.attestationPoPJWT(
         clock: Clock,
         authServerId: URL,
-    ): ClientAttestationPoP {
+    ): ClientAttestationPoPJWT {
         val header = popJwtHeader()
         val claimSet = popJwtClaimSet(authServerId, clock.instant())
         val jwt = SignedJWT(header, claimSet).apply { sign(popJwtSpec.jwsSigner) }
-        return ClientAttestationPoP(jwt)
+        return ClientAttestationPoPJWT(jwt)
     }
 
     private fun Client.Attested.popJwtHeader(): JWSHeader =
@@ -97,14 +79,32 @@ internal fun Map<String, Any?>.toJsonObject(): JsonObject {
     return Json.decodeFromString(jsonString)
 }
 
-fun JWTClaimsSet.cnf(): JsonObject? {
+internal fun JWTClaimsSet.cnf(): JsonObject? {
     return getJSONObjectClaim("cnf")?.toJsonObject()
 }
 
-internal fun HttpRequestBuilder.clientAttestationAndPoP(
-    attestation: ClientAttestation,
-    attestationPoP: ClientAttestationPoP,
+internal fun HttpRequestBuilder.clientAttestationHeaders(
+    clientAttestation: ClientAttestation,
 ) {
+    val (attestation, pop) = clientAttestation
     header("OAuth-Client-Attestation", attestation.jwt.serialize())
-    header("OAuth-Client-Attestation-PoP", attestationPoP.jwt.serialize())
+    header("OAuth-Client-Attestation-PoP", pop.jwt.serialize())
 }
+
+internal fun OpenId4VCIConfig.generateClientAttestationIfNeeded(
+    authServerId: URL,
+): ClientAttestation? =
+    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(clock, client, authServerId)
+
+internal fun DeferredIssuerConfig.generateClientAttestationIfNeeded(): ClientAttestation? =
+    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(clock, client, authServerId)
+
+private fun ClientAttestationPoPBuilder.generateClientAttestationIfNeeded(
+    clock: Clock,
+    client: Client,
+    authServerId: URL,
+): ClientAttestation? =
+    when (client) {
+        is Client.Attested -> client.attestationJWT to client.attestationPoPJWT(clock, authServerId)
+        else -> null
+    }

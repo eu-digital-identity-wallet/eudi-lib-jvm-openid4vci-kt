@@ -20,7 +20,7 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFa
 import eu.europa.ec.eudi.openid4vci.Grants.PreAuthorizedCode
 import eu.europa.ec.eudi.openid4vci.internal.GrantedAuthorizationDetailsSerializer
 import eu.europa.ec.eudi.openid4vci.internal.TokenResponse
-import eu.europa.ec.eudi.openid4vci.internal.clientAttestationAndPoP
+import eu.europa.ec.eudi.openid4vci.internal.clientAttestationHeaders
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -94,10 +94,10 @@ internal class TokenEndpointClient(
     private val clock: Clock,
     private val client: Client,
     private val authFlowRedirectionURI: URI,
-    authServerId: URL? = null,
     private val tokenEndpoint: URL,
     private val dPoPJwtFactory: DPoPJwtFactory?,
-    private val clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>?,
+    private val authServerId: URL?,
+    private val clientAttestationPoPBuilder: ClientAttestationPoPBuilder,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
 
@@ -105,18 +105,24 @@ internal class TokenEndpointClient(
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
         dPoPJwtFactory: DPoPJwtFactory?,
-        clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>?,
+        authServerId: URL?,
         ktorHttpClientFactory: KtorHttpClientFactory,
     ) : this(
         config.clock,
         config.client,
         config.authFlowRedirectionURI,
-        URL(authorizationServerMetadata.issuer.value),
         authorizationServerMetadata.tokenEndpointURI.toURL(),
         dPoPJwtFactory,
-        clientAttestationAndPoP,
+        authServerId,
+        config.clientAttestationPoPBuilder,
         ktorHttpClientFactory,
     )
+
+    init {
+        if (client is Client.Attested) {
+            requireNotNull(authServerId) { "For Attested client, authServerId is required" }
+        }
+    }
 
     /**
      * Submits a request for access token in authorization server's token endpoint passing parameters specific to the
@@ -187,8 +193,12 @@ internal class TokenEndpointClient(
                 dPoPJwtFactory?.let { factory ->
                     dpop(factory, tokenEndpoint, Htm.POST, accessToken = null, nonce = null)
                 }
-                clientAttestationAndPoP?.let { (attestation, pop) ->
-                    clientAttestationAndPoP(attestation, pop)
+                if (client is Client.Attested) {
+                    val pop = with(clientAttestationPoPBuilder) {
+                        checkNotNull(authServerId)
+                        client.attestationPoPJWT(clock, authServerId)
+                    }
+                    clientAttestationHeaders(client.attestationJWT to pop)
                 }
             }
         }

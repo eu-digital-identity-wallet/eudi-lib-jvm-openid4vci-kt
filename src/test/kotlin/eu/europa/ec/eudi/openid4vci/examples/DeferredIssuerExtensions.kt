@@ -133,7 +133,7 @@ data class DeferredIssuanceStoredContextTO(
                     if (clientAttestationJwt == null) Client.Public(clientId)
                     else {
                         val jwt = runCatching {
-                            ClientAttestation(SignedJWT.parse(clientAttestationJwt))
+                            ClientAttestationJWT(SignedJWT.parse(clientAttestationJwt))
                         }.getOrNull() ?: error("Invalid client attestation JWT")
                         val poPJWTSpec = ClientAttestationPoPJWTSpec(
                             signingAlgorithm = JWSAlgorithm.parse(checkNotNull(clientAttestationPopAlgorithm)),
@@ -178,7 +178,7 @@ data class DeferredIssuanceStoredContextTO(
             val authorizedTransaction = dCtx.authorizedTransaction
             return DeferredIssuanceStoredContextTO(
                 clientId = dCtx.config.client.id,
-                clientAttestationJwt = dCtx.config.client.ifAttested { attestation.jwt.serialize() },
+                clientAttestationJwt = dCtx.config.client.ifAttested { attestationJWT.jwt.serialize() },
                 clientAttestationPopType = dCtx.config.client.ifAttested { popJwtSpec.typ.toString() },
                 clientAttestationPopDuration = dCtx.config.client.ifAttested { popJwtSpec.duration.inWholeSeconds },
                 clientAttestationPopAlgorithm = dCtx.config.client.ifAttested { popJwtSpec.signingAlgorithm.toJSONString() },

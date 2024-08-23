@@ -28,7 +28,8 @@ import com.nimbusds.oauth2.sdk.rar.Location
 import com.nimbusds.openid.connect.sdk.Prompt
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
-import eu.europa.ec.eudi.openid4vci.internal.clientAttestationAndPoP
+import eu.europa.ec.eudi.openid4vci.internal.clientAttestationHeaders
+import eu.europa.ec.eudi.openid4vci.internal.generateClientAttestationIfNeeded
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -74,7 +75,6 @@ internal class AuthorizationEndpointClient(
     private val authorizationIssuer: String,
     private val authorizationEndpoint: URL,
     private val pushedAuthorizationRequestEndpoint: URL?,
-    private val clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>?,
     private val config: OpenId4VCIConfig,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
@@ -82,7 +82,6 @@ internal class AuthorizationEndpointClient(
     constructor(
         credentialIssuerId: CredentialIssuerId,
         authorizationServerMetadata: CIAuthorizationServerMetadata,
-        clientAttestationAndPoP: Pair<ClientAttestation, ClientAttestationPoP>?,
         config: OpenId4VCIConfig,
         ktorHttpClientFactory: KtorHttpClientFactory,
     ) : this(
@@ -90,7 +89,6 @@ internal class AuthorizationEndpointClient(
         authorizationServerMetadata.issuer.value,
         authorizationServerMetadata.authorizationEndpointURI.toURL(),
         authorizationServerMetadata.pushedAuthorizationRequestEndpointURI?.toURL(),
-        clientAttestationAndPoP,
         config,
         ktorHttpClientFactory,
     )
@@ -236,16 +234,16 @@ internal class AuthorizationEndpointClient(
     ): PushedAuthorizationRequestResponseTO {
         val response = ktorHttpClientFactory().use { client ->
             val url = parEndpoint.toURL()
-            val formParameters = pushedAuthorizationRequest.asFormPostParams()
+            val formParameters = run {
+                val fps = pushedAuthorizationRequest.asFormPostParams()
+                Parameters.build {
+                    fps.entries.forEach { (k, v) -> append(k, v) }
+                }
+            }
 
-            client.submitForm(
-                url = url.toString(),
-                formParameters = Parameters.build {
-                    formParameters.entries.forEach { (k, v) -> append(k, v) }
-                },
-            ) {
-                clientAttestationAndPoP?.let { (attestation, pop) ->
-                    clientAttestationAndPoP(attestation, pop)
+            client.submitForm(url.toString(), formParameters) {
+                config.generateClientAttestationIfNeeded(URL(authorizationIssuer))?.let {
+                    clientAttestationHeaders(it)
                 }
             }
         }
