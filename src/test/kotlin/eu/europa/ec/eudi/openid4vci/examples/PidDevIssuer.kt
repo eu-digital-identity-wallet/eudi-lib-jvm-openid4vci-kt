@@ -33,7 +33,7 @@ internal object PidDevIssuer :
     override val issuerId = IssuerId
     override val testUser = KeycloakUser("tneal", "password")
     override val cfg = OpenId4VCIConfig(
-        clientId = WALLET_CLIENT_ID,
+        client = Client.Public(WALLET_CLIENT_ID),
         authFlowRedirectionURI = Keycloak.DebugRedirectUri,
         keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
         credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
