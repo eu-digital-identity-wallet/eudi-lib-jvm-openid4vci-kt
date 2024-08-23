@@ -120,7 +120,7 @@ interface Issuer :
             }
 
             val clientAttestationAndPop =
-                config.clientAttestationAndPoP(URL(credentialOffer.authorizationServerMetadata.issuer.value))
+                config.attestationAndPopIfNeeded(URL(credentialOffer.authorizationServerMetadata.issuer.value))
 
             val authorizationEndpointClient =
                 AuthorizationEndpointClient(

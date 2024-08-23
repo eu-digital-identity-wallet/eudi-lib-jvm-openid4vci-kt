@@ -62,7 +62,7 @@ sealed interface Client : java.io.Serializable {
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
  * @param dPoPSigner a signer that if provided will enable the use of DPoP JWT
- * @param clientAttestationPoPBuilder a way to build a [ClientAttestationPoP]. Required in case of [Client.Attested]
+ * @param clientAttestationPoPBuilder a way to build a [ClientAttestationPoP]
  * @param parUsage whether to use PAR in case of authorization code grant
  * @param clock Wallet's clock
  */
@@ -73,7 +73,7 @@ data class OpenId4VCIConfig(
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPSigner: PopSigner.Jwt? = null,
-    val clientAttestationPoPBuilder: ClientAttestationPoPBuilder? = ClientAttestationPoPBuilder.Default,
+    val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
 ) {

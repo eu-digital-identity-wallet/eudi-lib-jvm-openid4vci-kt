@@ -17,7 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.DeferredIssuer.Companion.make
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessToken
-import eu.europa.ec.eudi.openid4vci.internal.clientAttestationAndPoP
+import eu.europa.ec.eudi.openid4vci.internal.attestationAndPopIfNeeded
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
 import java.net.URI
@@ -42,7 +42,7 @@ data class DeferredIssuerConfig(
     val authServerId: URL,
     val tokenEndpoint: URL,
     val dPoPSigner: PopSigner.Jwt? = null,
-    val clientAttestationPoPBuilder: ClientAttestationPoPBuilder? = ClientAttestationPoPBuilder.Default,
+    val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val responseEncryptionSpec: IssuanceResponseEncryptionSpec? = null,
     val clock: Clock = Clock.systemDefaultZone(),
 )
@@ -154,7 +154,7 @@ interface DeferredIssuer : QueryForDeferredCredential {
                 DPoPJwtFactory(signer = signer, clock = config.clock)
             }
 
-            val clientAttestationAndPop = config.clientAttestationAndPoP()
+            val clientAttestationAndPop = config.attestationAndPopIfNeeded()
 
             val tokenEndpointClient = TokenEndpointClient(
                 config.clock,
