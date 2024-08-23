@@ -125,7 +125,7 @@ private fun SignedJWT.ensureSignedNotMAC() {
     requireIsNotMAC(alg)
 }
 
-private fun requireIsNotMAC(alg: JWSAlgorithm) =
+internal fun requireIsNotMAC(alg: JWSAlgorithm) =
     require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
 
 private fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
