@@ -33,19 +33,19 @@ import kotlin.time.Duration.Companion.minutes
 
 internal fun selfSignedClient(
     clock: Clock = Clock.systemDefaultZone(),
-    privateKey: ECKey,
+    walletInstanceKey: ECKey,
     clientId: String,
     duration: Duration = 10.minutes,
     headerCustomization: JWSHeader.Builder.() -> Unit = {},
 ): Client.Attested {
-    require(privateKey.curve == Curve.P_256)
+    require(walletInstanceKey.curve == Curve.P_256)
     val algorithm = JWSAlgorithm.ES256
-    val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
+    val signer = DefaultJWSSignerFactory().createJWSSigner(walletInstanceKey, algorithm)
     val clientAttestationJWT = run {
         val claims = ClientAttestationClaims(
             issuer = clientId,
             clientId = clientId,
-            privateKey.toPublicJWK(),
+            walletInstanceKey.toPublicJWK(),
         )
         val builder = ClientAttestationJwtBuilder(clock, duration, algorithm, signer, claims, headerCustomization)
         builder.build()
@@ -62,12 +62,12 @@ internal fun selfSignedClient(
 internal data class ClientAttestationClaims(
     val issuer: String,
     val clientId: ClientId,
-    val pubKey: JWK,
+    val walletInstancePubKey: JWK,
 ) {
 
     init {
         require(clientId.isNotBlank() && clientId.isNotEmpty()) { "clientId cannot be blank" }
-        require(!pubKey.isPrivate) { "InstanceKey should be public" }
+        require(!walletInstancePubKey.isPrivate) { "InstanceKey should be public" }
     }
 }
 
@@ -97,7 +97,7 @@ private class ClientAttestationJwtBuilder(
 
     private fun jwsHeader(): JWSHeader =
         JWSHeader.Builder(algorithm).apply {
-            headerCustomization
+            headerCustomization()
         }.build()
 
     private fun claimSetForm(claims: ClientAttestationClaims): JWTClaimsSet =
@@ -106,7 +106,7 @@ private class ClientAttestationJwtBuilder(
             val exp = now.plusSeconds(duration.inWholeSeconds)
             issuer(claims.issuer)
             subject(claims.clientId)
-            claim("cnf", cnf(claims.pubKey.toPublicJWK()))
+            claim("cnf", cnf(claims.walletInstancePubKey.toPublicJWK()))
             issueTime(Date.from(now))
             expirationTime(Date.from(exp))
         }.build()
