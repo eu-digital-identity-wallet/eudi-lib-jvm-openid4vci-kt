@@ -26,6 +26,10 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.requireIsNotMAC
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.Clock
 import java.util.*
 import kotlin.time.Duration
@@ -45,7 +49,11 @@ internal fun selfSignedClient(
         val claims = ClientAttestationClaims(
             issuer = clientId,
             clientId = clientId,
-            walletInstanceKey.toPublicJWK(),
+            cnf = Cnf(
+                walletInstancePubKey = walletInstanceKey.toPublicJWK(),
+                keyType = KeyType.Software,
+                userAuthentication = UserAuthentication.InternalPin,
+            ),
         )
         val builder = ClientAttestationJwtBuilder(clock, duration, algorithm, signer, claims, headerCustomization)
         builder.build()
@@ -59,15 +67,115 @@ internal fun selfSignedClient(
     return Client.Attested(clientAttestationJWT, popJwtSpec)
 }
 
-internal data class ClientAttestationClaims(
+/**
+ * Asserts the security mechanism the Wallet uses to manage the private key associated
+ * with the public key given in the cnf claim.
+ * This mechanism is based on the capabilities of the execution environment of the Wallet,
+ * this might be a secure element (in case of a wallet residing on a smartphone)
+ * or a Cloud-HSM (in case of a cloud Wallet)
+ */
+@Serializable
+enum class KeyType {
+    /**
+     * Wallet uses software-based key management
+     */
+    @SerialName("software")
+    Software,
+
+    /**
+     * Wallet uses hardware-based key management
+     */
+    @SerialName("hardware")
+    Hardware,
+
+    /**
+     * Wallet uses the Trusted Execution Environment for key management
+     */
+    @SerialName("tee")
+    TEE,
+
+    /**
+     * Wallet uses the Secure Enclave for key management
+     */
+    @SerialName("secure_enclave")
+    SecureEnclave,
+
+    /**
+     * Wallet uses the Strongbox for key management
+     */
+    @SerialName("strong_box")
+    StrongBox,
+
+    /**
+     * Wallet uses a Secure Element for key management
+     */
+    @SerialName("secure_element")
+    SecureElement,
+
+    /**
+     * Wallet uses Hardware Security Module (HSM)
+     */
+    @SerialName("hsm")
+    HSM,
+}
+
+/**
+ *  Asserts the security mechanism the Wallet uses to authenticate the user
+ *  to authorize access to the private key associated with the public key given in the cnf claim.
+ *
+ */
+@Serializable
+enum class UserAuthentication {
+    /**
+     * The key usage is authorized by the mobile operating system using a biometric factor
+     */
+    @SerialName("system_biometry")
+    SystemBiometry,
+
+    /**
+     * The key usage is authorized by the mobile operating system using personal identification number (PIN).
+     */
+    @SerialName("system_pin")
+    SystemPin,
+
+    /**
+     * The key usage is authorized by the Wallet using a biometric factor.
+     */
+    @SerialName("internal_biometry")
+    InternalBiometry,
+
+    /**
+     * The key usage is authorized by the Wallet using PIN.
+     */
+    @SerialName("internal_pin")
+    InternalPin,
+
+    /**
+     * The key usage is authorized by the secure element managing the key itself using PIN
+     */
+    @SerialName("secure_element_pin")
+    SecureElementPin,
+}
+
+data class Cnf(
+    val walletInstancePubKey: JWK,
+    val keyType: KeyType? = null,
+    val userAuthentication: UserAuthentication? = null,
+    val aal: String? = null,
+) {
+    init {
+        require(!walletInstancePubKey.isPrivate) { "InstanceKey should be public" }
+    }
+}
+
+data class ClientAttestationClaims(
     val issuer: String,
     val clientId: ClientId,
-    val walletInstancePubKey: JWK,
+    val cnf: Cnf,
 ) {
 
     init {
         require(clientId.isNotBlank() && clientId.isNotEmpty()) { "clientId cannot be blank" }
-        require(!walletInstancePubKey.isPrivate) { "InstanceKey should be public" }
     }
 }
 
@@ -106,7 +214,7 @@ private class ClientAttestationJwtBuilder(
             val exp = now.plusSeconds(duration.inWholeSeconds)
             issuer(claims.issuer)
             subject(claims.clientId)
-            claim("cnf", cnf(claims.walletInstancePubKey.toPublicJWK()))
+            claim("cnf", cnf(claims.cnf))
             issueTime(Date.from(now))
             expirationTime(Date.from(exp))
         }.build()
@@ -127,5 +235,10 @@ private class ClientAttestationJwtBuilder(
     }
 }
 
-internal fun cnf(jwk: JWK): Map<String, Any> =
-    mapOf("jwk" to jwk.toJSONObject())
+private fun cnf(cnf: Cnf): Map<String, Any> =
+    buildMap {
+        put("jwt", cnf.walletInstancePubKey.toJSONObject())
+        cnf.keyType?.let { put("key_type", Json.encodeToString(it)) }
+        cnf.userAuthentication?.let { put("user_authentication", Json.encodeToString(it)) }
+        cnf.aal?.let { put("aal", it) }
+    }
