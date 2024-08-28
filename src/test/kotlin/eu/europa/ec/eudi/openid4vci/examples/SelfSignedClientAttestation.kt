@@ -40,6 +40,8 @@ internal fun selfSignedClient(
     walletInstanceKey: ECKey,
     clientId: String,
     duration: Duration = 10.minutes,
+    keyType: KeyType? = null,
+    userAuthentication: UserAuthentication? = null,
     headerCustomization: JWSHeader.Builder.() -> Unit = {},
 ): Client.Attested {
     require(walletInstanceKey.curve == Curve.P_256)
@@ -51,8 +53,8 @@ internal fun selfSignedClient(
             clientId = clientId,
             cnf = Cnf(
                 walletInstancePubKey = walletInstanceKey.toPublicJWK(),
-                keyType = KeyType.Software,
-                userAuthentication = UserAuthentication.InternalPin,
+                keyType = keyType,
+                userAuthentication = userAuthentication,
             ),
         )
         val builder = ClientAttestationJwtBuilder(clock, duration, algorithm, signer, claims, headerCustomization)
