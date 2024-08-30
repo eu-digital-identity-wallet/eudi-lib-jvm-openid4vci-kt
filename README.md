@@ -639,7 +639,7 @@ Furthermore, caller must provide a specification on how to produce the [Client A
 val clientAttestationJWT: ClientAttestationJWT("...")
 val popJwtSpec: ClientAttestationPoPJWTSpec = ClientAttestationPoPJWTSpec(
     signingAlgorithm = JWSAlgorithm.ES256, // Algorithm to sign the PoP JWT
-    duration = 1.min, // Duration of PoP JWT. Used for `exp` claim 
+    duration = 1.minutes, // Duration of PoP JWT. Used for `exp` claim 
     typ = null, // Optional, `typ` claim in the JWS header
     jwsSigner = signer, // Nimbus signer
 )  
