@@ -27,7 +27,7 @@ In particular, the library focuses on the wallet's role in and provides the foll
 
 | Feature                                                                                       | Coverage                                                                                                               |
 |-----------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| [Wallet-initiated issuance](#wallet-initiated-issuance)                                                                 | ✅                                                                                                                        |
+| [Wallet-initiated issuance](#wallet-initiated-issuance)                                                                 | ✅                                                                                                                      |
 | [Resolve a credential offer](#resolve-a-credential-offer)                                     | ✅ Unsigned metadata ❌ [accept-language](#issuer-metadata-accept-language) ❌ [signed metadata](#issuer-signed-metadata) |
 | [Authorization code flow](#authorization-code-flow)                                           | ✅                                                                                                                      |
 | [Pre-authorized code flow](#pre-authorized-code-flow)                                         | ✅                                                                                                                      |
@@ -44,8 +44,7 @@ In particular, the library focuses on the wallet's role in and provides the foll
 | [Pushed authorization requests](#pushed-authorization-requests)                               | ✅ Used by default, if supported by issuer                                                                              |
 | [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)           | ✅                                                                                                                      |
 | [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                             | ✅                                                                                                                      |
-| Wallet authentication                                                                         | currently, only public client                                                                                          |
-
+| Wallet authentication                                                                         | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth2-attestation-based-client-authentication)     |
 
 ## Disclaimer
 
@@ -549,7 +548,7 @@ The options available for the `Issuer` are represented by `OpenId4VCIConfig`
 
 ```kotlin
 data class OpenId4VCIConfig(
-    val clientId: ClientId,
+    val client: Client,
     val authFlowRedirectionURI: URI,
     val keyGenerationConfig: KeyGenerationConfig,
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
@@ -562,7 +561,9 @@ data class OpenId4VCIConfig(
 
 Options available:
 
-- clientId: Wallet `client_id` in the OAUTH2 sense while interacting with the Credential Issuer
+- client: Wallet `client authentication method` in the OAUTH2 sense while interacting with the Credential Issuer. 
+  - Either Public Client,
+  - [Attestation-Based Client Authentication](https://datatracker.ietf.org/doc/draft-ietf-oauth-attestation-based-client-auth/03/)
 - authFlowRedirectionURI: It is the `redirect_uri` parameter that will be included in a PAR or simple authorization request.
 - keyGenerationConfig: A way of generating ephemeral keys used for `credential_response_encryption`
 - credentialResponseEncryptionPolicy: A wallet policy in regard to whether it accepts credentials without `credential_response_encyrption` or not
@@ -575,7 +576,7 @@ Options available:
 import eu.europa.ec.eudi.openid4vci.*
 
 val openId4VCIConfig = OpenId4VCIConfig(
-    clientId = "wallet-dev", // the client id of wallet (acting as an OAUTH2 client)
+    client = Client.Public("wallet-dev"), // the client id of wallet (acting as an OAUTH2 client)
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
     keyGenerationConfig = KeyGenerationConfig.ecOnly(Curve.P_256), // what kind of ephemeral keys could be generated to encrypt credential issuance response
     credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses
@@ -623,6 +624,40 @@ Furthermore, all subsequent interactions will use the correct token type (Bearer
 Library supports [RFC7636](https://www.rfc-editor.org/rfc/rfc7636.html) by default 
 while performing [Authorization code flow](#authorization-code-flow). 
 This feature cannot be disabled.
+
+### OAUTH2 Attestation-Based Client Authentication
+
+Library supports [OAUTH2 Attestation-Based Client Authentication - Draft 03](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-03.html)
+
+To enable this, caller must have obtained a [Client/Wallet Attestation JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-03.html#name-client-attestation-jwt)
+How this is done, it is outside the scope of the library.
+
+Furthermore, caller must provide a specification on how to produce the [Client Attestation PoP JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-03.html#name-client-attestation-pop-jwt)
+
+```kotlin
+
+val clientAttestationJWT: ClientAttestationJWT("...")
+val popJwtSpec: ClientAttestationPoPJWTSpec = ClientAttestationPoPJWTSpec(
+    signingAlgorithm = JWSAlgorithm.ES256, // Algorithm to sign the PoP JWT
+    duration = 1.min, // Duration of PoP JWT. Used for `exp` claim 
+    typ = null, // Optional, `typ` claim in the JWS header
+    jwsSigner = signer, // Nimbus signer
+)  
+val wallet = Client.Attested(clientAttestationJWT, popJwtSpec)
+val openId4VCIConfig = OpenId4VCIConfig(
+    client = wallet
+    authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
+    keyGenerationConfig = KeyGenerationConfig.ecOnly(Curve.P_256), // what kind of ephemeral keys could be generated to encrypt credential issuance response
+    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses
+)
+```
+With this configuration library is able to 
+- Generate automatically the Client Attestation PoP JWT, with every call to the PAR and/or Token endpoint
+- Populate the [HTTP headers](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-03.html#name-client-attestation-http-hea) when accessing PAR and/or Token endpoints 
+
+Library will check that the authorization server of the issuer, 
+includes method `attest_jwt_client_auth` in claim `token_endpoint_auth_methods_supported`
+of its metadata.
 
 ## Features not supported
 
