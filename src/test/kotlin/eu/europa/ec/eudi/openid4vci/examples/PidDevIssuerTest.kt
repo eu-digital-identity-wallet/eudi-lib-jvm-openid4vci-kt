@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
-import eu.europa.ec.eudi.openid4vci.ProofTypeMetaPreference
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.DisplayName
 import kotlin.test.Ignore
@@ -29,16 +28,6 @@ class PidDevIssuerTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
             PidDevIssuer.PID_MsoMdoc_config_id,
             enableHttpLogging = false,
-            popSignerPreference = ProofTypeMetaPreference.FavorJWT,
-        )
-    }
-
-    @Test @Ignore
-    fun `Issue PID in mso_mdoc using authorize code flow and CWT proofs`() = runTest {
-        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
-            PidDevIssuer.PID_MsoMdoc_config_id,
-            enableHttpLogging = false,
-            popSignerPreference = ProofTypeMetaPreference.FavorCWT,
         )
     }
 
@@ -47,7 +36,6 @@ class PidDevIssuerTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
             PidDevIssuer.PID_SdJwtVC_config_id,
             enableHttpLogging = false,
-            popSignerPreference = ProofTypeMetaPreference.FavorJWT,
         )
     }
 
@@ -56,7 +44,6 @@ class PidDevIssuerTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
             PidDevIssuer.MDL_config_id,
             enableHttpLogging = false,
-            popSignerPreference = ProofTypeMetaPreference.FavorJWT,
         )
     }
 
@@ -65,7 +52,6 @@ class PidDevIssuerTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
             PidDevIssuer.MDL_config_id,
             enableHttpLogging = false,
-            popSignerPreference = ProofTypeMetaPreference.FavorCWT,
         )
     }
 }

@@ -18,11 +18,9 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
-import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
-import java.security.Signature
 
 /**
  * The result of a request for issuance
@@ -192,27 +190,6 @@ sealed interface PopSigner {
         val jwsSigner: JWSSigner,
     ) : PopSigner
 
-    /**
-     * A signer for proof of possession of type CWT
-     * @param algorithm The algorithm used by the singing key
-     * @param curve the curve used by the singing key
-     * @param bindingKey the public key to be included to the proof. It should correspond to the key
-     * used to sign the proof. If an instance of [CwtBindingKey.CoseKey] is provided key will be embedded
-     * to the protected header under the label "COSE_key". If an instance [CwtBindingKey.X509] the chain
-     * will be included in the protected header, as such.
-     * @param sign A suspended function to actually sign the data. It is required that implementer, uses
-     * the P1363 format
-     */
-    @Deprecated(
-        message = "CWT proofs have been removed from OpenId4VCI",
-    )
-    data class Cwt(
-        val algorithm: CoseAlgorithm,
-        val curve: CoseCurve,
-        val bindingKey: CwtBindingKey,
-        val sign: suspend (ByteArray) -> ByteArray,
-    ) : PopSigner
-
     companion object {
 
         /**
@@ -243,41 +220,6 @@ sealed interface PopSigner {
 
             val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
             return Jwt(algorithm, publicKey, signer)
-        }
-
-        /**
-         * Factory method for creating a [PopSigner.Cwt]
-         *
-         * Comes handy when caller has access to [privateKey]
-         *
-         * @param privateKey the key that will be used to sign the CWT
-         * In case of [JwtBindingKey.Did] this condition is not being checked.
-         * @return the CWT signer
-         */
-        @Deprecated(
-            message = "CWT proofs have been removed from OpenId4VCI",
-        )
-        fun cwtPopSigner(
-            privateKey: ECKey,
-        ): Cwt {
-            fun CoseAlgorithm.signature(): Signature =
-                when (this) {
-                    CoseAlgorithm.ES256 -> "SHA256withECDSAinP1363Format"
-                    CoseAlgorithm.ES384 -> "SHA384withECDSAinP1363Format"
-                    CoseAlgorithm.ES512 -> "SHA512withECDSAinP1363Format"
-                    else -> error("Unsupported $this")
-                }.let { Signature.getInstance(it) }
-
-            val algorithm = CoseAlgorithm(privateKey.algorithm.name).getOrThrow()
-            val curve = CoseCurve(privateKey.curve.name).getOrThrow()
-
-            return Cwt(algorithm, curve, CwtBindingKey.CoseKey(privateKey.toPublicJWK())) { data ->
-                with(algorithm.signature()) {
-                    initSign(privateKey.toECPrivateKey())
-                    update(data)
-                    sign()
-                }
-            }
         }
     }
 }

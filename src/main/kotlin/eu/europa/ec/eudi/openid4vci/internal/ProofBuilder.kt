@@ -15,10 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.authlete.cbor.CBORByteArray
-import com.authlete.cose.*
-import com.authlete.cwt.CWT
-import com.authlete.cwt.CWTClaimsSetBuilder
 import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.util.Base64
@@ -55,11 +51,6 @@ internal abstract class ProofBuilder<POP_SIGNER : PopSigner, out PROOF : Proof>(
                 is PopSigner.Jwt -> {
                     JwtProofBuilder.check(popSigner, proofTypesSupported)
                     JwtProofBuilder(clock, iss, aud, nonce, popSigner)
-                }
-
-                is PopSigner.Cwt -> {
-                    CwtProofBuilder.check(popSigner, proofTypesSupported)
-                    CwtProofBuilder(clock, iss, aud, nonce, popSigner)
                 }
             }
         }
@@ -112,92 +103,6 @@ internal class JwtProofBuilder(
             }
             val proofTypeSigningAlgorithmsSupported = spec.algorithms
             ensure(popSigner.algorithm in proofTypeSigningAlgorithmsSupported) {
-                CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported()
-            }
-        }
-    }
-}
-
-@Deprecated(
-    message = "CWT proofs have been removed from OpenId4VCI",
-)
-internal class CwtProofBuilder(
-    clock: Clock,
-    iss: ClientId,
-    aud: CredentialIssuerId,
-    nonce: CNonce,
-    popSigner: PopSigner.Cwt,
-) : ProofBuilder<PopSigner.Cwt, Proof.Cwt>(clock, iss, aud, nonce, popSigner) {
-
-    override suspend fun build(): Proof.Cwt {
-        val protectedHeader = protectedHeader()
-        val payload = payload()
-        val structure = sigStructure(protectedHeader, payload)
-        val signature: ByteArray = popSigner.sign(structure.encode())
-        val sign1 = sign1(protectedHeader, payload, signature)
-        val cwt = CWT(sign1)
-        return Proof.Cwt(cwt.encodeToBase64Url())
-    }
-
-    private fun protectedHeader(): COSEProtectedHeader =
-        COSEProtectedHeaderBuilder().apply {
-            alg(popSigner.algorithm.value)
-            contentType(HEADER_TYPE)
-            when (val bindingKey = popSigner.bindingKey) {
-                is CwtBindingKey.CoseKey -> {
-                    val key = COSEKey.fromJwk(bindingKey.jwk.toJSONObject())
-                    val keyAsByteString = CBORByteArray(key.encode())
-                    put("COSE_Key", keyAsByteString)
-                }
-
-                is CwtBindingKey.X509 -> {
-                    x5chain(bindingKey.chain)
-                }
-            }
-        }.build()
-
-    private fun payload(): CBORByteArray {
-        val claims = CWTClaimsSetBuilder().apply {
-            iss(iss)
-            aud(aud.toString())
-            iat(Date.from(clock.instant()))
-            nonce(nonce.value)
-        }.build()
-        return CBORByteArray(claims.encode())
-    }
-
-    private fun sigStructure(
-        protectedHeader: COSEProtectedHeader,
-        payload: CBORByteArray,
-    ): SigStructure = SigStructureBuilder()
-        .signature1()
-        .bodyAttributes(protectedHeader)
-        .payload(payload)
-        .build()
-
-    private fun sign1(
-        protectedHeader: COSEProtectedHeader,
-        payload: CBORByteArray,
-        signature: ByteArray,
-    ): COSESign1 =
-        COSESign1Builder()
-            .protectedHeader(protectedHeader)
-            .payload(payload)
-            .signature(signature)
-            .build()
-
-    companion object : CheckPopSigner<PopSigner.Cwt> {
-
-        private const val HEADER_TYPE = "openid4vci-proof+cwt"
-        override fun check(popSigner: PopSigner.Cwt, proofTypesSupported: ProofTypesSupported) {
-            val spec = proofTypesSupported.values.filterIsInstance<ProofTypeMeta.Cwt>().firstOrNull()
-            ensureNotNull(spec) {
-                CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported()
-            }
-            ensure(popSigner.algorithm in spec.algorithms) {
-                CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported()
-            }
-            ensure(popSigner.curve in spec.curves) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported()
             }
         }
