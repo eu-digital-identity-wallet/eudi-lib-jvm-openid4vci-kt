@@ -563,7 +563,7 @@ Options available:
 
 - client: Wallet `client authentication method` in the OAUTH2 sense while interacting with the Credential Issuer. 
   - Either Public Client,
-  - [Attestation-Based Client Authentication](https://datatracker.ietf.org/doc/draft-ietf-oauth-attestation-based-client-auth/03/)
+  - [Attestation-Based Client Authentication](#oauth2-attestation-based-client-authentication)
 - authFlowRedirectionURI: It is the `redirect_uri` parameter that will be included in a PAR or simple authorization request.
 - keyGenerationConfig: A way of generating ephemeral keys used for `credential_response_encryption`
 - credentialResponseEncryptionPolicy: A wallet policy in regard to whether it accepts credentials without `credential_response_encyrption` or not
