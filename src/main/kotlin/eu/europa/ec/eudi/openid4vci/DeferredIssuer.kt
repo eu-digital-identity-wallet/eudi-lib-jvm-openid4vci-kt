@@ -27,7 +27,7 @@ import java.time.Clock
  * A minimal configuration needed to [instantiate][DeferredIssuer.make]
  * the [DeferredIssuer].
  *
- * @param clientId the client_id of the wallet
+ * @param client the client for the wallet
  * @param deferredEndpoint the URL of the deferred endpoint
  * @param tokenEndpoint the URL of the token endpoint. Will be used if needed, to refresh the access token
  * @param dPoPSigner the signer that was used for DPoP. Must be provided only if DPoP was used.
@@ -36,10 +36,12 @@ import java.time.Clock
  * @param clock Wallet's clock
  */
 data class DeferredIssuerConfig(
-    val clientId: ClientId,
+    val client: Client,
     val deferredEndpoint: URL,
+    val authServerId: URL,
     val tokenEndpoint: URL,
     val dPoPSigner: PopSigner.Jwt? = null,
+    val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val responseEncryptionSpec: IssuanceResponseEncryptionSpec? = null,
     val clock: Clock = Clock.systemDefaultZone(),
 )
@@ -153,10 +155,12 @@ interface DeferredIssuer : QueryForDeferredCredential {
 
             val tokenEndpointClient = TokenEndpointClient(
                 config.clock,
-                config.clientId,
+                config.client,
                 URI.create("https://willNotBeUsed"), // this will not be used
+                config.authServerId,
                 config.tokenEndpoint,
                 dPoPJwtFactory,
+                config.clientAttestationPoPBuilder,
                 ktorHttpClientFactory,
             )
 

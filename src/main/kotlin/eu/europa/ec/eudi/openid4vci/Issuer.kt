@@ -15,12 +15,14 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod
 import eu.europa.ec.eudi.openid4vci.internal.*
 import eu.europa.ec.eudi.openid4vci.internal.http.*
 import io.ktor.client.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import java.net.URL
 
 /**
  * Entry point to the issuance library
@@ -109,6 +111,8 @@ interface Issuer :
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Result<Issuer> = runCatching {
+            config.client.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
+
             val dPoPJwtFactory = config.dPoPSigner?.let { signer ->
                 DPoPJwtFactory.createForServer(
                     signer = signer,
@@ -216,10 +220,12 @@ interface Issuer :
 
                     return DeferredIssuanceContext(
                         DeferredIssuerConfig(
-                            clientId = config.clientId,
+                            client = config.client,
                             deferredEndpoint = deferredEndpoint,
+                            authServerId = URL(authorizationServerMetadata.issuer.value),
                             tokenEndpoint = tokenEndpoint,
                             dPoPSigner = dPoPJwtFactory?.signer,
+                            clientAttestationPoPBuilder = config.clientAttestationPoPBuilder,
                             responseEncryptionSpec = responseEncryptionSpec,
                             clock = config.clock,
                         ),
@@ -305,5 +311,23 @@ interface Issuer :
                     }
                 }
             }
+    }
+}
+
+private const val ATTEST_JWT_CLIENT_AUTH = "attest_jwt_client_auth"
+
+internal fun Client.ensureSupportedByAuthorizationServer(authorizationServerMetadata: CIAuthorizationServerMetadata) {
+    val tokenEndPointAuthMethods =
+        authorizationServerMetadata.tokenEndpointAuthMethods.orEmpty()
+
+    when (this) {
+        is Client.Attested -> {
+            val expectedMethod = ClientAuthenticationMethod(ATTEST_JWT_CLIENT_AUTH)
+            require(expectedMethod in tokenEndPointAuthMethods) {
+                "$ATTEST_JWT_CLIENT_AUTH not supported by authorization server"
+            }
+        }
+
+        else -> Unit
     }
 }

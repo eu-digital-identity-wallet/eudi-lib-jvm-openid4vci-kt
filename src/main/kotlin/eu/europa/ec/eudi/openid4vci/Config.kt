@@ -23,9 +23,38 @@ import java.time.Clock
 typealias ClientId = String
 
 /**
+ * Wallet's OAUTH2 client view
+ */
+sealed interface Client : java.io.Serializable {
+    /**
+     * The client_id of the Wallet, issued when interacting with a credential issuer
+     */
+    val id: ClientId
+
+    /**
+     * Public Client
+     */
+    data class Public(override val id: ClientId) : Client
+
+    data class Attested(
+        val attestationJWT: ClientAttestationJWT,
+        val popJwtSpec: ClientAttestationPoPJWTSpec,
+    ) : Client {
+        init {
+            val id = attestationJWT.clientId
+            require(id.isNotBlank() && id.isNotEmpty())
+            val pubKey = attestationJWT.pubKey
+            require(!pubKey.isPrivate) { "InstanceKey should be public" }
+        }
+
+        override val id: ClientId = attestationJWT.clientId
+    }
+}
+
+/**
  * Configuration object to pass configuration properties to the issuance components.
  *
- * @param clientId  The authorization client's identifier.
+ * @param client the OAUTH2 client kind of the wallet
  * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
  * @param keyGenerationConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
  * @param credentialResponseEncryptionPolicy Wallet's policy for Credential Response encryption
@@ -33,19 +62,43 @@ typealias ClientId = String
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
  * @param dPoPSigner a signer that if provided will enable the use of DPoP JWT
+ * @param clientAttestationPoPBuilder a way to build a [ClientAttestationPoPJWT]
  * @param parUsage whether to use PAR in case of authorization code grant
  * @param clock Wallet's clock
  */
 data class OpenId4VCIConfig(
-    val clientId: ClientId,
+    val client: Client,
     val authFlowRedirectionURI: URI,
     val keyGenerationConfig: KeyGenerationConfig,
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPSigner: PopSigner.Jwt? = null,
+    val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
 ) {
+
+    constructor(
+        clientId: ClientId,
+        authFlowRedirectionURI: URI,
+        keyGenerationConfig: KeyGenerationConfig,
+        credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+        authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+        dPoPSigner: PopSigner.Jwt? = null,
+        clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
+        parUsage: ParUsage = ParUsage.IfSupported,
+        clock: Clock = Clock.systemDefaultZone(),
+    ) : this(
+        Client.Public(clientId),
+        authFlowRedirectionURI,
+        keyGenerationConfig,
+        credentialResponseEncryptionPolicy,
+        authorizeIssuanceConfig,
+        dPoPSigner,
+        clientAttestationPoPBuilder,
+        parUsage,
+        clock,
+    )
 
     init {
         if (null != dPoPSigner) {
@@ -58,6 +111,13 @@ data class OpenId4VCIConfig(
             }
         }
     }
+
+    @Deprecated(
+        message = "Deprecated in favor of openId4VCIConfig client.id",
+        replaceWith = ReplaceWith("client.id"),
+    )
+    val clientId: ClientId
+        get() = client.id
 }
 
 /**

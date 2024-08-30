@@ -20,6 +20,7 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFa
 import eu.europa.ec.eudi.openid4vci.Grants.PreAuthorizedCode
 import eu.europa.ec.eudi.openid4vci.internal.GrantedAuthorizationDetailsSerializer
 import eu.europa.ec.eudi.openid4vci.internal.TokenResponse
+import eu.europa.ec.eudi.openid4vci.internal.clientAttestationHeaders
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -91,10 +92,12 @@ internal sealed interface TokenResponseTO {
 
 internal class TokenEndpointClient(
     private val clock: Clock,
-    private val clientId: ClientId,
+    private val client: Client,
     private val authFlowRedirectionURI: URI,
+    private val authServerId: URL,
     private val tokenEndpoint: URL,
     private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val clientAttestationPoPBuilder: ClientAttestationPoPBuilder,
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
 
@@ -105,10 +108,12 @@ internal class TokenEndpointClient(
         ktorHttpClientFactory: KtorHttpClientFactory,
     ) : this(
         config.clock,
-        config.clientId,
+        config.client,
         config.authFlowRedirectionURI,
+        URL(authorizationServerMetadata.issuer.value),
         authorizationServerMetadata.tokenEndpointURI.toURL(),
         dPoPJwtFactory,
+        config.clientAttestationPoPBuilder,
         ktorHttpClientFactory,
     )
 
@@ -125,13 +130,14 @@ internal class TokenEndpointClient(
         authorizationCode: AuthorizationCode,
         pkceVerifier: PKCEVerifier,
     ): Result<TokenResponse> = runCatching {
-        val params = TokenEndpointForm.authCodeFlow(
-            authorizationCode = authorizationCode,
-            redirectionURI = authFlowRedirectionURI,
-            clientId = clientId,
-            pkceVerifier = pkceVerifier,
-        )
-        requestAccessToken(params).tokensOrFail(clock)
+        val params =
+            TokenEndpointForm.authCodeFlow(
+                clientId = client.id,
+                authorizationCode = authorizationCode,
+                redirectionURI = authFlowRedirectionURI,
+                pkceVerifier = pkceVerifier,
+            )
+        requestAccessToken(params)
     }
 
     /**
@@ -147,12 +153,13 @@ internal class TokenEndpointClient(
         preAuthorizedCode: PreAuthorizedCode,
         txCode: String?,
     ): Result<TokenResponse> = runCatching {
-        val params = TokenEndpointForm.preAuthCodeFlow(
-            clientId = clientId,
-            preAuthorizedCode = preAuthorizedCode,
-            txCode = txCode,
-        )
-        requestAccessToken(params).tokensOrFail(clock)
+        val params =
+            TokenEndpointForm.preAuthCodeFlow(
+                clientId = client.id,
+                preAuthorizedCode = preAuthorizedCode,
+                txCode = txCode,
+            )
+        requestAccessToken(params)
     }
 
     /**
@@ -164,26 +171,41 @@ internal class TokenEndpointClient(
      * a new [TokenResponse.refreshToken]
      */
     suspend fun refreshAccessToken(refreshToken: RefreshToken): Result<TokenResponse> = runCatching {
-        val params = TokenEndpointForm.refreshAccessToken(clientId, refreshToken)
-        requestAccessToken(params).tokensOrFail(clock = clock)
+        val params = TokenEndpointForm.refreshAccessToken(client.id, refreshToken)
+        requestAccessToken(params)
     }
 
     private suspend fun requestAccessToken(
         params: Map<String, String>,
-    ): TokenResponseTO =
-        ktorHttpClientFactory().use { client ->
+    ): TokenResponse {
+        val response = ktorHttpClientFactory().use { httpClient ->
             val formParameters = Parameters.build {
                 params.entries.forEach { (k, v) -> append(k, v) }
             }
-            val response = client.submitForm(tokenEndpoint.toString(), formParameters) {
+            httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
                 dPoPJwtFactory?.let { factory ->
                     dpop(factory, tokenEndpoint, Htm.POST, accessToken = null, nonce = null)
                 }
+                generateClientAttestationIfNeeded()?.let(::clientAttestationHeaders)
             }
-            if (response.status.isSuccess()) response.body<TokenResponseTO.Success>()
-            else response.body<TokenResponseTO.Failure>()
+        }
+        val responseTO = if (response.status.isSuccess()) response.body<TokenResponseTO.Success>()
+        else response.body<TokenResponseTO.Failure>()
+        return responseTO.tokensOrFail(clock)
+    }
+
+    private fun generateClientAttestationIfNeeded(): ClientAttestation? =
+        when (client) {
+            is Client.Attested ->
+                with(clientAttestationPoPBuilder) {
+                    val popJWT = client.attestationPoPJWT(clock, authServerId)
+                    client.attestationJWT to popJWT
+                }
+
+            else -> null
         }
 }
+
 internal object TokenEndpointForm {
     const val AUTHORIZATION_CODE_GRANT = "authorization_code"
     const val PRE_AUTHORIZED_CODE_GRANT = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
@@ -198,20 +220,21 @@ internal object TokenEndpointForm {
     const val REFRESH_TOKEN_PARAM = "refresh_token"
 
     fun authCodeFlow(
-        clientId: String,
+        clientId: ClientId,
         authorizationCode: AuthorizationCode,
         redirectionURI: URI,
         pkceVerifier: PKCEVerifier,
-    ): Map<String, String> = buildMap<String, String> {
-        put(CLIENT_ID_PARAM, clientId)
-        put(GRANT_TYPE_PARAM, AUTHORIZATION_CODE_GRANT)
-        put(AUTHORIZATION_CODE_PARAM, authorizationCode.code)
-        put(REDIRECT_URI_PARAM, redirectionURI.toString())
-        put(CODE_VERIFIER_PARAM, pkceVerifier.codeVerifier)
-    }.toMap()
+    ): Map<String, String> =
+        buildMap {
+            put(CLIENT_ID_PARAM, clientId)
+            put(GRANT_TYPE_PARAM, AUTHORIZATION_CODE_GRANT)
+            put(AUTHORIZATION_CODE_PARAM, authorizationCode.code)
+            put(REDIRECT_URI_PARAM, redirectionURI.toString())
+            put(CODE_VERIFIER_PARAM, pkceVerifier.codeVerifier)
+        }.toMap()
 
     fun preAuthCodeFlow(
-        clientId: String,
+        clientId: ClientId,
         preAuthorizedCode: PreAuthorizedCode,
         txCode: String?,
     ): Map<String, String> =
@@ -225,9 +248,10 @@ internal object TokenEndpointForm {
     fun refreshAccessToken(
         clientId: String,
         refreshToken: RefreshToken,
-    ): Map<String, String> = buildMap {
-        put(CLIENT_ID_PARAM, clientId)
-        put(GRANT_TYPE_PARAM, REFRESH_TOKEN)
-        put(REFRESH_TOKEN_PARAM, refreshToken.refreshToken)
-    }
+    ): Map<String, String> =
+        buildMap {
+            put(CLIENT_ID_PARAM, clientId)
+            put(GRANT_TYPE_PARAM, REFRESH_TOKEN)
+            put(REFRESH_TOKEN_PARAM, refreshToken.refreshToken)
+        }
 }

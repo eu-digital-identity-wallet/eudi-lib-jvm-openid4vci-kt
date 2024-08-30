@@ -28,6 +28,8 @@ import com.nimbusds.oauth2.sdk.rar.Location
 import com.nimbusds.openid.connect.sdk.Prompt
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
+import eu.europa.ec.eudi.openid4vci.internal.clientAttestationHeaders
+import eu.europa.ec.eudi.openid4vci.internal.generateClientAttestationIfNeeded
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -144,7 +146,7 @@ internal class AuthorizationEndpointClient(
 
         val parEndpoint = pushedAuthorizationRequestEndpoint?.toURI()
         checkNotNull(parEndpoint) { "PAR endpoint not advertised" }
-        val clientID = ClientID(config.clientId)
+        val clientID = ClientID(config.client.id)
         val codeVerifier = CodeVerifier()
         val pushedAuthorizationRequest = run {
             val request = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
@@ -161,7 +163,6 @@ internal class AuthorizationEndpointClient(
                 if (credentialsConfigurationIds.isNotEmpty()) {
                     authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
                 }
-                prompt(Prompt.Type.LOGIN)
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
         }
@@ -180,7 +181,7 @@ internal class AuthorizationEndpointClient(
             "No scopes or authorization details provided. Cannot prepare authorization request."
         }
 
-        val clientID = ClientID(config.clientId)
+        val clientID = ClientID(config.client.id)
         val codeVerifier = CodeVerifier()
         val authorizationRequest = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
             endpointURI(authorizationEndpoint.toURI())
@@ -223,26 +224,30 @@ internal class AuthorizationEndpointClient(
             pkceVerifier to authorizationCodeUrl
         }
 
-        is PushedAuthorizationRequestResponseTO.Failure -> throw PushedAuthorizationRequestFailed(
-            error,
-            errorDescription,
-        )
+        is PushedAuthorizationRequestResponseTO.Failure ->
+            throw PushedAuthorizationRequestFailed(error, errorDescription)
     }
 
     private suspend fun pushAuthorizationRequest(
         parEndpoint: URI,
         pushedAuthorizationRequest: PushedAuthorizationRequest,
-    ): PushedAuthorizationRequestResponseTO = ktorHttpClientFactory().use { client ->
-        val url = parEndpoint.toURL()
-        val formParameters = pushedAuthorizationRequest.asFormPostParams()
+    ): PushedAuthorizationRequestResponseTO {
+        val response = ktorHttpClientFactory().use { client ->
+            val url = parEndpoint.toURL()
+            val formParameters = run {
+                val fps = pushedAuthorizationRequest.asFormPostParams()
+                Parameters.build {
+                    fps.entries.forEach { (k, v) -> append(k, v) }
+                }
+            }
 
-        val response = client.submitForm(
-            url = url.toString(),
-            formParameters = Parameters.build {
-                formParameters.entries.forEach { (k, v) -> append(k, v) }
-            },
-        )
-        if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponseTO.Success>()
+            client.submitForm(url.toString(), formParameters) {
+                config.generateClientAttestationIfNeeded(URL(authorizationIssuer))?.let {
+                    clientAttestationHeaders(it)
+                }
+            }
+        }
+        return if (response.status.isSuccess()) response.body<PushedAuthorizationRequestResponseTO.Success>()
         else response.body<PushedAuthorizationRequestResponseTO.Failure>()
     }
 
