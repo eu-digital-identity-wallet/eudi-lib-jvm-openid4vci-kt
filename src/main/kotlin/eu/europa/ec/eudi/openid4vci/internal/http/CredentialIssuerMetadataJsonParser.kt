@@ -65,9 +65,7 @@ private sealed interface CredentialSupportedTO {
 
 @Serializable
 private data class ProofSigningAlgorithmsSupportedTO(
-    @SerialName("proof_signing_alg_values_supported") val algorithms: List<JsonPrimitive> = emptyList(),
-    @SerialName("proof_alg_values_supported") val isoAlgorithms: List<Int> = emptyList(),
-    @SerialName("proof_crv_values_supported") val isoCurves: List<Int> = emptyList(),
+    @SerialName("proof_signing_alg_values_supported") val algorithms: List<String> = emptyList(),
 )
 
 @Serializable
@@ -113,7 +111,7 @@ private data class MsdMdocCredentialTO(
         val coseAlgs = isoCredentialSigningAlgorithmsSupported.orEmpty().map {
             requireNotNull(it.toCoseAlgorithm()) { "Expecting COSE algorithm, yet got $it" }
         }
-        val coseCurves = isoCredentialCurvesSupported.orEmpty().map { CoseCurve(it).getOrThrow() }
+        val coseCurves = isoCredentialCurvesSupported.orEmpty().map { CoseCurve(it) }
         val policy = isoPolicy?.let { policy -> MsoMdocPolicy(policy.oneTimeUse, policy.batchSize) }
 
         fun claims(): MsoMdocClaims = claims.orEmpty().mapValues { (_, claims) ->
@@ -555,27 +553,9 @@ private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO)
     return when (type) {
         "jwt" -> ProofTypeMeta.Jwt(
             algorithms = meta.algorithms.map {
-                require(it.isString) { "Expecting JOSE algorithm" }
-                JWSAlgorithm.parse(it.content)
+                JWSAlgorithm.parse(it)
             },
         )
-
-        "cwt" -> {
-            val isoAlgorithms = meta.isoAlgorithms.map { CoseAlgorithm(it).getOrThrow() }
-            val isoCurves = meta.isoCurves.map { CoseCurve(it).getOrThrow() }
-            val vciAlgorithms = meta.algorithms.map { value ->
-                requireNotNull(value.toCoseAlgorithm()) {
-                    "Expecting COSE algorithm, yet got $value"
-                }
-            }
-
-            if (isoAlgorithms.isNotEmpty() && isoCurves.isNotEmpty()) {
-                ProofTypeMeta.Cwt(isoAlgorithms, isoCurves)
-            } else {
-                val calculatedCurves = vciAlgorithms.mapNotNull { it.correspondingCurve() }
-                ProofTypeMeta.Cwt(vciAlgorithms, calculatedCurves)
-            }
-        }
 
         "ldp_vp" -> ProofTypeMeta.LdpVp
         else -> error("Unknown Proof Type '$type'")
@@ -594,8 +574,8 @@ private fun cryptographicBindingMethodOf(s: String): CryptographicBindingMethod 
     }
 
 private fun JsonPrimitive.toCoseAlgorithm(): CoseAlgorithm? {
-    fun Int.toCose() = CoseAlgorithm(this).getOrNull()
-    fun String.toCoseByName() = CoseAlgorithm(this).getOrNull()
+    fun Int.toCose() = CoseAlgorithm(this)
+    fun String.toCoseByName() = CoseAlgorithm.byName(this)
     fun String.toCodeByValue() = toIntOrNull()?.toCose()
     val strOrNull by lazy { contentOrNull }
     return intOrNull?.toCose() ?: strOrNull?.toCodeByValue() ?: strOrNull?.toCoseByName()

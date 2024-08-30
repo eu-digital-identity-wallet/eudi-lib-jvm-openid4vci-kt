@@ -70,7 +70,6 @@ internal fun issuanceLog(message: String) {
 
 fun Issuer.popSigner(
     credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
-    popSignerPreference: ProofTypeMetaPreference = ProofTypeMetaPreference.FavorJWT,
 ): PopSigner? {
     val credentialConfigurationsSupported =
         credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported
@@ -82,7 +81,6 @@ fun Issuer.popSigner(
         val popSigner =
             CryptoGenerator.popSigner(
                 credentialConfiguration = credentialConfiguration,
-                preference = popSignerPreference,
             )
         checkNotNull(popSigner) { "No signer can be generated for $credentialConfigurationIdentifier" }
     }
@@ -93,10 +91,9 @@ suspend fun Issuer.submitCredentialRequest(
     credentialConfigurationId: CredentialConfigurationIdentifier =
         credentialOffer.credentialConfigurationIdentifiers.first(),
     claimSet: ClaimSet? = null,
-    popSignerPreference: ProofTypeMetaPreference,
 ): AuthorizedRequestAnd<SubmissionOutcome> {
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
-    val popSigner = popSigner(credentialConfigurationId, popSignerPreference)
+    val popSigner = popSigner(credentialConfigurationId)
     return authorizedRequest.requestSingle(requestPayload, popSigner).getOrThrow()
 }
 
@@ -128,14 +125,13 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
     enableHttpLogging: Boolean,
     credCfgId: CredentialConfigurationIdentifier = credentialOffer.credentialConfigurationIdentifiers.first(),
     claimSetToRequest: ClaimSet? = null,
-    popSignerPreference: ProofTypeMetaPreference,
 ) where
       ENV : HasTestUser<USER>,
       ENV : CanAuthorizeIssuance<USER> =
     coroutineScope {
         val authorizedRequest = authorizeUsingAuthorizationCodeFlow(env, enableHttpLogging)
         val (_, outcome) =
-            submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest, popSignerPreference)
+            submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest)
 
         ensureIssued(outcome)
         Unit
@@ -145,11 +141,10 @@ suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
     txCode: String?,
     credCfgId: CredentialConfigurationIdentifier,
     claimSetToRequest: ClaimSet?,
-    popSignerPreference: ProofTypeMetaPreference,
 ) = coroutineScope {
     val (authorized, outcome) = run {
         val authorizedRequest = authorizeWithPreAuthorizationCode(txCode).getOrThrow()
-        submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest, popSignerPreference)
+        submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest)
     }
 
     val issuedCredentials = ensureIssued(outcome)
@@ -203,7 +198,6 @@ suspend fun handleDeferred(
 suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
     credCfgId: CredentialConfigurationIdentifier,
     enableHttpLogging: Boolean = false,
-    popSignerPreference: ProofTypeMetaPreference = ProofTypeMetaPreference.FavorCWT,
     claimSetToRequest: (CredentialConfiguration) -> ClaimSet? = { null },
 ) where
       ENV : HasTestUser<USER>,
@@ -221,7 +215,6 @@ suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
         testIssuanceWithAuthorizationCodeFlow(
             env = this@testIssuanceWithAuthorizationCodeFlow,
             enableHttpLogging = enableHttpLogging,
-            popSignerPreference = popSignerPreference,
             claimSetToRequest = claimSetToRequest.invoke(credCfg),
         )
     }
@@ -232,7 +225,6 @@ suspend fun <ENV, USER> ENV.testIssuanceWithPreAuthorizedCodeFlow(
     credCfgId: CredentialConfigurationIdentifier,
     credentialOfferEndpoint: String? = null,
     enableHttpLogging: Boolean = false,
-    popSignerPreference: ProofTypeMetaPreference = ProofTypeMetaPreference.FavorCWT,
     claimSetToRequest: (CredentialConfiguration) -> ClaimSet? = { null },
 ) where ENV : CanBeUsedWithVciLib, ENV : HasTestUser<USER>, ENV : CanRequestForCredentialOffer<USER> {
     val credentialOfferUri = requestPreAuthorizedCodeGrantOffer(
@@ -246,7 +238,7 @@ suspend fun <ENV, USER> ENV.testIssuanceWithPreAuthorizedCodeFlow(
     with(issuer) {
         val credCfg = credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credCfgId]
         assertNotNull(credCfg)
-        testIssuanceWithPreAuthorizedCodeFlow(txCode, credCfgId, claimSetToRequest(credCfg), popSignerPreference)
+        testIssuanceWithPreAuthorizedCodeFlow(txCode, credCfgId, claimSetToRequest(credCfg))
     }
 }
 

@@ -224,7 +224,6 @@ internal class RequestIssuanceImpl(
     private fun assertProofSupported(p: Proof, credentialSupported: CredentialConfiguration) {
         val proofType = when (p) {
             is Proof.Jwt -> ProofType.JWT
-            is Proof.Cwt -> ProofType.CWT
             is Proof.LdpVp -> ProofType.LDP_VP
         }
         requireNotNull(credentialSupported.proofTypesSupported[proofType]) {
