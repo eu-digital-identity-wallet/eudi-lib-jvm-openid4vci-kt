@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.BatchRequestHasEncryptionSpecInIndividualRequests
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidIssuanceRequest
 
 internal sealed interface CredentialType {
@@ -27,63 +26,38 @@ internal sealed interface CredentialType {
     data class W3CSignedJwtType(val type: List<String>, val claims: GenericClaimSet?) : CredentialType
 }
 
+internal sealed interface CredentialConfigurationReference {
+    data class ById(val credentialIdentifier: CredentialIdentifier) : CredentialConfigurationReference
+    data class ByFormat(val credential: CredentialType) : CredentialConfigurationReference
+}
+
 /**
  * Credential(s) issuance request
  */
-internal sealed interface CredentialIssuanceRequest {
-
-    val encryption: IssuanceResponseEncryptionSpec?
-
-    /**
-     * Models an issuance request for a batch of credentials
-     *
-     * @param credentialRequests    List of individual credential issuance requests
-     * @return A [CredentialIssuanceRequest]
-     *
-     */
-    data class BatchRequest(
-        val credentialRequests: List<SingleRequest>,
-        override val encryption: IssuanceResponseEncryptionSpec?,
-    ) : CredentialIssuanceRequest {
-        init {
-            ensure(credentialRequests.all { it.encryption == null }) {
-                BatchRequestHasEncryptionSpecInIndividualRequests()
-            }
-        }
-    }
-
-    /**
-     * Sealed hierarchy of credential issuance requests.
-     */
-    sealed interface SingleRequest : CredentialIssuanceRequest {
-        val proof: Proof?
-    }
-
-    /**
-     * Based on pre-agreed credential identifier.
-     */
-    data class IdentifierBased(
-        val credentialId: CredentialIdentifier,
-        override val proof: Proof?,
-        override val encryption: IssuanceResponseEncryptionSpec?,
-    ) : SingleRequest
-
-    /**
-     * Based on the format of the requested credential.
-     */
-    data class FormatBased(
-        override val proof: Proof?,
-        override val encryption: IssuanceResponseEncryptionSpec?,
-        val credential: CredentialType,
-    ) : SingleRequest
+internal data class CredentialIssuanceRequest(
+    val reference: CredentialConfigurationReference,
+    val proofs: List<Proof>,
+    val encryption: IssuanceResponseEncryptionSpec?,
+) {
 
     companion object {
+        internal fun byId(
+            credentialIdentifier: CredentialIdentifier,
+            proofs: List<Proof>,
+            responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+        ): CredentialIssuanceRequest =
+            CredentialIssuanceRequest(
+                CredentialConfigurationReference.ById(credentialIdentifier),
+                proofs,
+                responseEncryptionSpec,
+            )
+
         internal fun formatBased(
             credentialConfiguration: CredentialConfiguration,
             claimSet: ClaimSet?,
-            proof: Proof?,
+            proofs: List<Proof>,
             responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-        ): FormatBased {
+        ): CredentialIssuanceRequest {
             val cd = when (credentialConfiguration) {
                 is MsoMdocCredential -> msoMdoc(credentialConfiguration, claimSet.ensureClaimSet())
                 is SdJwtVcCredential -> sdJwtVc(credentialConfiguration, claimSet.ensureClaimSet())
@@ -91,7 +65,12 @@ internal sealed interface CredentialIssuanceRequest {
                 is W3CJsonLdSignedJwtCredential -> error("Format $FORMAT_W3C_JSONLD_SIGNED_JWT not supported")
                 is W3CJsonLdDataIntegrityCredential -> error("Format $FORMAT_W3C_JSONLD_DATA_INTEGRITY not supported")
             }
-            return FormatBased(proof, responseEncryptionSpec, cd)
+
+            return CredentialIssuanceRequest(
+                CredentialConfigurationReference.ByFormat(cd),
+                proofs,
+                responseEncryptionSpec,
+            )
         }
     }
 }

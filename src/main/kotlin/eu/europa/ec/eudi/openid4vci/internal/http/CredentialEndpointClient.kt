@@ -44,7 +44,7 @@ internal class CredentialEndpointClient(
      */
     suspend fun placeIssuanceRequest(
         accessToken: AccessToken,
-        request: CredentialIssuanceRequest.SingleRequest,
+        request: CredentialIssuanceRequest,
     ): Result<CredentialIssuanceResponse> = runCatching {
         ktorHttpClientFactory().use { client ->
             val url = credentialEndpoint.value
@@ -59,44 +59,6 @@ internal class CredentialEndpointClient(
                     request.encryption,
                     fromTransferObject = { it.toDomain() },
                     transferObjectFromJwtClaims = { CredentialResponseSuccessTO.from(it) },
-                )
-            } else {
-                val error = response.body<GenericErrorResponseTO>()
-                throw error.toIssuanceError()
-            }
-        }
-    }
-}
-
-internal class BatchEndPointClient(
-    private val batchCredentialEndpoint: CredentialIssuerEndpoint,
-    private val dPoPJwtFactory: DPoPJwtFactory?,
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
-) {
-    /**
-     * Method that submits a request to credential issuer for the batch issuance of credentials.
-     *
-     * @param accessToken Access token authorizing the request
-     * @param request The batch credential issuance request
-     * @return credential issuer's response
-     */
-    suspend fun placeBatchIssuanceRequest(
-        accessToken: AccessToken,
-        request: CredentialIssuanceRequest.BatchRequest,
-    ): Result<CredentialIssuanceResponse> = runCatching {
-        ktorHttpClientFactory().use { client ->
-            val url = batchCredentialEndpoint.value
-            val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
-                contentType(ContentType.Application.Json)
-                setBody(BatchCredentialRequestTO.from(request))
-            }
-            if (response.status.isSuccess()) {
-                responsePossiblyEncrypted(
-                    response,
-                    request.encryption,
-                    fromTransferObject = { it.toDomain() },
-                    transferObjectFromJwtClaims = { BatchCredentialResponseSuccessTO.from(it) },
                 )
             } else {
                 val error = response.body<GenericErrorResponseTO>()

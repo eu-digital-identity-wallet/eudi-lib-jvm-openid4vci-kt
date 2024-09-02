@@ -121,24 +121,21 @@ typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
  */
 interface RequestIssuance {
 
-    @Deprecated(
-        message = "Deprecated and will be removed",
-        replaceWith = ReplaceWith("requestSingle(requestPayload, popSigner)"),
-    )
-    suspend fun AuthorizedRequest.requestSingleAndUpdateState(
+    suspend fun AuthorizedRequest.requestSingle(
         requestPayload: IssuanceRequestPayload,
         popSigner: PopSigner?,
-    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = requestSingle(requestPayload, popSigner)
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> =
+        request(requestPayload, popSigner?.let { listOf(it) } ?: emptyList())
 
     /**
      * Places a request to the credential issuance endpoint.
      * Method will attempt to automatically retry submission in case
      * - Initial authorization state is [AuthorizedRequest.NoProofRequired] and
-     * - a [popSigner] has been provided
+     * - one or more [popSigners] haven been provided
      *
      * @receiver the current authorization state
      * @param requestPayload the payload of the request
-     * @param popSigner Signer component of the proof to be sent. Although this is an optional
+     * @param popSigners one or more signer component of the proofs to be sent. Although this is an optional
      * parameter, only required in case the present authorization state is [AuthorizedRequest.ProofRequired],
      * caller is advised to provide it, in order to allow the method to automatically retry
      * in case of [CredentialIssuanceError.InvalidProof]
@@ -146,33 +143,9 @@ interface RequestIssuance {
      * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh c_nonce) and
      * the [SubmissionOutcome]
      */
-    suspend fun AuthorizedRequest.requestSingle(
+    suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
-        popSigner: PopSigner?,
-    ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
-}
-
-@Deprecated(
-    message = "Batch endpoint has been removed from OpenId4VCI",
-)
-interface RequestBatchIssuance {
-
-    @Deprecated(
-        message = "Deprecated and will be removed",
-        replaceWith = ReplaceWith("requestBatch(credentialsMetadata)"),
-    )
-    suspend fun AuthorizedRequest.requestBatchAndUpdateState(
-        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
-    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = requestBatch(credentialsMetadata)
-
-    /**
-     *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
-     *
-     *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-     *  @return The new state of request or error.
-     */
-    suspend fun AuthorizedRequest.requestBatch(
-        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
+        popSigners: List<PopSigner>,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 }
 
@@ -320,6 +293,12 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     class IssuerDoesNotSupportBatchIssuance : CredentialIssuanceError("IssuerDoesNotSupportBatchIssuance")
 
     /**
+     * Issuance server provides supports batch_size which is
+     * smaller than the number of [PopSigner] the caller provided.
+     */
+    class IssuerBatchSizeLimitExceeded(val batchSize: Int) : CredentialIssuanceError("IssuerBatchSizeLimitExceeded $batchSize")
+
+    /**
      * Issuance server does not support deferred credential issuance
      */
     class IssuerDoesNotSupportDeferredIssuance : CredentialIssuanceError("IssuerDoesNotSupportDeferredIssuance")
@@ -398,13 +377,6 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     }
 
     /**
-     * Batch credential request syntax is incorrect. Encryption information included in individual requests while shouldn't
-     */
-    class BatchRequestHasEncryptionSpecInIndividualRequests : CredentialIssuanceError(
-        "BatchRequestContainsEncryptionOnIndividualRequest",
-    )
-
-    /**
      * Wrong content-type of encrypted response. Content-type of encrypted responses must be application/jwt
      */
     data class InvalidResponseContentType(
@@ -413,11 +385,4 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     ) : CredentialIssuanceError(
         "Encrypted response content-type expected to be $expectedContentType but instead was $invalidContentType",
     )
-
-    /**
-     * Batch response is not syntactical as expected.
-     */
-    data class InvalidBatchIssuanceResponse(
-        val error: String,
-    ) : CredentialIssuanceError("Invalid batch issuance response: $error")
 }

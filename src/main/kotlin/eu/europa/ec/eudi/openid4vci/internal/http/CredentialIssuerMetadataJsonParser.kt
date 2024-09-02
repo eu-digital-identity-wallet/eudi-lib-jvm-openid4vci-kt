@@ -358,6 +358,11 @@ private data class W3CSignedJwtCredentialTO(
     }
 }
 
+@Serializable
+private data class BatchCredentialIssuanceTO(
+    @SerialName("batch_size") @Required val batchSize: Int,
+)
+
 /**
  * Unvalidated metadata of a Credential Issuer.
  */
@@ -366,13 +371,10 @@ private data class CredentialIssuerMetadataTO(
     @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
     @SerialName("authorization_servers") val authorizationServers: List<String>? = null,
     @SerialName("credential_endpoint") @Required val credentialEndpoint: String,
-    @Deprecated(
-        message = "Batch credential endpoint has been removed from OpenId4VCI",
-    )
-    @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
     @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
     @SerialName("notification_endpoint") val notificationEndpoint: String? = null,
     @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionTO? = null,
+    @SerialName("batch_credential_issuance") val batchCredentialIssuance: BatchCredentialIssuanceTO? = null,
     @SerialName("credential_identifiers_supported") val credentialIdentifiersSupported: Boolean = false,
     @SerialName("signed_metadata") val signedMetadata: String? = null,
     @SerialName("credential_configurations_supported") val credentialConfigurationsSupported: Map<String, CredentialSupportedTO> =
@@ -395,11 +397,6 @@ private data class CredentialIssuerMetadataTO(
         val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
             .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialEndpoint)
 
-        val batchCredentialEndpoint = batchCredentialEndpoint?.let {
-            CredentialIssuerEndpoint(it)
-                .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidBatchCredentialEndpoint)
-        }
-
         val deferredCredentialEndpoint = deferredCredentialEndpoint?.let {
             CredentialIssuerEndpoint(it)
                 .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidDeferredCredentialEndpoint)
@@ -409,7 +406,9 @@ private data class CredentialIssuerMetadataTO(
                 .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
         }
 
-        ensure(credentialConfigurationsSupported.isNotEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired }
+        ensure(credentialConfigurationsSupported.isNotEmpty()) {
+            CredentialIssuerMetadataValidationError.CredentialsSupportedRequired()
+        }
         val credentialsSupported = credentialConfigurationsSupported.map { (id, credentialSupportedTO) ->
             val credentialId = CredentialConfigurationIdentifier(id)
             val credential = runCatching { credentialSupportedTO.toDomain() }
@@ -418,15 +417,19 @@ private data class CredentialIssuerMetadataTO(
         }.toMap()
 
         val display = display?.map(DisplayTO::toDomain) ?: emptyList()
-
+        val batchIssuance = batchCredentialIssuance?.let {
+            runCatching { BatchCredentialIssuance(it.batchSize) }.ensureSuccess {
+                CredentialIssuerMetadataValidationError.InvalidBatchSize()
+            }
+        }
         return CredentialIssuerMetadata(
             credentialIssuerIdentifier,
             authorizationServers,
             credentialEndpoint,
-            batchCredentialEndpoint,
             deferredCredentialEndpoint,
             notificationEndpoint,
             credentialResponseEncryption(),
+            batchIssuance,
             credentialIdentifiersSupported,
             credentialsSupported,
             display,

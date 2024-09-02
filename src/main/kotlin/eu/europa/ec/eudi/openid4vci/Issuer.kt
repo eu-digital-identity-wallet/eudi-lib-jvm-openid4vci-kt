@@ -42,7 +42,6 @@ import java.net.URL
 interface Issuer :
     AuthorizeIssuance,
     RequestIssuance,
-    RequestBatchIssuance,
     QueryForDeferredCredential,
     NotifyIssuer {
 
@@ -155,15 +154,11 @@ interface Issuer :
                         dPoPJwtFactory,
                         ktorHttpClientFactory,
                     )
-                val batchEndPointClient =
-                    credentialOffer.credentialIssuerMetadata.batchCredentialEndpoint?.let { batchEndPoint ->
-                        BatchEndPointClient(batchEndPoint, dPoPJwtFactory, ktorHttpClientFactory)
-                    }
                 RequestIssuanceImpl(
                     credentialOffer,
                     config,
                     credentialEndpointClient,
-                    batchEndPointClient,
+                    credentialOffer.credentialIssuerMetadata.batchCredentialIssuance,
                     responseEncryptionSpec,
                 )
             }
@@ -193,7 +188,6 @@ interface Issuer :
                 Issuer,
                 AuthorizeIssuance by authorizeIssuance,
                 RequestIssuance by requestIssuance,
-                RequestBatchIssuance by requestIssuance,
                 QueryForDeferredCredential by queryForDeferredCredential,
                 NotifyIssuer by notifyIssuer {
                 override val credentialOffer: CredentialOffer

@@ -15,8 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.http.BatchCredentialResponseSuccessTO
-import eu.europa.ec.eudi.openid4vci.internal.http.IssuanceResponseTO
+import eu.europa.ec.eudi.openid4vci.internal.http.CredentialResponseSuccessTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -25,43 +24,34 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertIs
+import kotlin.test.fail
 
 class IssuanceBatchRequestTest {
 
     @Test
     fun `successful batch issuance`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
+            oidcWellKnownMocker(encryptedResponses = EncryptedResponses.REQUIRED),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
-            batchIssuanceRequestMocker(
+            singleIssuanceRequestMocker(
                 responseBuilder = {
                     val textContent = it?.body as TextContent
-                    if (textContent.text.contains("\"proof\":")) {
-                        respond(
-                            content = Json.encodeToString(
-                                BatchCredentialResponseSuccessTO(
-                                    credentialResponses = listOf(
-                                        IssuanceResponseTO(
-                                            credential = "issued_credential_content_mso_mdoc",
-                                        ),
-                                        IssuanceResponseTO(
-                                            credential = "issued_credential_content_sd_jwt_vc",
-                                        ),
-                                        IssuanceResponseTO(
-                                            credential = "issued_credential_content_jwt_vc_json",
-                                        ),
+                    if (textContent.text.contains("\"proofs\":")) {
+                        encryptedResponseDataBuilder(it) {
+                            Json.encodeToString(
+                                CredentialResponseSuccessTO(
+                                    credentials = listOf(
+                                        "issued_credential_content_mso_mdoc0",
+                                        "issued_credential_content_mso_mdoc1",
+                                        "issued_credential_content_mso_mdoc2",
                                     ),
                                     cNonce = "wlbQc6pCJp",
                                     cNonceExpiresInSeconds = 86400,
                                 ),
-                            ),
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(
-                                HttpHeaders.ContentType to listOf("application/json"),
-                            ),
-                        )
+                            )
+                        }
                     } else {
                         respond(
                             content = """
@@ -86,17 +76,22 @@ class IssuanceBatchRequestTest {
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
-        val requests = reqs()
+        val (request, popSigners) = reqs()
         val (_, outcome) = with(issuer) {
-            authorizedRequest.requestBatch(requests).getOrThrow()
+            authorizedRequest.request(request, popSigners).getOrThrow()
         }
-
-        assertIs<SubmissionOutcome.Success>(outcome)
-        outcome.credentials.forEach { assertIs<IssuedCredential.Issued>(it) }
+        when (outcome) {
+            is SubmissionOutcome.Failed -> {
+                fail(outcome.error.message)
+            }
+            is SubmissionOutcome.Success -> {
+                outcome.credentials.forEach { assertIs<IssuedCredential.Issued>(it) }
+            }
+        }
     }
 }
 
-fun reqs() = listOf(
+fun reqs() =
     IssuanceRequestPayload.ConfigurationBased(
         CredentialConfigurationIdentifier(PID_MsoMdoc),
         MsoMdocClaimSet(
@@ -107,27 +102,4 @@ fun reqs() = listOf(
                 "org.iso.18013.5.1" to "birth_date",
             ),
         ),
-    ),
-    IssuanceRequestPayload.ConfigurationBased(
-        CredentialConfigurationIdentifier(PID_SdJwtVC),
-        GenericClaimSet(
-            claims = listOf(
-                "given_name",
-                "family_name",
-                "birth_date",
-            ),
-        ),
-    ),
-
-    IssuanceRequestPayload.ConfigurationBased(
-        CredentialConfigurationIdentifier(DEGREE_JwtVcJson),
-        GenericClaimSet(
-            claims = listOf(
-                "given_name",
-                "family_name",
-                "degree",
-            ),
-        ),
-    ),
-
-).map { it to CryptoGenerator.rsaProofSigner() }
+    ) to (0..2).map { CryptoGenerator.rsaProofSigner() }
