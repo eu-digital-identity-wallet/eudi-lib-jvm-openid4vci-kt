@@ -48,25 +48,7 @@ internal class RequestIssuanceImpl(
         // Place the request
         //
         val outcome = placeIssuanceRequest(accessToken) {
-            val proofFactories = when (this) {
-                is AuthorizedRequest.NoProofRequired -> emptyList()
-                is AuthorizedRequest.ProofRequired -> {
-                    when (val popSignersNo = popSigners.size) {
-                        0 -> error("At least a PopSigner is required in Authorized.ProofRequired")
-                        1 -> Unit
-                        else -> {
-                            ensureNotNull(batchCredentialIssuance) {
-                                CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
-                            }
-                            val maxBatchSize = batchCredentialIssuance.batchSize
-                            ensure(popSignersNo <= maxBatchSize) {
-                                CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
-                            }
-                        }
-                    }
-                    popSigners.map { proofFactory(it, cNonce) }
-                }
-            }
+            val proofFactories = proofFactoriesForm(popSigners)
             singleRequest(requestPayload, proofFactories, credentialIdentifiers)
         }
 
@@ -113,6 +95,27 @@ internal class RequestIssuanceImpl(
             "$credentialId was not found within issuer metadata"
         }
     }
+
+    private fun AuthorizedRequest.proofFactoriesForm(popSigners: List<PopSigner>): List<ProofFactory> =
+        when (this) {
+            is AuthorizedRequest.NoProofRequired -> emptyList()
+            is AuthorizedRequest.ProofRequired -> {
+                when (val popSignersNo = popSigners.size) {
+                    0 -> error("At least a PopSigner is required in Authorized.ProofRequired")
+                    1 -> Unit
+                    else -> {
+                        ensureNotNull(batchCredentialIssuance) {
+                            CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+                        }
+                        val maxBatchSize = batchCredentialIssuance.batchSize
+                        ensure(popSignersNo <= maxBatchSize) {
+                            CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
+                        }
+                    }
+                }
+                popSigners.map { proofFactory(it, cNonce) }
+            }
+        }
 
     private fun proofFactory(proofSigner: PopSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
         val iss = config.client.id
