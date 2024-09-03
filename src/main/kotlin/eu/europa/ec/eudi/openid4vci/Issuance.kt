@@ -90,6 +90,8 @@ data class GenericClaimSet(val claims: List<ClaimName>) : ClaimSet
  */
 sealed interface IssuanceRequestPayload {
 
+    val credentialConfigurationIdentifier: CredentialConfigurationIdentifier
+
     /**
      * Credential identifier based request payload.
      *
@@ -97,7 +99,7 @@ sealed interface IssuanceRequestPayload {
      * @param credentialIdentifier  The credential identifier
      */
     data class IdentifierBased(
-        val credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
+        override val credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
         val credentialIdentifier: CredentialIdentifier,
     ) : IssuanceRequestPayload
 
@@ -109,7 +111,7 @@ sealed interface IssuanceRequestPayload {
      *          credential to be issued.
      */
     data class ConfigurationBased(
-        val credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
+        override val credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
         val claimSet: ClaimSet? = null,
     ) : IssuanceRequestPayload
 }

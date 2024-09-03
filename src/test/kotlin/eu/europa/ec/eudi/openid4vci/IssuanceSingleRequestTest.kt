@@ -214,7 +214,7 @@ class IssuanceSingleRequestTest {
 
             assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
             val credentialConfigurationId = CredentialConfigurationIdentifier("UniversityDegree")
-            assertFailsWith<IllegalArgumentException> {
+            assertFailsWith<IllegalStateException> {
                 val requestPayload =
                     IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
                 with(issuer) {
@@ -436,7 +436,7 @@ class IssuanceSingleRequestTest {
                 CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
                 CredentialIdentifier("DUMMY"),
             )
-            assertThrows<IllegalArgumentException> {
+            assertThrows<IllegalStateException> {
                 with(issuer) {
                     authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
                 }
@@ -472,7 +472,7 @@ class IssuanceSingleRequestTest {
                 CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
                 CredentialIdentifier("id"),
             )
-            assertThrows<IllegalArgumentException> {
+            assertThrows<IllegalStateException> {
                 with(issuer) {
                     authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
                 }
