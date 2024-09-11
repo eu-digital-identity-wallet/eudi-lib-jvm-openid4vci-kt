@@ -22,8 +22,10 @@ import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
-import eu.europa.ec.eudi.openid4vci.internal.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidResponseContentType
+import eu.europa.ec.eudi.openid4vci.internal.CredentialIssuanceRequest
+import eu.europa.ec.eudi.openid4vci.internal.SubmissionOutcomeInternal
+import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -45,7 +47,7 @@ internal class CredentialEndpointClient(
     suspend fun placeIssuanceRequest(
         accessToken: AccessToken,
         request: CredentialIssuanceRequest,
-    ): Result<CredentialIssuanceResponse> = runCatching {
+    ): Result<SubmissionOutcomeInternal> = runCatching {
         ktorHttpClientFactory().use { client ->
             val url = credentialEndpoint.value
             val response = client.post(url) {
@@ -62,7 +64,7 @@ internal class CredentialEndpointClient(
                 )
             } else {
                 val error = response.body<GenericErrorResponseTO>()
-                throw error.toIssuanceError()
+                SubmissionOutcomeInternal.Failed(error.toIssuanceError())
             }
         }
     }

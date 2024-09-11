@@ -18,38 +18,6 @@ package eu.europa.ec.eudi.openid4vci.internal
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
 
-/**
- * Models a response of the issuer to a successful issuance request.
- *
- * @param credentials issue credentials
- * @param transactionId transaction id in case of deferred issuance
- * @param cNonce Nonce information sent back from the issuance server.
- */
-internal data class CredentialIssuanceResponse(
-    val credentials: List<IssuedCredential>,
-    val transactionId: TransactionId?,
-    val cNonce: CNonce?,
-) {
-    init {
-        if (credentials.isNotEmpty()) {
-            require(transactionId == null)
-        }
-        if (transactionId != null) {
-            require(credentials.isEmpty())
-        }
-    }
-
-    fun <T, T1 : T, T2 : T> fold(
-        issued: (List<IssuedCredential>, CNonce?) -> T1,
-        deferred: (TransactionId, CNonce?) -> T2,
-    ): T =
-        when {
-            credentials.isNotEmpty() -> issued(credentials, cNonce)
-            transactionId != null -> deferred(transactionId, cNonce)
-            else -> error("Cannot happen")
-        }
-}
-
 internal class RequestIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     private val config: OpenId4VCIConfig,
@@ -185,15 +153,9 @@ internal class RequestIssuanceImpl(
         token: AccessToken,
         issuanceRequestSupplier: suspend () -> CredentialIssuanceRequest,
     ): SubmissionOutcomeInternal {
-        fun handleIssuanceFailure(error: Throwable): SubmissionOutcomeInternal.Failed =
-            SubmissionOutcomeInternal.fromThrowable(error) ?: throw error
-
         val req = issuanceRequestSupplier()
         val res = credentialEndpointClient.placeIssuanceRequest(token, req)
-        return res.fold(
-            onSuccess = { SubmissionOutcomeInternal.fromResponse(it) },
-            onFailure = { handleIssuanceFailure(it) },
-        )
+        return res.getOrThrow()
     }
 }
 
@@ -219,7 +181,7 @@ private fun CredentialConfiguration.assertProofSupported(proof: Proof) {
     }
 }
 
-private sealed interface SubmissionOutcomeInternal {
+internal sealed interface SubmissionOutcomeInternal {
 
     data class Success(
         val credentials: List<IssuedCredential>,
@@ -249,20 +211,6 @@ private sealed interface SubmissionOutcomeInternal {
         if (this is Failed && error is CredentialIssuanceError.InvalidProof) {
             CNonce(error.cNonce, error.cNonceExpiresIn)
         } else null
-
-    companion object {
-        fun fromResponse(response: CredentialIssuanceResponse): SubmissionOutcomeInternal =
-            response.fold(
-                issued = SubmissionOutcomeInternal::Success,
-                deferred = SubmissionOutcomeInternal::Deferred,
-            )
-
-        fun fromThrowable(error: Throwable): Failed? =
-            when (error) {
-                is CredentialIssuanceError -> Failed(error)
-                else -> null
-            }
-    }
 }
 
 private fun AuthorizedRequestAnd<SubmissionOutcome>.markInvalidProofIrrecoverable() =

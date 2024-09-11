@@ -215,7 +215,7 @@ internal data class CredentialResponseSuccessTO(
         }
     }
 
-    fun toDomain(): CredentialIssuanceResponse {
+    fun toDomain(): SubmissionOutcomeInternal {
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
         val transactionId = transactionId?.let { TransactionId(it) }
         val issuedCredentials =
@@ -225,11 +225,11 @@ internal data class CredentialResponseSuccessTO(
                 else -> emptyList()
             }
 
-        return CredentialIssuanceResponse(
-            cNonce = cNonce,
-            transactionId = transactionId,
-            credentials = issuedCredentials,
-        )
+        return when {
+            issuedCredentials.isNotEmpty() -> SubmissionOutcomeInternal.Success(issuedCredentials, cNonce)
+            transactionId != null -> SubmissionOutcomeInternal.Deferred(transactionId, cNonce)
+            else -> error("Cannot happen")
+        }
     }
 
     companion object {
