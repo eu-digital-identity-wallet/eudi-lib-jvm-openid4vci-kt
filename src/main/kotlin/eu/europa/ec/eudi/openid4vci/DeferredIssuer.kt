@@ -117,8 +117,8 @@ interface DeferredIssuer : QueryForDeferredCredential {
             val deferredIssuer = make(ctx.config, ktorHttpClientFactory).getOrThrow()
             val (newAuthorized, outcome) = with(deferredIssuer) {
                 with(ctx.authorizedTransaction.authorizedRequest) {
-                    val deferred = IssuedCredential.Deferred(ctx.authorizedTransaction.transactionId)
-                    queryForDeferredCredential(deferred).getOrThrow()
+                    val transactionId = ctx.authorizedTransaction.transactionId
+                    queryForDeferredCredential(transactionId).getOrThrow()
                 }
             }
             val newCtx = when (outcome) {

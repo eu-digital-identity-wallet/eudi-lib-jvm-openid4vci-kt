@@ -23,13 +23,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
-@Serializable
-internal data class IssuanceResponseTO(
-    @SerialName("credential") val credential: String? = null,
-    @SerialName("transaction_id") val transactionId: String? = null,
-    @SerialName("notification_id") val notificationId: String? = null,
-)
-
 //
 // Credential request / response
 //
@@ -224,11 +217,17 @@ internal data class CredentialResponseSuccessTO(
 
     fun toDomain(): CredentialIssuanceResponse {
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
+        val transactionId = transactionId?.let { TransactionId(it) }
         val issuedCredentials =
-            if (credentials.isNullOrEmpty()) listOf(issuedCredentialOf(transactionId, notificationId, credential))
-            else credentials.orEmpty().map { IssuedCredential.Issued(it) }
+            when {
+                credential != null -> listOf(IssuedCredential(credential, notificationId?.let(::NotificationId)))
+                !credentials.isNullOrEmpty() -> credentials.map { IssuedCredential(it, null) }
+                else -> emptyList()
+            }
+
         return CredentialIssuanceResponse(
             cNonce = cNonce,
+            transactionId = transactionId,
             credentials = issuedCredentials,
         )
     }
@@ -246,27 +245,6 @@ internal data class CredentialResponseSuccessTO(
     }
 }
 
-private fun issuedCredentialOf(
-    transactionId: String?,
-    notificationId: String?,
-    credential: String?,
-): IssuedCredential {
-    ensure(!(transactionId == null && credential == null)) {
-        val error =
-            "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters"
-        ResponseUnparsable(error)
-    }
-    return when {
-        transactionId != null -> IssuedCredential.Deferred(TransactionId(transactionId))
-        credential != null -> {
-            val notificationIdentifier = notificationId?.let { NotificationId(notificationId) }
-            IssuedCredential.Issued(credential, notificationIdentifier)
-        }
-
-        else -> error("Cannot happen")
-    }
-}
-
 //
 // Deferred request / response
 //
@@ -274,23 +252,20 @@ private fun issuedCredentialOf(
 @Serializable
 internal data class DeferredRequestTO(
     @SerialName("transaction_id") val transactionId: String,
-) {
-    companion object {
-        fun from(
-            deferredCredential: IssuedCredential.Deferred,
-        ): DeferredRequestTO {
-            val transactionId = deferredCredential.transactionId.value
-            return DeferredRequestTO(transactionId)
-        }
-    }
-}
+)
 
 @Serializable
 internal data class DeferredIssuanceSuccessResponseTO(
-    @SerialName("credential") val credential: String,
+    @SerialName("credential") val credential: String? = null,
+    @SerialName("credentials") val credentials: List<String>? = null,
 ) {
     fun toDomain(): DeferredCredentialQueryOutcome.Issued {
-        return DeferredCredentialQueryOutcome.Issued(IssuedCredential.Issued(credential))
+        val cs = when {
+            !credential.isNullOrEmpty() && credentials == null -> listOf(credential)
+            credential == null && !credentials.isNullOrEmpty() -> credentials
+            else -> error("One of credential or credentials must be present")
+        }.map { IssuedCredential(it) }
+        return DeferredCredentialQueryOutcome.Issued(cs)
     }
 
     companion object {

@@ -84,8 +84,11 @@ class IssuanceBatchRequestTest {
             is SubmissionOutcome.Failed -> {
                 fail(outcome.error.message)
             }
+            is SubmissionOutcome.Deferred -> {
+                fail("Got deferred")
+            }
             is SubmissionOutcome.Success -> {
-                outcome.credentials.forEach { assertIs<IssuedCredential.Issued>(it) }
+                outcome.credentials.forEach { assertIs<IssuedCredential>(it) }
             }
         }
     }

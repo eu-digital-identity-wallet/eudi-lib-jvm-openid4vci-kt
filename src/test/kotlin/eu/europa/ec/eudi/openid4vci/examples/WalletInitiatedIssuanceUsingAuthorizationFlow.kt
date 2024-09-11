@@ -79,7 +79,7 @@ private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: Keycl
 private suspend fun Issuer.submitCredentialRequest(
     authorizedRequest: AuthorizedRequest,
     credentialConfigurationId: CredentialConfigurationIdentifier,
-): AuthorizedRequestAnd<String> {
+): AuthorizedRequestAnd<List<IssuedCredential>> {
     issuanceLog("Requesting issuance of '$credentialConfigurationId'")
     val proofSigner = popSigner(credentialConfigurationId)
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
@@ -87,7 +87,16 @@ private suspend fun Issuer.submitCredentialRequest(
         .getOrThrow()
 
     return when (outcome) {
-        is SubmissionOutcome.Success -> newAuthorized to handleSuccess(newAuthorized, outcome)
+        is SubmissionOutcome.Success -> newAuthorized to outcome.credentials
+        is SubmissionOutcome.Deferred -> {
+            println("Hm we got a deferred issuance case with ${outcome.transactionId.value}")
+            val vcs = run {
+                val ctx = newAuthorized.deferredContext(outcome)
+                queryDeferredEndpoint(ctx)
+            }
+
+            newAuthorized to vcs
+        }
         is SubmissionOutcome.Failed ->
             throw if (outcome.error is CredentialIssuanceError.InvalidProof) {
                 IllegalStateException("Although providing a proof with c_nonce the proof is still invalid")
@@ -95,32 +104,19 @@ private suspend fun Issuer.submitCredentialRequest(
     }
 }
 
-private suspend fun Issuer.handleSuccess(
-    authorizedRequest: AuthorizedRequest,
-    submittedRequest: SubmissionOutcome.Success,
-) =
-    when (val issuedCredential = submittedRequest.credentials.first()) {
-        is IssuedCredential.Issued -> issuedCredential.credential
-        is IssuedCredential.Deferred -> {
-            println("Hm we got a deferred issuance case with $issuedCredential")
-            val ctx = authorizedRequest.deferredContext(issuedCredential)
-            queryDeferredEndpoint(ctx)
-        }
-    }
-
 private suspend fun queryDeferredEndpoint(
     deferredContext: DeferredIssuanceContext,
-): String {
+): List<IssuedCredential> {
     var ctx = deferredContext
-    var cred: String?
+    var cred: List<IssuedCredential>
     do {
         val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(ctx = ctx).getOrThrow()
         ctx = newCtx ?: ctx
         cred = when (outcome) {
             is DeferredCredentialQueryOutcome.Errored -> error(outcome.error)
-            is DeferredCredentialQueryOutcome.IssuancePending -> null
-            is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
+            is DeferredCredentialQueryOutcome.IssuancePending -> emptyList()
+            is DeferredCredentialQueryOutcome.Issued -> outcome.credentials
         }
-    } while (cred == null)
+    } while (cred.isEmpty())
     return cred
 }

@@ -54,13 +54,10 @@ class IssuanceDeferredRequestTest {
             val popSigner = CryptoGenerator.rsaProofSigner()
             val (newAuthorizedRequest, outcome) =
                 authorizedRequest.requestSingle(requestPayload, popSigner).getOrThrow()
-            assertIs<SubmissionOutcome.Success>(outcome)
-
-            val issuedCredential = outcome.credentials[0]
-            assertIs<IssuedCredential.Deferred>(issuedCredential)
+            assertIs<SubmissionOutcome.Deferred>(outcome)
 
             val (_, requestDeferredIssuance) =
-                newAuthorizedRequest.queryForDeferredCredential(issuedCredential)
+                newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId)
                     .getOrThrow()
 
             assertIs<DeferredCredentialQueryOutcome.Errored>(requestDeferredIssuance)
@@ -100,12 +97,10 @@ class IssuanceDeferredRequestTest {
             val popSigner = CryptoGenerator.rsaProofSigner()
             val (newAuthorizedRequest, outcome) =
                 authorizedRequest.requestSingle(requestPayload, popSigner).getOrThrow()
-            assertIs<SubmissionOutcome.Success>(outcome)
-            val issuedCredential = outcome.credentials[0]
-            assertIs<IssuedCredential.Deferred>(issuedCredential)
+            assertIs<SubmissionOutcome.Deferred>(outcome)
 
             val (_, requestDeferredIssuance) =
-                newAuthorizedRequest.queryForDeferredCredential(issuedCredential)
+                newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId)
                     .getOrThrow()
 
             assertIs<DeferredCredentialQueryOutcome.IssuancePending>(requestDeferredIssuance)
@@ -166,11 +161,9 @@ class IssuanceDeferredRequestTest {
                 CryptoGenerator.rsaProofSigner(),
             ).getOrThrow()
 
-            assertIs<SubmissionOutcome.Success>(outcome)
-            val issuedCredential = outcome.credentials[0]
-            require(issuedCredential is IssuedCredential.Deferred)
+            assertIs<SubmissionOutcome.Deferred>(outcome)
 
-            val (_, requestDeferredIssuance) = newAuthorized.queryForDeferredCredential(issuedCredential).getOrThrow()
+            val (_, requestDeferredIssuance) = newAuthorized.queryForDeferredCredential(outcome.transactionId).getOrThrow()
             assertIs<DeferredCredentialQueryOutcome.Issued>(requestDeferredIssuance)
         }
     }

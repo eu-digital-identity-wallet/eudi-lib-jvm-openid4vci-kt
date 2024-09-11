@@ -129,12 +129,11 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
       ENV : HasTestUser<USER>,
       ENV : CanAuthorizeIssuance<USER> =
     coroutineScope {
-        val authorizedRequest = authorizeUsingAuthorizationCodeFlow(env, enableHttpLogging)
-        val (_, outcome) =
-            submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest)
+        val authorizedReq = authorizeUsingAuthorizationCodeFlow(env, enableHttpLogging)
+        val (updatedAuthorizedReq, outcome) =
+            submitCredentialRequest(authorizedReq, credCfgId, claimSetToRequest)
 
-        ensureIssued(outcome)
-        Unit
+        ensureIssued(updatedAuthorizedReq, outcome)
     }
 
 suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
@@ -147,38 +146,41 @@ suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
         submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest)
     }
 
-    val issuedCredentials = ensureIssued(outcome)
-    check(outcome is SubmissionOutcome.Success)
-    issuedCredentials.filterIsInstance<IssuedCredential.Issued>().forEach { println(it) }
-    issuedCredentials.filterIsInstance<IssuedCredential.Deferred>().forEach { deferred ->
-        issuanceLog(
-            "Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
-        )
-        val deferredCtx = authorized.deferredContext(deferred)
-        handleDeferred(deferredCtx).also { println(it) }
+    ensureIssued(authorized, outcome)
+}
+
+suspend fun Issuer.ensureIssued(authorized: AuthorizedRequest, outcome: SubmissionOutcome) {
+    when (outcome) {
+        is SubmissionOutcome.Failed -> {
+            fail("Issuer rejected request. Reason :${outcome.error.message}")
+        }
+        is SubmissionOutcome.Deferred -> {
+            issuanceLog(
+                "Got a deferred issuance response from server with transaction_id ${outcome.transactionId.value}. Retrying issuance...",
+            )
+            val deferredCtx = authorized.deferredContext(outcome)
+            handleDeferred(deferredCtx).onEach(::println)
+        }
+        is SubmissionOutcome.Success -> {
+            outcome.credentials.forEach(::println)
+        }
     }
 }
 
-fun ensureIssued(outcome: SubmissionOutcome): List<IssuedCredential> =
-    when (outcome) {
-        is SubmissionOutcome.Failed -> fail("Issuer rejected request. Reason :${outcome.error.message}")
-        is SubmissionOutcome.Success -> outcome.credentials
-    }
-
 suspend fun handleDeferred(
     initialContext: DeferredIssuanceContext,
-): String {
+): List<String> {
     var ctx = initialContext
-    var cred: String?
+    var cred: List<String>
     do {
         val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(ctx = ctx).getOrThrow()
         ctx = newCtx ?: ctx
         cred = when (outcome) {
             is DeferredCredentialQueryOutcome.Errored -> error(outcome.error)
-            is DeferredCredentialQueryOutcome.IssuancePending -> null
-            is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
+            is DeferredCredentialQueryOutcome.IssuancePending -> emptyList()
+            is DeferredCredentialQueryOutcome.Issued -> outcome.credentials.map { it.credential }
         }
-    } while (cred == null)
+    } while (cred.isEmpty())
     return cred
 }
 

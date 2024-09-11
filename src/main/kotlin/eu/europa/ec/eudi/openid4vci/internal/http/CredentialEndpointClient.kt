@@ -77,7 +77,7 @@ internal class DeferredEndPointClient(
      * Method that submits a request to credential issuer's Deferred Credential Endpoint
      *
      * @param accessToken Access token authorizing the request
-     * @param deferredCredential The identifier of the Deferred Issuance transaction
+     * @param transactionId The identifier of the Deferred Issuance transaction
      * @param responseEncryptionSpec The response encryption information as specified when placing the issuance request. If initial request
      *      had specified response encryption then the issuer response is expected to be encrypted by the encryption details of the initial
      *      issuance request.
@@ -85,7 +85,7 @@ internal class DeferredEndPointClient(
      */
     suspend fun placeDeferredCredentialRequest(
         accessToken: AccessToken,
-        deferredCredential: IssuedCredential.Deferred,
+        transactionId: TransactionId,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<DeferredCredentialQueryOutcome> = runCatching {
         ktorHttpClientFactory().use { client ->
@@ -93,7 +93,7 @@ internal class DeferredEndPointClient(
             val response = client.post(url) {
                 bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
-                setBody(DeferredRequestTO.from(deferredCredential))
+                setBody(DeferredRequestTO(transactionId.value))
             }
             if (response.status.isSuccess()) {
                 responsePossiblyEncrypted<DeferredIssuanceSuccessResponseTO, DeferredCredentialQueryOutcome.Issued>(

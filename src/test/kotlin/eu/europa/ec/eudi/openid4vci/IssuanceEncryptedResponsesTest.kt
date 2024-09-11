@@ -466,13 +466,11 @@ class IssuanceEncryptedResponsesTest {
                     CredentialConfigurationIdentifier(PID_SdJwtVC),
                 )
                 val (newAuthorizedRequest, outcome) = authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
-                assertIs<SubmissionOutcome.Success>(outcome)
-                val deferredCredential = outcome.credentials.firstOrNull()
-                assertIs<IssuedCredential.Deferred>(deferredCredential)
+                assertIs<SubmissionOutcome.Deferred>(outcome)
 
                 assertFailsWith<CredentialIssuanceError.InvalidResponseContentType>(
                     block = {
-                        newAuthorizedRequest.queryForDeferredCredential(deferredCredential).getOrThrow()
+                        newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId).getOrThrow()
                     },
                 )
             }
@@ -536,12 +534,10 @@ class IssuanceEncryptedResponsesTest {
             )
             val (newAuthorizedRequest, outcome) =
                 authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
-            assertIs<SubmissionOutcome.Success>(outcome)
+            assertIs<SubmissionOutcome.Deferred>(outcome)
 
-            val deferredCredential = outcome.credentials[0]
-            assertIs<IssuedCredential.Deferred>(deferredCredential)
-
-            val (_, deferredOutcome) = newAuthorizedRequest.queryForDeferredCredential(deferredCredential).getOrThrow()
+            val (_, deferredOutcome) =
+                newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId).getOrThrow()
 
             assertIs<DeferredCredentialQueryOutcome.Issued>(deferredOutcome)
         }

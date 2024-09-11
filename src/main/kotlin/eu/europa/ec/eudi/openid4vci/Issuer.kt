@@ -30,7 +30,6 @@ import java.net.URL
  * Provides the following capabilities
  * - [AuthorizeIssuance]
  * - [RequestIssuance]
- * - [RequestBatchIssuance]
  * - [QueryForDeferredCredential]
  * - [NotifyIssuer]
  *
@@ -56,9 +55,9 @@ interface Issuer :
      *
      * @receiver the state of issuance
      * @param deferredCredential the transaction id returned by the issuer
-     * @return the context that would be needed to instantiate a [DeferredIssuer]
+     * @return the context that would be necessary to instantiate a [DeferredIssuer]
      */
-    fun AuthorizedRequest.deferredContext(deferredCredential: IssuedCredential.Deferred): DeferredIssuanceContext
+    fun AuthorizedRequest.deferredContext(deferredCredential: SubmissionOutcome.Deferred): DeferredIssuanceContext
 
     companion object {
 
@@ -197,7 +196,7 @@ interface Issuer :
                     get() = dPoPJwtFactory
 
                 override fun AuthorizedRequest.deferredContext(
-                    deferredCredential: IssuedCredential.Deferred,
+                    deferredCredential: SubmissionOutcome.Deferred,
                 ): DeferredIssuanceContext {
                     val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
                     val authorizationServerMetadata = credentialOffer.authorizationServerMetadata

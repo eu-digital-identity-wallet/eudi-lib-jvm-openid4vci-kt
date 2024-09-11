@@ -22,8 +22,10 @@ import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
 sealed interface DeferredCredentialQueryOutcome : java.io.Serializable {
 
     data class Issued(
-        val credential: IssuedCredential.Issued,
-    ) : DeferredCredentialQueryOutcome
+        val credentials: List<IssuedCredential>,
+    ) : DeferredCredentialQueryOutcome {
+        constructor(credential: IssuedCredential) : this(listOf(credential))
+    }
 
     data class IssuancePending(
         val interval: Long? = null,
@@ -43,11 +45,11 @@ fun interface QueryForDeferredCredential {
     /**
      * Given an authorized request submits a deferred credential request for an identifier of a Deferred Issuance transaction.
      *
-     * @param deferredCredential The identifier of a Deferred Issuance transaction.
+     * @param transactionId The identifier of a Deferred Issuance transaction.
      * @return The result of the query and a possibly refreshed [AuthorizedRequest]
      */
     suspend fun AuthorizedRequest.queryForDeferredCredential(
-        deferredCredential: IssuedCredential.Deferred,
+        transactionId: TransactionId,
     ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>>
 
     companion object {
@@ -74,10 +76,10 @@ fun interface QueryForDeferredCredential {
         ): QueryForDeferredCredential = object : QueryForDeferredCredential {
 
             override suspend fun AuthorizedRequest.queryForDeferredCredential(
-                deferredCredential: IssuedCredential.Deferred,
+                transactionId: TransactionId,
             ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> = runCatching {
                 val refreshed = refreshIfNeeded(this)
-                val outcome = placeDeferredCredentialRequest(refreshed, deferredCredential)
+                val outcome = placeDeferredCredentialRequest(refreshed, transactionId)
                 refreshed to outcome
             }
 
@@ -88,11 +90,11 @@ fun interface QueryForDeferredCredential {
 
             private suspend fun placeDeferredCredentialRequest(
                 authorizedRequest: AuthorizedRequest,
-                deferredCredential: IssuedCredential.Deferred,
+                transactionId: TransactionId,
             ): DeferredCredentialQueryOutcome =
                 deferredEndPointClient.placeDeferredCredentialRequest(
                     authorizedRequest.accessToken,
-                    deferredCredential,
+                    transactionId,
                     responseEncryptionSpec,
                 ).getOrThrow()
         }

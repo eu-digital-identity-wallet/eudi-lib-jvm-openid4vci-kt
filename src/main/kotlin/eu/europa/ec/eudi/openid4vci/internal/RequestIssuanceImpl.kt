@@ -21,16 +21,34 @@ import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
 /**
  * Models a response of the issuer to a successful issuance request.
  *
- * @param credentials The outcome of the issuance request.
- * if the issuance request was a batch request, it will contain
- * the results of each issuance request.
- * If it was a single issuance request list will contain only one result.
+ * @param credentials issue credentials
+ * @param transactionId transaction id in case of deferred issuance
  * @param cNonce Nonce information sent back from the issuance server.
  */
 internal data class CredentialIssuanceResponse(
     val credentials: List<IssuedCredential>,
+    val transactionId: TransactionId?,
     val cNonce: CNonce?,
-)
+) {
+    init {
+        if (credentials.isNotEmpty()) {
+            require(transactionId == null)
+        }
+        if (transactionId != null) {
+            require(credentials.isEmpty())
+        }
+    }
+
+    fun <T, T1 : T, T2 : T> fold(
+        issued: (List<IssuedCredential>, CNonce?) -> T1,
+        deferred: (TransactionId, CNonce?) -> T2,
+    ): T =
+        when {
+            credentials.isNotEmpty() -> issued(credentials, cNonce)
+            transactionId != null -> deferred(transactionId, cNonce)
+            else -> error("Cannot happen")
+        }
+}
 
 internal class RequestIssuanceImpl(
     private val credentialOffer: CredentialOffer,
@@ -81,6 +99,9 @@ internal class RequestIssuanceImpl(
             when (outcome) {
                 is SubmissionOutcomeInternal.Failed ->
                     outcome.cNonceFromInvalidProof()?.let { newCNonce -> withCNonce(newCNonce) }
+
+                is SubmissionOutcomeInternal.Deferred ->
+                    outcome.cNonce?.let { withCNonce(it) }
 
                 is SubmissionOutcomeInternal.Success ->
                     outcome.cNonce?.let { withCNonce(it) }
@@ -150,6 +171,7 @@ internal class RequestIssuanceImpl(
                     responseEncryptionSpec,
                 )
             }
+
             is IssuanceRequestPayload.IdentifierBased -> {
                 if (credentialIdentifiers != null) {
                     requestPayload.ensureAuthorized(credentialIdentifiers)
@@ -166,9 +188,10 @@ internal class RequestIssuanceImpl(
         fun handleIssuanceFailure(error: Throwable): SubmissionOutcomeInternal.Failed =
             SubmissionOutcomeInternal.fromThrowable(error) ?: throw error
 
-        val credentialRequest = issuanceRequestSupplier()
-        return credentialEndpointClient.placeIssuanceRequest(token, credentialRequest).fold(
-            onSuccess = { SubmissionOutcomeInternal.Success(it.credentials, it.cNonce) },
+        val req = issuanceRequestSupplier()
+        val res = credentialEndpointClient.placeIssuanceRequest(token, req)
+        return res.fold(
+            onSuccess = { SubmissionOutcomeInternal.fromResponse(it) },
             onFailure = { handleIssuanceFailure(it) },
         )
     }
@@ -203,6 +226,11 @@ private sealed interface SubmissionOutcomeInternal {
         val cNonce: CNonce?,
     ) : SubmissionOutcomeInternal
 
+    data class Deferred(
+        val transactionId: TransactionId,
+        val cNonce: CNonce?,
+    ) : SubmissionOutcomeInternal
+
     data class Failed(
         val error: CredentialIssuanceError,
     ) : SubmissionOutcomeInternal
@@ -210,6 +238,7 @@ private sealed interface SubmissionOutcomeInternal {
     fun toPub(): SubmissionOutcome =
         when (this) {
             is Success -> SubmissionOutcome.Success(credentials)
+            is Deferred -> SubmissionOutcome.Deferred(transactionId)
             is Failed -> SubmissionOutcome.Failed(error)
         }
 
@@ -222,6 +251,12 @@ private sealed interface SubmissionOutcomeInternal {
         } else null
 
     companion object {
+        fun fromResponse(response: CredentialIssuanceResponse): SubmissionOutcomeInternal =
+            response.fold(
+                issued = SubmissionOutcomeInternal::Success,
+                deferred = SubmissionOutcomeInternal::Deferred,
+            )
+
         fun fromThrowable(error: Throwable): Failed? =
             when (error) {
                 is CredentialIssuanceError -> Failed(error)
@@ -238,6 +273,7 @@ private fun AuthorizedRequestAnd<SubmissionOutcome>.markInvalidProofIrrecoverabl
             } else outcome
 
         is SubmissionOutcome.Success -> outcome
+        is SubmissionOutcome.Deferred -> outcome
     }
 
 private fun CredentialIssuanceError.InvalidProof.irrecoverbale() =

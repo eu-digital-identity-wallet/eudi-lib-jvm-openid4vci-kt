@@ -23,31 +23,15 @@ import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
 
 /**
- * The result of a request for issuance
+ *  Credential was issued from server and the result is returned inline.
+ *
+ * @param credential The issued credential.
+ * @param notificationId The identifier to be used in issuer's notification endpoint.
  */
-sealed interface IssuedCredential : java.io.Serializable {
-
-    /**
-     * Credential was issued from server and the result is returned inline.
-     *
-     * @param credential The issued credential.
-     * @param notificationId The identifier to be used in issuer's notification endpoint.
-     */
-    data class Issued(
-        val credential: String,
-        val notificationId: NotificationId? = null,
-    ) : IssuedCredential
-
-    /**
-     * Credential could not be issued immediately. An identifier is returned from server to be used later on
-     * to request the credential from issuer's Deferred Credential Endpoint.
-     *
-     * @param transactionId  A string identifying a Deferred Issuance transaction.
-     */
-    data class Deferred(
-        val transactionId: TransactionId,
-    ) : IssuedCredential
-}
+data class IssuedCredential(
+    val credential: String,
+    val notificationId: NotificationId? = null,
+) : java.io.Serializable
 
 /**
  * Sealed hierarchy of states describing the state of an issuance request submitted to a credential issuer.
@@ -61,6 +45,14 @@ sealed interface SubmissionOutcome : java.io.Serializable {
      * If it was a single issuance request list will contain only one result.
      */
     data class Success(val credentials: List<IssuedCredential>) : SubmissionOutcome
+
+    /**
+     * Credential could not be issued immediately. An identifier is returned from server to be used later on
+     * to request the credential from issuer's Deferred Credential Endpoint.
+     *
+     * @param transactionId  A string identifying a Deferred Issuance transaction.
+     */
+    data class Deferred(val transactionId: TransactionId) : SubmissionOutcome
 
     /**
      * State that denotes that the credential issuance request has failed
@@ -255,7 +247,8 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
      * It is marked as irrecoverable because it is raised only after the library
      * has automatically retried to recover from an [InvalidProof] error and failed
      */
-    data class IrrecoverableInvalidProof(val errorDescription: String? = null) : CredentialIssuanceError("Irrecoverable invalid proof ")
+    data class IrrecoverableInvalidProof(val errorDescription: String? = null) :
+        CredentialIssuanceError("Irrecoverable invalid proof ")
 
     /**
      * Issuer has not issued yet deferred credential. Retry interval (in seconds) is provided to caller
@@ -298,7 +291,8 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
      * Issuance server provides supports batch_size which is
      * smaller than the number of [PopSigner] the caller provided.
      */
-    class IssuerBatchSizeLimitExceeded(val batchSize: Int) : CredentialIssuanceError("IssuerBatchSizeLimitExceeded $batchSize")
+    class IssuerBatchSizeLimitExceeded(val batchSize: Int) :
+        CredentialIssuanceError("IssuerBatchSizeLimitExceeded $batchSize")
 
     /**
      * Issuance server does not support deferred credential issuance
