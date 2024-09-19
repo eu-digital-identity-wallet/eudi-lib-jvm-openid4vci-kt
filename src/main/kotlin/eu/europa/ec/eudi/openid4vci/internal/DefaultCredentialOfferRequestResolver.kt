@@ -61,7 +61,7 @@ private data class AuthorizationCodeTO(
 @Serializable
 private data class PreAuthorizedCodeTO(
     @SerialName("pre-authorized_code") @Required val preAuthorizedCode: String,
-    @SerialName("tx_code") @Required val txCode: TxCodeTO? = null,
+    @SerialName("tx_code") val txCode: TxCodeTO? = null,
     @SerialName("interval") val interval: Long? = null,
     @SerialName("authorization_server") val authorizationServer: String? = null,
 )
