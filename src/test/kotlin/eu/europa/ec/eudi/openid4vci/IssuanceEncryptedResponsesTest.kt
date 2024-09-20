@@ -22,16 +22,23 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
-import eu.europa.ec.eudi.openid4vci.internal.http.*
+import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
+import eu.europa.ec.eudi.openid4vci.internal.http.CredentialResponseSuccessTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.util.*
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class IssuanceEncryptedResponsesTest {
 
@@ -259,7 +266,7 @@ class IssuanceEncryptedResponsesTest {
                         encryptedResponseDataBuilder(it) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
-                                    credential = "issued_credential",
+                                    credential = JsonPrimitive("issued_credential"),
                                     notificationId = "fgh126lbHjtspVbn",
                                     cNonce = "wlbQc6pCJp",
                                     cNonceExpiresInSeconds = 86400,
@@ -336,9 +343,9 @@ class IssuanceEncryptedResponsesTest {
                         encryptedResponseDataBuilder(it) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
-                                    credentials = listOf(
-                                        "${PID_MsoMdoc}_issued_credential",
-                                    ),
+                                    credentials = buildJsonArray {
+                                        add("${PID_MsoMdoc}_issued_credential")
+                                    },
                                     cNonce = "wlbQc6pCJp",
                                     cNonceExpiresInSeconds = 86400,
                                 ),
@@ -396,7 +403,7 @@ class IssuanceEncryptedResponsesTest {
                         encryptedResponseDataBuilder(it) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
-                                    credentials = listOf("${PID_MsoMdoc}_issued_credential"),
+                                    credentials = buildJsonArray { add("${PID_MsoMdoc}_issued_credential") },
                                     cNonce = "wlbQc6pCJp",
                                     cNonceExpiresInSeconds = 86400,
                                 ),

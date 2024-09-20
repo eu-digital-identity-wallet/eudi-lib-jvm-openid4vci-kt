@@ -169,16 +169,16 @@ suspend fun Issuer.ensureIssued(authorized: AuthorizedRequest, outcome: Submissi
 
 suspend fun handleDeferred(
     initialContext: DeferredIssuanceContext,
-): List<String> {
+): List<IssuedCredential> {
     var ctx = initialContext
-    var cred: List<String>
+    var cred: List<IssuedCredential>
     do {
         val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(ctx = ctx).getOrThrow()
         ctx = newCtx ?: ctx
         cred = when (outcome) {
             is DeferredCredentialQueryOutcome.Errored -> error(outcome.error)
             is DeferredCredentialQueryOutcome.IssuancePending -> emptyList()
-            is DeferredCredentialQueryOutcome.Issued -> outcome.credentials.map { it.credential }
+            is DeferredCredentialQueryOutcome.Issued -> outcome.credentials
         }
     } while (cred.isEmpty())
     return cred
@@ -293,9 +293,9 @@ suspend fun <ENV : HasIssuerId> ENV.testMetaDataResolution(
         try {
             Issuer.metaData(httpClient, issuerId)
         } catch (t: Throwable) {
-            when {
-                t is CredentialIssuerMetadataError -> fail("Credential Issuer Metadata error", cause = t.cause)
-                t is AuthorizationServerMetadataResolutionException -> fail(
+            when (t) {
+                is CredentialIssuerMetadataError -> fail("Credential Issuer Metadata error", cause = t.cause)
+                is AuthorizationServerMetadataResolutionException -> fail(
                     "Authorization Server Metadata resolution error",
                     t.cause,
                 )

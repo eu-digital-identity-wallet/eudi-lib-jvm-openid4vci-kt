@@ -21,6 +21,15 @@ import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+
+sealed interface Credential {
+    @JvmInline
+    value class Str(val value: String) : Credential
+
+    @JvmInline
+    value class Json(val value: JsonObject) : Credential
+}
 
 /**
  *  Credential was issued from server and the result is returned inline.
@@ -28,8 +37,17 @@ import kotlinx.serialization.Serializable
  * @param credential The issued credential.
  */
 data class IssuedCredential(
-    val credential: String,
-) : java.io.Serializable
+    val credential: Credential,
+    val additionalInfo: JsonObject?,
+) : java.io.Serializable {
+    companion object {
+        fun string(credential: String, additionalInfo: JsonObject? = null): IssuedCredential =
+            IssuedCredential(Credential.Str(credential), additionalInfo)
+
+        fun json(credential: JsonObject, additionalInfo: JsonObject? = null): IssuedCredential =
+            IssuedCredential(Credential.Json(credential), additionalInfo)
+    }
+}
 
 /**
  * Sealed hierarchy of states describing the state of an issuance request submitted to a credential issuer.

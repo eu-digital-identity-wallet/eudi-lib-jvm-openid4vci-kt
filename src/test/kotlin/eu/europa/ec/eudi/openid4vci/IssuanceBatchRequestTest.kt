@@ -22,6 +22,8 @@ import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.fail
@@ -42,11 +44,11 @@ class IssuanceBatchRequestTest {
                         encryptedResponseDataBuilder(it) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
-                                    credentials = listOf(
-                                        "issued_credential_content_mso_mdoc0",
-                                        "issued_credential_content_mso_mdoc1",
-                                        "issued_credential_content_mso_mdoc2",
-                                    ),
+                                    credentials = buildJsonArray {
+                                        add("issued_credential_content_mso_mdoc0")
+                                        add("issued_credential_content_mso_mdoc1")
+                                        add("issued_credential_content_mso_mdoc2")
+                                    },
                                     cNonce = "wlbQc6pCJp",
                                     cNonceExpiresInSeconds = 86400,
                                 ),
