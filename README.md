@@ -356,7 +356,7 @@ val (updatedAuthorizedRequest, outcome) =
 
 ```
 
-[!NOTE]
+**Important note**
 
 The ability of the token endpoint of the credential issuer to provide a `c_nonce` is an
 optional feature specified in the OpenId4VCI specification. 
@@ -559,7 +559,6 @@ data class OpenId4VCIConfig(
 )
 ```
 
-[!TIP]
 Options available:
 
 - client: Wallet `client authentication method` in the OAUTH2 sense while interacting with the Credential Issuer. 
