@@ -209,8 +209,8 @@ internal data class CredentialResponseSuccessTO(
             }
         }
         if (notificationId != null) {
-            ensure(credential != null) {
-                ResponseUnparsable("notification_id must not be present if credential is not present")
+            ensure(credential != null || !credentials.isNullOrEmpty()) {
+                ResponseUnparsable("notification_id can be present, if credential or credentials is present")
             }
         }
     }
@@ -218,15 +218,16 @@ internal data class CredentialResponseSuccessTO(
     fun toDomain(): SubmissionOutcomeInternal {
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
         val transactionId = transactionId?.let { TransactionId(it) }
+        val notificationId = notificationId?.let(::NotificationId)
         val issuedCredentials =
             when {
-                credential != null -> listOf(IssuedCredential(credential, notificationId?.let(::NotificationId)))
-                !credentials.isNullOrEmpty() -> credentials.map { IssuedCredential(it, null) }
+                credential != null -> listOf(IssuedCredential(credential))
+                !credentials.isNullOrEmpty() -> credentials.map { IssuedCredential(it) }
                 else -> emptyList()
             }
 
         return when {
-            issuedCredentials.isNotEmpty() -> SubmissionOutcomeInternal.Success(issuedCredentials, cNonce)
+            issuedCredentials.isNotEmpty() -> SubmissionOutcomeInternal.Success(issuedCredentials, cNonce, notificationId)
             transactionId != null -> SubmissionOutcomeInternal.Deferred(transactionId, cNonce)
             else -> error("Cannot happen")
         }
@@ -258,19 +259,29 @@ internal data class DeferredRequestTO(
 internal data class DeferredIssuanceSuccessResponseTO(
     @SerialName("credential") val credential: String? = null,
     @SerialName("credentials") val credentials: List<String>? = null,
+    @SerialName("notification_id") val notificationId: String? = null,
 ) {
     fun toDomain(): DeferredCredentialQueryOutcome.Issued {
-        val cs = when {
+        val notificationId = notificationId?.let { NotificationId(it) }
+        val credentials = when {
             !credential.isNullOrEmpty() && credentials == null -> listOf(credential)
             credential == null && !credentials.isNullOrEmpty() -> credentials
             else -> error("One of credential or credentials must be present")
         }.map { IssuedCredential(it) }
-        return DeferredCredentialQueryOutcome.Issued(cs)
+
+        return DeferredCredentialQueryOutcome.Issued(credentials, notificationId)
     }
 
     companion object {
         fun from(jwtClaimsSet: JWTClaimsSet): DeferredIssuanceSuccessResponseTO {
-            return DeferredIssuanceSuccessResponseTO(jwtClaimsSet.getStringClaim("credential"))
+            val credential = jwtClaimsSet.getStringClaim("credential")
+            val credentials = jwtClaimsSet.getStringListClaim("credentials")
+            val notificationId = jwtClaimsSet.getStringClaim("notification_id")
+            return DeferredIssuanceSuccessResponseTO(
+                credential = credential,
+                credentials = credentials,
+                notificationId = notificationId,
+            )
         }
     }
 }

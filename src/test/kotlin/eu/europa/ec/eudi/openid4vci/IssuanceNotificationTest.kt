@@ -80,7 +80,7 @@ class IssuanceNotificationTest {
 
                     val issuedCredential = outcome.credentials.firstOrNull()
                     assertIs<IssuedCredential>(issuedCredential)
-                    val notId = issuedCredential.notificationId
+                    val notId = outcome.notificationId
                     assertNotNull(notId)
 
                     newAuthorizedRequest.notify(

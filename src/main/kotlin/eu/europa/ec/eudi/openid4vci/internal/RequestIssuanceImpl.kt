@@ -186,6 +186,7 @@ internal sealed interface SubmissionOutcomeInternal {
     data class Success(
         val credentials: List<IssuedCredential>,
         val cNonce: CNonce?,
+        val notificationId: NotificationId?,
     ) : SubmissionOutcomeInternal
 
     data class Deferred(
@@ -199,7 +200,7 @@ internal sealed interface SubmissionOutcomeInternal {
 
     fun toPub(): SubmissionOutcome =
         when (this) {
-            is Success -> SubmissionOutcome.Success(credentials)
+            is Success -> SubmissionOutcome.Success(credentials, notificationId)
             is Deferred -> SubmissionOutcome.Deferred(transactionId)
             is Failed -> SubmissionOutcome.Failed(error)
         }
@@ -217,12 +218,12 @@ private fun AuthorizedRequestAnd<SubmissionOutcome>.markInvalidProofIrrecoverabl
     first to when (val outcome = second) {
         is SubmissionOutcome.Failed ->
             if (outcome.error is CredentialIssuanceError.InvalidProof) {
-                SubmissionOutcome.Failed(outcome.error.irrecoverbale())
+                SubmissionOutcome.Failed(outcome.error.irrecoverable())
             } else outcome
 
         is SubmissionOutcome.Success -> outcome
         is SubmissionOutcome.Deferred -> outcome
     }
 
-private fun CredentialIssuanceError.InvalidProof.irrecoverbale() =
+private fun CredentialIssuanceError.InvalidProof.irrecoverable() =
     CredentialIssuanceError.IrrecoverableInvalidProof(errorDescription)

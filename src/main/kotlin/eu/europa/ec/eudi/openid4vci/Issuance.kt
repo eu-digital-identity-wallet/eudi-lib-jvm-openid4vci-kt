@@ -26,11 +26,9 @@ import kotlinx.serialization.Serializable
  *  Credential was issued from server and the result is returned inline.
  *
  * @param credential The issued credential.
- * @param notificationId The identifier to be used in issuer's notification endpoint.
  */
 data class IssuedCredential(
     val credential: String,
-    val notificationId: NotificationId? = null,
 ) : java.io.Serializable
 
 /**
@@ -43,8 +41,18 @@ sealed interface SubmissionOutcome : java.io.Serializable {
      * @param credentials The outcome of the issuance request.
      * If the issuance request was a batch request, it will contain the results of each issuance request.
      * If it was a single issuance request list will contain only one result.
+     *
+     * @param credentials The credentials issued
+     * @param notificationId The identifier to be used in issuer's notification endpoint.
      */
-    data class Success(val credentials: List<IssuedCredential>) : SubmissionOutcome
+    data class Success(
+        val credentials: List<IssuedCredential>,
+        val notificationId: NotificationId?,
+    ) : SubmissionOutcome {
+        init {
+            require(credentials.isNotEmpty()) { "credentials must not be empty" }
+        }
+    }
 
     /**
      * Credential could not be issued immediately. An identifier is returned from server to be used later on

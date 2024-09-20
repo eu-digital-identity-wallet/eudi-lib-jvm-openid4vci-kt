@@ -23,9 +23,8 @@ sealed interface DeferredCredentialQueryOutcome : java.io.Serializable {
 
     data class Issued(
         val credentials: List<IssuedCredential>,
-    ) : DeferredCredentialQueryOutcome {
-        constructor(credential: IssuedCredential) : this(listOf(credential))
-    }
+        val notificationId: NotificationId?,
+    ) : DeferredCredentialQueryOutcome
 
     data class IssuancePending(
         val interval: Long? = null,
