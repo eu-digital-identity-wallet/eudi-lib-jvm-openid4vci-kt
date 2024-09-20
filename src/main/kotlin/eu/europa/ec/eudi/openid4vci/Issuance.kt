@@ -23,18 +23,29 @@ import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
+/**
+ * Represents the credential as it is serialized by the credential issuer
+ * within a credential or deferred response.
+ *
+ * The choice is format-specific, and it can be either a string or a JSON object
+ */
 sealed interface Credential {
     @JvmInline
-    value class Str(val value: String) : Credential
+    value class Str(val value: String) : Credential {
+        override fun toString(): String = value
+    }
 
     @JvmInline
-    value class Json(val value: JsonObject) : Credential
+    value class Json(val value: JsonObject) : Credential {
+        override fun toString(): String = value.toString()
+    }
 }
 
 /**
  *  Credential was issued from server and the result is returned inline.
  *
  * @param credential The issued credential.
+ * @param additionalInfo Optional, information returned by the issuer for the [credential]
  */
 data class IssuedCredential(
     val credential: Credential,
