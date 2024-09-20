@@ -25,26 +25,26 @@ the [OpenId4VCI (draft 13)](https://openid.net/specs/openid-4-verifiable-credent
 In particular, the library focuses on the wallet's role in and provides the following features:
 
 
-| Feature                                                                                       | Coverage                                                                                                               |
-|-----------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| [Wallet-initiated issuance](#wallet-initiated-issuance)                                                                 | ✅                                                                                                                      |
-| [Resolve a credential offer](#resolve-a-credential-offer)                                     | ✅ Unsigned metadata ❌ [accept-language](#issuer-metadata-accept-language) ❌ [signed metadata](#issuer-signed-metadata) |
-| [Authorization code flow](#authorization-code-flow)                                           | ✅                                                                                                                      |
-| [Pre-authorized code flow](#pre-authorized-code-flow)                                         | ✅                                                                                                                      |
-| mso_mdoc format                                                                               | ✅                                                                                                                      |
-| SD-JWT-VC format                                                                              | ✅                                                                                                                      |
-| W3C VC DM                                                                                     | VC Signed as a JWT, Not Using JSON-LD                                                                                  |
-| [Place credential request](#place-credential-request)                                         | ✅ Including automatic handling of `invalid_proof`                                                                      |
-| [Place batch credential request](#place-batch-credential-request)                             | ✅                                                                                                                      | 
-| [Query for deferred credential](#query-for-deferred-credential)                               | ✅ Including automatic refresh of `access_token`                                                                        |
-| [Query for deferred credential at a later time](#query-for-deferred-credential-at-later-time) | ✅ Including automatic refresh of `access_token`                                                                        |
-| [Notify credential issuer](#notify-credential-issuer)                                         | ✅                                                                                                                      | 
-| Proof                                                                                         | ✅ JWT ✅ CWT                                                                                                            |
-| Credential response encryption                                                                | ✅                                                                                                                      |
-| [Pushed authorization requests](#pushed-authorization-requests)                               | ✅ Used by default, if supported by issuer                                                                              |
-| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)           | ✅                                                                                                                      |
-| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                             | ✅                                                                                                                      |
-| Wallet authentication                                                                         | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth2-attestation-based-client-authentication)     |
+| Feature                                                                                         | Coverage                                                                                                               |
+|-------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| [Wallet-initiated issuance](#wallet-initiated-issuance)                                         | ✅                                                                                                                      |
+| [Resolve a credential offer](#resolve-a-credential-offer)                                       | ✅ Unsigned metadata ❌ [accept-language](#issuer-metadata-accept-language) ❌ [signed metadata](#issuer-signed-metadata) |
+| [Authorization code flow](#authorization-code-flow)                                             | ✅                                                                                                                      |
+| [Pre-authorized code flow](#pre-authorized-code-flow)                                           | ✅                                                                                                                      |
+| mso_mdoc format                                                                                 | ✅                                                                                                                      |
+| SD-JWT-VC format                                                                                | ✅                                                                                                                      |
+| W3C VC DM                                                                                       | VC Signed as a JWT, Not Using JSON-LD                                                                                  |
+| [Place credential request](#place-credential-request)                                           | ✅ Including automatic handling of `invalid_proof`                                                                      |
+| [Place batch credential request](#place-batch-credential-request)                               | ✅                                                                                                                      | 
+| [Query for deferred credentials](#query-for-deferred-credentials)                               | ✅ Including automatic refresh of `access_token`                                                                        |
+| [Query for deferred credentials at a later time](#query-for-deferred-credentials-at-later-time) | ✅ Including automatic refresh of `access_token`                                                                        |
+| [Notify credential issuer](#notify-credential-issuer)                                           | ✅                                                                                                                      | 
+| Proof                                                                                           | ✅ JWT ✅ CWT                                                                                                            |
+| Credential response encryption                                                                  | ✅                                                                                                                      |
+| [Pushed authorization requests](#pushed-authorization-requests)                                 | ✅ Used by default, if supported by issuer                                                                              |
+| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)             | ✅                                                                                                                      |
+| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                               | ✅                                                                                                                      |
+| Wallet authentication                                                                           | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth2-attestation-based-client-authentication)     |
 
 ## Disclaimer
 
@@ -117,7 +117,7 @@ As a wallet/caller use the library to process a URI that represents a credential
 
 #### Resolve a credential offer preconditions
 
-- The wallet has obtained this URI. Typically, either scanning a QR Code or in response to a custom URI.
+- The wallet has got this URI. Typically, either scanning a QR Code or in response to a custom URI.
 - The wallet has prepared an issuance [configuration](#configuration-options), describing the capabilities & policies of the wallet.
 
 This resolution includes the following
@@ -130,22 +130,22 @@ This resolution includes the following
 
 #### Resolve a credential offer successful outcome:
 
-An instance of the [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt)  interface (the main entry point to the library) will have been initiated.
+An instance of the [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) interface (the main entry point to the library) will have been initiated.
 This instance, includes the resolved [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) and the necessary methods to proceed
 The resolved  offer contains the mandatory elements required for issuance.
 - The issuer's identifier
 - The selected authorization server that will authorize the issuance
 - The specific credentials that will be requested
 
-These elements  can be used to populate a wallet view that 
+These elements can be used to populate a wallet view that 
 asks user's consensus to proceed with the issuance. This includes  the authorization
 flow to be used (either authorization code flow, or pre-authorized code)
 
-This concern, though is out of the scope of library
+This concern, though, is out of the scope of the library
 
 #### Resolve a credential offer execution
 
-In order to resolve a credential offer wallet/caller must provide [configuration options](#configuration-options)
+To resolve a credential offer, wallet/caller must provide [configuration options](#configuration-options)
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
@@ -327,11 +327,11 @@ a specific credential identifier in case token endpoint provided an `authorizati
 
 The result of placing a request is represented by a `SubmissionOutcome` as follows:
 
-- `SubmissionOutcome.Sucess` This could represent either the issued credential or a transaction_id in case
-of deferred issuance, or
+- `SubmissionOutcome.Sucess` This represents one or more issued credentials, or
+- `SubmissionOutcome.Deferred` This indicates a deferred issuance and contains a `transaction_id`
 - `SubmissionOutcome.Failed` indication that credential issuer rejected the request, including the `invalid_proof` case.
 
-In case of an unexpected error a runtime will be raised.
+In case of an unexpected error, a runtime exception will be raised.
 
 #### Place credential request execution
 
@@ -356,7 +356,7 @@ val (updatedAuthorizedRequest, outcome) =
 
 ```
 
-**Important note**
+[!NOTE]
 
 The ability of the token endpoint of the credential issuer to provide a `c_nonce` is an
 optional feature specified in the OpenId4VCI specification. 
@@ -378,41 +378,41 @@ library will report as `IrrecoverableInvalidProof`.
 #### Place credential request next steps
 
 - Validate credential and store it. That's out of library scope, or
-- [Query for credential](#query-for-deferred-credential), or
-- [Query for credential at later time](#query-for-deferred-credential-at-later-time), or
+- [Query for credential](#query-for-deferred-credentials), or
+- [Query for credentials at later time](#query-for-deferred-credentials-at-later-time), or
 - [Notify credential issuer](#notify-credential-issuer)
 
-### Query for deferred credential
+### Query for deferred credentials
 
-Wallet/caller wants to query credential issuer for a deferred credential, while still holding
+Wallet/caller wants to query credential issuer for credentials, while still holding
 an `AuthorizedRequest` and an `Issuer` instance.
 
-#### Query for deferred credential preconditions
+#### Query for deferred credentials preconditions
 
 - Wallet/caller has [placed a credential request](#place-a-credential-request)
-- Wallet/caller has received an [outcome](#place-credential-request-outcome) carrying a `transaction_id`
+- Wallet/caller has received a [deferred outcome](#place-credential-request-outcome) carrying a `transaction_id`
 - Wallet/caller has an instance of `AuthorizedRequest` 
 
-#### Query for deferred credential steps
+#### Query for deferred credentials steps
 
 1. Wallet/caller issuing the `Issuer` instance places the query providing `AuthorizedRequest` and `transaction_id`
 2. Library checks if `access_token`  in `AuthorizedRequest` is expired
-3. If `access_token` is expired it will automatically be refreshed, provided that credential issuer has given a `refresh_token`
+3. If `access_token` is expired it will automatically be refreshed, if credential issuer has given a `refresh_token`
 4. Library places the query against the Deferred Endpoint of the credential issuer
 5. Library gets credential issuer response and maps it into `DeferredCredentialQueryOutcome`
 6. Caller gets back an `AuthorizedRequest` and `DeferredCredentialQueryOutcome`
 
-#### Query for deferred credential outcome
+#### Query for deferred credentials outcome
 
 The outcome of placing this query is a pair comprised of  
 
 - `AuthorizedRequest` : This represents a possibly updated `AuthorizedRequest` with a refreshed `access_token`
 - `DeferredCredentialQueryOutcome`: This is the response of the deferred endpoint and it could be one of
-  - `Issued` : Deferred credential was issued 
+  - `Issued` : Deferred credentials were issued and optionally a `notification_id` 
   - `IssuancePending`: Deferred credential was not ready
   - `Errored`: Credential issuer doesn't recognize the `transaction_id`
 
-#### Query for deferred credential execution
+#### Query for deferred credentials execution
 
 ```kotlin
 val authorizedRequest = // has been retrieved in a previous step
@@ -426,37 +426,37 @@ val (updatedAuthorizedRequest, outcome) =
     }    
 
 ```
-#### Query for deferred credential next steps
+#### Query for deferred credentials next steps
 
 - Validate credential and store it. That's out of library scope, or
-- [Query for credential](#query-for-deferred-credential)
+- [Query for credentials](#query-for-deferred-credentials)
 
-### Query for deferred credential at later time
+### Query for deferred credentials at later time
 
-Wallet/caller wants to suspend issuance process, store its context and query issuer at a later time.
+Wallet/caller wants to suspend an issuance process, store its context and query issuer at a later time.
 There are limitations for this use case
 
 - The lifecycle of `transaction_id` is bound to the expiration of the `access_token`.
-- The `access_token` can be refreshed - library transparently does this - only if credential issuer has provided a `refresh_token`
+- The `access_token` can be refreshed, the library transparently does this, only if credential issuer has provided a `refresh_token`
 
-This means that wallet/caller can query for a deferred credential as long as it has a non-expired
+This means that wallet/caller can query for deferred credentials as long as it has a non-expired
 `access_token` or `refresh_token`.
 
-### Query for deferred credential at later time preconditions
+### Query for deferred credentials at later time preconditions
 
-As per [query for deferred credential](#query-for-deferred-credential-preconditions)
+As per [query for deferred credentials](#query-for-deferred-credentials-preconditions)
 
-#### Query for deferred credential at a later time steps
+#### Query for deferred credentials at a later time steps
 
 1. Wallet/caller using the `Issuer` instance obtains a `DeferredIssuanceContext`. That's a minimum set of data (configuration options and state) that are needed to query again the credential issuer
 2. Wallet/caller stores the `DeferredIssuanceContext`. How this is done is outside the scope of the library
 3. Wallet/caller loads the `DeferredIssuanceContext`. That's also outside the scope of the library
 4. Wallet/caller queries the credential issuer issuing `DeferredIssuer`
-5. Library performs all steps defined in [Query for deferred credential](#query-for-deferred-credential)
+5. Library performs all steps defined in [Query for deferred credentials](#query-for-deferred-credentials)
 6. Library returns to the caller the `DeferredIssuanceContxt?` and the `DeferredCredentialQueryOutcome`
 7. Depending on the outcome, wallet/caller may choose to store the new `DeferredIssuanceContxt` to query again, later on
 
-#### Query for deferred credential at later time outcome
+#### Query for deferred credentials at later time outcome
 
 The outcome of placing this query is a pair comprised of
 - `DeferredIssuanceContext` : This represents a possibly new state of authorization carrying a refreshed `access_token`
@@ -465,7 +465,7 @@ The outcome of placing this query is a pair comprised of
     - `IssuancePending`: Deferred credential was not ready
     - `Errored`: Credential issuer doesn't recognize the `transaction_id`
 
-#### Query for deferred credential at later time execution
+#### Query for deferred credentials at later time execution
 
 ```kotlin
 
@@ -499,19 +499,19 @@ that serializes the context as a JSON object.
 
 ### Notify Credential Issuer
 
-Wallet/caller wants to notify the credential issuer, about the overall 
+Wallet/caller wants to notify the credential issuer about the overall 
 outcome of the issuance, using one of the defined notifications:
 
-- Accepted : Credential was successfully stored in the Wallet
+- Accepted: Credentials were successfully stored in the Wallet
 - Deleted: Unsuccessful Credential issuance was caused by a user action.
-- Failed:  Other unsuccessful cases
+- Failed: Other unsuccessful cases
 
 #### Notify Credential Issuer preconditions
 
 - Credential issuer advertises the optional Notification Endpoint
-- Wallet/caller has received a [IssuedCredential.Issued](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuance.kt) with a `notificationId`  
-  (via credential, deferred or batch endpoint)  
-- Wallet/caller has processed the issued credential (verification & storage)
+- Wallet/caller has received a a `notificationId`   
+  (via credential [response](#place-credential-request-outcome), deferred [response](#query-for-deferred-credentials-outcome))  
+- Wallet/caller has processed the issued credentials (verification & storage)
 - Wallet/caller still has a reference to the `Issuer` and `AuthorizedRequest` instances
 
 #### Notify Credential Issuer outcome
@@ -559,6 +559,7 @@ data class OpenId4VCIConfig(
 )
 ```
 
+[!TIP]
 Options available:
 
 - client: Wallet `client authentication method` in the OAUTH2 sense while interacting with the Credential Issuer. 
@@ -568,7 +569,7 @@ Options available:
 - keyGenerationConfig: A way of generating ephemeral keys used for `credential_response_encryption`
 - credentialResponseEncryptionPolicy: A wallet policy in regard to whether it accepts credentials without `credential_response_encyrption` or not
 - authorizeIssuanceConfig: Preference on using `scope` or `authorization_details` during authorization code flow
-- dPoPSigner: An optional way of singing DPoP JWTs. If not provided DPoP is off. If provided it will be used only if Credential Issuer advertises this feature
+- dPoPSigner: An optional way of singing DPoP JWTs. If not provided DPoP is off. If provided, it will be used only if Credential Issuer advertises this feature
 - parUsage: An indication to not use PAR endpoint or use it if advertised by the credential issuer
 - clock: Wallet/Caller clock.
 
@@ -617,7 +618,7 @@ If wallet [configuration](#configuration-options) provides a DPoP Signer and if 
 algorithms supported by wallet's DPoP Signer, then library will transparently request
 for a DPoP `access_token` instead of the default Bearer token.
 
-Furthermore, all subsequent interactions will use the correct token type (Bearer or DPoP)
+Furthermore, all further interactions will use the correct token type (Bearer or DPoP)
 
 ###  Proof Key for Code Exchange by OAuth Public Clients (PKCE)
 
@@ -652,7 +653,7 @@ val openId4VCIConfig = OpenId4VCIConfig(
 )
 ```
 With this configuration library is able to 
-- Generate automatically the Client Attestation PoP JWT, with every call to the PAR and/or Token endpoint
+- Automatically generate the Client Attestation PoP JWT, with every call to the PAR and/or Token endpoint
 - Populate the [HTTP headers](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-03.html#name-client-attestation-http-hea) when accessing PAR and/or Token endpoints 
 
 Library will check that the authorization server of the issuer, 
