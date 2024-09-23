@@ -32,7 +32,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import java.net.URI
-import java.net.URL
 import java.util.*
 
 internal object CredentialIssuerMetadataJsonParser {
@@ -77,6 +76,7 @@ private data class PolicyTO(
 /**
  * The data of a Verifiable Credentials issued as an ISO mDL.
  */
+@Suppress("unused")
 @Serializable
 @SerialName(FORMAT_MSO_MDOC)
 private data class MsdMdocCredentialTO(
@@ -147,6 +147,7 @@ private data class MsdMdocCredentialTO(
     }
 }
 
+@Suppress("unused")
 @Serializable
 @SerialName(FORMAT_SD_JWT_VC)
 private data class SdJwtVcCredentialTO(
@@ -209,7 +210,7 @@ private data class W3CJsonLdCredentialDefinitionTO(
 ) {
 
     fun toDomain(): W3CJsonLdCredentialDefinition = W3CJsonLdCredentialDefinition(
-        context = context.map { URL(it) },
+        context = context.map { URI(it).toURL() },
         type = types,
         credentialSubject = credentialSubject?.toDomain(),
     )
@@ -218,6 +219,7 @@ private data class W3CJsonLdCredentialDefinitionTO(
 /**
  * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
  */
+@Suppress("unused")
 @Serializable
 @SerialName(FORMAT_W3C_JSONLD_DATA_INTEGRITY)
 private data class W3CJsonLdDataIntegrityCredentialTO(
@@ -263,6 +265,7 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
 /**
  * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
  */
+@Suppress("unused")
 @Serializable
 @SerialName(FORMAT_W3C_JSONLD_SIGNED_JWT)
 private data class W3CJsonLdSignedJwtCredentialTO(
@@ -307,6 +310,7 @@ private data class W3CJsonLdSignedJwtCredentialTO(
 /**
  * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
  */
+@Suppress("unused")
 @Serializable
 @SerialName(FORMAT_W3C_SIGNED_JWT)
 private data class W3CSignedJwtCredentialTO(
@@ -548,13 +552,6 @@ private fun Map<String, ProofSigningAlgorithmsSupportedTO>?.toProofTypes(): Proo
     }
 
 private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta {
-    fun CoseAlgorithm.correspondingCurve(): CoseCurve? = when (this) {
-        CoseAlgorithm.ES256 -> CoseCurve.P_256
-        CoseAlgorithm.ES384 -> CoseCurve.P_384
-        CoseAlgorithm.ES512 -> CoseCurve.P_521
-        else -> null
-    }
-
     return when (type) {
         "jwt" -> ProofTypeMeta.Jwt(
             algorithms = meta.algorithms.map {

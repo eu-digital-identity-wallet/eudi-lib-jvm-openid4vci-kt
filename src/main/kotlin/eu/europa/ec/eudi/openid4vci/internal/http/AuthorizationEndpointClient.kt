@@ -242,7 +242,7 @@ internal class AuthorizationEndpointClient(
             }
 
             client.submitForm(url.toString(), formParameters) {
-                config.generateClientAttestationIfNeeded(URL(authorizationIssuer))?.let {
+                config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL())?.let {
                     clientAttestationHeaders(it)
                 }
             }

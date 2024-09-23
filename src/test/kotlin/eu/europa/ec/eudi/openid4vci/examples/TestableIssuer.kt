@@ -192,7 +192,7 @@ object Keycloak : CanAuthorizeIssuance<KeycloakUser> {
             val loginHtml = loginResponse.body<String>()
             val form = Jsoup.parse(loginHtml).body().getElementById("kc-form-login") as FormElement
             val action = form.attr("action")
-            URL(action)
+            URI(action).toURL()
         }
 
         fun formParameters() = Parameters.build {

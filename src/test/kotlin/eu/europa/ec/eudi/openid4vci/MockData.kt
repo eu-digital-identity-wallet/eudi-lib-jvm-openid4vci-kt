@@ -35,7 +35,6 @@ import com.nimbusds.openid.connect.sdk.op.OIDCProviderEndpointMetadata
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import io.ktor.http.*
 import java.net.URI
-import java.net.URL
 import java.util.*
 
 object SampleIssuer {
@@ -156,8 +155,8 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
     ),
     W3CJsonLdCredentialDefinition(
         listOf(
-            URL("https://www.w3.org/2018/credentials/v1"),
-            URL("https://www.w3.org/2018/credentials/examples/v1"),
+            URI("https://www.w3.org/2018/credentials/v1").toURL(),
+            URI("https://www.w3.org/2018/credentials/examples/v1").toURL(),
         ),
         listOf("VerifiableCredential_LDP_VC", "UniversityDegreeCredential_LDP_VC"),
         mapOf(
@@ -212,8 +211,8 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
     ),
     W3CJsonLdCredentialDefinition(
         listOf(
-            URL("https://www.w3.org/2018/credentials/v1"),
-            URL("https://www.w3.org/2018/credentials/examples/v1"),
+            URI("https://www.w3.org/2018/credentials/v1").toURL(),
+            URI("https://www.w3.org/2018/credentials/examples/v1").toURL(),
         ),
         listOf("VerifiableCredential_JWT_VC_JSON-LD", "UniversityDegreeCredential_JWT_VC_JSON-LD"),
         mapOf(

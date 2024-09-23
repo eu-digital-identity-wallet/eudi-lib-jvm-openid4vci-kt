@@ -26,7 +26,7 @@ import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import java.net.URL
+import java.net.URI
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -41,7 +41,8 @@ suspend fun DeferredIssuer.Companion.queryForDeferredCredential(
 ): Result<Pair<DeferredIssuanceStoredContextTO?, DeferredCredentialQueryOutcome>> = runCatching {
     val ctx = ctxTO.toDeferredIssuanceStoredContext(clock, recreatePopSigner, recreateClientAttestationPodSigner)
     val (newCtx, outcome) = queryForDeferredCredential(ctx, ktorHttpClientFactory).getOrThrow()
-    val newCtxTO = newCtx?.let { DeferredIssuanceStoredContextTO.from(it, ctxTO.dPoPSignerKid, ctxTO.clientAttestationPopKeyId) }
+    val newCtxTO =
+        newCtx?.let { DeferredIssuanceStoredContextTO.from(it, ctxTO.dPoPSignerKid, ctxTO.clientAttestationPopKeyId) }
     newCtxTO to outcome
 }
 
@@ -139,14 +140,18 @@ data class DeferredIssuanceStoredContextTO(
                             signingAlgorithm = JWSAlgorithm.parse(checkNotNull(clientAttestationPopAlgorithm)),
                             duration = Duration.ofSeconds(checkNotNull(clientAttestationPopDuration)).toKotlinDuration(),
                             typ = checkNotNull(clientAttestationPopType),
-                            jwsSigner = checkNotNull(recreateClientAttestationPodSigner).invoke(checkNotNull(clientAttestationPopKeyId)),
+                            jwsSigner = checkNotNull(recreateClientAttestationPodSigner).invoke(
+                                checkNotNull(
+                                    clientAttestationPopKeyId,
+                                ),
+                            ),
                         )
 
                         Client.Attested(jwt, poPJWTSpec)
                     },
-                deferredEndpoint = URL(deferredEndpoint),
-                authServerId = URL(authServerId),
-                tokenEndpoint = URL(tokenEndpoint),
+                deferredEndpoint = URI(deferredEndpoint).toURL(),
+                authServerId = URI(authServerId).toURL(),
+                tokenEndpoint = URI(tokenEndpoint).toURL(),
                 dPoPSigner = dPoPSignerKid?.let { requireNotNull(recreatePopSigner).invoke(it) },
                 responseEncryptionSpec = responseEncryptionSpec?.let { responseEncryption(it) },
             ),
@@ -165,11 +170,12 @@ data class DeferredIssuanceStoredContextTO(
 
     companion object {
 
-        fun <A>Client.ifAttested(getter: Client.Attested.() -> A?): A? =
+        fun <A> Client.ifAttested(getter: Client.Attested.() -> A?): A? =
             when (this) {
                 is Client.Attested -> getter()
                 is Client.Public -> null
             }
+
         fun from(
             dCtx: DeferredIssuanceContext,
             dPoPSignerKid: String?,

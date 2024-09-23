@@ -110,7 +110,7 @@ internal class TokenEndpointClient(
         config.clock,
         config.client,
         config.authFlowRedirectionURI,
-        URL(authorizationServerMetadata.issuer.value),
+        URI(authorizationServerMetadata.issuer.value).toURL(),
         authorizationServerMetadata.tokenEndpointURI.toURL(),
         dPoPJwtFactory,
         config.clientAttestationPoPBuilder,
