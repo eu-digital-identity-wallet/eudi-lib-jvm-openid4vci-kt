@@ -25,7 +25,6 @@ import io.ktor.client.request.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * The unvalidated data of a Credential Offer.
@@ -62,7 +61,6 @@ private data class AuthorizationCodeTO(
 private data class PreAuthorizedCodeTO(
     @SerialName("pre-authorized_code") @Required val preAuthorizedCode: String,
     @SerialName("tx_code") val txCode: TxCodeTO? = null,
-    @SerialName("interval") val interval: Long? = null,
     @SerialName("authorization_server") val authorizationServer: String? = null,
 )
 
@@ -192,7 +190,6 @@ private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata
             Grants.PreAuthorizedCode(
                 it.preAuthorizedCode,
                 it.txCode?.toTxCode(),
-                it.interval?.seconds ?: 5.seconds,
                 authorizationServer,
             )
         }

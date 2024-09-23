@@ -19,7 +19,6 @@ import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialOfferRequestResolv
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.http.*
 import java.io.Serializable
-import kotlin.time.Duration
 
 /**
  * A Credential Offer.
@@ -85,12 +84,10 @@ sealed interface Grants : Serializable {
     data class PreAuthorizedCode(
         val preAuthorizedCode: String,
         val txCode: TxCode? = null,
-        val interval: Duration,
         val authorizationServer: HttpsUrl? = null,
     ) : Grants {
         init {
             require(preAuthorizedCode.isNotBlank()) { "preAuthorizedCode cannot be blank" }
-            require(interval.isPositive()) { "interval cannot be negative or zero" }
         }
     }
 
