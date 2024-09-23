@@ -144,7 +144,7 @@ private data class MsdMdocCredentialTO(
             display,
             docType,
             claims(),
-            order ?: emptyList(),
+            order.orEmpty(),
         )
     }
 }
@@ -257,7 +257,7 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
             context = context,
             type = type,
             credentialDefinition = credentialDefinition.toDomain(),
-            order = order ?: emptyList(),
+            order = order.orEmpty(),
         )
     }
 }
@@ -301,7 +301,7 @@ private data class W3CJsonLdSignedJwtCredentialTO(
             display = display,
             context = context,
             credentialDefinition = credentialDefinition.toDomain(),
-            order = order ?: emptyList(),
+            order = order.orEmpty(),
         )
     }
 }
@@ -355,7 +355,7 @@ private data class W3CSignedJwtCredentialTO(
             proofTypesSupported = proofTypesSupported,
             display = display,
             credentialDefinition = credentialDefinition.toDomain(),
-            order = order ?: emptyList(),
+            order = order.orEmpty(),
         )
     }
 }
