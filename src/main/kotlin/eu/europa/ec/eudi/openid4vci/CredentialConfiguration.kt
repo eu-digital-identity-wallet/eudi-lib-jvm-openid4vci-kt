@@ -66,11 +66,14 @@ sealed interface ProofTypeMeta : Serializable {
     data object LdpVp : ProofTypeMeta {
         private fun readResolve(): Any = LdpVp
     }
+
+    data class Unsupported(val type: String) : ProofTypeMeta
 }
 
-fun ProofTypeMeta.type(): ProofType = when (this) {
+fun ProofTypeMeta.type(): ProofType? = when (this) {
     is ProofTypeMeta.Jwt -> ProofType.JWT
     is ProofTypeMeta.LdpVp -> ProofType.LDP_VP
+    is ProofTypeMeta.Unsupported -> null
 }
 
 @JvmInline

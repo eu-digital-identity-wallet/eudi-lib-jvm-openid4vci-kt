@@ -87,6 +87,7 @@ object CryptoGenerator {
             }
 
             ProofTypeMeta.LdpVp -> null
+            is ProofTypeMeta.Unsupported -> null
         }
 
     fun popSigner(

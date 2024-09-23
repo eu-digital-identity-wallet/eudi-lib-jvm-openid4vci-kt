@@ -551,8 +551,8 @@ private fun Map<String, ProofSigningAlgorithmsSupportedTO>?.toProofTypes(): Proo
         }
     }
 
-private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta {
-    return when (type) {
+private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta =
+    when (type) {
         "jwt" -> ProofTypeMeta.Jwt(
             algorithms = meta.algorithms.map {
                 JWSAlgorithm.parse(it)
@@ -560,9 +560,8 @@ private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO)
         )
 
         "ldp_vp" -> ProofTypeMeta.LdpVp
-        else -> error("Unknown Proof Type '$type'")
+        else -> ProofTypeMeta.Unsupported(type)
     }
-}
 
 /**
  * Utility method to convert a list of string to a list of [CryptographicBindingMethod].
