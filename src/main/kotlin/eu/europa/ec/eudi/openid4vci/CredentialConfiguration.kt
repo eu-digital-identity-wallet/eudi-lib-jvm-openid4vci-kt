@@ -189,6 +189,7 @@ data class SdJwtVcCredential(
     override val display: List<Display> = emptyList(),
     val type: String,
     val claims: Map<ClaimName, Claim?>?,
+    val order: List<ClaimName> = emptyList(),
 ) : CredentialConfiguration
 
 data class W3CJsonLdCredentialDefinition(
