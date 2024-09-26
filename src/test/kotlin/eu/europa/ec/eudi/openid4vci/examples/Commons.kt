@@ -70,31 +70,49 @@ internal fun issuanceLog(message: String) {
 
 fun Issuer.popSigner(
     credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
-): PopSigner? {
+): PopSigner? = popSigners(credentialConfigurationIdentifier, 1).firstOrNull()
+
+fun Issuer.popSigners(
+    credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
+    proofsNo: Int = 1,
+): List<PopSigner> {
     val credentialConfigurationsSupported =
         credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported
     val credentialConfiguration =
         checkNotNull(credentialConfigurationsSupported[credentialConfigurationIdentifier])
 
-    return if (credentialConfiguration.proofTypesSupported.values.isEmpty()) null
+    return if (credentialConfiguration.proofTypesSupported.values.isEmpty() || proofsNo == 0) emptyList()
     else {
-        val popSigner =
-            CryptoGenerator.popSigner(
-                credentialConfiguration = credentialConfiguration,
-            )
-        checkNotNull(popSigner) { "No signer can be generated for $credentialConfigurationIdentifier" }
+        val popSigners =
+            (0..<proofsNo).mapNotNull {
+                CryptoGenerator.popSigner(
+                    credentialConfiguration = credentialConfiguration,
+                )
+            }
+        check(popSigners.isNotEmpty()) { "No signer can be generated for $credentialConfigurationIdentifier" }
+        popSigners
     }
 }
-
+sealed interface BatchOption {
+    data object DontUse : BatchOption
+    data object MaxProofs : BatchOption
+}
 suspend fun Issuer.submitCredentialRequest(
     authorizedRequest: AuthorizedRequest,
     credentialConfigurationId: CredentialConfigurationIdentifier =
         credentialOffer.credentialConfigurationIdentifiers.first(),
     claimSet: ClaimSet? = null,
+    batchOption: BatchOption,
 ): AuthorizedRequestAnd<SubmissionOutcome> {
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
-    val popSigner = popSigner(credentialConfigurationId)
-    return authorizedRequest.requestSingle(requestPayload, popSigner).getOrThrow()
+    val proofsNo =
+        when (batchOption) {
+            BatchOption.DontUse -> 1
+            BatchOption.MaxProofs -> credentialOffer.credentialIssuerMetadata.batchCredentialIssuance?.batchSize ?: 1
+        }
+
+    val popSigners = popSigners(credentialConfigurationId, proofsNo)
+    return authorizedRequest.request(requestPayload, popSigners).getOrThrow()
 }
 
 suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(
@@ -125,13 +143,14 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
     enableHttpLogging: Boolean,
     credCfgId: CredentialConfigurationIdentifier = credentialOffer.credentialConfigurationIdentifiers.first(),
     claimSetToRequest: ClaimSet? = null,
+    batchOption: BatchOption,
 ) where
       ENV : HasTestUser<USER>,
       ENV : CanAuthorizeIssuance<USER> =
     coroutineScope {
         val authorizedReq = authorizeUsingAuthorizationCodeFlow(env, enableHttpLogging)
         val (updatedAuthorizedReq, outcome) =
-            submitCredentialRequest(authorizedReq, credCfgId, claimSetToRequest)
+            submitCredentialRequest(authorizedReq, credCfgId, claimSetToRequest, batchOption)
 
         ensureIssued(updatedAuthorizedReq, outcome)
     }
@@ -140,10 +159,11 @@ suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
     txCode: String?,
     credCfgId: CredentialConfigurationIdentifier,
     claimSetToRequest: ClaimSet?,
+    batchOption: BatchOption,
 ) = coroutineScope {
     val (authorized, outcome) = run {
         val authorizedRequest = authorizeWithPreAuthorizationCode(txCode).getOrThrow()
-        submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest)
+        submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest, batchOption)
     }
 
     ensureIssued(authorized, outcome)
@@ -200,6 +220,7 @@ suspend fun handleDeferred(
 suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
     credCfgId: CredentialConfigurationIdentifier,
     enableHttpLogging: Boolean = false,
+    batchOption: BatchOption = BatchOption.DontUse,
     claimSetToRequest: (CredentialConfiguration) -> ClaimSet? = { null },
 ) where
       ENV : HasTestUser<USER>,
@@ -217,6 +238,7 @@ suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
         testIssuanceWithAuthorizationCodeFlow(
             env = this@testIssuanceWithAuthorizationCodeFlow,
             enableHttpLogging = enableHttpLogging,
+            batchOption = batchOption,
             claimSetToRequest = claimSetToRequest.invoke(credCfg),
         )
     }
@@ -227,6 +249,7 @@ suspend fun <ENV, USER> ENV.testIssuanceWithPreAuthorizedCodeFlow(
     credCfgId: CredentialConfigurationIdentifier,
     credentialOfferEndpoint: String? = null,
     enableHttpLogging: Boolean = false,
+    batchOption: BatchOption,
     claimSetToRequest: (CredentialConfiguration) -> ClaimSet? = { null },
 ) where ENV : CanBeUsedWithVciLib, ENV : HasTestUser<USER>, ENV : CanRequestForCredentialOffer<USER> {
     val credentialOfferUri = requestPreAuthorizedCodeGrantOffer(
@@ -240,7 +263,7 @@ suspend fun <ENV, USER> ENV.testIssuanceWithPreAuthorizedCodeFlow(
     with(issuer) {
         val credCfg = credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credCfgId]
         assertNotNull(credCfg)
-        testIssuanceWithPreAuthorizedCodeFlow(txCode, credCfgId, claimSetToRequest(credCfg))
+        testIssuanceWithPreAuthorizedCodeFlow(txCode, credCfgId, claimSetToRequest(credCfg), batchOption)
     }
 }
 

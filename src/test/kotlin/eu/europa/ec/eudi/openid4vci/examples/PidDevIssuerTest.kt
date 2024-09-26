@@ -28,6 +28,7 @@ class PidDevIssuerTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
             PidDevIssuer.PID_MsoMdoc_config_id,
             enableHttpLogging = false,
+            batchOption = BatchOption.MaxProofs,
         )
     }
 
@@ -36,6 +37,7 @@ class PidDevIssuerTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
             PidDevIssuer.PID_SdJwtVC_config_id,
             enableHttpLogging = false,
+            batchOption = BatchOption.MaxProofs,
         )
     }
 
@@ -44,14 +46,7 @@ class PidDevIssuerTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
             PidDevIssuer.MDL_config_id,
             enableHttpLogging = false,
-        )
-    }
-
-    @Test @Ignore
-    fun `Issue mDL in mso_mdoc using authorize code flow and CWT proofs`() = runTest {
-        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
-            PidDevIssuer.MDL_config_id,
-            enableHttpLogging = false,
+            batchOption = BatchOption.MaxProofs,
         )
     }
 }
