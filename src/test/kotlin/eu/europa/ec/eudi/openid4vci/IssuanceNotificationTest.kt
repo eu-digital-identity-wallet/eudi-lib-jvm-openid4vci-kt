@@ -75,7 +75,7 @@ class IssuanceNotificationTest {
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
                     val popSigner = CryptoGenerator.rsaProofSigner()
                     val (newAuthorizedRequest, outcome) =
-                        authorizedRequest.requestSingle(requestPayload, popSigner).getOrThrow()
+                        authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
                     assertIs<SubmissionOutcome.Success>(outcome)
 
                     val issuedCredential = outcome.credentials.firstOrNull()

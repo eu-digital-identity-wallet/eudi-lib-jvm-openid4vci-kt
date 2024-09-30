@@ -91,9 +91,10 @@ private suspend fun submit(
     credentialConfigurationId: CredentialConfigurationIdentifier,
 ): AuthorizedRequestAnd<List<IssuedCredential>> {
     with(issuer) {
-        val proofSigner = popSigner(credentialConfigurationId)
+        val proofSigners = popSigners(credentialConfigurationId, proofsNo = 1)
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-        val (newAuthorized, outcome) = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
+        val (newAuthorized, outcome) =
+            authorized.request(requestPayload, proofSigners).getOrThrow()
         return when (outcome) {
             is SubmissionOutcome.Success -> newAuthorized to outcome.credentials
             is SubmissionOutcome.Deferred -> newAuthorized to handleDeferred(issuer, authorized, outcome.transactionId)

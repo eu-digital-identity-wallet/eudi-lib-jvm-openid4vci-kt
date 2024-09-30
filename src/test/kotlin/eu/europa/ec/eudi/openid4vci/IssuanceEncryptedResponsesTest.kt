@@ -180,7 +180,7 @@ class IssuanceEncryptedResponsesTest {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-                noProofRequired.requestSingle(requestPayload, null).getOrThrow()
+                noProofRequired.request(requestPayload).getOrThrow()
             }
         }
 
@@ -217,7 +217,7 @@ class IssuanceEncryptedResponsesTest {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-                noProofRequired.requestSingle(requestPayload, null).getOrThrow()
+                noProofRequired.request(requestPayload).getOrThrow()
             }
         }
 
@@ -249,7 +249,7 @@ class IssuanceEncryptedResponsesTest {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-                noProofRequired.requestSingle(requestPayload, null).getOrThrow()
+                noProofRequired.request(requestPayload).getOrThrow()
             }
         }
 
@@ -325,7 +325,7 @@ class IssuanceEncryptedResponsesTest {
                 assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
-                val (_, outcome) = authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
+                val (_, outcome) = authorizedRequest.request(requestPayload).getOrThrow()
                 assertIs<SubmissionOutcome.Success>(outcome)
             }
         }
@@ -383,10 +383,8 @@ class IssuanceEncryptedResponsesTest {
             )
 
             with(issuer) {
-                authorizedRequest.requestSingle(
-                    IssuanceRequestPayload.ConfigurationBased(CredentialConfigurationIdentifier(PID_MsoMdoc)),
-                    null,
-                ).getOrThrow()
+                val payload = IssuanceRequestPayload.ConfigurationBased(CredentialConfigurationIdentifier(PID_MsoMdoc))
+                authorizedRequest.request(payload).getOrThrow()
             }
         }
 
@@ -472,7 +470,8 @@ class IssuanceEncryptedResponsesTest {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                     CredentialConfigurationIdentifier(PID_SdJwtVC),
                 )
-                val (newAuthorizedRequest, outcome) = authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
+                val (newAuthorizedRequest, outcome) =
+                    authorizedRequest.request(requestPayload).getOrThrow()
                 assertIs<SubmissionOutcome.Deferred>(outcome)
 
                 assertFailsWith<CredentialIssuanceError.InvalidResponseContentType>(
@@ -540,7 +539,7 @@ class IssuanceEncryptedResponsesTest {
                 null,
             )
             val (newAuthorizedRequest, outcome) =
-                authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
+                authorizedRequest.request(requestPayload).getOrThrow()
             assertIs<SubmissionOutcome.Deferred>(outcome)
 
             val (_, deferredOutcome) =

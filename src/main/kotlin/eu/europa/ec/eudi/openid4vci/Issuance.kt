@@ -152,11 +152,15 @@ typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
  */
 interface RequestIssuance {
 
+    @Deprecated(
+        message = "Method deprecated and will be removed in a future release",
+        replaceWith = ReplaceWith("request(requestPayload, popSigner?.let(::listOf).orEmpty()"),
+    )
     suspend fun AuthorizedRequest.requestSingle(
         requestPayload: IssuanceRequestPayload,
         popSigner: PopSigner?,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> =
-        request(requestPayload, popSigner?.let { listOf(it) } ?: emptyList())
+        request(requestPayload, popSigner?.let(::listOf).orEmpty())
 
     /**
      * Places a request to the credential issuance endpoint.
@@ -166,9 +170,9 @@ interface RequestIssuance {
      *
      * @receiver the current authorization state
      * @param requestPayload the payload of the request
-     * @param popSigners one or more signer component of the proofs to be sent. Although this is an optional
-     * parameter, only required in case the present authorization state is [AuthorizedRequest.ProofRequired],
-     * caller is advised to provide it, in order to allow the method to automatically retry
+     * @param popSigners one or more signers for the proofs to be sent.
+     * Although this is an optional parameter, only required in case the present authorization state is [AuthorizedRequest.ProofRequired],
+     * caller is advised to provide it, to allow the method to automatically retry
      * in case of [CredentialIssuanceError.InvalidProof]
      *
      * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh c_nonce) and
@@ -176,7 +180,7 @@ interface RequestIssuance {
      */
     suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
-        popSigners: List<PopSigner>,
+        popSigners: List<PopSigner> = emptyList(),
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 }
 
@@ -310,7 +314,7 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     class UnsupportedCredentialType : CredentialIssuanceError("UnsupportedCredentialType")
 
     /**
-     * Un-supported credential type requested to issuance server
+     * Unsupported credential type requested to issuance server
      */
     class UnsupportedCredentialFormat : CredentialIssuanceError("UnsupportedCredentialFormat")
 
