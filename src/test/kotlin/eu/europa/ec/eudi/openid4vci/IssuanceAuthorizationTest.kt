@@ -98,7 +98,7 @@ class IssuanceAuthorizationTest {
                     "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
                 )
 
-                val form = assertIs<FormDataContent>(request, "Not a form post")
+                val form = assertIs<FormDataContent>(request.body, "Not a form post")
                 assertNotNull(
                     form.formData[TokenEndpointForm.CODE_VERIFIER_PARAM],
                     "PKCE code verifier was expected but not sent.",
@@ -142,6 +142,7 @@ class IssuanceAuthorizationTest {
             authRequestPrepared
                 .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
                 .also { println(it) }
+                .getOrThrow()
         }
     }
 
@@ -186,7 +187,7 @@ class IssuanceAuthorizationTest {
                     }
 
                     val form = assertIs<FormDataContent>(request.body, "Not a form post")
-                    assertNull(
+                    assertNotNull(
                         form.formData[TokenEndpointForm.CODE_VERIFIER_PARAM],
                         "PKCE code verifier was expected but not sent.",
                     )
@@ -198,7 +199,7 @@ class IssuanceAuthorizationTest {
                         form.formData[TokenEndpointForm.REDIRECT_URI_PARAM],
                         "Parameter ${TokenEndpointForm.REDIRECT_URI_PARAM} was expected but not sent.",
                     )
-                    assertNull(
+                    assertNotNull(
                         form.formData[TokenEndpointForm.CLIENT_ID_PARAM],
                         "Parameter ${TokenEndpointForm.CLIENT_ID_PARAM} was expected but not sent.",
                     )
@@ -228,6 +229,7 @@ class IssuanceAuthorizationTest {
                 authRequestPrepared
                     .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
                     .also { println(it) }
+                    .getOrThrow()
             }
         }
 
@@ -766,7 +768,7 @@ class IssuanceAuthorizationTest {
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             ).getOrThrow()
 
-            issuer.prepareAuthorizationRequest()
+            issuer.prepareAuthorizationRequest().getOrThrow()
         }
 
     private suspend fun credentialOffer(
