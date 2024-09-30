@@ -35,7 +35,7 @@ internal class RequestIssuanceImpl(
         //
         val outcome = placeIssuanceRequest(accessToken) {
             val proofFactories = proofFactoriesForm(popSigners)
-            buildRequest(requestPayload, proofFactories, credentialIdentifiers)
+            buildRequest(requestPayload, proofFactories, credentialIdentifiers.orEmpty())
         }
 
         //
@@ -116,7 +116,7 @@ internal class RequestIssuanceImpl(
     private suspend fun buildRequest(
         requestPayload: IssuanceRequestPayload,
         proofFactories: List<ProofFactory>,
-        credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
+        authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
     ): CredentialIssuanceRequest {
         val credentialCfg = run {
             val creCfgId = requestPayload.credentialConfigurationIdentifier
@@ -141,9 +141,7 @@ internal class RequestIssuanceImpl(
             }
 
             is IssuanceRequestPayload.IdentifierBased -> {
-                if (credentialIdentifiers != null) {
-                    requestPayload.ensureAuthorized(credentialIdentifiers)
-                }
+                requestPayload.ensureAuthorized(authorizationDetails)
                 CredentialIssuanceRequest.byId(requestPayload.credentialIdentifier, proofs, responseEncryptionSpec)
             }
         }
@@ -160,10 +158,10 @@ internal class RequestIssuanceImpl(
 }
 
 private fun IssuanceRequestPayload.IdentifierBased.ensureAuthorized(
-    credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
+    authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
 ) {
     val credentialId = credentialIdentifier
-    val authorizedCredIds = checkNotNull(credentialIdentifiers[credentialConfigurationIdentifier]) {
+    val authorizedCredIds = checkNotNull(authorizationDetails[credentialConfigurationIdentifier]) {
         "No credential identifiers authorized for $credentialConfigurationIdentifier"
     }
     check(credentialId in authorizedCredIds) {
