@@ -108,7 +108,10 @@ suspend fun Issuer.submitCredentialRequest(
     val proofsNo =
         when (batchOption) {
             BatchOption.DontUse -> 1
-            BatchOption.MaxProofs -> credentialOffer.credentialIssuerMetadata.batchCredentialIssuance?.batchSize ?: 1
+            BatchOption.MaxProofs -> when (val batchIssuance = credentialOffer.credentialIssuerMetadata.batchCredentialIssuance) {
+                BatchCredentialIssuance.NotSupported -> 1
+                is BatchCredentialIssuance.Supported -> batchIssuance.batchSize
+            }
         }
 
     val popSigners = popSigners(credentialConfigurationId, proofsNo)

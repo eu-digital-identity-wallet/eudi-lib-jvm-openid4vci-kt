@@ -317,7 +317,7 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
             listOf(EncryptionMethod.XC20P),
         ),
     ),
-    BatchCredentialIssuance(batchSize = 2),
+    BatchCredentialIssuance.Supported(batchSize = 2),
     true,
     mapOf(
         CredentialConfigurationIdentifier("UniversityDegree_JWT") to universityDegreeJwt(),

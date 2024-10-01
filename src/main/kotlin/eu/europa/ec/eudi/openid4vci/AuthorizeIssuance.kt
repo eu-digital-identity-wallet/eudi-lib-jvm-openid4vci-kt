@@ -26,11 +26,14 @@ import java.time.Instant
  * for preparing the authorization request
  * @param state the state which was sent with the
  * authorization request
+ * @param identifiersSentAsAuthDetails The list of the offer's [CredentialConfigurationIdentifier]s that are or will be communicated to
+ * authorization server as detailed authorizations, part of a Rich Authorization Request.
  */
 data class AuthorizationRequestPrepared(
     val authorizationCodeURL: HttpsUrl,
     val pkceVerifier: PKCEVerifier,
     val state: String,
+    val identifiersSentAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
 ) : java.io.Serializable
 
 /**
@@ -113,6 +116,13 @@ sealed interface AuthorizedRequest : java.io.Serializable {
     ) : AuthorizedRequest
 }
 
+sealed interface AuthorizationDetailsInTokenRequest {
+
+    data object DoNotInclude : AuthorizationDetailsInTokenRequest
+
+    data class Include(val filter: (CredentialConfigurationIdentifier) -> Boolean) : AuthorizationDetailsInTokenRequest
+}
+
 interface AuthorizeIssuance {
 
     /**
@@ -134,22 +144,29 @@ interface AuthorizeIssuance {
      * Using the access code retrieved after performing the authorization request prepared from a call to
      * [AuthorizeOfferIssuance.prepareAuthorizationRequest()], it posts a request to authorization server's token endpoint to
      * retrieve an access token. This step transitions state from [AuthorizationRequestPrepared] to an
-     * [AuthorizedRequest] state
+     * [AuthorizedRequest] state.
      *
      * @param authorizationCode The authorization code returned from authorization server via front-channel
      * @param serverState The state returned from authorization server via front-channel
+     * @param authDetailsOption Defines if upon access token request extra authorization details will be set to fine grain the
+     * scope of the access token.
      * @return an issuance request in authorized state
      */
     suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
         authorizationCode: AuthorizationCode,
         serverState: String,
+        authDetailsOption: AuthorizationDetailsInTokenRequest = AuthorizationDetailsInTokenRequest.DoNotInclude,
     ): Result<AuthorizedRequest>
 
     /**
      * Action to authorize an issuance request using Pre-Authorized Code Flow.
      *
      * @param txCode   Optional parameter in case the credential offer specifies that a user provided pin is required for authorization
+     * @param authDetailsOption An option to include authorization_details in the request or not
      * @return an issuance request in authorized state
      */
-    suspend fun authorizeWithPreAuthorizationCode(txCode: String?): Result<AuthorizedRequest>
+    suspend fun authorizeWithPreAuthorizationCode(
+        txCode: String?,
+        authDetailsOption: AuthorizationDetailsInTokenRequest = AuthorizationDetailsInTokenRequest.DoNotInclude,
+    ): Result<AuthorizedRequest>
 }

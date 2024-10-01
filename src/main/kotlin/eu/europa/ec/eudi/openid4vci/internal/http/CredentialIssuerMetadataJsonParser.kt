@@ -422,10 +422,11 @@ private data class CredentialIssuerMetadataTO(
 
         val display = display?.map(DisplayTO::toDomain) ?: emptyList()
         val batchIssuance = batchCredentialIssuance?.let {
-            runCatching { BatchCredentialIssuance(it.batchSize) }.ensureSuccess {
+            runCatching { BatchCredentialIssuance.Supported(it.batchSize) }.ensureSuccess {
                 CredentialIssuerMetadataValidationError.InvalidBatchSize()
             }
-        }
+        } ?: BatchCredentialIssuance.NotSupported
+
         return CredentialIssuerMetadata(
             credentialIssuerIdentifier,
             authorizationServers,

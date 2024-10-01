@@ -22,7 +22,7 @@ internal class RequestIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     private val config: OpenId4VCIConfig,
     private val credentialEndpointClient: CredentialEndpointClient,
-    private val batchCredentialIssuance: BatchCredentialIssuance?,
+    private val batchCredentialIssuance: BatchCredentialIssuance,
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ) : RequestIssuance {
 
@@ -93,12 +93,14 @@ internal class RequestIssuanceImpl(
                     0 -> error("At least a PopSigner is required in Authorized.ProofRequired")
                     1 -> Unit
                     else -> {
-                        ensureNotNull(batchCredentialIssuance) {
-                            CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
-                        }
-                        val maxBatchSize = batchCredentialIssuance.batchSize
-                        ensure(popSignersNo <= maxBatchSize) {
-                            CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
+                        when (batchCredentialIssuance) {
+                            BatchCredentialIssuance.NotSupported -> CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+                            is BatchCredentialIssuance.Supported -> {
+                                val maxBatchSize = batchCredentialIssuance.batchSize
+                                ensure(popSignersNo <= maxBatchSize) {
+                                    CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
+                                }
+                            }
                         }
                     }
                 }

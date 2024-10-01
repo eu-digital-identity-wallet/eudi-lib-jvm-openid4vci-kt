@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
-import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotSupported
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import java.io.Serializable
 import java.net.URL
@@ -55,9 +54,15 @@ data class SupportedEncryptionAlgorithmsAndMethods(
     }
 }
 
-data class BatchCredentialIssuance(val batchSize: Int) {
-    init {
-        require(batchSize > 0) { "batchSize must be greater than 0" }
+sealed interface BatchCredentialIssuance : Serializable {
+    data object NotSupported : BatchCredentialIssuance {
+        private fun readResolve(): Any = NotSupported
+    }
+
+    data class Supported(val batchSize: Int) : BatchCredentialIssuance {
+        init {
+            require(batchSize > 0) { "batchSize must be greater than 0" }
+        }
     }
 }
 
@@ -70,8 +75,8 @@ data class CredentialIssuerMetadata(
     val credentialEndpoint: CredentialIssuerEndpoint,
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val notificationEndpoint: CredentialIssuerEndpoint? = null,
-    val credentialResponseEncryption: CredentialResponseEncryption = NotSupported,
-    val batchCredentialIssuance: BatchCredentialIssuance?,
+    val credentialResponseEncryption: CredentialResponseEncryption = CredentialResponseEncryption.NotSupported,
+    val batchCredentialIssuance: BatchCredentialIssuance = BatchCredentialIssuance.NotSupported,
     val credentialIdentifiersSupported: Boolean = false,
     val credentialConfigurationsSupported: Map<CredentialConfigurationIdentifier, CredentialConfiguration>,
     val display: List<Display> = emptyList(),

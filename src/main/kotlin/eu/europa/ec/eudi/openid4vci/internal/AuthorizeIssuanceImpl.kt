@@ -54,7 +54,7 @@ internal class AuthorizeIssuanceImpl(
                     state,
                     issuerState,
                 ).getOrThrow()
-            AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier, state)
+            AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier, state, configurationIds)
         }
 
     private fun scopesAndCredentialConfigurationIds(): Pair<List<Scope>, List<CredentialConfigurationIdentifier>> {
@@ -81,15 +81,25 @@ internal class AuthorizeIssuanceImpl(
     override suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
         authorizationCode: AuthorizationCode,
         serverState: String,
+        authDetailsOption: AuthorizationDetailsInTokenRequest,
     ): Result<AuthorizedRequest> =
         runCatching {
             ensure(serverState == state) { InvalidAuthorizationState() }
+            val credConfigIdsAsAuthDetails = when (authDetailsOption) {
+                AuthorizationDetailsInTokenRequest.DoNotInclude -> emptyList()
+                is AuthorizationDetailsInTokenRequest.Include -> {
+                    identifiersSentAsAuthDetails.filter(authDetailsOption.filter)
+                }
+            }
             val tokenResponse =
-                tokenEndpointClient.requestAccessTokenAuthFlow(authorizationCode, pkceVerifier).getOrThrow()
+                tokenEndpointClient.requestAccessTokenAuthFlow(authorizationCode, pkceVerifier, credConfigIdsAsAuthDetails).getOrThrow()
             authorizedRequest(credentialOffer, tokenResponse)
         }
 
-    override suspend fun authorizeWithPreAuthorizationCode(txCode: String?): Result<AuthorizedRequest> = runCatching {
+    override suspend fun authorizeWithPreAuthorizationCode(
+        txCode: String?,
+        authDetailsOption: AuthorizationDetailsInTokenRequest,
+    ): Result<AuthorizedRequest> = runCatching {
         val offeredGrants = requireNotNull(credentialOffer.grants) {
             "Grant not specified in credential offer."
         }
@@ -97,8 +107,14 @@ internal class AuthorizeIssuanceImpl(
             "Pre-authorized code grant expected"
         }
         with(preAuthorizedCode) { validate(txCode) }
+        val credConfigIdsAsAuthDetails = when (authDetailsOption) {
+            AuthorizationDetailsInTokenRequest.DoNotInclude -> emptyList()
+            is AuthorizationDetailsInTokenRequest.Include -> {
+                credentialOffer.credentialConfigurationIdentifiers.filter(authDetailsOption.filter)
+            }
+        }
         val tokenResponse =
-            tokenEndpointClient.requestAccessTokenPreAuthFlow(preAuthorizedCode, txCode).getOrThrow()
+            tokenEndpointClient.requestAccessTokenPreAuthFlow(preAuthorizedCode, txCode, credConfigIdsAsAuthDetails).getOrThrow()
         authorizedRequest(credentialOffer, tokenResponse)
     }
 }

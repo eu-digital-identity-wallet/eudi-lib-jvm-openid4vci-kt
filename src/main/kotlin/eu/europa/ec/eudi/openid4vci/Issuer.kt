@@ -129,6 +129,7 @@ interface Issuer :
 
             val tokenEndpointClient =
                 TokenEndpointClient(
+                    credentialOffer.credentialIssuerIdentifier,
                     credentialOffer.authorizationServerMetadata,
                     config,
                     dPoPJwtFactory,
@@ -213,6 +214,7 @@ interface Issuer :
 
                     return DeferredIssuanceContext(
                         DeferredIssuerConfig(
+                            credentialIssuerId = credentialOffer.credentialIssuerIdentifier,
                             client = config.client,
                             deferredEndpoint = deferredEndpoint,
                             authServerId = URI(authorizationServerMetadata.issuer.value).toURL(),

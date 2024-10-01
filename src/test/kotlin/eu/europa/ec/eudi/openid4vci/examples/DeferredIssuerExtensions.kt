@@ -105,6 +105,7 @@ data class AccessTokenTO(
 
 @Serializable
 data class DeferredIssuanceStoredContextTO(
+    @Required @SerialName("credential_issuer") val credentialIssuerId: String,
     @Required @SerialName("client_id") val clientId: String,
     @SerialName("client_attestation_jwt") val clientAttestationJwt: String? = null,
     @SerialName("client_attestation_pop_duration") val clientAttestationPopDuration: Long? = null,
@@ -129,6 +130,7 @@ data class DeferredIssuanceStoredContextTO(
     ): DeferredIssuanceContext {
         return DeferredIssuanceContext(
             config = DeferredIssuerConfig(
+                credentialIssuerId = CredentialIssuerId(credentialIssuerId).getOrThrow(),
                 clock = clock,
                 client =
                     if (clientAttestationJwt == null) Client.Public(clientId)
@@ -183,6 +185,7 @@ data class DeferredIssuanceStoredContextTO(
         ): DeferredIssuanceStoredContextTO {
             val authorizedTransaction = dCtx.authorizedTransaction
             return DeferredIssuanceStoredContextTO(
+                credentialIssuerId = dCtx.config.credentialIssuerId.toString(),
                 clientId = dCtx.config.client.id,
                 clientAttestationJwt = dCtx.config.client.ifAttested { attestationJWT.jwt.serialize() },
                 clientAttestationPopType = dCtx.config.client.ifAttested { popJwtSpec.typ.toString() },
