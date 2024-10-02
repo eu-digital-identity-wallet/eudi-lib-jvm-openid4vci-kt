@@ -27,7 +27,6 @@ import kotlinx.serialization.json.JsonObject
 import java.net.URLEncoder
 
 internal const val OPENID_CREDENTIAL = "openid_credential"
-internal const val AUTHORIZATION_DETAILS = "authorization_details"
 
 internal fun CredentialConfigurationIdentifier.toNimbusAuthDetail(
     includeLocations: Boolean,

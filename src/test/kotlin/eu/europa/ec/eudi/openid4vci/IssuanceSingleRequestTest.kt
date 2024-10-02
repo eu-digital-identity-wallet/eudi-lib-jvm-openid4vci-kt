@@ -173,7 +173,7 @@ class IssuanceSingleRequestTest {
                 tokenPostMocker(),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
@@ -208,7 +208,7 @@ class IssuanceSingleRequestTest {
                 tokenPostMocker(),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
@@ -383,7 +383,7 @@ class IssuanceSingleRequestTest {
                 ),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
@@ -424,7 +424,7 @@ class IssuanceSingleRequestTest {
                 ),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
@@ -460,7 +460,7 @@ class IssuanceSingleRequestTest {
                 ),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
@@ -497,7 +497,7 @@ class IssuanceSingleRequestTest {
             ),
         )
         val (authorizedRequest, _) = authorizeRequestForCredentialOffer(
-            credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
             ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 

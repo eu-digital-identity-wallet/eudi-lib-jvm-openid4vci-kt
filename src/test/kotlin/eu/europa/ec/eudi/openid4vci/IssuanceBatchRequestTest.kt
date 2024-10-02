@@ -74,7 +74,7 @@ class IssuanceBatchRequestTest {
         )
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 

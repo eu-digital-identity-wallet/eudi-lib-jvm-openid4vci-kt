@@ -377,7 +377,7 @@ class IssuanceEncryptedResponsesTest {
             )
 
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
@@ -419,7 +419,7 @@ class IssuanceEncryptedResponsesTest {
             )
 
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )

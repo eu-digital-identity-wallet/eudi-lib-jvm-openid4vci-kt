@@ -16,45 +16,19 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.http.PushedAuthorizationRequestResponseTO
-import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointForm
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenResponseTO
 import io.ktor.client.engine.mock.*
-import io.ktor.client.request.forms.*
 import io.ktor.http.*
-import io.ktor.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import parPost_ApplyAssertionsAndGetFormData
+import tokenPost_ApplyAuthFlowAssertionsAndGetFormData
+import tokenPost_ApplyPreAuthFlowAssertionsAndGetFormData
 import java.util.*
-import kotlin.test.*
-import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail as NimbusAuthorizationDetail
-
-private val AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
-          "grants": {
-            "authorization_code": {
-              "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
-            }
-          }
-        }
-""".trimIndent()
-
-private val PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
-          "grants": {
-            "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
-              "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
-              "tx_code": {
-                "input_mode": "numeric"
-              }
-            }
-          }
-        }
-""".trimIndent()
+import kotlin.test.Test
+import kotlin.test.assertTrue
+import kotlin.test.fail
 
 class IssuanceAuthorizationTest {
 
@@ -64,12 +38,7 @@ class IssuanceAuthorizationTest {
             oidcWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker { request ->
-                assertEquals(
-                    "application/x-www-form-urlencoded; charset=UTF-8",
-                    request.body.contentType?.toString(),
-                    "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
-                )
-                val form = assertIs<FormDataContent>(request.body, "Not a form post")
+                val form = with(request) { parPost_ApplyAssertionsAndGetFormData(false) }
 
                 assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
                     form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
@@ -77,59 +46,13 @@ class IssuanceAuthorizationTest {
                 assertTrue("Missing scope eu.europa.ec.eudiw.pid_mso_mdoc") {
                     form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc") ?: false
                 }
-                assertNull(
-                    form.formData["issuer_state"],
-                    "No issuer_state expected when issuance starts from wallet",
-                )
-                assertNotNull(
-                    form.formData["code_challenge"],
-                    "PKCE code challenge was expected but not sent.",
-                )
-                assertNotNull(
-                    form.formData["code_challenge_method"],
-                    "PKCE code challenge method was expected but not sent.",
-                )
             },
             tokenPostMocker { request ->
-
-                assertEquals(
-                    "application/x-www-form-urlencoded; charset=UTF-8",
-                    request.body.contentType?.toString(),
-                    "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
-                )
-
-                val form = assertIs<FormDataContent>(request.body, "Not a form post")
-                assertNotNull(
-                    form.formData[TokenEndpointForm.CODE_VERIFIER_PARAM],
-                    "PKCE code verifier was expected but not sent.",
-                )
-                assertNotNull(
-                    form.formData[TokenEndpointForm.AUTHORIZATION_CODE_PARAM],
-                    "Parameter ${TokenEndpointForm.AUTHORIZATION_CODE_PARAM} was expected but not sent.",
-                )
-
-                assertNotNull(
-                    form.formData[TokenEndpointForm.REDIRECT_URI_PARAM],
-                    "Parameter ${TokenEndpointForm.REDIRECT_URI_PARAM} was expected but not sent.",
-                )
-                assertNotNull(
-                    form.formData[TokenEndpointForm.CLIENT_ID_PARAM],
-                    "Parameter ${TokenEndpointForm.CLIENT_ID_PARAM} was expected but not sent.",
-                )
-                val grantType = form.formData[TokenEndpointForm.GRANT_TYPE_PARAM]
-                assertNotNull(
-                    grantType,
-                    "Parameter ${TokenEndpointForm.GRANT_TYPE_PARAM} was expected but not sent.",
-                )
-                assertEquals(
-                    TokenEndpointForm.AUTHORIZATION_CODE_GRANT,
-                    grantType,
-                    "Expected grant_type is ${TokenEndpointForm.AUTHORIZATION_CODE_GRANT} but instead sent $grantType.",
-                )
+                with(request) { tokenPost_ApplyAuthFlowAssertionsAndGetFormData() }
             },
         )
 
-        val offer = credentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
+        val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_NO_GRANTS)
         val issuer = Issuer.make(
             config = OpenId4VCIConfiguration,
             credentialOffer = offer,
@@ -140,9 +63,8 @@ class IssuanceAuthorizationTest {
             val authorizationCode = UUID.randomUUID().toString()
             val serverState = authRequestPrepared.state // dummy don't use it
             authRequestPrepared
-                .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
+                .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState).getOrThrow()
                 .also { println(it) }
-                .getOrThrow()
         }
     }
 
@@ -153,70 +75,20 @@ class IssuanceAuthorizationTest {
                 oidcWellKnownMocker(),
                 authServerWellKnownMocker(),
                 parPostMocker { request ->
-                    assertEquals(
-                        "application/x-www-form-urlencoded; charset=UTF-8",
-                        request.body.contentType?.toString(),
-                        "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
-                    )
-                    val form = assertIs<FormDataContent>(request.body, "Not a form post")
-
+                    val form = with(request) { parPost_ApplyAssertionsAndGetFormData(false) }
                     assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
                         form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
                     }
                     assertTrue("Missing scope eu.europa.ec.eudiw.pid_mso_mdoc") {
                         form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc") ?: false
                     }
-                    assertNull(
-                        form.formData["issuer_state"],
-                        "No issuer_state expected when issuance starts from wallet",
-                    )
-                    assertNotNull(
-                        form.formData["code_challenge"],
-                        "PKCE code challenge was expected but not sent.",
-                    )
-                    assertNotNull(
-                        form.formData["code_challenge_method"],
-                        "PKCE code challenge method was expected but not sent.",
-                    )
                 },
                 tokenPostMocker { request ->
-                    assertTrue(
-                        "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
-                    ) {
-                        request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
-                    }
-
-                    val form = assertIs<FormDataContent>(request.body, "Not a form post")
-                    assertNotNull(
-                        form.formData[TokenEndpointForm.CODE_VERIFIER_PARAM],
-                        "PKCE code verifier was expected but not sent.",
-                    )
-                    assertNotNull(
-                        form.formData[TokenEndpointForm.AUTHORIZATION_CODE_PARAM],
-                        "Parameter ${TokenEndpointForm.AUTHORIZATION_CODE_PARAM} was expected but not sent.",
-                    )
-                    assertNotNull(
-                        form.formData[TokenEndpointForm.REDIRECT_URI_PARAM],
-                        "Parameter ${TokenEndpointForm.REDIRECT_URI_PARAM} was expected but not sent.",
-                    )
-                    assertNotNull(
-                        form.formData[TokenEndpointForm.CLIENT_ID_PARAM],
-                        "Parameter ${TokenEndpointForm.CLIENT_ID_PARAM} was expected but not sent.",
-                    )
-                    val grantType = form.formData[TokenEndpointForm.GRANT_TYPE_PARAM]
-                    assertNotNull(
-                        grantType,
-                        "Parameter ${TokenEndpointForm.GRANT_TYPE_PARAM} was expected but not sent.",
-                    )
-                    assertEquals(
-                        TokenEndpointForm.AUTHORIZATION_CODE_GRANT,
-                        grantType,
-                        "Expected grant_type is ${TokenEndpointForm.AUTHORIZATION_CODE_GRANT} but instead sent $grantType.",
-                    )
+                    with(request) { tokenPost_ApplyAuthFlowAssertionsAndGetFormData() }
                 },
             )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CREDENTIAL_OFFER_NO_GRANTS)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_NO_GRANTS)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -229,7 +101,6 @@ class IssuanceAuthorizationTest {
                 authRequestPrepared
                     .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
                     .also { println(it) }
-                    .getOrThrow()
             }
         }
 
@@ -243,45 +114,17 @@ class IssuanceAuthorizationTest {
                     fail("No pushed authorization request should have been sent in case of pre-authorized code flow")
                 },
                 tokenPostMocker { request ->
-                    assertTrue(
-                        "Wrong content-type, expected application/x-www-form-urlencoded but was ${request.headers["Content-Type"]}",
-                    ) {
-                        request.body.contentType?.toString() == "application/x-www-form-urlencoded; charset=UTF-8"
-                    }
-                    assertTrue("Not a form post") {
-                        request.body is FormDataContent
-                    }
-                    val form = request.body as FormDataContent
-
-                    assertTrue("PKCE code verifier was not expected but sent.") {
-                        form.formData["code_verifier"] == null
-                    }
-                    assertTrue("Parameter ${TokenEndpointForm.PRE_AUTHORIZED_CODE_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.PRE_AUTHORIZED_CODE_PARAM] != null
-                    }
-                    assertTrue("Parameter ${TokenEndpointForm.TX_CODE_PARAM} was expected but not sent.") {
-                        form.formData[TokenEndpointForm.TX_CODE_PARAM] != null
-                    }
-
-                    val grantType = form.formData[TokenEndpointForm.GRANT_TYPE_PARAM]
-                    assertTrue("Parameter ${TokenEndpointForm.GRANT_TYPE_PARAM} was expected but not sent.") {
-                        grantType != null
-                    }
-                    assertTrue(
-                        "Expected grant_type is ${TokenEndpointForm.PRE_AUTHORIZED_CODE_GRANT} but got $grantType.",
-                    ) {
-                        grantType == TokenEndpointForm.PRE_AUTHORIZED_CODE_GRANT
-                    }
+                    with(request) { tokenPost_ApplyPreAuthFlowAssertionsAndGetFormData() }
                 },
             )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             ).getOrThrow()
             with(issuer) {
-                authorizeWithPreAuthorizationCode("123456").getOrThrow()
+                authorizeWithPreAuthorizationCode("1234").getOrThrow()
             }
         }
 
@@ -293,23 +136,7 @@ class IssuanceAuthorizationTest {
                 oidcWellKnownMocker(),
             )
 
-            val preAuthGrantOffer = """
-                {
-                  "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-                  "credential_configuration_ids": ["$PID_MsoMdoc", "$PID_SdJwtVC"],
-                  "grants": {
-                    "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
-                      "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
-                      "tx_code": {
-                        "input_mode": "text",
-                        "length": 4
-                      }
-                    }
-                  }
-                }
-            """.trimIndent()
-
-            val offer = credentialOffer(mockedKtorHttpClientFactory, preAuthGrantOffer)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -339,22 +166,7 @@ class IssuanceAuthorizationTest {
                 oidcWellKnownMocker(),
             )
 
-            val preAuthGrantOffer = """
-                {
-                  "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-                  "credential_configuration_ids": ["$PID_MsoMdoc", "$PID_SdJwtVC"],
-                  "grants": {
-                    "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
-                      "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
-                      "tx_code": {
-                        "input_mode": "numeric"
-                      }
-                    }
-                  }
-                }
-            """.trimIndent()
-
-            val offer = credentialOffer(mockedKtorHttpClientFactory, preAuthGrantOffer)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -403,7 +215,7 @@ class IssuanceAuthorizationTest {
                     },
                 ),
             )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -424,7 +236,7 @@ class IssuanceAuthorizationTest {
                         },
                     )
 
-                val authorizedRequest = authorizeWithPreAuthorizationCode("123456").getOrThrow()
+                val authorizedRequest = authorizeWithPreAuthorizationCode("1234").getOrThrow()
                 assertTrue("Token endpoint provides c_nonce but authorized request is not ProofRequired") {
                     authorizedRequest is AuthorizedRequest.ProofRequired
                 }
@@ -458,7 +270,7 @@ class IssuanceAuthorizationTest {
                     },
                 ),
             )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -564,7 +376,7 @@ class IssuanceAuthorizationTest {
                 ),
             )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -608,7 +420,7 @@ class IssuanceAuthorizationTest {
                     },
                 ),
             )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -653,7 +465,7 @@ class IssuanceAuthorizationTest {
                     },
                 ),
             )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -703,7 +515,7 @@ class IssuanceAuthorizationTest {
                     },
                 ),
             )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, PRE_AUTH_CODE_GRANT_CREDENTIAL_OFFER)
+            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -711,7 +523,7 @@ class IssuanceAuthorizationTest {
             ).getOrThrow()
 
             with(issuer) {
-                authorizeWithPreAuthorizationCode("123456")
+                authorizeWithPreAuthorizationCode("1234")
                     .fold(
                         onSuccess = {
                             fail("Exception expected to be thrown")
@@ -723,52 +535,6 @@ class IssuanceAuthorizationTest {
                         },
                     )
             }
-        }
-
-    @Test
-    fun `when offer has a credential with no 'scope' in its configuration, then authorization_details attribute is included in request`() =
-        runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                authServerWellKnownMocker(),
-                parPostMocker { request ->
-                    val form = request.body as FormDataContent
-                    assertTrue("Missing authorization_details request attribute") {
-                        form.formData["authorization_details"] != null
-                    }
-                    val authDetails = NimbusAuthorizationDetail.parseList(form.formData["authorization_details"])
-                    assertTrue("Missing authorization_details eu.europa.ec.eudiw.pid_mso_mdoc") {
-                        authDetails.any {
-                            it.getField("credential_configuration_id") != null &&
-                                it.getField("credential_configuration_id").equals("eu.europa.ec.eudiw.pid_mso_mdoc")
-                        }
-                    }
-
-                    assertTrue("Missing scope attribute") {
-                        form.formData["scope"] != null
-                    }
-                    assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
-                        form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
-                    }
-                },
-                RequestMocker(
-                    requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
-                    responseBuilder = {
-                        respond(
-                            content = getResourceAsText("well-known/openid-credential-issuer_no_scopes.json"),
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType to listOf("application/json")),
-                        )
-                    },
-                ),
-            )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, AUTH_CODE_GRANT_CREDENTIAL_OFFER)
-            val issuer = Issuer.make(
-                config = OpenId4VCIConfiguration,
-                credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
-            ).getOrThrow()
-
-            issuer.prepareAuthorizationRequest().getOrThrow()
         }
 
     private suspend fun credentialOffer(

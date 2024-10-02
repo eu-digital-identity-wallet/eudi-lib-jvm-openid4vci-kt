@@ -139,14 +139,19 @@ internal class TokenEndpointClient(
         pkceVerifier: PKCEVerifier,
         credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
     ): Result<TokenResponse> = runCatching {
+        // Append authorization_details form param if needed
+        val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
+            authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
+        }
         val params =
             TokenEndpointForm.authCodeFlow(
                 clientId = client.id,
                 authorizationCode = authorizationCode,
                 redirectionURI = authFlowRedirectionURI,
                 pkceVerifier = pkceVerifier,
+                authorizationDetails = authDetails,
             )
-        requestAccessToken(params, credConfigIdsAsAuthDetails)
+        requestAccessToken(params)
     }
 
     /**
@@ -163,13 +168,18 @@ internal class TokenEndpointClient(
         txCode: String?,
         credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
     ): Result<TokenResponse> = runCatching {
+        // Append authorization_details form param if needed
+        val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
+            authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
+        }
         val params =
             TokenEndpointForm.preAuthCodeFlow(
                 clientId = client.id,
                 preAuthorizedCode = preAuthorizedCode,
                 txCode = txCode,
+                authorizationDetails = authDetails,
             )
-        requestAccessToken(params, credConfigIdsAsAuthDetails)
+        requestAccessToken(params)
     }
 
     /**
@@ -187,15 +197,10 @@ internal class TokenEndpointClient(
 
     private suspend fun requestAccessToken(
         params: Map<String, String>,
-        credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
     ): TokenResponse {
         val response = ktorHttpClientFactory().use { httpClient ->
             val formParameters = Parameters.build {
                 params.entries.forEach { (k, v) -> append(k, v) }
-                // Append authorization_details form param if needed
-                if (credConfigIdsAsAuthDetails.isNotEmpty()) {
-                    appendAuthorizationDetailsFormParam(credConfigIdsAsAuthDetails)
-                }
             }
             httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
                 dPoPJwtFactory?.let { factory ->
@@ -209,16 +214,17 @@ internal class TokenEndpointClient(
         return responseTO.tokensOrFail(clock)
     }
 
-    private fun ParametersBuilder.appendAuthorizationDetailsFormParam(
+    private fun authorizationDetailsFormParam(
         credentialConfigurationIds: List<CredentialConfigurationIdentifier>,
-    ) {
-        val authDetailsNimbus = credentialConfigurationIds.map {
+    ): String {
+        require(credentialConfigurationIds.isNotEmpty())
+        return credentialConfigurationIds.map {
             it.toNimbusAuthDetail(
                 includeLocations = isCredentialIssuerAuthorizationServer,
                 credentialIssuerId = credentialIssuerId,
             )
         }
-        append(AUTHORIZATION_DETAILS, authDetailsNimbus.toFormParamString())
+            .toFormParamString()
     }
 
     private fun generateClientAttestationIfNeeded(): ClientAttestation? =
@@ -245,12 +251,14 @@ internal object TokenEndpointForm {
     const val TX_CODE_PARAM = "tx_code"
     const val PRE_AUTHORIZED_CODE_PARAM = "pre-authorized_code"
     const val REFRESH_TOKEN_PARAM = "refresh_token"
+    const val AUTHORIZATION_DETAILS = "authorization_details"
 
     fun authCodeFlow(
         clientId: ClientId,
         authorizationCode: AuthorizationCode,
         redirectionURI: URI,
         pkceVerifier: PKCEVerifier,
+        authorizationDetails: String?,
     ): Map<String, String> =
         buildMap {
             put(CLIENT_ID_PARAM, clientId)
@@ -258,18 +266,21 @@ internal object TokenEndpointForm {
             put(AUTHORIZATION_CODE_PARAM, authorizationCode.code)
             put(REDIRECT_URI_PARAM, redirectionURI.toString())
             put(CODE_VERIFIER_PARAM, pkceVerifier.codeVerifier)
+            authorizationDetails?.let { put(AUTHORIZATION_DETAILS, it) }
         }.toMap()
 
     fun preAuthCodeFlow(
         clientId: ClientId,
         preAuthorizedCode: PreAuthorizedCode,
         txCode: String?,
+        authorizationDetails: String?,
     ): Map<String, String> =
         buildMap {
             put(CLIENT_ID_PARAM, clientId)
             put(GRANT_TYPE_PARAM, PRE_AUTHORIZED_CODE_GRANT)
             put(PRE_AUTHORIZED_CODE_PARAM, preAuthorizedCode.preAuthorizedCode)
             txCode?.let { put(TX_CODE_PARAM, it) }
+            authorizationDetails?.let { put(AUTHORIZATION_DETAILS, it) }
         }.toMap()
 
     fun refreshAccessToken(
