@@ -20,9 +20,9 @@ import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointForm
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
-import parPost_ApplyAssertionsAndGetFormData
-import tokenPost_ApplyAuthFlowAssertionsAndGetFormData
-import tokenPost_ApplyPreAuthFlowAssertionsAndGetFormData
+import parPostApplyAssertionsAndGetFormData
+import tokenPostApplyAuthFlowAssertionsAndGetFormData
+import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
 import java.net.URLDecoder
 import java.util.*
 import kotlin.test.Test
@@ -40,7 +40,7 @@ class RichAuthorizationRequestTest {
                 fail("No pushed authorization request should have been sent in case of pre-authorized code flow")
             },
             tokenPostMocker { request ->
-                val form = with(request) { tokenPost_ApplyPreAuthFlowAssertionsAndGetFormData() }
+                val form = with(request) { tokenPostApplyPreAuthFlowAssertionsAndGetFormData() }
 
                 val authorizationDetails = form.formData[TokenEndpointForm.AUTHORIZATION_DETAILS]
                 assertTrue("Parameter ${TokenEndpointForm.AUTHORIZATION_DETAILS} was expected but not sent.") {
@@ -67,7 +67,7 @@ class RichAuthorizationRequestTest {
         with(issuer) {
             authorizeWithPreAuthorizationCode(
                 txCode = "1234",
-                authDetailsOption = AuthorizationDetailsInTokenRequest.Include { true },
+                authDetailsOption = AccessTokenOption.Limited { true },
             ).getOrThrow()
         }
     }
@@ -79,7 +79,7 @@ class RichAuthorizationRequestTest {
                 oidcWellKnownMocker(),
                 authServerWellKnownMocker(),
                 parPostMocker { request ->
-                    val form = with(request) { parPost_ApplyAssertionsAndGetFormData(false) }
+                    val form = with(request) { parPostApplyAssertionsAndGetFormData(false) }
                     assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
                         form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
                     }
@@ -88,7 +88,7 @@ class RichAuthorizationRequestTest {
                     }
                 },
                 tokenPostMocker { request ->
-                    val form = with(request) { tokenPost_ApplyAuthFlowAssertionsAndGetFormData() }
+                    val form = with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
 
                     val authorizationDetails = form.formData[TokenEndpointForm.AUTHORIZATION_DETAILS]
                     assertTrue("Parameter ${TokenEndpointForm.AUTHORIZATION_DETAILS} was not expected but sent.") {
@@ -111,7 +111,7 @@ class RichAuthorizationRequestTest {
                     .authorizeWithAuthorizationCode(
                         authorizationCode = AuthorizationCode(authorizationCode),
                         serverState = serverState,
-                        authDetailsOption = AuthorizationDetailsInTokenRequest.Include { true },
+                        authDetailsOption = AccessTokenOption.Limited { true },
                     ).getOrThrow()
                     .also { println(it) }
             }
@@ -134,10 +134,10 @@ class RichAuthorizationRequestTest {
                 ),
                 authServerWellKnownMocker(),
                 parPostMocker { request ->
-                    with(request) { parPost_ApplyAssertionsAndGetFormData(false) }
+                    with(request) { parPostApplyAssertionsAndGetFormData(false) }
                 },
                 tokenPostMocker { request ->
-                    val form = with(request) { tokenPost_ApplyAuthFlowAssertionsAndGetFormData() }
+                    val form = with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
 
                     val authorizationDetails = form.formData[TokenEndpointForm.AUTHORIZATION_DETAILS]
                     assertTrue("Parameter ${TokenEndpointForm.AUTHORIZATION_DETAILS} was expected but not sent.") {
@@ -169,7 +169,7 @@ class RichAuthorizationRequestTest {
                     .authorizeWithAuthorizationCode(
                         authorizationCode = AuthorizationCode(authorizationCode),
                         serverState = serverState,
-                        authDetailsOption = AuthorizationDetailsInTokenRequest.Include { true },
+                        authDetailsOption = AccessTokenOption.Limited { true },
                     ).getOrThrow()
                     .also { println(it) }
             }
@@ -192,10 +192,10 @@ class RichAuthorizationRequestTest {
                 ),
                 authServerWellKnownMocker(),
                 parPostMocker { request ->
-                    with(request) { parPost_ApplyAssertionsAndGetFormData(false) }
+                    with(request) { parPostApplyAssertionsAndGetFormData(false) }
                 },
                 tokenPostMocker { request ->
-                    val form = with(request) { tokenPost_ApplyAuthFlowAssertionsAndGetFormData() }
+                    val form = with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
 
                     val authorizationDetails = form.formData[TokenEndpointForm.AUTHORIZATION_DETAILS]
                     assertTrue("Parameter ${TokenEndpointForm.AUTHORIZATION_DETAILS} was not expected but sent.") {
@@ -219,7 +219,7 @@ class RichAuthorizationRequestTest {
                     .authorizeWithAuthorizationCode(
                         authorizationCode = AuthorizationCode(authorizationCode),
                         serverState = serverState,
-                        authDetailsOption = AuthorizationDetailsInTokenRequest.DoNotInclude,
+                        authDetailsOption = AccessTokenOption.AsRequested,
                     ).getOrThrow()
                     .also { println(it) }
             }
@@ -231,7 +231,7 @@ class RichAuthorizationRequestTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
                 parPostMocker { request ->
-                    val form = with(request) { parPost_ApplyAssertionsAndGetFormData(true) }
+                    val form = with(request) { parPostApplyAssertionsAndGetFormData(true) }
                     assertTrue("Missing authorization_details request attribute") {
                         form.formData["authorization_details"] != null
                     }

@@ -21,7 +21,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-val parPost_ApplyAssertionsAndGetFormData: HttpRequestData.(expectIssuerState: Boolean) -> FormDataContent = { expectIssuerState ->
+val parPostApplyAssertionsAndGetFormData: HttpRequestData.(expectIssuerState: Boolean) -> FormDataContent = { expectIssuerState ->
     kotlin.test.assertEquals(
         "application/x-www-form-urlencoded; charset=UTF-8",
         body.contentType?.toString(),
@@ -47,7 +47,7 @@ val parPost_ApplyAssertionsAndGetFormData: HttpRequestData.(expectIssuerState: B
     form
 }
 
-val tokenPost_ApplyAuthFlowAssertionsAndGetFormData: HttpRequestData.() -> FormDataContent = {
+val tokenPostApplyAuthFlowAssertionsAndGetFormData: HttpRequestData.() -> FormDataContent = {
     assertTrue(
         "Wrong content-type, expected application/x-www-form-urlencoded but was ${headers["Content-Type"]}",
     ) {
@@ -84,7 +84,7 @@ val tokenPost_ApplyAuthFlowAssertionsAndGetFormData: HttpRequestData.() -> FormD
     form
 }
 
-val tokenPost_ApplyPreAuthFlowAssertionsAndGetFormData: HttpRequestData.() -> FormDataContent = {
+val tokenPostApplyPreAuthFlowAssertionsAndGetFormData: HttpRequestData.() -> FormDataContent = {
     assertTrue(
         "Wrong content-type, expected application/x-www-form-urlencoded but was ${headers["Content-Type"]}",
     ) {

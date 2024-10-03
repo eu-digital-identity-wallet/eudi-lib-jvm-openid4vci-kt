@@ -33,7 +33,7 @@ data class AuthorizationRequestPrepared(
     val authorizationCodeURL: HttpsUrl,
     val pkceVerifier: PKCEVerifier,
     val state: String,
-    val identifiersSentAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
+    val identifiersSentAsAuthDetails: List<CredentialConfigurationIdentifier>,
 ) : java.io.Serializable
 
 /**
@@ -116,11 +116,11 @@ sealed interface AuthorizedRequest : java.io.Serializable {
     ) : AuthorizedRequest
 }
 
-sealed interface AuthorizationDetailsInTokenRequest {
+sealed interface AccessTokenOption {
 
-    data object DoNotInclude : AuthorizationDetailsInTokenRequest
+    data object AsRequested : AccessTokenOption
 
-    data class Include(val filter: (CredentialConfigurationIdentifier) -> Boolean) : AuthorizationDetailsInTokenRequest
+    data class Limited(val filter: (CredentialConfigurationIdentifier) -> Boolean) : AccessTokenOption
 }
 
 interface AuthorizeIssuance {
@@ -155,7 +155,7 @@ interface AuthorizeIssuance {
     suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
         authorizationCode: AuthorizationCode,
         serverState: String,
-        authDetailsOption: AuthorizationDetailsInTokenRequest = AuthorizationDetailsInTokenRequest.DoNotInclude,
+        authDetailsOption: AccessTokenOption = AccessTokenOption.AsRequested,
     ): Result<AuthorizedRequest>
 
     /**
@@ -167,6 +167,6 @@ interface AuthorizeIssuance {
      */
     suspend fun authorizeWithPreAuthorizationCode(
         txCode: String?,
-        authDetailsOption: AuthorizationDetailsInTokenRequest = AuthorizationDetailsInTokenRequest.DoNotInclude,
+        authDetailsOption: AccessTokenOption = AccessTokenOption.AsRequested,
     ): Result<AuthorizedRequest>
 }

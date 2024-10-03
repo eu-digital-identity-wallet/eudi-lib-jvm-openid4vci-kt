@@ -22,9 +22,9 @@ import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import parPost_ApplyAssertionsAndGetFormData
-import tokenPost_ApplyAuthFlowAssertionsAndGetFormData
-import tokenPost_ApplyPreAuthFlowAssertionsAndGetFormData
+import parPostApplyAssertionsAndGetFormData
+import tokenPostApplyAuthFlowAssertionsAndGetFormData
+import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -38,7 +38,7 @@ class IssuanceAuthorizationTest {
             oidcWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker { request ->
-                val form = with(request) { parPost_ApplyAssertionsAndGetFormData(false) }
+                val form = with(request) { parPostApplyAssertionsAndGetFormData(false) }
 
                 assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
                     form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
@@ -48,7 +48,7 @@ class IssuanceAuthorizationTest {
                 }
             },
             tokenPostMocker { request ->
-                with(request) { tokenPost_ApplyAuthFlowAssertionsAndGetFormData() }
+                with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
             },
         )
 
@@ -75,7 +75,7 @@ class IssuanceAuthorizationTest {
                 oidcWellKnownMocker(),
                 authServerWellKnownMocker(),
                 parPostMocker { request ->
-                    val form = with(request) { parPost_ApplyAssertionsAndGetFormData(false) }
+                    val form = with(request) { parPostApplyAssertionsAndGetFormData(false) }
                     assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
                         form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
                     }
@@ -84,7 +84,7 @@ class IssuanceAuthorizationTest {
                     }
                 },
                 tokenPostMocker { request ->
-                    with(request) { tokenPost_ApplyAuthFlowAssertionsAndGetFormData() }
+                    with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
                 },
             )
 
@@ -114,7 +114,7 @@ class IssuanceAuthorizationTest {
                     fail("No pushed authorization request should have been sent in case of pre-authorized code flow")
                 },
                 tokenPostMocker { request ->
-                    with(request) { tokenPost_ApplyPreAuthFlowAssertionsAndGetFormData() }
+                    with(request) { tokenPostApplyPreAuthFlowAssertionsAndGetFormData() }
                 },
             )
             val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)

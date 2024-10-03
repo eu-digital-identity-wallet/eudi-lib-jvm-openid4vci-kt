@@ -81,13 +81,13 @@ internal class AuthorizeIssuanceImpl(
     override suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
         authorizationCode: AuthorizationCode,
         serverState: String,
-        authDetailsOption: AuthorizationDetailsInTokenRequest,
+        authDetailsOption: AccessTokenOption,
     ): Result<AuthorizedRequest> =
         runCatching {
             ensure(serverState == state) { InvalidAuthorizationState() }
             val credConfigIdsAsAuthDetails = when (authDetailsOption) {
-                AuthorizationDetailsInTokenRequest.DoNotInclude -> emptyList()
-                is AuthorizationDetailsInTokenRequest.Include -> {
+                AccessTokenOption.AsRequested -> emptyList()
+                is AccessTokenOption.Limited -> {
                     identifiersSentAsAuthDetails.filter(authDetailsOption.filter)
                 }
             }
@@ -98,7 +98,7 @@ internal class AuthorizeIssuanceImpl(
 
     override suspend fun authorizeWithPreAuthorizationCode(
         txCode: String?,
-        authDetailsOption: AuthorizationDetailsInTokenRequest,
+        authDetailsOption: AccessTokenOption,
     ): Result<AuthorizedRequest> = runCatching {
         val offeredGrants = requireNotNull(credentialOffer.grants) {
             "Grant not specified in credential offer."
@@ -108,8 +108,8 @@ internal class AuthorizeIssuanceImpl(
         }
         with(preAuthorizedCode) { validate(txCode) }
         val credConfigIdsAsAuthDetails = when (authDetailsOption) {
-            AuthorizationDetailsInTokenRequest.DoNotInclude -> emptyList()
-            is AuthorizationDetailsInTokenRequest.Include -> {
+            AccessTokenOption.AsRequested -> emptyList()
+            is AccessTokenOption.Limited -> {
                 credentialOffer.credentialConfigurationIdentifiers.filter(authDetailsOption.filter)
             }
         }
