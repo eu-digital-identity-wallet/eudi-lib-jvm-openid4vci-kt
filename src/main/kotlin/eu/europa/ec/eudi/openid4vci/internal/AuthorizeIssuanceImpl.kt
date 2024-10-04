@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.AccessTokenOption.AsRequested
+import eu.europa.ec.eudi.openid4vci.AccessTokenOption.Limited
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.NoProofRequired
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.ProofRequired
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidAuthorizationState
@@ -85,12 +87,7 @@ internal class AuthorizeIssuanceImpl(
     ): Result<AuthorizedRequest> =
         runCatching {
             ensure(serverState == state) { InvalidAuthorizationState() }
-            val credConfigIdsAsAuthDetails = when (authDetailsOption) {
-                AccessTokenOption.AsRequested -> emptyList()
-                is AccessTokenOption.Limited -> {
-                    identifiersSentAsAuthDetails.filter(authDetailsOption.filter)
-                }
-            }
+            val credConfigIdsAsAuthDetails = identifiersSentAsAuthDetails.filter(authDetailsOption)
             val tokenResponse =
                 tokenEndpointClient.requestAccessTokenAuthFlow(authorizationCode, pkceVerifier, credConfigIdsAsAuthDetails).getOrThrow()
             authorizedRequest(credentialOffer, tokenResponse)
@@ -107,12 +104,9 @@ internal class AuthorizeIssuanceImpl(
             "Pre-authorized code grant expected"
         }
         with(preAuthorizedCode) { validate(txCode) }
-        val credConfigIdsAsAuthDetails = when (authDetailsOption) {
-            AccessTokenOption.AsRequested -> emptyList()
-            is AccessTokenOption.Limited -> {
-                credentialOffer.credentialConfigurationIdentifiers.filter(authDetailsOption.filter)
-            }
-        }
+        val credConfigIdsAsAuthDetails =
+            credentialOffer.credentialConfigurationIdentifiers.filter(authDetailsOption)
+
         val tokenResponse =
             tokenEndpointClient.requestAccessTokenPreAuthFlow(preAuthorizedCode, txCode, credConfigIdsAsAuthDetails).getOrThrow()
         authorizedRequest(credentialOffer, tokenResponse)
@@ -159,3 +153,11 @@ internal fun authorizedRequest(
             NoProofRequired(accessToken, refreshToken, authorizationDetails, timestamp)
     }
 }
+
+private fun Iterable<CredentialConfigurationIdentifier>.filter(
+    accessTokenOption: AccessTokenOption,
+): List<CredentialConfigurationIdentifier> =
+    when (accessTokenOption) {
+        AsRequested -> emptyList()
+        is Limited -> filter(accessTokenOption.filter)
+    }
