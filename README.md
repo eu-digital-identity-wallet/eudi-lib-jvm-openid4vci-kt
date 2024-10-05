@@ -20,31 +20,30 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
 ## Overview
 
 This is a Kotlin library, targeting JVM, that supports
-the [OpenId4VCI (draft 13)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-13.html) protocol.
+the [OpenId4VCI (draft 14)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-14.html) protocol.
 
 In particular, the library focuses on the wallet's role in and provides the following features:
 
 
-| Feature                                                                                         | Coverage                                                                                                               |
-|-------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| [Wallet-initiated issuance](#wallet-initiated-issuance)                                         | ✅                                                                                                                      |
+| Feature                                                                                         | Coverage                                                                                                        |
+|-------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| [Wallet-initiated issuance](#wallet-initiated-issuance)                                         | ✅                                                                                                               |
 | [Resolve a credential offer](#resolve-a-credential-offer)                                       | ✅ Unsigned metadata ❌ [accept-language](#issuer-metadata-accept-language) ❌ [signed metadata](#issuer-signed-metadata) |
-| [Authorization code flow](#authorization-code-flow)                                             | ✅                                                                                                                      |
-| [Pre-authorized code flow](#pre-authorized-code-flow)                                           | ✅                                                                                                                      |
-| mso_mdoc format                                                                                 | ✅                                                                                                                      |
-| SD-JWT-VC format                                                                                | ✅                                                                                                                      |
-| W3C VC DM                                                                                       | VC Signed as a JWT, Not Using JSON-LD                                                                                  |
-| [Place credential request](#place-credential-request)                                           | ✅ Including automatic handling of `invalid_proof`                                                                      |
-| [Place batch credential request](#place-batch-credential-request)                               | ✅                                                                                                                      | 
-| [Query for deferred credentials](#query-for-deferred-credentials)                               | ✅ Including automatic refresh of `access_token`                                                                        |
-| [Query for deferred credentials at a later time](#query-for-deferred-credentials-at-later-time) | ✅ Including automatic refresh of `access_token`                                                                        |
-| [Notify credential issuer](#notify-credential-issuer)                                           | ✅                                                                                                                      | 
-| Proof                                                                                           | ✅ JWT ✅ CWT                                                                                                            |
-| Credential response encryption                                                                  | ✅                                                                                                                      |
-| [Pushed authorization requests](#pushed-authorization-requests)                                 | ✅ Used by default, if supported by issuer                                                                              |
-| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)             | ✅                                                                                                                      |
-| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                               | ✅                                                                                                                      |
-| Wallet authentication                                                                           | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth2-attestation-based-client-authentication)     |
+| [Authorization code flow](#authorization-code-flow)                                             | ✅                                                                                                               |
+| [Pre-authorized code flow](#pre-authorized-code-flow)                                           | ✅                                                                                                               |
+| mso_mdoc format                                                                                 | ✅                                                                                                               |
+| SD-JWT-VC format                                                                                | ✅                                                                                                               |
+| W3C VC DM                                                                                       | VC Signed as a JWT, Not Using JSON-LD                                                                           |
+| [Place credential request](#place-credential-request)                                           | ✅ Including automatic handling of `invalid_proof` & multiple proofs                                             |
+| [Query for deferred credentials](#query-for-deferred-credentials)                               | ✅ Including automatic refresh of `access_token`                                                                 |
+| [Query for deferred credentials at a later time](#query-for-deferred-credentials-at-later-time) | ✅ Including automatic refresh of `access_token`                                                                 |
+| [Notify credential issuer](#notify-credential-issuer)                                           | ✅                                                                                                               | 
+| Proof                                                                                           | ✅ JWT                                                                                                           |
+| Credential response encryption                                                                  | ✅                                                                                                               |
+| [Pushed authorization requests](#pushed-authorization-requests)                                 | ✅ Used by default, if supported by issuer                                                                       |
+| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)             | ✅                                                                                                               |
+| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                               | ✅                                                                                                               |
+| Wallet authentication                                                                           | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth2-attestation-based-client-authentication) |
 
 ## Disclaimer
 
@@ -181,7 +180,7 @@ perhaps is more convenient since it includes fewer steps.
 
 At the end of the use case, wallet will have an `AuthorizedRequest` instance.
 
-Depending on the capabilities of the token endpoint of the credential issuer this `AuthorizedRequest` will be either 
+Depending on the capabilities of the token endpoint, this `AuthorizedRequest` will be either 
 - `ProofRequired` : That's the case where Token Endpoint provided a `c_nonce` attribute
 - `NoProofRequired` : Otherwise.
 
@@ -190,8 +189,7 @@ the `refresh_token` and `c_nonce`
 
 #### Authorize wallet for issuance next steps
 
-- [Place credential request](#place-credential-request), or
-- [Place batch credential request](#place-batch-credential-request)
+- [Place credential request](#place-credential-request)
 
 ### Authorization code flow
 
@@ -225,7 +223,7 @@ Library prepares this URL as follows
 2. Wallet/Caller opens the mobile's browser to the URL calculated in the previous step
 3. User interacts with the authorization server via mobile device agent, typically providing his authorization
 4. On success, authorization redirects to a wallet provided `redirect_uri`, providing the `code` and a `state` parameters
-5. Using the `Issuer` instance exchange the `authorization code` for an `access_token` 
+5. Using the `Issuer` instance exchange the `authorization code` for an `access_token`.
 
 In the scope of the library are steps 1 and 5.
 
@@ -255,6 +253,11 @@ val authorizedRequest =
          }
      }
 ```
+
+> [!TIP]
+> If credential issuer supports `authorization_details`, caller can 
+> reduce the scope of the `access_token` by passing `authorization_details` also to the token endpoint.
+> Function `authorizeWithAuthorizationCode` supports this via parameter `authDetailsOption: AccessTokenOption`
 
 ### Pre-authorized code flow
 
@@ -298,6 +301,12 @@ val authorizedRequest =
     }
 ```
 
+> [!TIP]
+> If credential issuer supports `authorization_details`, caller can
+> reduce the scope of the `access_token` by passing `authorization_details` to the token endpoint.
+> Function `authorizeWithPreAuthorizationCode` supports this via parameter `authDetailsOption: AccessTokenOption`
+
+
 ### Place credential request
 
 Wallet/caller wants to place a request against the credential issuer, for one of 
@@ -312,7 +321,7 @@ a specific credential identifier in case token endpoint provided an `authorizati
 - Wallet/Caller has decided for which `credential_configuration_id` - found in the offer - the request will be placed for
 - Wallet/Caller has decided which `credential_identifier` - optional attribute found in the `AuthorizedRequest` - the request will be placed for
 - Wallet/Caller has decided if a subset of the claims will be requested or all.
-- Wallet/Caller is ready to provide a suitable Proof signer for JWT or CWT proofs, if applicable
+- Wallet/Caller is ready to provide one or more suitable Proof signers for JWT proofs, if applicable
 
 #### Place credential request steps
 
@@ -350,29 +359,34 @@ val request =
 val (updatedAuthorizedRequest, outcome) =
     with(issuer) {
         with(authorizedRequest) {
-            requestSingle(request, popSigner)
+            request(request, listOf(popSigner))
         }
     }
 
 ```
 
-**Important note**
+> [!TIP]
+> If more than one `popSigner` are passed to function `request` 
+> multiple instances of the credential will be issued, provided that
+> credential issuer supports batch issuance.
 
-The ability of the token endpoint of the credential issuer to provide a `c_nonce` is an
+> [!NOTE]
+>
+>The ability of the token endpoint  to provide a `c_nonce` is an
 optional feature specified in the OpenId4VCI specification. 
-
-According to the specification, the wallet must be able to receive a 
+>
+>According to the specification, the wallet must be able to receive a 
 `c_nonce` primarily via the credential issuance response, which is represented by `SubmissionOutcome`
 in the library.
-
-For this reason, it is not uncommon that the first request to the credential issuance endpoint
+>
+>For this reason, it is not uncommon that the first request to the credential issuance endpoint
 will have as an outcome `Failed` with an error `InvalidProof`. 
 That's typical if credential issuer's token endpoint doesn't provide a `c_nonce` and 
 proof is required for the requested credential.
-
-The library will automatically try to handle the invalid proof response and place a second request 
+>
+>The library will automatically try to handle the invalid proof response and place a second request 
 which includes proofs. This can be done only if caller has provided a `popSigner` while 
-invoking `requestSingle()`. In case, that this second request fails with `invalid_proof` 
+invoking `request()`. In case, that this second request fails with `invalid_proof` 
 library will report as `IrrecoverableInvalidProof`.
 
 #### Place credential request next steps
@@ -461,8 +475,8 @@ As per [query for deferred credentials](#query-for-deferred-credentials-precondi
 The outcome of placing this query is a pair comprised of
 - `DeferredIssuanceContext` : This represents a possibly new state of authorization carrying a refreshed `access_token`
 - `DeferredCredentialQueryOutcome`: This is the response of the deferred endpoint and it could be one of
-    - `Issued` : Deferred credential was issued
-    - `IssuancePending`: Deferred credential was not ready
+    - `Issued` : One or more deferred credentials were issued
+    - `IssuancePending`: One or more deferred credentials were not ready
     - `Errored`: Credential issuer doesn't recognize the `transaction_id`
 
 #### Query for deferred credentials at later time execution
@@ -509,7 +523,7 @@ outcome of the issuance, using one of the defined notifications:
 #### Notify Credential Issuer preconditions
 
 - Credential issuer advertises the optional Notification Endpoint
-- Wallet/caller has received a a `notificationId`   
+- Wallet/caller has received a `notificationId`   
   (via credential [response](#place-credential-request-outcome), deferred [response](#query-for-deferred-credentials-outcome))  
 - Wallet/caller has processed the issued credentials (verification & storage)
 - Wallet/caller still has a reference to the `Issuer` and `AuthorizedRequest` instances
@@ -597,15 +611,9 @@ To use the PAR endpoint
 Library will automatically use the PAR endpoint during the [authorization code flow](#authorization-code-flow), 
 otherwise it will fall back to a regular authorization request.
 
-### Place batch credential request
-
-Library supports placing request against the Batch Endpoint of the Credential Issuer.
-Usage of this feature is not recommended since future release of OpenId4VCI 
-will include to the Credential Issuance endpoint for some of the Batch Endpoint capabilities.
-
 ### Proof Types Supported
 
-The current version of the library supports JWT and CWT proofs
+The current version of the library supports JWT proofs
 
 ### Demonstrating Proof of Possession (DPoP)
 
