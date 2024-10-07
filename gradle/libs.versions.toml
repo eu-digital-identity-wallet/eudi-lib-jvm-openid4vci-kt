@@ -1,6 +1,6 @@
 [versions]
 coroutines = "1.7.3"
-dependency-check = "10.0.3"
+dependency-check = "10.0.4"
 sonarqube = "5.1.0.4882"
 kotlin = "1.9.21"
 spotless = "6.25.0"
@@ -12,8 +12,8 @@ java = "17"
 ktlint = "0.50.0"
 dokka = "1.9.20"
 maven-publish = "0.29.0"
-logback = "1.5.6"
-authlete-cbor = "1.18"
+logback = "1.5.8"
+authlete-cbor = "1.19"
 
 [libraries]
 nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
