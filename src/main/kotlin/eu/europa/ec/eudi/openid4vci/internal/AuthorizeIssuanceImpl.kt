@@ -113,14 +113,14 @@ internal class AuthorizeIssuanceImpl(
     }
 }
 
-internal fun Grants.PreAuthorizedCode.validate(txCode: String?) {
+private fun Grants.PreAuthorizedCode.validate(txCode: String?) {
     val expectedTxCodeSpec = this@validate.txCode
     if (expectedTxCodeSpec != null) {
         with(expectedTxCodeSpec) { validate(txCode) }
     }
 }
 
-internal fun TxCode.validate(txCode: String?) {
+private fun TxCode.validate(txCode: String?) {
     require(!txCode.isNullOrEmpty()) {
         "Issuer's grant is pre-authorization code with transaction code required but no transaction code passed"
     }
@@ -136,7 +136,7 @@ internal fun TxCode.validate(txCode: String?) {
     }
 }
 
-internal fun authorizedRequest(
+private fun authorizedRequest(
     offer: CredentialOffer,
     tokenResponse: TokenResponse,
 ): AuthorizedRequest {
