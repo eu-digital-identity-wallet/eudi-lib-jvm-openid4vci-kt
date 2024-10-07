@@ -69,7 +69,7 @@ use the library to initiate issuance:
 - Fetch and validate the OAUTH2 or OIDC metadata used by the Credential Issuer
 - Ensure that out-of-band knowledge is valid
 
-This is equivalent as [resolving a credential offer](#resolve-a-credential-offer), having authorization code grant, without issuer state.
+This is equivalent to [resolving a credential offer](#resolve-a-credential-offer), having authorization code grant, without issuer state.
 
 #### Wallet-initiated issuance preconditions
 
@@ -130,8 +130,8 @@ This resolution includes the following
 #### Resolve a credential offer successful outcome:
 
 An instance of the [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) interface (the main entry point to the library) will have been initiated.
-This instance, includes the resolved [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) and the necessary methods to proceed
-The resolved  offer contains the mandatory elements required for issuance.
+This instance includes the resolved [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) and the necessary methods to proceed.
+The resolved offer contains the mandatory elements required for issuance.
 - The issuer's identifier
 - The selected authorization server that will authorize the issuance
 - The specific credentials that will be requested
@@ -456,7 +456,7 @@ There are limitations for this use case
 This means that wallet/caller can query for deferred credentials as long as it has a non-expired
 `access_token` or `refresh_token`.
 
-### Query for deferred credentials at later time preconditions
+#### Query for deferred credentials at later time preconditions
 
 As per [query for deferred credentials](#query-for-deferred-credentials-preconditions)
 
