@@ -22,9 +22,6 @@ import com.nimbusds.oauth2.sdk.id.ClientID
 import com.nimbusds.oauth2.sdk.id.State
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import com.nimbusds.oauth2.sdk.pkce.CodeVerifier
-import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail
-import com.nimbusds.oauth2.sdk.rar.AuthorizationType
-import com.nimbusds.oauth2.sdk.rar.Location
 import com.nimbusds.openid.connect.sdk.Prompt
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
@@ -38,7 +35,6 @@ import kotlinx.serialization.Serializable
 import java.net.URI
 import java.net.URL
 import com.nimbusds.oauth2.sdk.Scope as NimbusScope
-import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail as NimbusAuthorizationDetail
 
 /**
  * Sealed hierarchy of possible responses to a Pushed Authorization Request.
@@ -161,7 +157,14 @@ internal class AuthorizationEndpointClient(
                     }
                 }
                 if (credentialsConfigurationIds.isNotEmpty()) {
-                    authorizationDetails(credentialsConfigurationIds.map(::toNimbus))
+                    authorizationDetails(
+                        credentialsConfigurationIds.map {
+                            it.toNimbusAuthDetail(
+                                includeLocations = !isCredentialIssuerAuthorizationServer,
+                                credentialIssuerId = credentialIssuerId,
+                            )
+                        },
+                    )
                 }
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
@@ -196,7 +199,14 @@ internal class AuthorizationEndpointClient(
                 }
             }
             if (credentialsAuthorizationDetails.isNotEmpty()) {
-                authorizationDetails(credentialsAuthorizationDetails.map(::toNimbus))
+                authorizationDetails(
+                    credentialsAuthorizationDetails.map {
+                        it.toNimbusAuthDetail(
+                            includeLocations = !isCredentialIssuerAuthorizationServer,
+                            credentialIssuerId = credentialIssuerId,
+                        )
+                    },
+                )
             }
             prompt(Prompt.Type.LOGIN)
         }.build()
@@ -242,7 +252,7 @@ internal class AuthorizationEndpointClient(
             }
 
             client.submitForm(url.toString(), formParameters) {
-                config.generateClientAttestationIfNeeded(URL(authorizationIssuer))?.let {
+                config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL())?.let {
                     clientAttestationHeaders(it)
                 }
             }
@@ -251,22 +261,9 @@ internal class AuthorizationEndpointClient(
         else response.body<PushedAuthorizationRequestResponseTO.Failure>()
     }
 
-    private fun toNimbus(
-        credentialConfigurationId: CredentialConfigurationIdentifier,
-    ): AuthorizationDetail =
-        with(NimbusAuthorizationDetail.Builder(AuthorizationType(OPENID_CREDENTIAL))) {
-            if (!isCredentialIssuerAuthorizationServer) {
-                val locations = listOf(Location(credentialIssuerId.value.value.toURI()))
-                locations(locations)
-            }
-            field("credential_configuration_id", credentialConfigurationId.value)
-        }.build()
-
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =
         authorizationRequest.toParameters().mapValues { (_, value) -> value[0] }.toMap()
 }
-
-private const val OPENID_CREDENTIAL = "openid_credential"
 
 private object AuthorizationEndpointParams {
     const val PARAM_CLIENT_ID = "client_id"

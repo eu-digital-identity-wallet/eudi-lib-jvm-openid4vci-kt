@@ -22,7 +22,7 @@ import io.ktor.client.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import java.net.URL
+import java.net.URI
 
 /**
  * Entry point to the issuance library
@@ -30,7 +30,6 @@ import java.net.URL
  * Provides the following capabilities
  * - [AuthorizeIssuance]
  * - [RequestIssuance]
- * - [RequestBatchIssuance]
  * - [QueryForDeferredCredential]
  * - [NotifyIssuer]
  *
@@ -42,7 +41,6 @@ import java.net.URL
 interface Issuer :
     AuthorizeIssuance,
     RequestIssuance,
-    RequestBatchIssuance,
     QueryForDeferredCredential,
     NotifyIssuer {
 
@@ -57,9 +55,9 @@ interface Issuer :
      *
      * @receiver the state of issuance
      * @param deferredCredential the transaction id returned by the issuer
-     * @return the context that would be needed to instantiate a [DeferredIssuer]
+     * @return the context that would be necessary to instantiate a [DeferredIssuer]
      */
-    fun AuthorizedRequest.deferredContext(deferredCredential: IssuedCredential.Deferred): DeferredIssuanceContext
+    fun AuthorizedRequest.deferredContext(deferredCredential: SubmissionOutcome.Deferred): DeferredIssuanceContext
 
     companion object {
 
@@ -131,6 +129,7 @@ interface Issuer :
 
             val tokenEndpointClient =
                 TokenEndpointClient(
+                    credentialOffer.credentialIssuerIdentifier,
                     credentialOffer.authorizationServerMetadata,
                     config,
                     dPoPJwtFactory,
@@ -155,15 +154,11 @@ interface Issuer :
                         dPoPJwtFactory,
                         ktorHttpClientFactory,
                     )
-                val batchEndPointClient =
-                    credentialOffer.credentialIssuerMetadata.batchCredentialEndpoint?.let { batchEndPoint ->
-                        BatchEndPointClient(batchEndPoint, dPoPJwtFactory, ktorHttpClientFactory)
-                    }
                 RequestIssuanceImpl(
                     credentialOffer,
                     config,
                     credentialEndpointClient,
-                    batchEndPointClient,
+                    credentialOffer.credentialIssuerMetadata.batchCredentialIssuance,
                     responseEncryptionSpec,
                 )
             }
@@ -193,7 +188,6 @@ interface Issuer :
                 Issuer,
                 AuthorizeIssuance by authorizeIssuance,
                 RequestIssuance by requestIssuance,
-                RequestBatchIssuance by requestIssuance,
                 QueryForDeferredCredential by queryForDeferredCredential,
                 NotifyIssuer by notifyIssuer {
                 override val credentialOffer: CredentialOffer
@@ -203,7 +197,7 @@ interface Issuer :
                     get() = dPoPJwtFactory
 
                 override fun AuthorizedRequest.deferredContext(
-                    deferredCredential: IssuedCredential.Deferred,
+                    deferredCredential: SubmissionOutcome.Deferred,
                 ): DeferredIssuanceContext {
                     val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
                     val authorizationServerMetadata = credentialOffer.authorizationServerMetadata
@@ -220,9 +214,10 @@ interface Issuer :
 
                     return DeferredIssuanceContext(
                         DeferredIssuerConfig(
+                            credentialIssuerId = credentialOffer.credentialIssuerIdentifier,
                             client = config.client,
                             deferredEndpoint = deferredEndpoint,
-                            authServerId = URL(authorizationServerMetadata.issuer.value),
+                            authServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
                             tokenEndpoint = tokenEndpoint,
                             dPoPSigner = dPoPJwtFactory?.signer,
                             clientAttestationPoPBuilder = config.clientAttestationPoPBuilder,

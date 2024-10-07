@@ -53,7 +53,6 @@ sealed interface CryptographicBindingMethod : Serializable {
  */
 enum class ProofType : Serializable {
     JWT,
-    CWT,
     LDP_VP,
 }
 
@@ -64,25 +63,17 @@ sealed interface ProofTypeMeta : Serializable {
         }
     }
 
-    @Deprecated(
-        message = "CWT proofs have been removed from OpenId4VCI",
-    )
-    data class Cwt(val algorithms: List<CoseAlgorithm>, val curves: List<CoseCurve>) : ProofTypeMeta {
-        init {
-            require(algorithms.isNotEmpty()) { "Supported algorithms in case of CWT cannot be empty" }
-            require(curves.isNotEmpty()) { "Supported curves in case of CWT cannot be empty" }
-        }
-    }
-
     data object LdpVp : ProofTypeMeta {
         private fun readResolve(): Any = LdpVp
     }
+
+    data class Unsupported(val type: String) : ProofTypeMeta
 }
 
-fun ProofTypeMeta.type(): ProofType = when (this) {
+fun ProofTypeMeta.type(): ProofType? = when (this) {
     is ProofTypeMeta.Jwt -> ProofType.JWT
-    is ProofTypeMeta.Cwt -> ProofType.CWT
     is ProofTypeMeta.LdpVp -> ProofType.LDP_VP
+    is ProofTypeMeta.Unsupported -> null
 }
 
 @JvmInline
@@ -158,10 +149,12 @@ data class Claim(
 typealias Namespace = String
 typealias ClaimName = String
 typealias MsoMdocClaims = Map<Namespace, Map<ClaimName, Claim>>
+
 fun MsoMdocClaims.toClaimSet(): MsoMdocClaimSet = MsoMdocClaimSet(
     mapValues { (_, claims) -> claims.keys.toList() }
         .flatMap { (nameSpace, claims) -> claims.map { claimName -> nameSpace to claimName } },
 )
+
 data class MsoMdocPolicy(val oneTimeUse: Boolean, val batchSize: Int?) : Serializable
 
 /**

@@ -32,7 +32,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import java.net.URI
-import java.net.URL
 import java.util.*
 
 internal object CredentialIssuerMetadataJsonParser {
@@ -65,9 +64,7 @@ private sealed interface CredentialSupportedTO {
 
 @Serializable
 private data class ProofSigningAlgorithmsSupportedTO(
-    @SerialName("proof_signing_alg_values_supported") val algorithms: List<JsonPrimitive> = emptyList(),
-    @SerialName("proof_alg_values_supported") val isoAlgorithms: List<Int> = emptyList(),
-    @SerialName("proof_crv_values_supported") val isoCurves: List<Int> = emptyList(),
+    @SerialName("proof_signing_alg_values_supported") val algorithms: List<String> = emptyList(),
 )
 
 @Serializable
@@ -79,6 +76,7 @@ private data class PolicyTO(
 /**
  * The data of a Verifiable Credentials issued as an ISO mDL.
  */
+@Suppress("unused")
 @Serializable
 @SerialName(FORMAT_MSO_MDOC)
 private data class MsdMdocCredentialTO(
@@ -113,7 +111,7 @@ private data class MsdMdocCredentialTO(
         val coseAlgs = isoCredentialSigningAlgorithmsSupported.orEmpty().map {
             requireNotNull(it.toCoseAlgorithm()) { "Expecting COSE algorithm, yet got $it" }
         }
-        val coseCurves = isoCredentialCurvesSupported.orEmpty().map { CoseCurve(it).getOrThrow() }
+        val coseCurves = isoCredentialCurvesSupported.orEmpty().map { CoseCurve(it) }
         val policy = isoPolicy?.let { policy -> MsoMdocPolicy(policy.oneTimeUse, policy.batchSize) }
 
         fun claims(): MsoMdocClaims = claims.orEmpty().mapValues { (_, claims) ->
@@ -149,6 +147,7 @@ private data class MsdMdocCredentialTO(
     }
 }
 
+@Suppress("unused")
 @Serializable
 @SerialName(FORMAT_SD_JWT_VC)
 private data class SdJwtVcCredentialTO(
@@ -211,7 +210,7 @@ private data class W3CJsonLdCredentialDefinitionTO(
 ) {
 
     fun toDomain(): W3CJsonLdCredentialDefinition = W3CJsonLdCredentialDefinition(
-        context = context.map { URL(it) },
+        context = context.map { URI(it).toURL() },
         type = types,
         credentialSubject = credentialSubject?.toDomain(),
     )
@@ -220,6 +219,7 @@ private data class W3CJsonLdCredentialDefinitionTO(
 /**
  * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
  */
+@Suppress("unused")
 @Serializable
 @SerialName(FORMAT_W3C_JSONLD_DATA_INTEGRITY)
 private data class W3CJsonLdDataIntegrityCredentialTO(
@@ -265,6 +265,7 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
 /**
  * The data of a W3C Verifiable Credential issued as a signed JWT using JSON-LD.
  */
+@Suppress("unused")
 @Serializable
 @SerialName(FORMAT_W3C_JSONLD_SIGNED_JWT)
 private data class W3CJsonLdSignedJwtCredentialTO(
@@ -309,6 +310,7 @@ private data class W3CJsonLdSignedJwtCredentialTO(
 /**
  * The data of a W3C Verifiable Credential issued as a signed JWT, not using JSON-LD.
  */
+@Suppress("unused")
 @Serializable
 @SerialName(FORMAT_W3C_SIGNED_JWT)
 private data class W3CSignedJwtCredentialTO(
@@ -360,6 +362,11 @@ private data class W3CSignedJwtCredentialTO(
     }
 }
 
+@Serializable
+private data class BatchCredentialIssuanceTO(
+    @SerialName("batch_size") @Required val batchSize: Int,
+)
+
 /**
  * Unvalidated metadata of a Credential Issuer.
  */
@@ -368,13 +375,10 @@ private data class CredentialIssuerMetadataTO(
     @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
     @SerialName("authorization_servers") val authorizationServers: List<String>? = null,
     @SerialName("credential_endpoint") @Required val credentialEndpoint: String,
-    @Deprecated(
-        message = "Batch credential endpoint has been removed from OpenId4VCI",
-    )
-    @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
     @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
     @SerialName("notification_endpoint") val notificationEndpoint: String? = null,
     @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionTO? = null,
+    @SerialName("batch_credential_issuance") val batchCredentialIssuance: BatchCredentialIssuanceTO? = null,
     @SerialName("credential_identifiers_supported") val credentialIdentifiersSupported: Boolean = false,
     @SerialName("signed_metadata") val signedMetadata: String? = null,
     @SerialName("credential_configurations_supported") val credentialConfigurationsSupported: Map<String, CredentialSupportedTO> =
@@ -397,11 +401,6 @@ private data class CredentialIssuerMetadataTO(
         val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
             .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialEndpoint)
 
-        val batchCredentialEndpoint = batchCredentialEndpoint?.let {
-            CredentialIssuerEndpoint(it)
-                .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidBatchCredentialEndpoint)
-        }
-
         val deferredCredentialEndpoint = deferredCredentialEndpoint?.let {
             CredentialIssuerEndpoint(it)
                 .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidDeferredCredentialEndpoint)
@@ -411,7 +410,9 @@ private data class CredentialIssuerMetadataTO(
                 .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
         }
 
-        ensure(credentialConfigurationsSupported.isNotEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired }
+        ensure(credentialConfigurationsSupported.isNotEmpty()) {
+            CredentialIssuerMetadataValidationError.CredentialsSupportedRequired()
+        }
         val credentialsSupported = credentialConfigurationsSupported.map { (id, credentialSupportedTO) ->
             val credentialId = CredentialConfigurationIdentifier(id)
             val credential = runCatching { credentialSupportedTO.toDomain() }
@@ -420,15 +421,20 @@ private data class CredentialIssuerMetadataTO(
         }.toMap()
 
         val display = display?.map(DisplayTO::toDomain) ?: emptyList()
+        val batchIssuance = batchCredentialIssuance?.let {
+            runCatching { BatchCredentialIssuance.Supported(it.batchSize) }.ensureSuccess {
+                CredentialIssuerMetadataValidationError.InvalidBatchSize()
+            }
+        } ?: BatchCredentialIssuance.NotSupported
 
         return CredentialIssuerMetadata(
             credentialIssuerIdentifier,
             authorizationServers,
             credentialEndpoint,
-            batchCredentialEndpoint,
             deferredCredentialEndpoint,
             notificationEndpoint,
             credentialResponseEncryption(),
+            batchIssuance,
             credentialIdentifiersSupported,
             credentialsSupported,
             display,
@@ -546,43 +552,17 @@ private fun Map<String, ProofSigningAlgorithmsSupportedTO>?.toProofTypes(): Proo
         }
     }
 
-private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta {
-    fun CoseAlgorithm.correspondingCurve(): CoseCurve? = when (this) {
-        CoseAlgorithm.ES256 -> CoseCurve.P_256
-        CoseAlgorithm.ES384 -> CoseCurve.P_384
-        CoseAlgorithm.ES512 -> CoseCurve.P_521
-        else -> null
-    }
-
-    return when (type) {
+private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta =
+    when (type) {
         "jwt" -> ProofTypeMeta.Jwt(
             algorithms = meta.algorithms.map {
-                require(it.isString) { "Expecting JOSE algorithm" }
-                JWSAlgorithm.parse(it.content)
+                JWSAlgorithm.parse(it)
             },
         )
 
-        "cwt" -> {
-            val isoAlgorithms = meta.isoAlgorithms.map { CoseAlgorithm(it).getOrThrow() }
-            val isoCurves = meta.isoCurves.map { CoseCurve(it).getOrThrow() }
-            val vciAlgorithms = meta.algorithms.map { value ->
-                requireNotNull(value.toCoseAlgorithm()) {
-                    "Expecting COSE algorithm, yet got $value"
-                }
-            }
-
-            if (isoAlgorithms.isNotEmpty() && isoCurves.isNotEmpty()) {
-                ProofTypeMeta.Cwt(isoAlgorithms, isoCurves)
-            } else {
-                val calculatedCurves = vciAlgorithms.mapNotNull { it.correspondingCurve() }
-                ProofTypeMeta.Cwt(vciAlgorithms, calculatedCurves)
-            }
-        }
-
         "ldp_vp" -> ProofTypeMeta.LdpVp
-        else -> error("Unknown Proof Type '$type'")
+        else -> ProofTypeMeta.Unsupported(type)
     }
-}
 
 /**
  * Utility method to convert a list of string to a list of [CryptographicBindingMethod].
@@ -596,8 +576,8 @@ private fun cryptographicBindingMethodOf(s: String): CryptographicBindingMethod 
     }
 
 private fun JsonPrimitive.toCoseAlgorithm(): CoseAlgorithm? {
-    fun Int.toCose() = CoseAlgorithm(this).getOrNull()
-    fun String.toCoseByName() = CoseAlgorithm(this).getOrNull()
+    fun Int.toCose() = CoseAlgorithm(this)
+    fun String.toCoseByName() = CoseAlgorithm.byName(this)
     fun String.toCodeByValue() = toIntOrNull()?.toCose()
     val strOrNull by lazy { contentOrNull }
     return intOrNull?.toCose() ?: strOrNull?.toCodeByValue() ?: strOrNull?.toCoseByName()

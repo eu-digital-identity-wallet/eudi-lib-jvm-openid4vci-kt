@@ -26,7 +26,7 @@ const val PID_MsoMdoc = "eu.europa.ec.eudiw.pid_mso_mdoc"
 const val DEGREE_JwtVcJson = "UniversityDegree_jwt_vc_json"
 const val MDL_MsoMdoc = "MobileDrivingLicense_msoMdoc"
 
-val CREDENTIAL_OFFER_NO_GRANTS = """
+val CredentialOfferMixedDocTypes_NO_GRANTS = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
           "credential_configuration_ids": ["$PID_SdJwtVC", "$PID_MsoMdoc", "$DEGREE_JwtVcJson"]          
@@ -51,6 +51,34 @@ val CredentialOfferWithJwtVcJson_NO_GRANTS = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
           "credential_configuration_ids": ["$DEGREE_JwtVcJson"]
+        }
+""".trimIndent()
+
+val CredentialOfferMixedDocTypes_PRE_AUTH_GRANT = """
+        {
+          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+          "credential_configuration_ids": ["$PID_MsoMdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+          "grants": {
+            "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+              "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
+              "tx_code": {
+                "input_mode": "numeric",
+                "length": 4
+              }
+            }
+          }
+        }
+""".trimIndent()
+
+val CredentialOfferMixedDocTypes_AUTH_GRANT = """
+        {
+          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+          "grants": {
+            "authorization_code": {
+              "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
+            }
+          }
         }
 """.trimIndent()
 

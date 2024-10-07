@@ -35,7 +35,6 @@ import com.nimbusds.openid.connect.sdk.op.OIDCProviderEndpointMetadata
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import io.ktor.http.*
 import java.net.URI
-import java.net.URL
 import java.util.*
 
 object SampleIssuer {
@@ -156,8 +155,8 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
     ),
     W3CJsonLdCredentialDefinition(
         listOf(
-            URL("https://www.w3.org/2018/credentials/v1"),
-            URL("https://www.w3.org/2018/credentials/examples/v1"),
+            URI("https://www.w3.org/2018/credentials/v1").toURL(),
+            URI("https://www.w3.org/2018/credentials/examples/v1").toURL(),
         ),
         listOf("VerifiableCredential_LDP_VC", "UniversityDegreeCredential_LDP_VC"),
         mapOf(
@@ -212,8 +211,8 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
     ),
     W3CJsonLdCredentialDefinition(
         listOf(
-            URL("https://www.w3.org/2018/credentials/v1"),
-            URL("https://www.w3.org/2018/credentials/examples/v1"),
+            URI("https://www.w3.org/2018/credentials/v1").toURL(),
+            URI("https://www.w3.org/2018/credentials/examples/v1").toURL(),
         ),
         listOf("VerifiableCredential_JWT_VC_JSON-LD", "UniversityDegreeCredential_JWT_VC_JSON-LD"),
         mapOf(
@@ -302,7 +301,6 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
     SampleIssuer.Id,
     listOf(SampleAuthServer.Url),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials").getOrThrow(),
-    CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/batch").getOrThrow(),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/deferred").getOrThrow(),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/notification").getOrThrow(),
     CredentialResponseEncryption.Required(
@@ -312,8 +310,6 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
                 JWEAlgorithm.ECDH_ES_A128KW,
                 JWEAlgorithm.ECDH_ES_A192KW,
                 JWEAlgorithm.ECDH_ES_A256KW,
-                JWEAlgorithm.RSA1_5,
-                JWEAlgorithm.RSA_OAEP,
                 JWEAlgorithm.RSA_OAEP_256,
                 JWEAlgorithm.RSA_OAEP_384,
                 JWEAlgorithm.RSA_OAEP_512,
@@ -321,6 +317,7 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
             listOf(EncryptionMethod.XC20P),
         ),
     ),
+    BatchCredentialIssuance.Supported(batchSize = 2),
     true,
     mapOf(
         CredentialConfigurationIdentifier("UniversityDegree_JWT") to universityDegreeJwt(),

@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vci
 import kotlinx.coroutines.test.runTest
 import org.apache.http.client.utils.URIBuilder
 import kotlin.test.*
-import kotlin.time.Duration.Companion.seconds
 
 internal class DefaultCredentialOfferRequestResolverTest {
 
@@ -47,7 +46,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             ),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", TxCode(), 5.seconds),
+                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", TxCode()),
             ),
         )
 
@@ -180,7 +179,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             ),
             Grants.Both(
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
-                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", TxCode(), 5.seconds),
+                Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", TxCode()),
             ),
         )
 

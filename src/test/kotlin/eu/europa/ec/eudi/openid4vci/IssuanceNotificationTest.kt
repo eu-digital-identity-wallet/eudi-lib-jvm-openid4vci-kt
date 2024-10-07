@@ -75,16 +75,17 @@ class IssuanceNotificationTest {
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
                     val popSigner = CryptoGenerator.rsaProofSigner()
                     val (newAuthorizedRequest, outcome) =
-                        authorizedRequest.requestSingle(requestPayload, popSigner).getOrThrow()
-                    assertIs<SubmissionOutcome.Success>(outcome, "Not a successful issuance")
+                        authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
+                    assertIs<SubmissionOutcome.Success>(outcome)
 
                     val issuedCredential = outcome.credentials.firstOrNull()
-                    assertIs<IssuedCredential.Issued>(issuedCredential, "Is Deferred although expecting Issued")
-                    assertNotNull(issuedCredential.notificationId, "No notification id found")
+                    assertIs<IssuedCredential>(issuedCredential)
+                    val notId = outcome.notificationId
+                    assertNotNull(notId)
 
                     newAuthorizedRequest.notify(
                         CredentialIssuanceEvent.Accepted(
-                            id = issuedCredential.notificationId!!,
+                            id = notId,
                             description = "Credential received and validated",
                         ),
                     )

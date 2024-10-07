@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
-import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryption.NotSupported
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import java.io.Serializable
 import java.net.URL
@@ -44,13 +43,25 @@ data class SupportedEncryptionAlgorithmsAndMethods(
         require(encryptionMethods.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
 
         if (algorithms.isEmpty()) {
-            throw CredentialIssuerMetadataValidationError.CredentialResponseEncryptionAlgorithmsRequired
+            throw CredentialIssuerMetadataValidationError.CredentialResponseEncryptionAlgorithmsRequired()
         }
         val allAreAsymmetricAlgorithms = algorithms.all {
             JWEAlgorithm.Family.ASYMMETRIC.contains(it)
         }
         if (!allAreAsymmetricAlgorithms) {
-            throw CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired
+            throw CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired()
+        }
+    }
+}
+
+sealed interface BatchCredentialIssuance : Serializable {
+    data object NotSupported : BatchCredentialIssuance {
+        private fun readResolve(): Any = NotSupported
+    }
+
+    data class Supported(val batchSize: Int) : BatchCredentialIssuance {
+        init {
+            require(batchSize > 0) { "batchSize must be greater than 0" }
         }
     }
 }
@@ -62,13 +73,10 @@ data class CredentialIssuerMetadata(
     val credentialIssuerIdentifier: CredentialIssuerId,
     val authorizationServers: List<HttpsUrl> = listOf(credentialIssuerIdentifier.value),
     val credentialEndpoint: CredentialIssuerEndpoint,
-    @Deprecated(
-        message = "Batch credential endpoint has been removed from OpenId4VCI",
-    )
-    val batchCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val notificationEndpoint: CredentialIssuerEndpoint? = null,
-    val credentialResponseEncryption: CredentialResponseEncryption = NotSupported,
+    val credentialResponseEncryption: CredentialResponseEncryption = CredentialResponseEncryption.NotSupported,
+    val batchCredentialIssuance: BatchCredentialIssuance = BatchCredentialIssuance.NotSupported,
     val credentialIdentifiersSupported: Boolean = false,
     val credentialConfigurationsSupported: Map<CredentialConfigurationIdentifier, CredentialConfiguration>,
     val display: List<Display> = emptyList(),
@@ -153,11 +161,6 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
     class InvalidCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
     /**
-     * The URL of the Batch Credential Endpoint is not valid.
-     */
-    class InvalidBatchCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
-
-    /**
      * The URL of the Deferred Credential Endpoint is not valid.
      */
     class InvalidDeferredCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
@@ -170,20 +173,14 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
     /**
      * Credential Encryption Algorithms are required.
      */
-    object CredentialResponseEncryptionAlgorithmsRequired :
-        CredentialIssuerMetadataValidationError(IllegalArgumentException("Credential ResponseEncryption Algorithms Required")) {
-
-        private fun readResolve(): Any = CredentialResponseEncryptionAlgorithmsRequired
-    }
+    class CredentialResponseEncryptionAlgorithmsRequired :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("Credential ResponseEncryption Algorithms Required"))
 
     /**
      * Credential Encryption Algorithms must be of asymmetric encryption family.
      */
-    object CredentialResponseAsymmetricEncryptionAlgorithmsRequired :
-        CredentialIssuerMetadataValidationError(IllegalArgumentException("Asymmetric ResponseEncryption Algorithms Required")) {
-
-        private fun readResolve(): Any = CredentialResponseAsymmetricEncryptionAlgorithmsRequired
-    }
+    class CredentialResponseAsymmetricEncryptionAlgorithmsRequired :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("Asymmetric ResponseEncryption Algorithms Required"))
 
     /**
      * The supported Credentials not valid.
@@ -193,11 +190,11 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
     /**
      * Supported Credentials are required.
      */
-    object CredentialsSupportedRequired :
-        CredentialIssuerMetadataValidationError(IllegalArgumentException("Credentials Supported Required")) {
+    class CredentialsSupportedRequired :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("Credentials Supported Required"))
 
-        private fun readResolve(): Any = CredentialsSupportedRequired
-    }
+    class InvalidBatchSize :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("batch_size should be greater than zero"))
 }
 
 /**

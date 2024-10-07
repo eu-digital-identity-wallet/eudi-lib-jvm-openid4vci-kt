@@ -27,7 +27,6 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.EncryptedResponses.*
-import eu.europa.ec.eudi.openid4vci.internal.http.BatchCredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.PushedAuthorizationRequestResponseTO
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenResponseTO
@@ -157,12 +156,12 @@ internal fun tokenPostMockerWithAuthDetails(
 private fun authorizationDetails(
     configurationIds: List<CredentialConfigurationIdentifier>,
 ): Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> =
-    configurationIds.map {
-        it to listOf(
+    configurationIds.associateWith {
+        listOf(
             CredentialIdentifier("${it.value}_1"),
             CredentialIdentifier("${it.value}_2"),
         )
-    }.toMap()
+    }
 
 internal fun singleIssuanceRequestMocker(
     credential: String = "",
@@ -171,16 +170,6 @@ internal fun singleIssuanceRequestMocker(
 ): RequestMocker =
     RequestMocker(
         requestMatcher = endsWith("/credentials", HttpMethod.Post),
-        responseBuilder = responseBuilder,
-        requestValidator = requestValidator,
-    )
-
-internal fun batchIssuanceRequestMocker(
-    responseBuilder: HttpResponseDataBuilder,
-    requestValidator: (request: HttpRequestData) -> Unit = {},
-): RequestMocker =
-    RequestMocker(
-        requestMatcher = endsWith("/credentials/batch", HttpMethod.Post),
         responseBuilder = responseBuilder,
         requestValidator = requestValidator,
     )
@@ -198,7 +187,7 @@ internal fun deferredIssuanceRequestMocker(
 private fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(request: HttpRequestData?, credential: String): HttpResponseData {
     val textContent = request?.body as TextContent
     val issuanceRequest = Json.decodeFromString<JsonObject>(textContent.text)
-    return if (issuanceRequest.get("proof") != null) {
+    return if (issuanceRequest["proof"] != null) {
         respond(
             content = """
                     {                                  
@@ -320,8 +309,8 @@ fun MockRequestHandleScope.encryptedResponseDataBuilder(
 private fun extractEncryptionSpec(request: HttpRequestData?): Triple<JWK, JWEAlgorithm, EncryptionMethod> {
     val textContent = request?.body as TextContent
     val text = textContent.text
-    val credentialResponseEncryption = if (text.contains("credential_requests")) {
-        Json.decodeFromString<BatchCredentialRequestTO>(text).credentialResponseEncryption
+    val credentialResponseEncryption = if (text.contains("proofs")) {
+        Json.decodeFromString<CredentialRequestTO>(text).credentialResponseEncryption
     } else {
         Json.decodeFromString<CredentialRequestTO>(text).credentialResponseEncryption
     }

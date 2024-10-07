@@ -36,6 +36,7 @@ import java.time.Clock
  * @param clock Wallet's clock
  */
 data class DeferredIssuerConfig(
+    val credentialIssuerId: CredentialIssuerId,
     val client: Client,
     val deferredEndpoint: URL,
     val authServerId: URL,
@@ -117,8 +118,8 @@ interface DeferredIssuer : QueryForDeferredCredential {
             val deferredIssuer = make(ctx.config, ktorHttpClientFactory).getOrThrow()
             val (newAuthorized, outcome) = with(deferredIssuer) {
                 with(ctx.authorizedTransaction.authorizedRequest) {
-                    val deferred = IssuedCredential.Deferred(ctx.authorizedTransaction.transactionId)
-                    queryForDeferredCredential(deferred).getOrThrow()
+                    val transactionId = ctx.authorizedTransaction.transactionId
+                    queryForDeferredCredential(transactionId).getOrThrow()
                 }
             }
             val newCtx = when (outcome) {
@@ -154,6 +155,7 @@ interface DeferredIssuer : QueryForDeferredCredential {
             }
 
             val tokenEndpointClient = TokenEndpointClient(
+                config.credentialIssuerId,
                 config.clock,
                 config.client,
                 URI.create("https://willNotBeUsed"), // this will not be used

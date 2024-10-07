@@ -38,17 +38,6 @@ internal sealed interface Proof {
     value class Jwt(val jwt: JWT) : Proof
 
     /**
-     * Proof of possession is structured as a CWT
-     *
-     * @param cwt The proof CWT
-     */
-    @Deprecated(
-        message = "CWT proofs have been removed from OpenId4VCI",
-    )
-    @JvmInline
-    value class Cwt(val cwt: String) : Proof
-
-    /**
      * Proof of possession is structured as a LDP_VP
      *
      * @param ldpVp The proof LDP_VP

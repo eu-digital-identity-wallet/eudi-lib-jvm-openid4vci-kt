@@ -46,16 +46,16 @@ fun main(): Unit = runBlocking {
 
     val offerCredentialConfIds = credentialOffer.credentialConfigurationIdentifiers
 
-    val credentials = offerCredentialConfIds.map { credentialId ->
+    val credentials = offerCredentialConfIds.associate { credentialId ->
         issuanceLog("Requesting issuance of '$credentialId'")
-        val (newAuthorizedRequest, credential) = submit(issuer, authorizedRequest, credentialId)
+        val (newAuthorizedRequest, credentials) = submit(issuer, authorizedRequest, credentialId)
         authorizedRequest = newAuthorizedRequest
-        credentialId.value to credential
+        credentialId.value to credentials
     }
 
     println("--> Issued credentials :")
-    credentials.onEach { (credentialId, credential) ->
-        println("\t [$credentialId] : $credential")
+    credentials.onEach { (credentialId, credentials) ->
+        println("\t [$credentialId] : $credentials")
     }
 }
 
@@ -89,13 +89,15 @@ private suspend fun submit(
     issuer: Issuer,
     authorized: AuthorizedRequest,
     credentialConfigurationId: CredentialConfigurationIdentifier,
-): AuthorizedRequestAnd<String> {
+): AuthorizedRequestAnd<List<IssuedCredential>> {
     with(issuer) {
-        val proofSigner = popSigner(credentialConfigurationId)
+        val proofSigners = popSigners(credentialConfigurationId, proofsNo = 1)
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-        val (newAuthorized, outcome) = authorized.requestSingle(requestPayload, proofSigner).getOrThrow()
+        val (newAuthorized, outcome) =
+            authorized.request(requestPayload, proofSigners).getOrThrow()
         return when (outcome) {
-            is SubmissionOutcome.Success -> newAuthorized to handleSuccess(outcome, issuer, newAuthorized)
+            is SubmissionOutcome.Success -> newAuthorized to outcome.credentials
+            is SubmissionOutcome.Deferred -> newAuthorized to handleDeferred(issuer, authorized, outcome.transactionId)
             is SubmissionOutcome.Failed ->
                 throw if (outcome.error is CredentialIssuanceError.InvalidProof) {
                     IllegalStateException("Although providing a proof with c_nonce the proof is still invalid")
@@ -104,29 +106,18 @@ private suspend fun submit(
     }
 }
 
-private suspend fun handleSuccess(
-    submittedRequest: SubmissionOutcome.Success,
-    issuer: Issuer,
-    authorized: AuthorizedRequest,
-): String = when (val issuedCredential = submittedRequest.credentials[0]) {
-    is IssuedCredential.Issued -> issuedCredential.credential
-    is IssuedCredential.Deferred -> {
-        handleDeferred(issuer, authorized, issuedCredential)
-    }
-}
-
 private suspend fun handleDeferred(
     issuer: Issuer,
     authorized: AuthorizedRequest,
-    deferred: IssuedCredential.Deferred,
-): String {
+    transactionId: TransactionId,
+): List<IssuedCredential> {
     issuanceLog(
-        "Got a deferred issuance response from server with transaction_id ${deferred.transactionId.value}. Retrying issuance...",
+        "Got a deferred issuance response from server with transaction_id ${transactionId.value}. Retrying issuance...",
     )
     with(issuer) {
-        val (_, outcome) = authorized.queryForDeferredCredential(deferred).getOrThrow()
+        val (_, outcome) = authorized.queryForDeferredCredential(transactionId).getOrThrow()
         return when (outcome) {
-            is DeferredCredentialQueryOutcome.Issued -> outcome.credential.credential
+            is DeferredCredentialQueryOutcome.Issued -> outcome.credentials
             is DeferredCredentialQueryOutcome.IssuancePending -> throw RuntimeException(
                 "Credential not ready yet. Try after ${outcome.interval}",
             )

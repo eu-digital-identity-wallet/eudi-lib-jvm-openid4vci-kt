@@ -93,7 +93,7 @@ class IssuanceSingleRequestTest {
                     val (updatedAuthorizedRequest, outcome) = assertDoesNotThrow {
                         val requestPayload =
                             IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
-                        authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
+                        authorizedRequest.request(requestPayload, emptyList()).getOrThrow()
                     }
                     assertIs<AuthorizedRequest.ProofRequired>(updatedAuthorizedRequest)
                     assertIs<SubmissionOutcome.Failed>(outcome)
@@ -150,7 +150,7 @@ class IssuanceSingleRequestTest {
                         val (_, outcome) = assertDoesNotThrow {
                             val requestPayload =
                                 IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
-                            authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
+                            authorizedRequest.request(requestPayload).getOrThrow()
                         }
                         assertIs<SubmissionOutcome.Failed>(outcome)
                         assertIs<CredentialIssuanceError.ResponseUnparsable>(outcome.error)
@@ -173,7 +173,7 @@ class IssuanceSingleRequestTest {
                 tokenPostMocker(),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
@@ -185,7 +185,7 @@ class IssuanceSingleRequestTest {
                 assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
                     val requestPayload =
                         IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSetMsoMdoc)
-                    authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
+                    authorizedRequest.request(requestPayload).getOrThrow()
                 }
 
                 val claimSetSdJwtVc = GenericClaimSet(listOf("degree"))
@@ -193,7 +193,7 @@ class IssuanceSingleRequestTest {
                 assertFailsWith<CredentialIssuanceError.InvalidIssuanceRequest> {
                     val requestPayload =
                         IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSetSdJwtVc)
-                    authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
+                    authorizedRequest.request(requestPayload).getOrThrow()
                 }
             }
         }
@@ -208,17 +208,17 @@ class IssuanceSingleRequestTest {
                 tokenPostMocker(),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
             assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
             val credentialConfigurationId = CredentialConfigurationIdentifier("UniversityDegree")
-            assertFailsWith<IllegalArgumentException> {
+            assertFailsWith<IllegalStateException> {
                 val requestPayload =
                     IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
                 with(issuer) {
-                    authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
+                    authorizedRequest.request(requestPayload, emptyList()).getOrThrow()
                 }
             }
         }
@@ -266,7 +266,7 @@ class IssuanceSingleRequestTest {
         val popSigner = CryptoGenerator.rsaProofSigner()
         val (_, outcome) =
             with(issuer) {
-                authorizedRequest.requestSingle(requestPayload, popSigner).getOrThrow()
+                authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
             }
         assertIs<SubmissionOutcome.Success>(outcome)
     }
@@ -303,10 +303,8 @@ class IssuanceSingleRequestTest {
                     val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
                     val popSigner = CryptoGenerator.rsaProofSigner()
-                    val (newAuthorizedRequest, outcome) = authorizedRequest.requestSingle(
-                        requestPayload,
-                        popSigner,
-                    ).getOrThrow()
+                    val (newAuthorizedRequest, outcome) =
+                        authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
                     assertTrue { authorizedRequest != newAuthorizedRequest }
                     assertIs<SubmissionOutcome.Success>(outcome)
                 }
@@ -350,10 +348,8 @@ class IssuanceSingleRequestTest {
                     val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
                     val popSigner = CryptoGenerator.rsaProofSigner()
-                    val (newAuthorizedRequest, outcome) = authorizedRequest.requestSingle(
-                        requestPayload,
-                        popSigner,
-                    ).getOrThrow()
+                    val (newAuthorizedRequest, outcome) =
+                        authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
                     assertTrue { authorizedRequest != newAuthorizedRequest }
                     assertIs<SubmissionOutcome.Success>(outcome)
                 }
@@ -387,7 +383,7 @@ class IssuanceSingleRequestTest {
                 ),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
@@ -401,7 +397,7 @@ class IssuanceSingleRequestTest {
                     }
                     ?: error("No credential identifier")
             with(issuer) {
-                authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
+                authorizedRequest.request(requestPayload).getOrThrow()
             }
         }
 
@@ -428,7 +424,7 @@ class IssuanceSingleRequestTest {
                 ),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
@@ -436,9 +432,9 @@ class IssuanceSingleRequestTest {
                 CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
                 CredentialIdentifier("DUMMY"),
             )
-            assertThrows<IllegalArgumentException> {
+            assertThrows<IllegalStateException> {
                 with(issuer) {
-                    authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
+                    authorizedRequest.request(requestPayload).getOrThrow()
                 }
             }
         }
@@ -464,7 +460,7 @@ class IssuanceSingleRequestTest {
                 ),
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-                credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 ktorHttpClientFactory = mockedKtorHttpClientFactory,
             )
 
@@ -472,9 +468,9 @@ class IssuanceSingleRequestTest {
                 CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
                 CredentialIdentifier("id"),
             )
-            assertThrows<IllegalArgumentException> {
+            assertThrows<IllegalStateException> {
                 with(issuer) {
-                    authorizedRequest.requestSingle(requestPayload, null).getOrThrow()
+                    authorizedRequest.request(requestPayload).getOrThrow()
                 }
             }
         }
@@ -501,7 +497,7 @@ class IssuanceSingleRequestTest {
             ),
         )
         val (authorizedRequest, _) = authorizeRequestForCredentialOffer(
-            credentialOfferStr = CREDENTIAL_OFFER_NO_GRANTS,
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
             ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 

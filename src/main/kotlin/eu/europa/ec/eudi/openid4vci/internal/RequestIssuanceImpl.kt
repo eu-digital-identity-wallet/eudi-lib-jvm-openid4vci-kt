@@ -16,48 +16,26 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance
-import eu.europa.ec.eudi.openid4vci.internal.http.BatchEndPointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
-
-/**
- * Models a response of the issuer to a successful issuance request.
- *
- * @param credentials The outcome of the issuance request.
- * if the issuance request was a batch request, it will contain
- * the results of each issuance request.
- * If it was a single issuance request list will contain only one result.
- * @param cNonce Nonce information sent back from the issuance server.
- */
-internal data class CredentialIssuanceResponse(
-    val credentials: List<IssuedCredential>,
-    val cNonce: CNonce?,
-)
 
 internal class RequestIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     private val config: OpenId4VCIConfig,
     private val credentialEndpointClient: CredentialEndpointClient,
-    private val batchEndPointClient: BatchEndPointClient?,
+    private val batchCredentialIssuance: BatchCredentialIssuance,
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-) : RequestIssuance, RequestBatchIssuance {
+) : RequestIssuance {
 
-    override suspend fun AuthorizedRequest.requestSingle(
+    override suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
-        popSigner: PopSigner?,
+        popSigners: List<PopSigner>,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
         //
         // Place the request
         //
         val outcome = placeIssuanceRequest(accessToken) {
-            val proofFactory = when (this) {
-                is AuthorizedRequest.NoProofRequired -> null
-                is AuthorizedRequest.ProofRequired -> {
-                    requireNotNull(popSigner) { "PopSigner is required in Authorized.ProofRequired" }
-                    proofFactory(popSigner, cNonce)
-                }
-            }
-            singleRequest(requestPayload, proofFactory, credentialIdentifiers)
+            val proofFactories = proofFactoriesForm(popSigners)
+            buildRequest(requestPayload, proofFactories, credentialIdentifiers.orEmpty())
         }
 
         //
@@ -71,12 +49,12 @@ internal class RequestIssuanceImpl(
         //
         val retryOnInvalidProof =
             this is AuthorizedRequest.NoProofRequired &&
-                popSigner != null &&
+                popSigners.isNotEmpty() &&
                 updatedAuthorizedRequest is AuthorizedRequest.ProofRequired &&
                 outcome.isInvalidProof()
 
         suspend fun retry() =
-            updatedAuthorizedRequest.requestSingle(requestPayload, popSigner)
+            updatedAuthorizedRequest.request(requestPayload, popSigners)
                 .getOrThrow()
                 .markInvalidProofIrrecoverable()
 
@@ -90,53 +68,13 @@ internal class RequestIssuanceImpl(
                 is SubmissionOutcomeInternal.Failed ->
                     outcome.cNonceFromInvalidProof()?.let { newCNonce -> withCNonce(newCNonce) }
 
+                is SubmissionOutcomeInternal.Deferred ->
+                    outcome.cNonce?.let { withCNonce(it) }
+
                 is SubmissionOutcomeInternal.Success ->
                     outcome.cNonce?.let { withCNonce(it) }
             }
         return updated ?: this
-    }
-
-    override suspend fun AuthorizedRequest.requestBatch(
-        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
-    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
-        //
-        // Place the request
-        //
-        val outcome = placeIssuanceRequest(accessToken) {
-            val credentialRequests = credentialsMetadata.map { (requestPayload, popSigner) ->
-                val proofFactory = when (this) {
-                    is AuthorizedRequest.NoProofRequired -> null
-                    is AuthorizedRequest.ProofRequired -> {
-                        requireNotNull(popSigner) { "PopSigner is required in Authorized.ProofRequired" }
-                        proofFactory(popSigner, cNonce)
-                    }
-                }
-                singleRequest(requestPayload, proofFactory, credentialIdentifiers, true)
-            }
-            CredentialIssuanceRequest.BatchRequest(credentialRequests, responseEncryptionSpec)
-        }
-
-        //
-        // Update state
-        //
-        val updatedAuthorizedRequest = this.withCNonceFrom(outcome)
-
-        //
-        // Retry on invalid proof if we begin from NoProofRequired and issuer
-        // replied with InvalidProof
-        //
-        val retryOnInvalidProof =
-            this is AuthorizedRequest.NoProofRequired &&
-                updatedAuthorizedRequest is AuthorizedRequest.ProofRequired &&
-                outcome.isInvalidProof()
-
-        suspend fun retry() =
-            updatedAuthorizedRequest.requestBatch(credentialsMetadata)
-                .getOrThrow()
-                .markInvalidProofIrrecoverable()
-
-        if (retryOnInvalidProof) retry()
-        else updatedAuthorizedRequest to outcome.toPub()
     }
 
     private fun credentialSupportedById(credentialId: CredentialConfigurationIdentifier): CredentialConfiguration {
@@ -147,88 +85,67 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private suspend fun proofFactory(proofSigner: PopSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
+    private fun AuthorizedRequest.proofFactoriesForm(popSigners: List<PopSigner>): List<ProofFactory> =
+        when (this) {
+            is AuthorizedRequest.NoProofRequired -> emptyList()
+            is AuthorizedRequest.ProofRequired -> {
+                when (val popSignersNo = popSigners.size) {
+                    0 -> error("At least a PopSigner is required in Authorized.ProofRequired")
+                    1 -> Unit
+                    else -> {
+                        when (batchCredentialIssuance) {
+                            BatchCredentialIssuance.NotSupported -> CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+                            is BatchCredentialIssuance.Supported -> {
+                                val maxBatchSize = batchCredentialIssuance.batchSize
+                                ensure(popSignersNo <= maxBatchSize) {
+                                    CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
+                                }
+                            }
+                        }
+                    }
+                }
+                popSigners.map { proofFactory(it, cNonce) }
+            }
+        }
+
+    private fun proofFactory(proofSigner: PopSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
         val iss = config.client.id
         val aud = credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier
         val proofTypesSupported = credentialSupported.proofTypesSupported
         ProofBuilder(proofTypesSupported, config.clock, iss, aud, cNonce, proofSigner).build()
     }
 
-    private suspend fun singleRequest(
+    private suspend fun buildRequest(
         requestPayload: IssuanceRequestPayload,
-        proofFactory: ProofFactory?,
-        credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
-        partOfBatch: Boolean = false,
-    ): CredentialIssuanceRequest.SingleRequest {
-        val includeEncryptionSpec = !partOfBatch
+        proofFactories: List<ProofFactory>,
+        authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
+    ): CredentialIssuanceRequest {
+        val credentialCfg = run {
+            val creCfgId = requestPayload.credentialConfigurationIdentifier
+            check(creCfgId in credentialOffer.credentialConfigurationIdentifiers) {
+                "The provided credential configuration ${creCfgId.value} is not part of the credential offer"
+            }
+            credentialSupportedById(creCfgId)
+        }
+
+        val proofs = proofFactories.map { factory ->
+            factory(credentialCfg).also(credentialCfg::assertProofSupported)
+        }
+
         return when (requestPayload) {
             is IssuanceRequestPayload.ConfigurationBased -> {
-                formatBasedRequest(
-                    requestPayload.credentialConfigurationIdentifier,
+                CredentialIssuanceRequest.formatBased(
+                    credentialCfg,
                     requestPayload.claimSet,
-                    proofFactory,
-                    includeEncryptionSpec,
+                    proofs,
+                    responseEncryptionSpec,
                 )
             }
 
             is IssuanceRequestPayload.IdentifierBased -> {
-                val (credentialConfigurationId, credentialId) = requestPayload
-                require(
-                    credentialIdentifiers != null &&
-                        credentialIdentifiers[credentialConfigurationId]?.contains(credentialId) ?: false,
-                ) {
-                    "The credential identifier passed is not valid or unknown"
-                }
-                identifierBasedRequest(credentialConfigurationId, credentialId, proofFactory, includeEncryptionSpec)
+                requestPayload.ensureAuthorized(authorizationDetails)
+                CredentialIssuanceRequest.byId(requestPayload.credentialIdentifier, proofs, responseEncryptionSpec)
             }
-        }
-    }
-
-    private suspend fun formatBasedRequest(
-        credentialConfigurationId: CredentialConfigurationIdentifier,
-        claimSet: ClaimSet?,
-        proofFactory: ProofFactory?,
-        includeEncryptionSpec: Boolean,
-    ): CredentialIssuanceRequest.FormatBased {
-        require(credentialOffer.credentialConfigurationIdentifiers.contains(credentialConfigurationId)) {
-            "The requested credential is not authorized for issuance"
-        }
-        val credentialSupported = credentialSupportedById(credentialConfigurationId)
-        val proof = proofFactory?.invoke(credentialSupported)?.also { assertProofSupported(it, credentialSupported) }
-        return CredentialIssuanceRequest.formatBased(
-            credentialSupported,
-            claimSet,
-            proof,
-            responseEncryptionSpec.takeIf { includeEncryptionSpec },
-        )
-    }
-
-    private suspend fun identifierBasedRequest(
-        credentialConfigurationId: CredentialConfigurationIdentifier,
-        credentialId: CredentialIdentifier,
-        proofFactory: ProofFactory?,
-        includeEncryptionSpec: Boolean,
-    ): CredentialIssuanceRequest.IdentifierBased {
-        require(credentialOffer.credentialConfigurationIdentifiers.contains(credentialConfigurationId)) {
-            "The requested credential is not authorized for issuance"
-        }
-        val credentialSupported = credentialSupportedById(credentialConfigurationId)
-        val proof = proofFactory?.invoke(credentialSupported)?.also { assertProofSupported(it, credentialSupported) }
-        return CredentialIssuanceRequest.IdentifierBased(
-            credentialId,
-            proof,
-            responseEncryptionSpec.takeIf { includeEncryptionSpec },
-        )
-    }
-
-    private fun assertProofSupported(p: Proof, credentialSupported: CredentialConfiguration) {
-        val proofType = when (p) {
-            is Proof.Jwt -> ProofType.JWT
-            is Proof.Cwt -> ProofType.CWT
-            is Proof.LdpVp -> ProofType.LDP_VP
-        }
-        requireNotNull(credentialSupported.proofTypesSupported[proofType]) {
-            "Provided proof type $proofType is not one of supported [${credentialSupported.proofTypesSupported}]."
         }
     }
 
@@ -236,31 +153,44 @@ internal class RequestIssuanceImpl(
         token: AccessToken,
         issuanceRequestSupplier: suspend () -> CredentialIssuanceRequest,
     ): SubmissionOutcomeInternal {
-        fun handleIssuanceFailure(error: Throwable): SubmissionOutcomeInternal.Failed =
-            SubmissionOutcomeInternal.fromThrowable(error) ?: throw error
-        return when (val credentialRequest = issuanceRequestSupplier()) {
-            is CredentialIssuanceRequest.SingleRequest -> {
-                credentialEndpointClient.placeIssuanceRequest(token, credentialRequest).fold(
-                    onSuccess = { SubmissionOutcomeInternal.Success(it.credentials, it.cNonce) },
-                    onFailure = { handleIssuanceFailure(it) },
-                )
-            }
-
-            is CredentialIssuanceRequest.BatchRequest -> {
-                ensureNotNull(batchEndPointClient) { IssuerDoesNotSupportBatchIssuance() }
-                batchEndPointClient.placeBatchIssuanceRequest(token, credentialRequest).fold(
-                    onSuccess = { SubmissionOutcomeInternal.Success(it.credentials, it.cNonce) },
-                    onFailure = { handleIssuanceFailure(it) },
-                )
-            }
-        }
+        val req = issuanceRequestSupplier()
+        val res = credentialEndpointClient.placeIssuanceRequest(token, req)
+        return res.getOrThrow()
     }
 }
 
-private sealed interface SubmissionOutcomeInternal {
+private fun IssuanceRequestPayload.IdentifierBased.ensureAuthorized(
+    authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
+) {
+    val credentialId = credentialIdentifier
+    val authorizedCredIds = checkNotNull(authorizationDetails[credentialConfigurationIdentifier]) {
+        "No credential identifiers authorized for $credentialConfigurationIdentifier"
+    }
+    check(credentialId in authorizedCredIds) {
+        "The credential identifier ${credentialId.value} is not authorized"
+    }
+}
+
+private fun CredentialConfiguration.assertProofSupported(proof: Proof) {
+    val proofType = when (proof) {
+        is Proof.Jwt -> ProofType.JWT
+        is Proof.LdpVp -> ProofType.LDP_VP
+    }
+    checkNotNull(proofTypesSupported[proofType]) {
+        "Provided proof type $proofType is not one of supported [$proofTypesSupported]."
+    }
+}
+
+internal sealed interface SubmissionOutcomeInternal {
 
     data class Success(
         val credentials: List<IssuedCredential>,
+        val cNonce: CNonce?,
+        val notificationId: NotificationId?,
+    ) : SubmissionOutcomeInternal
+
+    data class Deferred(
+        val transactionId: TransactionId,
         val cNonce: CNonce?,
     ) : SubmissionOutcomeInternal
 
@@ -270,7 +200,8 @@ private sealed interface SubmissionOutcomeInternal {
 
     fun toPub(): SubmissionOutcome =
         when (this) {
-            is Success -> SubmissionOutcome.Success(credentials)
+            is Success -> SubmissionOutcome.Success(credentials, notificationId)
+            is Deferred -> SubmissionOutcome.Deferred(transactionId)
             is Failed -> SubmissionOutcome.Failed(error)
         }
 
@@ -281,24 +212,18 @@ private sealed interface SubmissionOutcomeInternal {
         if (this is Failed && error is CredentialIssuanceError.InvalidProof) {
             CNonce(error.cNonce, error.cNonceExpiresIn)
         } else null
-
-    companion object {
-        fun fromThrowable(error: Throwable): Failed? =
-            when (error) {
-                is CredentialIssuanceError -> Failed(error)
-                else -> null
-            }
-    }
 }
 
 private fun AuthorizedRequestAnd<SubmissionOutcome>.markInvalidProofIrrecoverable() =
     first to when (val outcome = second) {
         is SubmissionOutcome.Failed ->
             if (outcome.error is CredentialIssuanceError.InvalidProof) {
-                SubmissionOutcome.Failed(outcome.error.irrecoverbale())
+                SubmissionOutcome.Failed(outcome.error.irrecoverable())
             } else outcome
+
         is SubmissionOutcome.Success -> outcome
+        is SubmissionOutcome.Deferred -> outcome
     }
 
-private fun CredentialIssuanceError.InvalidProof.irrecoverbale() =
+private fun CredentialIssuanceError.InvalidProof.irrecoverable() =
     CredentialIssuanceError.IrrecoverableInvalidProof(errorDescription)

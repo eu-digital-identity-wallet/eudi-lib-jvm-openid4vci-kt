@@ -22,8 +22,10 @@ import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
-import eu.europa.ec.eudi.openid4vci.internal.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidResponseContentType
+import eu.europa.ec.eudi.openid4vci.internal.CredentialIssuanceRequest
+import eu.europa.ec.eudi.openid4vci.internal.SubmissionOutcomeInternal
+import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -44,8 +46,8 @@ internal class CredentialEndpointClient(
      */
     suspend fun placeIssuanceRequest(
         accessToken: AccessToken,
-        request: CredentialIssuanceRequest.SingleRequest,
-    ): Result<CredentialIssuanceResponse> = runCatching {
+        request: CredentialIssuanceRequest,
+    ): Result<SubmissionOutcomeInternal> = runCatching {
         ktorHttpClientFactory().use { client ->
             val url = credentialEndpoint.value
             val response = client.post(url) {
@@ -62,45 +64,7 @@ internal class CredentialEndpointClient(
                 )
             } else {
                 val error = response.body<GenericErrorResponseTO>()
-                throw error.toIssuanceError()
-            }
-        }
-    }
-}
-
-internal class BatchEndPointClient(
-    private val batchCredentialEndpoint: CredentialIssuerEndpoint,
-    private val dPoPJwtFactory: DPoPJwtFactory?,
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
-) {
-    /**
-     * Method that submits a request to credential issuer for the batch issuance of credentials.
-     *
-     * @param accessToken Access token authorizing the request
-     * @param request The batch credential issuance request
-     * @return credential issuer's response
-     */
-    suspend fun placeBatchIssuanceRequest(
-        accessToken: AccessToken,
-        request: CredentialIssuanceRequest.BatchRequest,
-    ): Result<CredentialIssuanceResponse> = runCatching {
-        ktorHttpClientFactory().use { client ->
-            val url = batchCredentialEndpoint.value
-            val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
-                contentType(ContentType.Application.Json)
-                setBody(BatchCredentialRequestTO.from(request))
-            }
-            if (response.status.isSuccess()) {
-                responsePossiblyEncrypted(
-                    response,
-                    request.encryption,
-                    fromTransferObject = { it.toDomain() },
-                    transferObjectFromJwtClaims = { BatchCredentialResponseSuccessTO.from(it) },
-                )
-            } else {
-                val error = response.body<GenericErrorResponseTO>()
-                throw error.toIssuanceError()
+                SubmissionOutcomeInternal.Failed(error.toIssuanceError())
             }
         }
     }
@@ -115,7 +79,7 @@ internal class DeferredEndPointClient(
      * Method that submits a request to credential issuer's Deferred Credential Endpoint
      *
      * @param accessToken Access token authorizing the request
-     * @param deferredCredential The identifier of the Deferred Issuance transaction
+     * @param transactionId The identifier of the Deferred Issuance transaction
      * @param responseEncryptionSpec The response encryption information as specified when placing the issuance request. If initial request
      *      had specified response encryption then the issuer response is expected to be encrypted by the encryption details of the initial
      *      issuance request.
@@ -123,7 +87,7 @@ internal class DeferredEndPointClient(
      */
     suspend fun placeDeferredCredentialRequest(
         accessToken: AccessToken,
-        deferredCredential: IssuedCredential.Deferred,
+        transactionId: TransactionId,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
     ): Result<DeferredCredentialQueryOutcome> = runCatching {
         ktorHttpClientFactory().use { client ->
@@ -131,7 +95,7 @@ internal class DeferredEndPointClient(
             val response = client.post(url) {
                 bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
                 contentType(ContentType.Application.Json)
-                setBody(DeferredRequestTO.from(deferredCredential))
+                setBody(DeferredRequestTO(transactionId.value))
             }
             if (response.status.isSuccess()) {
                 responsePossiblyEncrypted<DeferredIssuanceSuccessResponseTO, DeferredCredentialQueryOutcome.Issued>(

@@ -91,6 +91,7 @@ internal sealed interface TokenResponseTO {
 }
 
 internal class TokenEndpointClient(
+    private val credentialIssuerId: CredentialIssuerId,
     private val clock: Clock,
     private val client: Client,
     private val authFlowRedirectionURI: URI,
@@ -101,16 +102,21 @@ internal class TokenEndpointClient(
     private val ktorHttpClientFactory: KtorHttpClientFactory,
 ) {
 
+    private val isCredentialIssuerAuthorizationServer: Boolean
+        get() = credentialIssuerId.toString() == authServerId.toString()
+
     constructor(
+        credentialIssuerId: CredentialIssuerId,
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
         dPoPJwtFactory: DPoPJwtFactory?,
         ktorHttpClientFactory: KtorHttpClientFactory,
     ) : this(
+        credentialIssuerId,
         config.clock,
         config.client,
         config.authFlowRedirectionURI,
-        URL(authorizationServerMetadata.issuer.value),
+        URI(authorizationServerMetadata.issuer.value).toURL(),
         authorizationServerMetadata.tokenEndpointURI.toURL(),
         dPoPJwtFactory,
         config.clientAttestationPoPBuilder,
@@ -123,19 +129,27 @@ internal class TokenEndpointClient(
      *
      * @param authorizationCode The authorization code generated from authorization server.
      * @param pkceVerifier  The code verifier that was used when submitting the Pushed Authorization Request.
+     * @param credConfigIdsAsAuthDetails The list of [CredentialConfigurationIdentifier]s that have been passed to authorization server
+     * as authorization details, part of a Rich Authorization Request.
      * @return The result of the request as a pair of the access token and the optional c_nonce information returned
      *      from token endpoint.
      */
     suspend fun requestAccessTokenAuthFlow(
         authorizationCode: AuthorizationCode,
         pkceVerifier: PKCEVerifier,
+        credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
     ): Result<TokenResponse> = runCatching {
+        // Append authorization_details form param if needed
+        val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
+            authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
+        }
         val params =
             TokenEndpointForm.authCodeFlow(
                 clientId = client.id,
                 authorizationCode = authorizationCode,
                 redirectionURI = authFlowRedirectionURI,
                 pkceVerifier = pkceVerifier,
+                authorizationDetails = authDetails,
             )
         requestAccessToken(params)
     }
@@ -152,12 +166,18 @@ internal class TokenEndpointClient(
     suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: PreAuthorizedCode,
         txCode: String?,
+        credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
     ): Result<TokenResponse> = runCatching {
+        // Append authorization_details form param if needed
+        val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
+            authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
+        }
         val params =
             TokenEndpointForm.preAuthCodeFlow(
                 clientId = client.id,
                 preAuthorizedCode = preAuthorizedCode,
                 txCode = txCode,
+                authorizationDetails = authDetails,
             )
         requestAccessToken(params)
     }
@@ -194,6 +214,19 @@ internal class TokenEndpointClient(
         return responseTO.tokensOrFail(clock)
     }
 
+    private fun authorizationDetailsFormParam(
+        credentialConfigurationIds: List<CredentialConfigurationIdentifier>,
+    ): String {
+        require(credentialConfigurationIds.isNotEmpty())
+        return credentialConfigurationIds.map {
+            it.toNimbusAuthDetail(
+                includeLocations = isCredentialIssuerAuthorizationServer,
+                credentialIssuerId = credentialIssuerId,
+            )
+        }
+            .toFormParamString()
+    }
+
     private fun generateClientAttestationIfNeeded(): ClientAttestation? =
         when (client) {
             is Client.Attested ->
@@ -218,12 +251,14 @@ internal object TokenEndpointForm {
     const val TX_CODE_PARAM = "tx_code"
     const val PRE_AUTHORIZED_CODE_PARAM = "pre-authorized_code"
     const val REFRESH_TOKEN_PARAM = "refresh_token"
+    const val AUTHORIZATION_DETAILS = "authorization_details"
 
     fun authCodeFlow(
         clientId: ClientId,
         authorizationCode: AuthorizationCode,
         redirectionURI: URI,
         pkceVerifier: PKCEVerifier,
+        authorizationDetails: String?,
     ): Map<String, String> =
         buildMap {
             put(CLIENT_ID_PARAM, clientId)
@@ -231,18 +266,21 @@ internal object TokenEndpointForm {
             put(AUTHORIZATION_CODE_PARAM, authorizationCode.code)
             put(REDIRECT_URI_PARAM, redirectionURI.toString())
             put(CODE_VERIFIER_PARAM, pkceVerifier.codeVerifier)
+            authorizationDetails?.let { put(AUTHORIZATION_DETAILS, it) }
         }.toMap()
 
     fun preAuthCodeFlow(
         clientId: ClientId,
         preAuthorizedCode: PreAuthorizedCode,
         txCode: String?,
+        authorizationDetails: String?,
     ): Map<String, String> =
         buildMap {
             put(CLIENT_ID_PARAM, clientId)
             put(GRANT_TYPE_PARAM, PRE_AUTHORIZED_CODE_GRANT)
             put(PRE_AUTHORIZED_CODE_PARAM, preAuthorizedCode.preAuthorizedCode)
             txCode?.let { put(TX_CODE_PARAM, it) }
+            authorizationDetails?.let { put(AUTHORIZATION_DETAILS, it) }
         }.toMap()
 
     fun refreshAccessToken(

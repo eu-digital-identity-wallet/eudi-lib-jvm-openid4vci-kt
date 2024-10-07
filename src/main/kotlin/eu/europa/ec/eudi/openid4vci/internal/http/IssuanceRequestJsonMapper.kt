@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
-import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
@@ -23,74 +22,6 @@ import eu.europa.ec.eudi.openid4vci.internal.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-
-//
-// Batch request / response
-//
-@Serializable
-internal data class BatchCredentialRequestTO(
-    @SerialName("credential_requests") val credentialRequests: List<CredentialRequestTO>,
-    @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionSpecTO? = null,
-) {
-    companion object {
-        fun from(batchRequest: CredentialIssuanceRequest.BatchRequest): BatchCredentialRequestTO {
-            val credentialRequests = batchRequest.credentialRequests.map { CredentialRequestTO.from(it) }
-            val credentialResponseEncryption = batchRequest.encryption?.run {
-                CredentialResponseEncryptionSpecTO.from(this)
-            }
-            return BatchCredentialRequestTO(credentialRequests, credentialResponseEncryption)
-        }
-    }
-}
-
-@Serializable
-internal data class BatchCredentialResponseSuccessTO(
-    @SerialName("credential_responses") val credentialResponses: List<IssuanceResponseTO>,
-    @SerialName("c_nonce") val cNonce: String? = null,
-    @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
-) {
-
-    fun toDomain(): CredentialIssuanceResponse {
-        val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
-        return CredentialIssuanceResponse(
-            cNonce = cNonce,
-            credentials = credentialResponses.map {
-                issuedCredentialOf(
-                    it.transactionId,
-                    it.notificationId,
-                    it.credential,
-                )
-            },
-        )
-    }
-
-    companion object {
-        fun from(jwtClaimsSet: JWTClaimsSet): BatchCredentialResponseSuccessTO = with(jwtClaimsSet) {
-            val jsonArray = JSONObjectUtils.getJSONObjectArray(claims, "credential_responses")
-            ensure(jsonArray != null) {
-                InvalidBatchIssuanceResponse("missing credential_responses in response")
-            }
-            BatchCredentialResponseSuccessTO(
-                credentialResponses = jsonArray.map { attr ->
-                    IssuanceResponseTO(
-                        credential = JSONObjectUtils.getString(attr, "credential"),
-                        transactionId = JSONObjectUtils.getString(attr, "transaction_id"),
-                        notificationId = JSONObjectUtils.getString(attr, "notification_id"),
-                    )
-                },
-                cNonce = getStringClaim("c_nonce"),
-                cNonceExpiresInSeconds = getLongClaim("c_nonce_expires_in"),
-            )
-        }
-    }
-}
-
-@Serializable
-internal data class IssuanceResponseTO(
-    @SerialName("credential") val credential: String? = null,
-    @SerialName("transaction_id") val transactionId: String? = null,
-    @SerialName("notification_id") val notificationId: String? = null,
-)
 
 //
 // Credential request / response
@@ -124,43 +55,66 @@ internal data class CredentialDefinitionTO(
 )
 
 @Serializable
+data class ProofsTO(
+    @SerialName("jwt") val jwtProofs: List<String>? = null,
+    @SerialName("ldp_vp") val ldpVpProofs: List<String>? = null,
+) {
+
+    init {
+        require(!(jwtProofs.isNullOrEmpty() && ldpVpProofs.isNullOrEmpty()))
+    }
+}
+
+@Serializable
 internal data class CredentialRequestTO(
     @SerialName("credential_identifier") val credentialIdentifier: String? = null,
     @SerialName("format") val format: String? = null,
     @SerialName("doctype") val docType: String? = null,
     @SerialName("vct") val vct: String? = null,
     @SerialName("proof") val proof: Proof? = null,
+    @SerialName("proofs") val proofs: ProofsTO? = null,
     @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionSpecTO? = null,
     @SerialName("claims") val claims: JsonObject? = null,
     @SerialName("credential_definition") val credentialDefinition: CredentialDefinitionTO? = null,
 ) {
     init {
         require(format != null || credentialIdentifier != null) { "Either format or credentialIdentifier must be set" }
+        require(!(proof != null && proofs != null)) {
+            "On of proof or proofs must be provided"
+        }
     }
 
     companion object {
 
-        private fun credentialResponseEncryption(request: CredentialIssuanceRequest) =
-            request.encryption?.run {
-                CredentialResponseEncryptionSpecTO.from(this)
-            }
-
-        fun from(request: CredentialIssuanceRequest.FormatBased, credential: CredentialType.MsoMdocDocType) =
-            CredentialRequestTO(
+        fun from(
+            credential: CredentialType.MsoMdocDocType,
+            proofs: List<Proof>,
+            encryption: IssuanceResponseEncryptionSpec?,
+        ): CredentialRequestTO {
+            val (p, ps) = proofs.proofOrProofs()
+            return CredentialRequestTO(
                 format = FORMAT_MSO_MDOC,
-                proof = request.proof,
-                credentialResponseEncryption = credentialResponseEncryption(request),
+                proof = p,
+                proofs = ps,
+                credentialResponseEncryption = encryption?.let(CredentialResponseEncryptionSpecTO::from),
                 docType = credential.doctype,
                 claims = credential.claimSet?.let {
                     Json.encodeToJsonElement(it).jsonObject
                 },
             )
+        }
 
-        fun from(request: CredentialIssuanceRequest.FormatBased, credential: CredentialType.SdJwtVcType) =
-            CredentialRequestTO(
+        fun from(
+            credential: CredentialType.SdJwtVcType,
+            proofs: List<Proof>,
+            encryption: IssuanceResponseEncryptionSpec?,
+        ): CredentialRequestTO {
+            val (p, ps) = proofs.proofOrProofs()
+            return CredentialRequestTO(
                 format = FORMAT_SD_JWT_VC,
-                proof = request.proof,
-                credentialResponseEncryption = credentialResponseEncryption(request),
+                proof = p,
+                proofs = ps,
+                credentialResponseEncryption = encryption?.let(CredentialResponseEncryptionSpecTO::from),
                 vct = credential.type,
                 claims = credential.claims?.let {
                     buildJsonObject {
@@ -170,12 +124,19 @@ internal data class CredentialRequestTO(
                     }
                 },
             )
+        }
 
-        fun from(request: CredentialIssuanceRequest.FormatBased, credential: CredentialType.W3CSignedJwtType) =
-            CredentialRequestTO(
+        fun from(
+            credential: CredentialType.W3CSignedJwtType,
+            proofs: List<Proof>,
+            encryption: IssuanceResponseEncryptionSpec?,
+        ): CredentialRequestTO {
+            val (p, ps) = proofs.proofOrProofs()
+            return CredentialRequestTO(
                 format = FORMAT_W3C_SIGNED_JWT,
-                proof = request.proof,
-                credentialResponseEncryption = credentialResponseEncryption(request),
+                proof = p,
+                proofs = ps,
+                credentialResponseEncryption = encryption?.let(CredentialResponseEncryptionSpecTO::from),
                 credentialDefinition = CredentialDefinitionTO(
                     type = credential.type,
                     credentialSubject = credential.claims?.let {
@@ -187,76 +148,140 @@ internal data class CredentialRequestTO(
                     },
                 ),
             )
+        }
 
-        fun from(request: CredentialIssuanceRequest.IdentifierBased) =
-            CredentialRequestTO(
-                credentialIdentifier = request.credentialId.value,
-                proof = request.proof,
-                credentialResponseEncryption = credentialResponseEncryption(request),
+        fun from(
+            credentialIdentifier: CredentialIdentifier,
+            proofs: List<Proof>,
+            encryption: IssuanceResponseEncryptionSpec?,
+        ): CredentialRequestTO {
+            val (p, ps) = proofs.proofOrProofs()
+            return CredentialRequestTO(
+                credentialIdentifier = credentialIdentifier.value,
+                proof = p,
+                proofs = ps,
+                credentialResponseEncryption = encryption?.let(CredentialResponseEncryptionSpecTO::from),
             )
+        }
 
-        fun from(request: CredentialIssuanceRequest.SingleRequest): CredentialRequestTO {
-            return when (request) {
-                is CredentialIssuanceRequest.FormatBased -> when (val credential = request.credential) {
-                    is CredentialType.MsoMdocDocType -> from(request, credential)
-                    is CredentialType.SdJwtVcType -> from(request, credential)
-                    is CredentialType.W3CSignedJwtType -> from(request, credential)
-                }
+        fun from(request: CredentialIssuanceRequest): CredentialRequestTO {
+            val (ref, proofs, encryption) = request
+            return when (ref) {
+                is CredentialConfigurationReference.ByFormat ->
+                    when (val credential = ref.credential) {
+                        is CredentialType.MsoMdocDocType -> from(credential, proofs, encryption)
+                        is CredentialType.SdJwtVcType -> from(credential, proofs, encryption)
+                        is CredentialType.W3CSignedJwtType -> from(credential, proofs, encryption)
+                    }
 
-                is CredentialIssuanceRequest.IdentifierBased -> from(request)
+                is CredentialConfigurationReference.ById -> from(ref.credentialIdentifier, proofs, encryption)
             }
         }
+
+        private fun List<Proof>?.proofOrProofs(): Pair<Proof?, ProofsTO?> =
+            if (this.isNullOrEmpty()) null to null
+            else if (size == 1) first() to null
+            else null to ProofsTO(
+                jwtProofs = filterIsInstance<Proof.Jwt>().map { it.jwt.serialize() }.takeIf { it.isNotEmpty() },
+                ldpVpProofs = filterIsInstance<Proof.LdpVp>().map { it.ldpVp }.takeIf { it.isNotEmpty() },
+            )
     }
 }
 
 @Serializable
 internal data class CredentialResponseSuccessTO(
-    @SerialName("credential") val credential: String? = null,
+    @SerialName("credential") val credential: JsonElement? = null,
+    @SerialName("credentials") val credentials: JsonArray? = null,
     @SerialName("transaction_id") val transactionId: String? = null,
     @SerialName("notification_id") val notificationId: String? = null,
     @SerialName("c_nonce") val cNonce: String? = null,
     @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
 ) {
-    fun toDomain(): CredentialIssuanceResponse {
+    init {
+        if (credential != null) {
+            ensureNotNull(issuedCredentialOf(credential)) {
+                throw ResponseUnparsable("credential could be either a string or a json object")
+            }
+        }
+        if (!credentials.isNullOrEmpty()) {
+            credentials.forEach { credential ->
+                ensureNotNull(issuedCredentialOf(credential)) {
+                    throw ResponseUnparsable("credential could be either a string or a json object")
+                }
+            }
+        }
+        ensure(!(credential != null && !credentials.isNullOrEmpty())) {
+            ResponseUnparsable("Only one of credential or credentials can be present")
+        }
+        if (transactionId != null) {
+            ensure(credential == null && credentials.isNullOrEmpty()) {
+                ResponseUnparsable("transaction_id must not be used if credential or credentials is present")
+            }
+        }
+        if (notificationId != null) {
+            ensure(credential != null || !credentials.isNullOrEmpty()) {
+                ResponseUnparsable("notification_id can be present, if credential or credentials is present")
+            }
+        }
+    }
+
+    fun toDomain(): SubmissionOutcomeInternal {
         val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
-        val issuedCredential = issuedCredentialOf(transactionId, notificationId, credential)
-        return CredentialIssuanceResponse(
-            cNonce = cNonce,
-            credentials = listOf(issuedCredential),
-        )
+        val transactionId = transactionId?.let { TransactionId(it) }
+        val notificationId = notificationId?.let(::NotificationId)
+
+        val issuedCredentials =
+            when {
+                credential != null -> listOf(checkNotNull(issuedCredentialOf(credential)))
+                !credentials.isNullOrEmpty() -> credentials.map { credential ->
+                    checkNotNull(issuedCredentialOf(credential))
+                }
+
+                else -> emptyList()
+            }
+
+        return when {
+            issuedCredentials.isNotEmpty() -> SubmissionOutcomeInternal.Success(
+                issuedCredentials,
+                cNonce,
+                notificationId,
+            )
+
+            transactionId != null -> SubmissionOutcomeInternal.Deferred(transactionId, cNonce)
+            else -> error("Cannot happen")
+        }
     }
 
     companion object {
-        fun from(jwtClaimsSet: JWTClaimsSet): CredentialResponseSuccessTO =
-            CredentialResponseSuccessTO(
-                credential = jwtClaimsSet.getStringClaim("credential"),
+
+        fun from(jwtClaimsSet: JWTClaimsSet): CredentialResponseSuccessTO {
+            val claims = jwtClaimsSet.asJsonObject()
+            return CredentialResponseSuccessTO(
+                credential = claims["credential"],
+                credentials = claims["credentials"] as? JsonArray,
                 transactionId = jwtClaimsSet.getStringClaim("transaction_id"),
                 notificationId = jwtClaimsSet.getStringClaim("notification_id"),
                 cNonce = jwtClaimsSet.getStringClaim("c_nonce"),
                 cNonceExpiresInSeconds = jwtClaimsSet.getLongClaim("c_nonce_expires_in"),
             )
+        }
     }
 }
 
-private fun issuedCredentialOf(
-    transactionId: String?,
-    notificationId: String?,
-    credential: String?,
-): IssuedCredential {
-    ensure(!(transactionId == null && credential == null)) {
-        val error =
-            "Got success response for issuance but response misses 'transaction_id' and 'certificate' parameters"
-        ResponseUnparsable(error)
-    }
-    return when {
-        transactionId != null -> IssuedCredential.Deferred(TransactionId(transactionId))
-        credential != null -> {
-            val notificationIdentifier = notificationId?.let { NotificationId(notificationId) }
-            IssuedCredential.Issued(credential, notificationIdentifier)
-        }
+private fun JWTClaimsSet.asJsonObject(): JsonObject {
+    val json = Json.parseToJsonElement(toString())
+    check(json is JsonObject)
+    return json
+}
 
-        else -> error("Cannot happen")
+private fun issuedCredentialOf(json: JsonElement): IssuedCredential? {
+    fun credentialOf(json: JsonElement): Credential? = when {
+        json is JsonPrimitive && json.isString -> Credential.Str(json.content)
+        json is JsonObject && json.isNotEmpty() -> Credential.Json(json)
+        else -> null
     }
+    // This would change in draft 15
+    return credentialOf(json)?.let { IssuedCredential(it, null) }
 }
 
 //
@@ -266,28 +291,33 @@ private fun issuedCredentialOf(
 @Serializable
 internal data class DeferredRequestTO(
     @SerialName("transaction_id") val transactionId: String,
-) {
-    companion object {
-        fun from(
-            deferredCredential: IssuedCredential.Deferred,
-        ): DeferredRequestTO {
-            val transactionId = deferredCredential.transactionId.value
-            return DeferredRequestTO(transactionId)
-        }
-    }
-}
+)
 
 @Serializable
 internal data class DeferredIssuanceSuccessResponseTO(
-    @SerialName("credential") val credential: String,
+    @SerialName("credential") val credential: JsonElement? = null,
+    @SerialName("credentials") val credentials: JsonArray? = null,
+    @SerialName("notification_id") val notificationId: String? = null,
 ) {
     fun toDomain(): DeferredCredentialQueryOutcome.Issued {
-        return DeferredCredentialQueryOutcome.Issued(IssuedCredential.Issued(credential))
+        val notificationId = notificationId?.let { NotificationId(it) }
+        val credentials = when {
+            credential is JsonPrimitive && credential.contentOrNull != null && credentials == null -> listOf(credential)
+            credential == null && !credentials.isNullOrEmpty() -> credentials
+            else -> error("One of credential or credentials must be present")
+        }.map { requireNotNull(issuedCredentialOf(it)) }
+
+        return DeferredCredentialQueryOutcome.Issued(credentials, notificationId)
     }
 
     companion object {
         fun from(jwtClaimsSet: JWTClaimsSet): DeferredIssuanceSuccessResponseTO {
-            return DeferredIssuanceSuccessResponseTO(jwtClaimsSet.getStringClaim("credential"))
+            val claims = jwtClaimsSet.asJsonObject()
+            return DeferredIssuanceSuccessResponseTO(
+                credential = claims["credential"],
+                credentials = claims["credentials"] as? JsonArray,
+                notificationId = jwtClaimsSet.getStringClaim("notification_id"),
+            )
         }
     }
 }

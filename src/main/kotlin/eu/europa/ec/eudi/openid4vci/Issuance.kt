@@ -18,37 +18,46 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
-import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
 import kotlinx.serialization.Serializable
-import java.security.Signature
+import kotlinx.serialization.json.JsonObject
 
 /**
- * The result of a request for issuance
+ * Represents the credential as it is serialized by the credential issuer
+ * within a credential or deferred response.
+ *
+ * The choice is format-specific, and it can be either a string or a JSON object
  */
-sealed interface IssuedCredential : java.io.Serializable {
+sealed interface Credential {
+    @JvmInline
+    value class Str(val value: String) : Credential {
+        override fun toString(): String = value
+    }
 
-    /**
-     * Credential was issued from server and the result is returned inline.
-     *
-     * @param credential The issued credential.
-     * @param notificationId The identifier to be used in issuer's notification endpoint.
-     */
-    data class Issued(
-        val credential: String,
-        val notificationId: NotificationId? = null,
-    ) : IssuedCredential
+    @JvmInline
+    value class Json(val value: JsonObject) : Credential {
+        override fun toString(): String = value.toString()
+    }
+}
 
-    /**
-     * Credential could not be issued immediately. An identifier is returned from server to be used later on
-     * to request the credential from issuer's Deferred Credential Endpoint.
-     *
-     * @param transactionId  A string identifying a Deferred Issuance transaction.
-     */
-    data class Deferred(
-        val transactionId: TransactionId,
-    ) : IssuedCredential
+/**
+ *  Credential was issued from server and the result is returned inline.
+ *
+ * @param credential The issued credential.
+ * @param additionalInfo Optional, information returned by the issuer for the [credential]
+ */
+data class IssuedCredential(
+    val credential: Credential,
+    val additionalInfo: JsonObject?,
+) : java.io.Serializable {
+    companion object {
+        fun string(credential: String, additionalInfo: JsonObject? = null): IssuedCredential =
+            IssuedCredential(Credential.Str(credential), additionalInfo)
+
+        fun json(credential: JsonObject, additionalInfo: JsonObject? = null): IssuedCredential =
+            IssuedCredential(Credential.Json(credential), additionalInfo)
+    }
 }
 
 /**
@@ -61,8 +70,26 @@ sealed interface SubmissionOutcome : java.io.Serializable {
      * @param credentials The outcome of the issuance request.
      * If the issuance request was a batch request, it will contain the results of each issuance request.
      * If it was a single issuance request list will contain only one result.
+     *
+     * @param credentials The credentials issued
+     * @param notificationId The identifier to be used in issuer's notification endpoint.
      */
-    data class Success(val credentials: List<IssuedCredential>) : SubmissionOutcome
+    data class Success(
+        val credentials: List<IssuedCredential>,
+        val notificationId: NotificationId?,
+    ) : SubmissionOutcome {
+        init {
+            require(credentials.isNotEmpty()) { "credentials must not be empty" }
+        }
+    }
+
+    /**
+     * Credential could not be issued immediately. An identifier is returned from server to be used later on
+     * to request the credential from issuer's Deferred Credential Endpoint.
+     *
+     * @param transactionId  A string identifying a Deferred Issuance transaction.
+     */
+    data class Deferred(val transactionId: TransactionId) : SubmissionOutcome
 
     /**
      * State that denotes that the credential issuance request has failed
@@ -92,6 +119,8 @@ data class GenericClaimSet(val claims: List<ClaimName>) : ClaimSet
  */
 sealed interface IssuanceRequestPayload {
 
+    val credentialConfigurationIdentifier: CredentialConfigurationIdentifier
+
     /**
      * Credential identifier based request payload.
      *
@@ -99,7 +128,7 @@ sealed interface IssuanceRequestPayload {
      * @param credentialIdentifier  The credential identifier
      */
     data class IdentifierBased(
-        val credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
+        override val credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
         val credentialIdentifier: CredentialIdentifier,
     ) : IssuanceRequestPayload
 
@@ -111,7 +140,7 @@ sealed interface IssuanceRequestPayload {
      *          credential to be issued.
      */
     data class ConfigurationBased(
-        val credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
+        override val credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
         val claimSet: ClaimSet? = null,
     ) : IssuanceRequestPayload
 }
@@ -124,57 +153,34 @@ typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
 interface RequestIssuance {
 
     @Deprecated(
-        message = "Deprecated and will be removed",
-        replaceWith = ReplaceWith("requestSingle(requestPayload, popSigner)"),
+        message = "Method deprecated and will be removed in a future release",
+        replaceWith = ReplaceWith("request(requestPayload, popSigner?.let(::listOf).orEmpty()"),
     )
-    suspend fun AuthorizedRequest.requestSingleAndUpdateState(
+    suspend fun AuthorizedRequest.requestSingle(
         requestPayload: IssuanceRequestPayload,
         popSigner: PopSigner?,
-    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = requestSingle(requestPayload, popSigner)
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> =
+        request(requestPayload, popSigner?.let(::listOf).orEmpty())
 
     /**
      * Places a request to the credential issuance endpoint.
      * Method will attempt to automatically retry submission in case
      * - Initial authorization state is [AuthorizedRequest.NoProofRequired] and
-     * - a [popSigner] has been provided
+     * - one or more [popSigners] haven been provided
      *
      * @receiver the current authorization state
      * @param requestPayload the payload of the request
-     * @param popSigner Signer component of the proof to be sent. Although this is an optional
-     * parameter, only required in case the present authorization state is [AuthorizedRequest.ProofRequired],
-     * caller is advised to provide it, in order to allow the method to automatically retry
+     * @param popSigners one or more signers for the proofs to be sent.
+     * Although this is an optional parameter, only required in case the present authorization state is [AuthorizedRequest.ProofRequired],
+     * caller is advised to provide it, to allow the method to automatically retry
      * in case of [CredentialIssuanceError.InvalidProof]
      *
      * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh c_nonce) and
      * the [SubmissionOutcome]
      */
-    suspend fun AuthorizedRequest.requestSingle(
+    suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
-        popSigner: PopSigner?,
-    ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
-}
-
-@Deprecated(
-    message = "Batch endpoint has been removed from OpenId4VCI",
-)
-interface RequestBatchIssuance {
-
-    @Deprecated(
-        message = "Deprecated and will be removed",
-        replaceWith = ReplaceWith("requestBatch(credentialsMetadata)"),
-    )
-    suspend fun AuthorizedRequest.requestBatchAndUpdateState(
-        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
-    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = requestBatch(credentialsMetadata)
-
-    /**
-     *  Batch request for issuing multiple credentials having an [AuthorizedRequest.ProofRequired] authorization.
-     *
-     *  @param credentialsMetadata   The metadata specifying the credentials that will be requested.
-     *  @return The new state of request or error.
-     */
-    suspend fun AuthorizedRequest.requestBatch(
-        credentialsMetadata: List<Pair<IssuanceRequestPayload, PopSigner?>>,
+        popSigners: List<PopSigner> = emptyList(),
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 }
 
@@ -190,27 +196,6 @@ sealed interface PopSigner {
         val algorithm: JWSAlgorithm,
         val bindingKey: JwtBindingKey,
         val jwsSigner: JWSSigner,
-    ) : PopSigner
-
-    /**
-     * A signer for proof of possession of type CWT
-     * @param algorithm The algorithm used by the singing key
-     * @param curve the curve used by the singing key
-     * @param bindingKey the public key to be included to the proof. It should correspond to the key
-     * used to sign the proof. If an instance of [CwtBindingKey.CoseKey] is provided key will be embedded
-     * to the protected header under the label "COSE_key". If an instance [CwtBindingKey.X509] the chain
-     * will be included in the protected header, as such.
-     * @param sign A suspended function to actually sign the data. It is required that implementer, uses
-     * the P1363 format
-     */
-    @Deprecated(
-        message = "CWT proofs have been removed from OpenId4VCI",
-    )
-    data class Cwt(
-        val algorithm: CoseAlgorithm,
-        val curve: CoseCurve,
-        val bindingKey: CwtBindingKey,
-        val sign: suspend (ByteArray) -> ByteArray,
     ) : PopSigner
 
     companion object {
@@ -243,41 +228,6 @@ sealed interface PopSigner {
 
             val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
             return Jwt(algorithm, publicKey, signer)
-        }
-
-        /**
-         * Factory method for creating a [PopSigner.Cwt]
-         *
-         * Comes handy when caller has access to [privateKey]
-         *
-         * @param privateKey the key that will be used to sign the CWT
-         * In case of [JwtBindingKey.Did] this condition is not being checked.
-         * @return the CWT signer
-         */
-        @Deprecated(
-            message = "CWT proofs have been removed from OpenId4VCI",
-        )
-        fun cwtPopSigner(
-            privateKey: ECKey,
-        ): Cwt {
-            fun CoseAlgorithm.signature(): Signature =
-                when (this) {
-                    CoseAlgorithm.ES256 -> "SHA256withECDSAinP1363Format"
-                    CoseAlgorithm.ES384 -> "SHA384withECDSAinP1363Format"
-                    CoseAlgorithm.ES512 -> "SHA512withECDSAinP1363Format"
-                    else -> error("Unsupported $this")
-                }.let { Signature.getInstance(it) }
-
-            val algorithm = CoseAlgorithm(privateKey.algorithm.name).getOrThrow()
-            val curve = CoseCurve(privateKey.curve.name).getOrThrow()
-
-            return Cwt(algorithm, curve, CwtBindingKey.CoseKey(privateKey.toPublicJWK())) { data ->
-                with(algorithm.signature()) {
-                    initSign(privateKey.toECPrivateKey())
-                    update(data)
-                    sign()
-                }
-            }
         }
     }
 }
@@ -338,7 +288,8 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
      * It is marked as irrecoverable because it is raised only after the library
      * has automatically retried to recover from an [InvalidProof] error and failed
      */
-    data class IrrecoverableInvalidProof(val errorDescription: String? = null) : CredentialIssuanceError("Irrecoverable invalid proof ")
+    data class IrrecoverableInvalidProof(val errorDescription: String? = null) :
+        CredentialIssuanceError("Irrecoverable invalid proof ")
 
     /**
      * Issuer has not issued yet deferred credential. Retry interval (in seconds) is provided to caller
@@ -363,7 +314,7 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     class UnsupportedCredentialType : CredentialIssuanceError("UnsupportedCredentialType")
 
     /**
-     * Un-supported credential type requested to issuance server
+     * Unsupported credential type requested to issuance server
      */
     class UnsupportedCredentialFormat : CredentialIssuanceError("UnsupportedCredentialFormat")
 
@@ -376,6 +327,13 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
      * Issuance server does not support batch credential requests
      */
     class IssuerDoesNotSupportBatchIssuance : CredentialIssuanceError("IssuerDoesNotSupportBatchIssuance")
+
+    /**
+     * Issuance server provides supports batch_size which is
+     * smaller than the number of [PopSigner] the caller provided.
+     */
+    class IssuerBatchSizeLimitExceeded(val batchSize: Int) :
+        CredentialIssuanceError("IssuerBatchSizeLimitExceeded $batchSize")
 
     /**
      * Issuance server does not support deferred credential issuance
@@ -456,13 +414,6 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     }
 
     /**
-     * Batch credential request syntax is incorrect. Encryption information included in individual requests while shouldn't
-     */
-    class BatchRequestHasEncryptionSpecInIndividualRequests : CredentialIssuanceError(
-        "BatchRequestContainsEncryptionOnIndividualRequest",
-    )
-
-    /**
      * Wrong content-type of encrypted response. Content-type of encrypted responses must be application/jwt
      */
     data class InvalidResponseContentType(
@@ -471,11 +422,4 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     ) : CredentialIssuanceError(
         "Encrypted response content-type expected to be $expectedContentType but instead was $invalidContentType",
     )
-
-    /**
-     * Batch response is not syntactical as expected.
-     */
-    data class InvalidBatchIssuanceResponse(
-        val error: String,
-    ) : CredentialIssuanceError("Invalid batch issuance response: $error")
 }

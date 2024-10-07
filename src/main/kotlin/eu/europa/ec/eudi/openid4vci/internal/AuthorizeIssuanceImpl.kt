@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.AccessTokenOption.AsRequested
+import eu.europa.ec.eudi.openid4vci.AccessTokenOption.Limited
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.NoProofRequired
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.ProofRequired
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidAuthorizationState
@@ -54,7 +56,7 @@ internal class AuthorizeIssuanceImpl(
                     state,
                     issuerState,
                 ).getOrThrow()
-            AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier, state)
+            AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier, state, configurationIds)
         }
 
     private fun scopesAndCredentialConfigurationIds(): Pair<List<Scope>, List<CredentialConfigurationIdentifier>> {
@@ -81,15 +83,20 @@ internal class AuthorizeIssuanceImpl(
     override suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
         authorizationCode: AuthorizationCode,
         serverState: String,
+        authDetailsOption: AccessTokenOption,
     ): Result<AuthorizedRequest> =
         runCatching {
             ensure(serverState == state) { InvalidAuthorizationState() }
+            val credConfigIdsAsAuthDetails = identifiersSentAsAuthDetails.filter(authDetailsOption)
             val tokenResponse =
-                tokenEndpointClient.requestAccessTokenAuthFlow(authorizationCode, pkceVerifier).getOrThrow()
+                tokenEndpointClient.requestAccessTokenAuthFlow(authorizationCode, pkceVerifier, credConfigIdsAsAuthDetails).getOrThrow()
             authorizedRequest(credentialOffer, tokenResponse)
         }
 
-    override suspend fun authorizeWithPreAuthorizationCode(txCode: String?): Result<AuthorizedRequest> = runCatching {
+    override suspend fun authorizeWithPreAuthorizationCode(
+        txCode: String?,
+        authDetailsOption: AccessTokenOption,
+    ): Result<AuthorizedRequest> = runCatching {
         val offeredGrants = requireNotNull(credentialOffer.grants) {
             "Grant not specified in credential offer."
         }
@@ -97,20 +104,23 @@ internal class AuthorizeIssuanceImpl(
             "Pre-authorized code grant expected"
         }
         with(preAuthorizedCode) { validate(txCode) }
+        val credConfigIdsAsAuthDetails =
+            credentialOffer.credentialConfigurationIdentifiers.filter(authDetailsOption)
+
         val tokenResponse =
-            tokenEndpointClient.requestAccessTokenPreAuthFlow(preAuthorizedCode, txCode).getOrThrow()
+            tokenEndpointClient.requestAccessTokenPreAuthFlow(preAuthorizedCode, txCode, credConfigIdsAsAuthDetails).getOrThrow()
         authorizedRequest(credentialOffer, tokenResponse)
     }
 }
 
-internal fun Grants.PreAuthorizedCode.validate(txCode: String?) {
+private fun Grants.PreAuthorizedCode.validate(txCode: String?) {
     val expectedTxCodeSpec = this@validate.txCode
     if (expectedTxCodeSpec != null) {
         with(expectedTxCodeSpec) { validate(txCode) }
     }
 }
 
-internal fun TxCode.validate(txCode: String?) {
+private fun TxCode.validate(txCode: String?) {
     require(!txCode.isNullOrEmpty()) {
         "Issuer's grant is pre-authorization code with transaction code required but no transaction code passed"
     }
@@ -126,7 +136,7 @@ internal fun TxCode.validate(txCode: String?) {
     }
 }
 
-internal fun authorizedRequest(
+private fun authorizedRequest(
     offer: CredentialOffer,
     tokenResponse: TokenResponse,
 ): AuthorizedRequest {
@@ -143,3 +153,11 @@ internal fun authorizedRequest(
             NoProofRequired(accessToken, refreshToken, authorizationDetails, timestamp)
     }
 }
+
+private fun Iterable<CredentialConfigurationIdentifier>.filter(
+    accessTokenOption: AccessTokenOption,
+): List<CredentialConfigurationIdentifier> =
+    when (accessTokenOption) {
+        AsRequested -> emptyList()
+        is Limited -> filter(accessTokenOption.filter)
+    }
