@@ -28,7 +28,7 @@ class PidDevIssuerTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
             PidDevIssuer.PID_MsoMdoc_config_id,
             enableHttpLogging = false,
-            batchOption = BatchOption.MaxProofs,
+            batchOption = BatchOption.Specific(2),
         )
     }
 
@@ -37,7 +37,7 @@ class PidDevIssuerTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
             PidDevIssuer.PID_SdJwtVC_config_id,
             enableHttpLogging = false,
-            batchOption = BatchOption.MaxProofs,
+            batchOption = BatchOption.Specific(2),
         )
     }
 
@@ -46,7 +46,7 @@ class PidDevIssuerTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
             PidDevIssuer.MDL_config_id,
             enableHttpLogging = false,
-            batchOption = BatchOption.MaxProofs,
+            batchOption = BatchOption.Specific(2),
         )
     }
 }

@@ -29,6 +29,7 @@ import org.apache.http.conn.ssl.TrustSelfSignedStrategy
 import org.apache.http.ssl.SSLContextBuilder
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.net.URI
+import kotlin.math.min
 import kotlin.test.assertNotNull
 import kotlin.test.fail
 
@@ -95,6 +96,7 @@ fun Issuer.popSigners(
 }
 sealed interface BatchOption {
     data object DontUse : BatchOption
+    data class Specific(val proofsNo: Int) : BatchOption
     data object MaxProofs : BatchOption
 }
 suspend fun Issuer.submitCredentialRequest(
@@ -111,6 +113,11 @@ suspend fun Issuer.submitCredentialRequest(
             BatchOption.MaxProofs -> when (val batchIssuance = credentialOffer.credentialIssuerMetadata.batchCredentialIssuance) {
                 BatchCredentialIssuance.NotSupported -> 1
                 is BatchCredentialIssuance.Supported -> batchIssuance.batchSize
+            }
+
+            is BatchOption.Specific -> when (val batchIssuance = credentialOffer.credentialIssuerMetadata.batchCredentialIssuance) {
+                BatchCredentialIssuance.NotSupported -> 1
+                is BatchCredentialIssuance.Supported -> min(batchIssuance.batchSize, batchOption.proofsNo)
             }
         }
 
