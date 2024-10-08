@@ -23,10 +23,12 @@ import kotlinx.coroutines.coroutineScope
 internal suspend fun ActionRequiredForJWSCompletionException.recoverUsing(unlockSignature: UnlockSignature) =
     completableJWSObjectSigning.unlockAndComplete(unlockSignature)
 
-internal suspend fun CompletableJWSObjectSigning.unlockAndComplete(unlock: UnlockSignature): Unit =
+internal suspend fun CompletableJWSObjectSigning.unlockAndComplete(
+    unlock: UnlockSignature,
+) {
     coroutineScope {
-        val initializedSignature =
-            checkNotNull(initializedSignature) { "Missing signature" }
+        val initializedSignature = checkNotNull(initializedSignature) { "Missing signature" }
         unlock(initializedSignature)
         complete()
     }
+}

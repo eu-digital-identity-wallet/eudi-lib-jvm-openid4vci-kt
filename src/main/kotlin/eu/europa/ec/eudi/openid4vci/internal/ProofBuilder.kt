@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.jose.ActionRequiredForJWSCompletionException
 import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.util.Base64
@@ -69,7 +70,7 @@ internal class JwtProofBuilder(
     override suspend fun build(): Proof.Jwt {
         val header = header()
         val claimSet = claimSet()
-        val jwt = SignedJWT(header, claimSet).apply { sign(popSigner.jwsSigner) }
+        val jwt = SignedJWT(header, claimSet).apply { sign(popSigner) }
         return Proof.Jwt(jwt)
     }
 
