@@ -124,6 +124,7 @@ interface Issuer :
                     credentialOffer.credentialIssuerIdentifier,
                     credentialOffer.authorizationServerMetadata,
                     config,
+                    dPoPJwtFactory,
                     ktorHttpClientFactory,
                 )
 
