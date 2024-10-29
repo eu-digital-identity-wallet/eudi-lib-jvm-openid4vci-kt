@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.openid.connect.sdk.Nonce
 import java.time.Instant
 
 /**
@@ -34,6 +35,7 @@ data class AuthorizationRequestPrepared(
     val pkceVerifier: PKCEVerifier,
     val state: String,
     val identifiersSentAsAuthDetails: List<CredentialConfigurationIdentifier>,
+    val dpopNonce: Nonce?,
 ) : java.io.Serializable
 
 /**
@@ -49,6 +51,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
     val refreshToken: RefreshToken?
     val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?
     val timestamp: Instant
+    val dpopNonce: Nonce?
 
     fun isAccessTokenExpired(at: Instant): Boolean = accessToken.isExpired(timestamp, at)
     fun isRefreshTokenExpiredOrMissing(at: Instant): Boolean = refreshToken?.isExpired(timestamp, at) ?: true
@@ -61,24 +64,27 @@ sealed interface AuthorizedRequest : java.io.Serializable {
      * @return The new state of the request.
      */
     fun withCNonce(cNonce: CNonce): ProofRequired =
-        ProofRequired(accessToken, refreshToken, cNonce, credentialIdentifiers, timestamp)
+        ProofRequired(accessToken, refreshToken, cNonce, credentialIdentifiers, timestamp, dpopNonce)
 
     fun withRefreshedAccessToken(
         refreshedAccessToken: AccessToken,
         newRefreshToken: RefreshToken?,
         at: Instant,
+        newDpopNonce: Nonce?,
     ): AuthorizedRequest =
         when (this) {
             is NoProofRequired -> copy(
                 accessToken = refreshedAccessToken,
                 refreshToken = newRefreshToken ?: refreshToken,
                 timestamp = at,
+                dpopNonce = newDpopNonce,
             )
 
             is ProofRequired -> copy(
                 accessToken = refreshedAccessToken,
                 refreshToken = newRefreshToken ?: refreshToken,
                 timestamp = at,
+                dpopNonce = newDpopNonce,
             )
         }
 
@@ -95,6 +101,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
         override val refreshToken: RefreshToken?,
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
         override val timestamp: Instant,
+        override val dpopNonce: Nonce?,
     ) : AuthorizedRequest
 
     /**
@@ -113,6 +120,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
         val cNonce: CNonce,
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
         override val timestamp: Instant,
+        override val dpopNonce: Nonce?,
     ) : AuthorizedRequest
 }
 

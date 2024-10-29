@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
+import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.Grants.PreAuthorizedCode
@@ -138,7 +139,8 @@ internal class TokenEndpointClient(
         authorizationCode: AuthorizationCode,
         pkceVerifier: PKCEVerifier,
         credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
-    ): Result<TokenResponse> = runCatching {
+        dpopNonce: Nonce?,
+    ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
         // Append authorization_details form param if needed
         val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
             authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
@@ -151,7 +153,7 @@ internal class TokenEndpointClient(
                 pkceVerifier = pkceVerifier,
                 authorizationDetails = authDetails,
             )
-        requestAccessToken(params)
+        placeTokenRequest(params, dpopNonce)
     }
 
     /**
@@ -167,7 +169,8 @@ internal class TokenEndpointClient(
         preAuthorizedCode: PreAuthorizedCode,
         txCode: String?,
         credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
-    ): Result<TokenResponse> = runCatching {
+        dpopNonce: Nonce?,
+    ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
         // Append authorization_details form param if needed
         val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
             authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
@@ -179,7 +182,7 @@ internal class TokenEndpointClient(
                 txCode = txCode,
                 authorizationDetails = authDetails,
             )
-        requestAccessToken(params)
+        placeTokenRequest(params, dpopNonce)
     }
 
     /**
@@ -190,28 +193,58 @@ internal class TokenEndpointClient(
      * @return the token end point response, which will include a new [TokenResponse.accessToken] and possibly
      * a new [TokenResponse.refreshToken]
      */
-    suspend fun refreshAccessToken(refreshToken: RefreshToken): Result<TokenResponse> = runCatching {
+    suspend fun refreshAccessToken(
+        refreshToken: RefreshToken,
+        dpopNonce: Nonce?,
+    ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
         val params = TokenEndpointForm.refreshAccessToken(client.id, refreshToken)
-        requestAccessToken(params)
+        placeTokenRequest(params, dpopNonce)
     }
 
-    private suspend fun requestAccessToken(
+    private suspend fun placeTokenRequest(
         params: Map<String, String>,
-    ): TokenResponse {
-        val response = ktorHttpClientFactory().use { httpClient ->
-            val formParameters = Parameters.build {
-                params.entries.forEach { (k, v) -> append(k, v) }
-            }
-            httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
-                dPoPJwtFactory?.let { factory ->
-                    dpop(factory, tokenEndpoint, Htm.POST, accessToken = null, nonce = null)
+        dpopNonce: Nonce?,
+    ): Pair<TokenResponse, Nonce?> {
+        suspend fun requestInternal(
+            existingDpopNonce: Nonce?,
+            retried: Boolean,
+        ): Pair<TokenResponseTO, Nonce?> {
+            val response = ktorHttpClientFactory().use { httpClient ->
+                val formParameters = Parameters.build {
+                    params.entries.forEach { (k, v) -> append(k, v) }
                 }
-                generateClientAttestationIfNeeded()?.let(::clientAttestationHeaders)
+                httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
+                    dPoPJwtFactory?.let { factory ->
+                        dpop(factory, tokenEndpoint, Htm.POST, accessToken = null, nonce = existingDpopNonce?.value)
+                    }
+                    generateClientAttestationIfNeeded()?.let(::clientAttestationHeaders)
+                }
+            }
+
+            return when {
+                response.status.isSuccess() -> {
+                    val responseTO = response.body<TokenResponseTO.Success>()
+                    val newDopNonce = response.headers["DPoP-Nonce"]?.let { nonce -> Nonce(nonce) }
+                    responseTO to (newDopNonce ?: existingDpopNonce)
+                }
+
+                response.status == HttpStatusCode.BadRequest -> {
+                    val errorTO = response.body<TokenResponseTO.Failure>()
+                    val newDopNonce = response.headers["DPoP-Nonce"]?.let { nonce -> Nonce(nonce) }
+                    when {
+                        errorTO.error == "use_dpop_nonce" && newDopNonce != null && !retried -> {
+                            requestInternal(newDopNonce, true)
+                        }
+                        else -> errorTO to (newDopNonce ?: existingDpopNonce)
+                    }
+                }
+
+                else -> throw AccessTokenRequestFailed("Token request failed with ${response.status}", "N/A")
             }
         }
-        val responseTO = if (response.status.isSuccess()) response.body<TokenResponseTO.Success>()
-        else response.body<TokenResponseTO.Failure>()
-        return responseTO.tokensOrFail(clock)
+
+        val (responseTO, newDopNonce) = requestInternal(dpopNonce, false)
+        return responseTO.tokensOrFail(clock) to newDopNonce
     }
 
     private fun authorizationDetailsFormParam(
