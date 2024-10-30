@@ -29,31 +29,31 @@ internal class NotificationEndPointClient(
 
     suspend fun notifyIssuer(
         accessToken: AccessToken,
-        dpopNonce: Nonce?,
+        resourceServerDpopNonce: Nonce?,
         event: CredentialIssuanceEvent,
     ): Result<Unit> =
         runCatching {
-            notifyIssuerInternal(accessToken, dpopNonce, event, false)
+            notifyIssuerInternal(accessToken, resourceServerDpopNonce, event, false)
         }
 
     private suspend fun notifyIssuerInternal(
         accessToken: AccessToken,
-        dpopNonce: Nonce?,
+        resourceServerDpopNonce: Nonce?,
         event: CredentialIssuanceEvent,
         retried: Boolean,
     ) {
         ktorHttpClientFactory().use { client ->
             val url = notificationEndpoint.value
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = dpopNonce)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = resourceServerDpopNonce)
                 contentType(ContentType.Application.Json)
                 setBody(NotificationTO.from(event))
             }
 
             if (!response.status.isSuccess()) {
-                val newDPopNonce = response.dpopNonce()
-                if (response.isResourceServerDpopNonceRequired() && newDPopNonce != null && !retried) {
-                    notifyIssuerInternal(accessToken, newDPopNonce, event, true)
+                val newResourceServerDpopNonce = response.dpopNonce()
+                if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
+                    notifyIssuerInternal(accessToken, newResourceServerDpopNonce, event, true)
                 } else {
                     val errorResponse = response.body<GenericErrorResponseTO>()
                     throw NotificationFailed(errorResponse.error)

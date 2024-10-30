@@ -151,11 +151,11 @@ internal class RequestIssuanceImpl(
 
     private suspend fun placeIssuanceRequest(
         token: AccessToken,
-        dpopNonce: Nonce?,
+        resourceServerDpopNonce: Nonce?,
         issuanceRequestSupplier: suspend () -> CredentialIssuanceRequest,
     ): Pair<SubmissionOutcomeInternal, Nonce?> {
         val req = issuanceRequestSupplier()
-        val res = credentialEndpointClient.placeIssuanceRequest(token, dpopNonce, req)
+        val res = credentialEndpointClient.placeIssuanceRequest(token, resourceServerDpopNonce, req)
         return res.getOrThrow()
     }
 }

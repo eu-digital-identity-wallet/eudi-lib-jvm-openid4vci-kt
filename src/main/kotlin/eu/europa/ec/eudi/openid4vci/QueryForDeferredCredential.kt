@@ -78,8 +78,8 @@ fun interface QueryForDeferredCredential {
                 transactionId: TransactionId,
             ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> = runCatching {
                 val refreshed = refreshIfNeeded(this)
-                val (outcome, newDPopNonce) = placeDeferredCredentialRequest(refreshed, transactionId)
-                refreshed.withResourceServerDpopNonce(newDPopNonce) to outcome
+                val (outcome, newResourceServerDpopNonce) = placeDeferredCredentialRequest(refreshed, transactionId)
+                refreshed.withResourceServerDpopNonce(newResourceServerDpopNonce) to outcome
             }
 
             private suspend fun refreshIfNeeded(authorizedRequest: AuthorizedRequest): AuthorizedRequest =
