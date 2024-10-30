@@ -63,6 +63,6 @@ fun interface NotifyIssuer {
          * @return a [NotifyIssuer]
          */
         internal operator fun invoke(notificationEndPointClient: NotificationEndPointClient): NotifyIssuer =
-            NotifyIssuer { event -> notificationEndPointClient.notifyIssuer(accessToken, event) }
+            NotifyIssuer { event -> notificationEndPointClient.notifyIssuer(accessToken, resourceServerDpopNonce, event) }
     }
 }
