@@ -52,6 +52,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
     val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?
     val timestamp: Instant
     val authorizationServerDpopNonce: Nonce?
+    val resourceServerDpopNonce: Nonce?
 
     fun isAccessTokenExpired(at: Instant): Boolean = accessToken.isExpired(timestamp, at)
     fun isRefreshTokenExpiredOrMissing(at: Instant): Boolean = refreshToken?.isExpired(timestamp, at) ?: true
@@ -71,6 +72,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
             credentialIdentifiers,
             timestamp,
             authorizationServerDpopNonce = authorizationServerDpopNonce,
+            resourceServerDpopNonce = resourceServerDpopNonce,
         )
 
     fun withRefreshedAccessToken(
@@ -95,6 +97,12 @@ sealed interface AuthorizedRequest : java.io.Serializable {
             )
         }
 
+    fun withResourceServerDpopNonce(newResourceServerDpopNonce: Nonce?): AuthorizedRequest =
+        when (this) {
+            is NoProofRequired -> copy(resourceServerDpopNonce = newResourceServerDpopNonce)
+            is ProofRequired -> copy(resourceServerDpopNonce = newResourceServerDpopNonce)
+        }
+
     /**
      * Issuer authorized issuance
      *
@@ -103,6 +111,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
      * @param credentialIdentifiers authorization details, if provided by the token endpoint
      * @param timestamp the point in time of the authorization (when tokens were issued)
      * @param authorizationServerDpopNonce Nonce value for DPoP provided by the Authorization Server
+     * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
      */
     data class NoProofRequired(
         override val accessToken: AccessToken,
@@ -110,6 +119,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
         override val timestamp: Instant,
         override val authorizationServerDpopNonce: Nonce?,
+        override val resourceServerDpopNonce: Nonce?,
     ) : AuthorizedRequest
 
     /**
@@ -122,6 +132,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
      * @param credentialIdentifiers authorization details, if provided by the token endpoint
      * @param timestamp the point in time of the authorization (when tokens were issued)
      * @param authorizationServerDpopNonce Nonce value for DPoP provided by the Authorization Server
+     * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
      */
     data class ProofRequired(
         override val accessToken: AccessToken,
@@ -130,6 +141,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
         override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
         override val timestamp: Instant,
         override val authorizationServerDpopNonce: Nonce?,
+        override val resourceServerDpopNonce: Nonce?,
     ) : AuthorizedRequest
 }
 

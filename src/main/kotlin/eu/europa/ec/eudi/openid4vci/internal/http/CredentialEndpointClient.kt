@@ -21,6 +21,7 @@ import com.nimbusds.jose.proc.JWEDecryptionKeySelector
 import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
+import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidResponseContentType
 import eu.europa.ec.eudi.openid4vci.internal.CredentialIssuanceRequest
@@ -41,33 +42,51 @@ internal class CredentialEndpointClient(
      * Method that submits a request to credential issuer for the issuance of a single credential.
      *
      * @param accessToken Access token authorizing the request
+     * @param dpopNonce Nonce value for DPoP provided by the Resource Server
      * @param request The single credential issuance request
      * @return credential issuer's response
      */
     suspend fun placeIssuanceRequest(
         accessToken: AccessToken,
+        dpopNonce: Nonce?,
         request: CredentialIssuanceRequest,
-    ): Result<SubmissionOutcomeInternal> = runCatching {
+    ): Result<Pair<SubmissionOutcomeInternal, Nonce?>> =
+        runCatching {
+            placeIssuanceRequestInternal(accessToken, dpopNonce, request, false)
+        }
+
+    private suspend fun placeIssuanceRequestInternal(
+        accessToken: AccessToken,
+        dpopNonce: Nonce?,
+        request: CredentialIssuanceRequest,
+        retried: Boolean,
+    ): Pair<SubmissionOutcomeInternal, Nonce?> =
         ktorHttpClientFactory().use { client ->
             val url = credentialEndpoint.value
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = dpopNonce?.value)
                 contentType(ContentType.Application.Json)
                 setBody(CredentialRequestTO.from(request))
             }
             if (response.status.isSuccess()) {
-                responsePossiblyEncrypted(
+                val submissionOutcome = responsePossiblyEncrypted(
                     response,
                     request.encryption,
                     fromTransferObject = { it.toDomain() },
                     transferObjectFromJwtClaims = { CredentialResponseSuccessTO.from(it) },
                 )
+                val newDpopNonce = response.dpopNonce()
+                submissionOutcome to newDpopNonce
             } else {
-                val error = response.body<GenericErrorResponseTO>()
-                SubmissionOutcomeInternal.Failed(error.toIssuanceError())
+                val newDPopNonce = response.dpopNonce()
+                if (response.isResourceServerDpopNonceRequired() && newDPopNonce != null && !retried) {
+                    placeIssuanceRequestInternal(accessToken, newDPopNonce, request, true)
+                } else {
+                    val error = response.body<GenericErrorResponseTO>()
+                    SubmissionOutcomeInternal.Failed(error.toIssuanceError()) to newDPopNonce
+                }
             }
         }
-    }
 }
 
 internal class DeferredEndPointClient(
@@ -93,7 +112,7 @@ internal class DeferredEndPointClient(
         ktorHttpClientFactory().use { client ->
             val url = deferredCredentialEndpoint.value
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = null)
                 contentType(ContentType.Application.Json)
                 setBody(DeferredRequestTO(transactionId.value))
             }

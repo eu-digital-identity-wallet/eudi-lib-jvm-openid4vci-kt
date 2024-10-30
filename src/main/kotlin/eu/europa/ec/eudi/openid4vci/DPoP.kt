@@ -143,6 +143,7 @@ fun HttpRequestBuilder.bearerOrDPoPAuth(
     htu: URL,
     htm: Htm,
     accessToken: AccessToken,
+    nonce: String?,
 ) {
     when (accessToken) {
         is AccessToken.Bearer -> {
@@ -150,7 +151,7 @@ fun HttpRequestBuilder.bearerOrDPoPAuth(
         }
         is AccessToken.DPoP -> {
             if (factory != null) {
-                dpop(factory, htu, htm, accessToken, nonce = null)
+                dpop(factory, htu, htm, accessToken, nonce = nonce)
                 dpopAuth(accessToken)
             } else {
                 bearerAuth(AccessToken.Bearer(accessToken.accessToken, accessToken.expiresIn))

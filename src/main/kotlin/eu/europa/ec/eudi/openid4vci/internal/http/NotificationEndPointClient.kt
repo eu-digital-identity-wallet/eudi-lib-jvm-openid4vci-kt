@@ -40,7 +40,7 @@ internal class NotificationEndPointClient(
         ktorHttpClientFactory().use { client ->
             val url = notificationEndpoint.value
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = null)
                 contentType(ContentType.Application.Json)
                 setBody(NotificationTO.from(event))
             }

@@ -166,10 +166,18 @@ private fun authorizedRequest(
                 authorizationDetails,
                 timestamp,
                 authorizationServerDpopNonce = newDpopNonce,
+                resourceServerDpopNonce = null,
             )
 
         else ->
-            NoProofRequired(accessToken, refreshToken, authorizationDetails, timestamp, authorizationServerDpopNonce = newDpopNonce)
+            NoProofRequired(
+                accessToken,
+                refreshToken,
+                authorizationDetails,
+                timestamp,
+                authorizationServerDpopNonce = newDpopNonce,
+                resourceServerDpopNonce = null,
+            )
     }
 }
 

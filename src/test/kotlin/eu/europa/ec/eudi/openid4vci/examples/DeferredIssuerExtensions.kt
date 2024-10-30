@@ -164,6 +164,7 @@ data class DeferredIssuanceStoredContextTO(
                     credentialIdentifiers = emptyMap(),
                     timestamp = Instant.ofEpochSecond(authorizationTimestamp),
                     authorizationServerDpopNonce = null,
+                    resourceServerDpopNonce = null,
                 ),
                 transactionId = TransactionId(transactionId),
             ),
