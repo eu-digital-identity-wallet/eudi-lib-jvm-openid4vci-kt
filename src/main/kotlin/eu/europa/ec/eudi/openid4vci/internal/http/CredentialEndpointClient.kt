@@ -75,14 +75,14 @@ internal class CredentialEndpointClient(
                     transferObjectFromJwtClaims = { CredentialResponseSuccessTO.from(it) },
                 )
                 val newResourceServerDpopNonce = response.dpopNonce()
-                submissionOutcome to newResourceServerDpopNonce
+                submissionOutcome to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
             } else {
                 val newResourceServerDpopNonce = response.dpopNonce()
                 if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
                     placeIssuanceRequestInternal(accessToken, newResourceServerDpopNonce, request, true)
                 } else {
                     val error = response.body<GenericErrorResponseTO>()
-                    SubmissionOutcomeInternal.Failed(error.toIssuanceError()) to newResourceServerDpopNonce
+                    SubmissionOutcomeInternal.Failed(error.toIssuanceError()) to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
                 }
             }
         }
@@ -137,7 +137,7 @@ internal class DeferredEndPointClient(
                     transferObjectFromJwtClaims = { DeferredIssuanceSuccessResponseTO.from(it) },
                 )
                 val newResourceServerDpopNonce = response.dpopNonce()
-                outcome to newResourceServerDpopNonce
+                outcome to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
             } else {
                 val newResourceServerDpopNonce = response.dpopNonce()
                 if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
@@ -150,7 +150,7 @@ internal class DeferredEndPointClient(
                     )
                 } else {
                     val responsePayload = response.body<GenericErrorResponseTO>()
-                    responsePayload.toDeferredCredentialQueryOutcome() to newResourceServerDpopNonce
+                    responsePayload.toDeferredCredentialQueryOutcome() to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
                 }
             }
         }
