@@ -31,7 +31,7 @@ internal class NotificationEndPointClient(
         accessToken: AccessToken,
         resourceServerDpopNonce: Nonce?,
         event: CredentialIssuanceEvent,
-    ): Result<Unit> =
+    ): Result<Nonce?> =
         runCatching {
             notifyIssuerInternal(accessToken, resourceServerDpopNonce, event, false)
         }
@@ -41,7 +41,7 @@ internal class NotificationEndPointClient(
         resourceServerDpopNonce: Nonce?,
         event: CredentialIssuanceEvent,
         retried: Boolean,
-    ) {
+    ): Nonce? =
         ktorHttpClientFactory().use { client ->
             val url = notificationEndpoint.value
             val response = client.post(url) {
@@ -50,7 +50,9 @@ internal class NotificationEndPointClient(
                 setBody(NotificationTO.from(event))
             }
 
-            if (!response.status.isSuccess()) {
+            if (response.status.isSuccess()) {
+                response.dpopNonce() ?: resourceServerDpopNonce
+            } else {
                 val newResourceServerDpopNonce = response.dpopNonce()
                 if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
                     notifyIssuerInternal(accessToken, newResourceServerDpopNonce, event, true)
@@ -60,5 +62,4 @@ internal class NotificationEndPointClient(
                 }
             }
         }
-    }
 }
