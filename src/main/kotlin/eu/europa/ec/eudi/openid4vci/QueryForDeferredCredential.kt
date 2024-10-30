@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.IssuerDoesNotSupportDeferredIssuance
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessToken
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
@@ -78,8 +79,8 @@ fun interface QueryForDeferredCredential {
                 transactionId: TransactionId,
             ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> = runCatching {
                 val refreshed = refreshIfNeeded(this)
-                val outcome = placeDeferredCredentialRequest(refreshed, transactionId)
-                refreshed to outcome
+                val (outcome, newDPopNonce) = placeDeferredCredentialRequest(refreshed, transactionId)
+                refreshed.withResourceServerDpopNonce(newDPopNonce) to outcome
             }
 
             private suspend fun refreshIfNeeded(authorizedRequest: AuthorizedRequest): AuthorizedRequest =
@@ -90,9 +91,10 @@ fun interface QueryForDeferredCredential {
             private suspend fun placeDeferredCredentialRequest(
                 authorizedRequest: AuthorizedRequest,
                 transactionId: TransactionId,
-            ): DeferredCredentialQueryOutcome =
+            ): Pair<DeferredCredentialQueryOutcome, Nonce?> =
                 deferredEndPointClient.placeDeferredCredentialRequest(
                     authorizedRequest.accessToken,
+                    authorizedRequest.resourceServerDpopNonce,
                     transactionId,
                     responseEncryptionSpec,
                 ).getOrThrow()
