@@ -46,7 +46,7 @@ fun interface NotifyIssuer {
 
     suspend fun AuthorizedRequest.notify(
         event: CredentialIssuanceEvent,
-    ): Result<AuthorizedRequestAnd<Unit>>
+    ): Result<AuthorizedRequest>
 
     companion object {
 
@@ -54,7 +54,7 @@ fun interface NotifyIssuer {
          * No operation notifier (does nothing)
          * Used in case credential issuer doesn't advertise a notification endpoint
          */
-        val NoOp: NotifyIssuer = NotifyIssuer { Result.success(this to Unit) }
+        val NoOp: NotifyIssuer = NotifyIssuer { Result.success(this) }
 
         /**
          * Factory method for creating a [NotifyIssuer]
@@ -65,7 +65,7 @@ fun interface NotifyIssuer {
         internal operator fun invoke(notificationEndPointClient: NotificationEndPointClient): NotifyIssuer =
             NotifyIssuer { event ->
                 notificationEndPointClient.notifyIssuer(accessToken, resourceServerDpopNonce, event)
-                    .map { newResourceServerDpopNonce -> withResourceServerDpopNonce(newResourceServerDpopNonce) to Unit }
+                    .map { newResourceServerDpopNonce -> withResourceServerDpopNonce(newResourceServerDpopNonce) }
             }
     }
 }
