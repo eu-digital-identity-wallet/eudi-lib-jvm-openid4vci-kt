@@ -64,7 +64,7 @@ data class AuthorizedTransaction(
                 refreshToken = authorizedRequest.refreshToken,
                 credentialIdentifiers = authorizedRequest.credentialIdentifiers,
                 timestamp = authorizedRequest.timestamp,
-                dpopNonce = authorizedRequest.dpopNonce,
+                authorizationServerDpopNonce = authorizedRequest.authorizationServerDpopNonce,
             )
         },
         transactionId = transactionId,

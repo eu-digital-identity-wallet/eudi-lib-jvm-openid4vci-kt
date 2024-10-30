@@ -159,10 +159,17 @@ private fun authorizedRequest(
     val (accessToken, refreshToken, cNonce, authorizationDetails, timestamp) = tokenResponse
     return when {
         cNonce != null && offerRequiresProofs ->
-            ProofRequired(accessToken, refreshToken, cNonce, authorizationDetails, timestamp, newDpopNonce)
+            ProofRequired(
+                accessToken,
+                refreshToken,
+                cNonce = cNonce,
+                authorizationDetails,
+                timestamp,
+                authorizationServerDpopNonce = newDpopNonce,
+            )
 
         else ->
-            NoProofRequired(accessToken, refreshToken, authorizationDetails, timestamp, newDpopNonce)
+            NoProofRequired(accessToken, refreshToken, authorizationDetails, timestamp, authorizationServerDpopNonce = newDpopNonce)
     }
 }
 
