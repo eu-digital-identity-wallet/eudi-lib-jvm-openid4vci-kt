@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.openid.connect.sdk.Nonce
 import java.time.Instant
 
 /**

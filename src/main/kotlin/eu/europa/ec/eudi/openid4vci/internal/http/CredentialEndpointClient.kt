@@ -21,7 +21,6 @@ import com.nimbusds.jose.proc.JWEDecryptionKeySelector
 import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
-import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidResponseContentType
 import eu.europa.ec.eudi.openid4vci.internal.CredentialIssuanceRequest
@@ -64,7 +63,7 @@ internal class CredentialEndpointClient(
         ktorHttpClientFactory().use { client ->
             val url = credentialEndpoint.value
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = dpopNonce?.value)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = dpopNonce)
                 contentType(ContentType.Application.Json)
                 setBody(CredentialRequestTO.from(request))
             }
@@ -125,7 +124,7 @@ internal class DeferredEndPointClient(
         ktorHttpClientFactory().use { client ->
             val url = deferredCredentialEndpoint.value
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = dpopNonce?.value)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = dpopNonce)
                 contentType(ContentType.Application.Json)
                 setBody(DeferredRequestTO(transactionId.value))
             }

@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
-import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.NotificationFailed
 import io.ktor.client.call.*
@@ -46,7 +45,7 @@ internal class NotificationEndPointClient(
         ktorHttpClientFactory().use { client ->
             val url = notificationEndpoint.value
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = dpopNonce?.value)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = dpopNonce)
                 contentType(ContentType.Application.Json)
                 setBody(NotificationTO.from(event))
             }

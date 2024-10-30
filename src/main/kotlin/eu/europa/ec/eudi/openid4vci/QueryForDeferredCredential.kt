@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.IssuerDoesNotSupportDeferredIssuance
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessToken
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient

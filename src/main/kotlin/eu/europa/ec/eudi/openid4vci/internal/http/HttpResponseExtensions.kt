@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
-import com.nimbusds.openid.connect.sdk.Nonce
+import eu.europa.ec.eudi.openid4vci.Nonce
 import io.ktor.client.statement.*
 import io.ktor.http.*
 

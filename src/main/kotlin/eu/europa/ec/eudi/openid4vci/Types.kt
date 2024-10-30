@@ -310,3 +310,9 @@ value class CoseCurve(val value: Int) {
         val P_521 = CoseCurve(3)
     }
 }
+
+/**
+ * Nonce (single use) value provided either by the Authorization or Resource server.
+ */
+@JvmInline
+value class Nonce(val value: String)
