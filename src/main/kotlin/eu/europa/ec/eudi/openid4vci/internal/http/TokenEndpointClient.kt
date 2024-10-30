@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
-import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.Grants.PreAuthorizedCode
@@ -215,7 +214,7 @@ internal class TokenEndpointClient(
                 }
                 httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
                     dPoPJwtFactory?.let { factory ->
-                        dpop(factory, tokenEndpoint, Htm.POST, accessToken = null, nonce = existingDpopNonce?.value)
+                        dpop(factory, tokenEndpoint, Htm.POST, accessToken = null, nonce = existingDpopNonce)
                     }
                     generateClientAttestationIfNeeded()?.let(::clientAttestationHeaders)
                 }
@@ -224,13 +223,13 @@ internal class TokenEndpointClient(
             return when {
                 response.status.isSuccess() -> {
                     val responseTO = response.body<TokenResponseTO.Success>()
-                    val newDopNonce = response.headers["DPoP-Nonce"]?.let { nonce -> Nonce(nonce) }
+                    val newDopNonce = response.dpopNonce()
                     responseTO to (newDopNonce ?: existingDpopNonce)
                 }
 
                 response.status == HttpStatusCode.BadRequest -> {
                     val errorTO = response.body<TokenResponseTO.Failure>()
-                    val newDopNonce = response.headers["DPoP-Nonce"]?.let { nonce -> Nonce(nonce) }
+                    val newDopNonce = response.dpopNonce()
                     when {
                         errorTO.error == "use_dpop_nonce" && newDopNonce != null && !retried -> {
                             requestInternal(newDopNonce, true)

@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.AccessTokenOption.AsRequested
 import eu.europa.ec.eudi.openid4vci.AccessTokenOption.Limited
@@ -159,10 +158,25 @@ private fun authorizedRequest(
     val (accessToken, refreshToken, cNonce, authorizationDetails, timestamp) = tokenResponse
     return when {
         cNonce != null && offerRequiresProofs ->
-            ProofRequired(accessToken, refreshToken, cNonce, authorizationDetails, timestamp, newDpopNonce)
+            ProofRequired(
+                accessToken,
+                refreshToken,
+                cNonce = cNonce,
+                authorizationDetails,
+                timestamp,
+                authorizationServerDpopNonce = newDpopNonce,
+                resourceServerDpopNonce = null,
+            )
 
         else ->
-            NoProofRequired(accessToken, refreshToken, authorizationDetails, timestamp, newDpopNonce)
+            NoProofRequired(
+                accessToken,
+                refreshToken,
+                authorizationDetails,
+                timestamp,
+                authorizationServerDpopNonce = newDpopNonce,
+                resourceServerDpopNonce = null,
+            )
     }
 }
 

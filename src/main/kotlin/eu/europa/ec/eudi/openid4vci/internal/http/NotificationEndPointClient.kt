@@ -15,14 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
-import eu.europa.ec.eudi.openid4vci.AccessToken
+import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.NotificationFailed
-import eu.europa.ec.eudi.openid4vci.CredentialIssuanceEvent
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerEndpoint
-import eu.europa.ec.eudi.openid4vci.DPoPJwtFactory
-import eu.europa.ec.eudi.openid4vci.Htm
-import eu.europa.ec.eudi.openid4vci.KtorHttpClientFactory
-import eu.europa.ec.eudi.openid4vci.bearerOrDPoPAuth
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -35,21 +29,37 @@ internal class NotificationEndPointClient(
 
     suspend fun notifyIssuer(
         accessToken: AccessToken,
+        resourceServerDpopNonce: Nonce?,
         event: CredentialIssuanceEvent,
-    ): Result<Unit> = runCatching {
+    ): Result<Nonce?> =
+        runCatching {
+            notifyIssuerInternal(accessToken, resourceServerDpopNonce, event, false)
+        }
+
+    private suspend fun notifyIssuerInternal(
+        accessToken: AccessToken,
+        resourceServerDpopNonce: Nonce?,
+        event: CredentialIssuanceEvent,
+        retried: Boolean,
+    ): Nonce? =
         ktorHttpClientFactory().use { client ->
             val url = notificationEndpoint.value
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = resourceServerDpopNonce)
                 contentType(ContentType.Application.Json)
                 setBody(NotificationTO.from(event))
             }
+
             if (response.status.isSuccess()) {
-                Unit
+                response.dpopNonce() ?: resourceServerDpopNonce
             } else {
-                val errorResponse = response.body<GenericErrorResponseTO>()
-                throw NotificationFailed(errorResponse.error)
+                val newResourceServerDpopNonce = response.dpopNonce()
+                if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
+                    notifyIssuerInternal(accessToken, newResourceServerDpopNonce, event, true)
+                } else {
+                    val errorResponse = response.body<GenericErrorResponseTO>()
+                    throw NotificationFailed(errorResponse.error)
+                }
             }
         }
-    }
 }

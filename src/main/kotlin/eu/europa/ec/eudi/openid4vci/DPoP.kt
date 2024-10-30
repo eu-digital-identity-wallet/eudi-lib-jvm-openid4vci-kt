@@ -21,7 +21,6 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.dpop.DPoPUtils
 import com.nimbusds.oauth2.sdk.id.JWTID
-import com.nimbusds.openid.connect.sdk.Nonce
 import io.ktor.client.request.*
 import io.ktor.http.*
 import java.net.URL
@@ -29,6 +28,7 @@ import java.time.Clock
 import java.util.*
 import com.nimbusds.oauth2.sdk.dpop.DPoPProofFactory as NimbusDPoPProofFactory
 import com.nimbusds.oauth2.sdk.token.DPoPAccessToken as NimbusDPoPAccessToken
+import com.nimbusds.openid.connect.sdk.Nonce as NimbusNonce
 
 const val DPoP = "DPoP"
 
@@ -58,7 +58,7 @@ class DPoPJwtFactory(
         htm: Htm,
         htu: URL,
         accessToken: AccessToken.DPoP? = null,
-        nonce: String? = null,
+        nonce: Nonce? = null,
     ): Result<SignedJWT> = runCatching {
         val jwsHeader: JWSHeader = JWSHeader.Builder(signer.algorithm)
             .type(NimbusDPoPProofFactory.TYPE)
@@ -72,7 +72,7 @@ class DPoPJwtFactory(
             accessToken?.let {
                 NimbusDPoPAccessToken(it.accessToken)
             },
-            nonce?.let { Nonce(it) },
+            nonce?.let { NimbusNonce(it.value) },
         )
         SignedJWT(jwsHeader, jwtClaimsSet).apply { sign(signer.jwsSigner) }
     }
@@ -143,6 +143,7 @@ fun HttpRequestBuilder.bearerOrDPoPAuth(
     htu: URL,
     htm: Htm,
     accessToken: AccessToken,
+    nonce: Nonce?,
 ) {
     when (accessToken) {
         is AccessToken.Bearer -> {
@@ -150,7 +151,7 @@ fun HttpRequestBuilder.bearerOrDPoPAuth(
         }
         is AccessToken.DPoP -> {
             if (factory != null) {
-                dpop(factory, htu, htm, accessToken, nonce = null)
+                dpop(factory, htu, htm, accessToken, nonce = nonce)
                 dpopAuth(accessToken)
             } else {
                 bearerAuth(AccessToken.Bearer(accessToken.accessToken, accessToken.expiresIn))
@@ -167,7 +168,7 @@ fun HttpRequestBuilder.dpop(
     htu: URL,
     htm: Htm,
     accessToken: AccessToken.DPoP?,
-    nonce: String?,
+    nonce: Nonce?,
 ) {
     val jwt = factory.createDPoPJwt(htm, htu, accessToken, nonce).getOrThrow().serialize()
     header(DPoP, jwt)

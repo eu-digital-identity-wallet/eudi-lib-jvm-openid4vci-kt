@@ -41,33 +41,51 @@ internal class CredentialEndpointClient(
      * Method that submits a request to credential issuer for the issuance of a single credential.
      *
      * @param accessToken Access token authorizing the request
+     * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
      * @param request The single credential issuance request
      * @return credential issuer's response
      */
     suspend fun placeIssuanceRequest(
         accessToken: AccessToken,
+        resourceServerDpopNonce: Nonce?,
         request: CredentialIssuanceRequest,
-    ): Result<SubmissionOutcomeInternal> = runCatching {
+    ): Result<Pair<SubmissionOutcomeInternal, Nonce?>> =
+        runCatching {
+            placeIssuanceRequestInternal(accessToken, resourceServerDpopNonce, request, false)
+        }
+
+    private suspend fun placeIssuanceRequestInternal(
+        accessToken: AccessToken,
+        resourceServerDpopNonce: Nonce?,
+        request: CredentialIssuanceRequest,
+        retried: Boolean,
+    ): Pair<SubmissionOutcomeInternal, Nonce?> =
         ktorHttpClientFactory().use { client ->
             val url = credentialEndpoint.value
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = resourceServerDpopNonce)
                 contentType(ContentType.Application.Json)
                 setBody(CredentialRequestTO.from(request))
             }
             if (response.status.isSuccess()) {
-                responsePossiblyEncrypted(
+                val submissionOutcome = responsePossiblyEncrypted(
                     response,
                     request.encryption,
                     fromTransferObject = { it.toDomain() },
                     transferObjectFromJwtClaims = { CredentialResponseSuccessTO.from(it) },
                 )
+                val newResourceServerDpopNonce = response.dpopNonce()
+                submissionOutcome to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
             } else {
-                val error = response.body<GenericErrorResponseTO>()
-                SubmissionOutcomeInternal.Failed(error.toIssuanceError())
+                val newResourceServerDpopNonce = response.dpopNonce()
+                if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
+                    placeIssuanceRequestInternal(accessToken, newResourceServerDpopNonce, request, true)
+                } else {
+                    val error = response.body<GenericErrorResponseTO>()
+                    SubmissionOutcomeInternal.Failed(error.toIssuanceError()) to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
+                }
             }
         }
-    }
 }
 
 internal class DeferredEndPointClient(
@@ -79,6 +97,7 @@ internal class DeferredEndPointClient(
      * Method that submits a request to credential issuer's Deferred Credential Endpoint
      *
      * @param accessToken Access token authorizing the request
+     * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
      * @param transactionId The identifier of the Deferred Issuance transaction
      * @param responseEncryptionSpec The response encryption information as specified when placing the issuance request. If initial request
      *      had specified response encryption then the issuer response is expected to be encrypted by the encryption details of the initial
@@ -87,29 +106,54 @@ internal class DeferredEndPointClient(
      */
     suspend fun placeDeferredCredentialRequest(
         accessToken: AccessToken,
+        resourceServerDpopNonce: Nonce?,
         transactionId: TransactionId,
         responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
-    ): Result<DeferredCredentialQueryOutcome> = runCatching {
+    ): Result<Pair<DeferredCredentialQueryOutcome, Nonce?>> =
+        runCatching {
+            placeDeferredCredentialRequestInternal(accessToken, resourceServerDpopNonce, transactionId, responseEncryptionSpec, false)
+        }
+
+    private suspend fun placeDeferredCredentialRequestInternal(
+        accessToken: AccessToken,
+        resourceServerDpopNonce: Nonce?,
+        transactionId: TransactionId,
+        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+        retried: Boolean,
+    ): Pair<DeferredCredentialQueryOutcome, Nonce?> =
         ktorHttpClientFactory().use { client ->
             val url = deferredCredentialEndpoint.value
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken)
+                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = resourceServerDpopNonce)
                 contentType(ContentType.Application.Json)
                 setBody(DeferredRequestTO(transactionId.value))
             }
+
             if (response.status.isSuccess()) {
-                responsePossiblyEncrypted<DeferredIssuanceSuccessResponseTO, DeferredCredentialQueryOutcome.Issued>(
+                val outcome = responsePossiblyEncrypted<DeferredIssuanceSuccessResponseTO, DeferredCredentialQueryOutcome.Issued>(
                     response,
                     responseEncryptionSpec,
                     fromTransferObject = { it.toDomain() },
                     transferObjectFromJwtClaims = { DeferredIssuanceSuccessResponseTO.from(it) },
                 )
+                val newResourceServerDpopNonce = response.dpopNonce()
+                outcome to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
             } else {
-                val responsePayload = response.body<GenericErrorResponseTO>()
-                responsePayload.toDeferredCredentialQueryOutcome()
+                val newResourceServerDpopNonce = response.dpopNonce()
+                if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
+                    placeDeferredCredentialRequestInternal(
+                        accessToken,
+                        newResourceServerDpopNonce,
+                        transactionId,
+                        responseEncryptionSpec,
+                        true,
+                    )
+                } else {
+                    val responsePayload = response.body<GenericErrorResponseTO>()
+                    responsePayload.toDeferredCredentialQueryOutcome() to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
+                }
             }
         }
-    }
 }
 
 private suspend inline fun <reified ResponseTO, Response> responsePossiblyEncrypted(

@@ -33,7 +33,7 @@ internal class RequestIssuanceImpl(
         //
         // Place the request
         //
-        val outcome = placeIssuanceRequest(accessToken) {
+        val (outcome, newResourceServerDpopNonce) = placeIssuanceRequest(accessToken, resourceServerDpopNonce) {
             val proofFactories = proofFactoriesForm(popSigners)
             buildRequest(requestPayload, proofFactories, credentialIdentifiers.orEmpty())
         }
@@ -41,7 +41,7 @@ internal class RequestIssuanceImpl(
         //
         // Update state
         //
-        val updatedAuthorizedRequest = this.withCNonceFrom(outcome)
+        val updatedAuthorizedRequest = this.withCNonceFrom(outcome).withResourceServerDpopNonce(newResourceServerDpopNonce)
 
         //
         // Retry on invalid proof if we begin from NoProofRequired and issuer
@@ -151,10 +151,11 @@ internal class RequestIssuanceImpl(
 
     private suspend fun placeIssuanceRequest(
         token: AccessToken,
+        resourceServerDpopNonce: Nonce?,
         issuanceRequestSupplier: suspend () -> CredentialIssuanceRequest,
-    ): SubmissionOutcomeInternal {
+    ): Pair<SubmissionOutcomeInternal, Nonce?> {
         val req = issuanceRequestSupplier()
-        val res = credentialEndpointClient.placeIssuanceRequest(token, req)
+        val res = credentialEndpointClient.placeIssuanceRequest(token, resourceServerDpopNonce, req)
         return res.getOrThrow()
     }
 }

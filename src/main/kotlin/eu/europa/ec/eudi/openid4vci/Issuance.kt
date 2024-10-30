@@ -175,8 +175,8 @@ interface RequestIssuance {
      * caller is advised to provide it, to allow the method to automatically retry
      * in case of [CredentialIssuanceError.InvalidProof]
      *
-     * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh c_nonce) and
-     * the [SubmissionOutcome]
+     * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh c_nonce and/or
+     * updated Resource-Server DPoP Nonce) and the [SubmissionOutcome]
      */
     suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
