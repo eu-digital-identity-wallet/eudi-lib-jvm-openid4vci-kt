@@ -25,25 +25,25 @@ the [OpenId4VCI (draft 14)](https://openid.net/specs/openid-4-verifiable-credent
 In particular, the library focuses on the wallet's role in and provides the following features:
 
 
-| Feature                                                                                         | Coverage                                                                                                        |
-|-------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
-| [Wallet-initiated issuance](#wallet-initiated-issuance)                                         | ✅                                                                                                               |
+| Feature                                                                                         | Coverage                                                                                                               |
+|-------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| [Wallet-initiated issuance](#wallet-initiated-issuance)                                         | ✅                                                                                                                      |
 | [Resolve a credential offer](#resolve-a-credential-offer)                                       | ✅ Unsigned metadata ❌ [accept-language](#issuer-metadata-accept-language) ❌ [signed metadata](#issuer-signed-metadata) |
-| [Authorization code flow](#authorization-code-flow)                                             | ✅                                                                                                               |
-| [Pre-authorized code flow](#pre-authorized-code-flow)                                           | ✅                                                                                                               |
-| mso_mdoc format                                                                                 | ✅                                                                                                               |
-| SD-JWT-VC format                                                                                | ✅                                                                                                               |
-| W3C VC DM                                                                                       | VC Signed as a JWT, Not Using JSON-LD                                                                           |
-| [Place credential request](#place-credential-request)                                           | ✅ Including automatic handling of `invalid_proof` & multiple proofs                                             |
-| [Query for deferred credentials](#query-for-deferred-credentials)                               | ✅ Including automatic refresh of `access_token`                                                                 |
-| [Query for deferred credentials at a later time](#query-for-deferred-credentials-at-later-time) | ✅ Including automatic refresh of `access_token`                                                                 |
-| [Notify credential issuer](#notify-credential-issuer)                                           | ✅                                                                                                               | 
-| Proof                                                                                           | ✅ JWT                                                                                                           |
-| Credential response encryption                                                                  | ✅                                                                                                               |
-| [Pushed authorization requests](#pushed-authorization-requests)                                 | ✅ Used by default, if supported by issuer                                                                       |
-| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)             | ✅                                                                                                               |
-| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                               | ✅                                                                                                               |
-| Wallet authentication                                                                           | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth2-attestation-based-client-authentication) |
+| [Authorization code flow](#authorization-code-flow)                                             | ✅                                                                                                                      |
+| [Pre-authorized code flow](#pre-authorized-code-flow)                                           | ✅                                                                                                                      |
+| mso_mdoc format                                                                                 | ✅                                                                                                                      |
+| SD-JWT-VC format                                                                                | ✅                                                                                                                      |
+| W3C VC DM                                                                                       | VC Signed as a JWT, Not Using JSON-LD                                                                                  |
+| [Place credential request](#place-credential-request)                                           | ✅ Including automatic handling of `invalid_proof` & multiple proofs                                                    |
+| [Query for deferred credentials](#query-for-deferred-credentials)                               | ✅ Including automatic refresh of `access_token`                                                                        |
+| [Query for deferred credentials at a later time](#query-for-deferred-credentials-at-later-time) | ✅ Including automatic refresh of `access_token`                                                                        |
+| [Notify credential issuer](#notify-credential-issuer)                                           | ✅                                                                                                                      | 
+| Proof                                                                                           | ✅ JWT                                                                                                                  |
+| Credential response encryption                                                                  | ✅                                                                                                                      |
+| [Pushed authorization requests](#pushed-authorization-requests)                                 | ✅ Used by default, if supported by issuer                                                                              |
+| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)             | ✅                                                                                                                      |
+| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                               | ✅                                                                                                                      |
+| Wallet authentication                                                                           | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth2-attestation-based-client-authentication)     |
 
 ## Disclaimer
 
@@ -626,6 +626,14 @@ algorithms supported by wallet's DPoP Signer, then library will transparently re
 for a DPoP `access_token` instead of the default Bearer token.
 
 Furthermore, all further interactions will use the correct token type (Bearer or DPoP)
+
+Library supports both
+[Authorization Server-Provided Nonce](https://datatracker.ietf.org/doc/html/rfc9449#name-authorization-server-provid) and
+[Resource Server-Provided Nonce](https://datatracker.ietf.org/doc/html/rfc9449#name-resource-server-provided-no). It
+features automatic recovery/retry support, and is able to recover from `use_dpop_nonce` errors given that a new DPoP
+Nonce is provided in the `DPoP-Nonce` header. Finally, library refreshes DPoP Nonce whenever a new value is provided,
+either by the Authorization Server or the Credential Issuer, using the `DPoP-Nonce` header, and all subsequent
+interactions use the newly provided DPoP Nonce value.
 
 ###  Proof Key for Code Exchange by OAuth Public Clients (PKCE)
 
