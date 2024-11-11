@@ -15,8 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import java.time.Instant
 
 /**
@@ -39,12 +37,8 @@ data class AuthorizationRequestPrepared(
     val dpopNonce: Nonce?,
 ) : java.io.Serializable
 
-@Serializable
-enum class Grant {
-    @SerialName("authorization_code")
+enum class Grant : java.io.Serializable {
     AuthorizationCode,
-
-    @SerialName("urn:ietf:params:oauth:grant-type:pre-authorized_code")
     PreAuthorizedCodeGrant,
 }
 

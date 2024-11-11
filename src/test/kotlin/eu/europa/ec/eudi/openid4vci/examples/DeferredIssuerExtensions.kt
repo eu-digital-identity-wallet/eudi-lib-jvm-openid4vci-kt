@@ -104,6 +104,31 @@ data class AccessTokenTO(
 }
 
 @Serializable
+enum class GrantTO {
+    @SerialName("authorization_code")
+    AuthorizationCode,
+
+    @SerialName("urn:ietf:params:oauth:grant-type:pre-authorized_code")
+    PreAuthorizedCodeGrant,
+
+    ;
+
+    fun toGrant(): Grant =
+        when (this) {
+            AuthorizationCode -> Grant.AuthorizationCode
+            PreAuthorizedCodeGrant -> Grant.PreAuthorizedCodeGrant
+        }
+
+    companion object {
+        fun fromGrant(grant: Grant): GrantTO =
+            when (grant) {
+                Grant.AuthorizationCode -> AuthorizationCode
+                Grant.PreAuthorizedCodeGrant -> PreAuthorizedCodeGrant
+            }
+    }
+}
+
+@Serializable
 data class DeferredIssuanceStoredContextTO(
     @Required @SerialName("credential_issuer") val credentialIssuerId: String,
     @Required @SerialName("client_id") val clientId: String,
@@ -120,8 +145,8 @@ data class DeferredIssuanceStoredContextTO(
     @SerialName("transaction_id") val transactionId: String,
     @SerialName("access_token") val accessToken: AccessTokenTO,
     @SerialName("refresh_token") val refreshToken: RefreshTokenTO? = null,
-    @SerialName("authorization_timestamp") val authorizationTimestamp: Long,
-    @SerialName("grant") val grant: Grant,
+    @SerialName("authorization_timestamGrantTO.fromGrant(grant)p") val authorizationTimestamp: Long,
+    @SerialName("grant") val grant: GrantTO,
 ) {
 
     fun toDeferredIssuanceStoredContext(
@@ -166,7 +191,7 @@ data class DeferredIssuanceStoredContextTO(
                     timestamp = Instant.ofEpochSecond(authorizationTimestamp),
                     authorizationServerDpopNonce = null,
                     resourceServerDpopNonce = null,
-                    grant = grant,
+                    grant = grant.toGrant(),
                 ),
                 transactionId = TransactionId(transactionId),
             ),
@@ -205,7 +230,7 @@ data class DeferredIssuanceStoredContextTO(
                 accessToken = AccessTokenTO.from(authorizedTransaction.authorizedRequest.accessToken),
                 refreshToken = authorizedTransaction.authorizedRequest.refreshToken?.let { RefreshTokenTO.from(it) },
                 authorizationTimestamp = authorizedTransaction.authorizedRequest.timestamp.epochSecond,
-                grant = authorizedTransaction.authorizedRequest.grant,
+                grant = GrantTO.fromGrant(authorizedTransaction.authorizedRequest.grant),
             )
         }
 
