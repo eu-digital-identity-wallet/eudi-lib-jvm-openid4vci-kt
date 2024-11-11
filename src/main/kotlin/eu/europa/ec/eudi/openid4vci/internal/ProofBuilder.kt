@@ -30,7 +30,7 @@ private interface CheckPopSigner<POP_SIGNER : PopSigner> {
 
 internal abstract class ProofBuilder<POP_SIGNER : PopSigner, out PROOF : Proof>(
     val clock: Clock,
-    val iss: ClientId,
+    val iss: ClientId?,
     val aud: CredentialIssuerId,
     val nonce: CNonce,
     val popSigner: POP_SIGNER,
@@ -42,7 +42,7 @@ internal abstract class ProofBuilder<POP_SIGNER : PopSigner, out PROOF : Proof>(
         operator fun invoke(
             proofTypesSupported: ProofTypesSupported,
             clock: Clock,
-            iss: ClientId,
+            iss: ClientId?,
             aud: CredentialIssuerId,
             nonce: CNonce,
             popSigner: PopSigner,
@@ -54,12 +54,33 @@ internal abstract class ProofBuilder<POP_SIGNER : PopSigner, out PROOF : Proof>(
                 }
             }
         }
+        operator fun invoke(
+            proofTypesSupported: ProofTypesSupported,
+            clock: Clock,
+            client: Client,
+            grant: Grant,
+            aud: CredentialIssuerId,
+            nonce: CNonce,
+            popSigner: PopSigner,
+        ): ProofBuilder<*, *> =
+            invoke(proofTypesSupported, clock, iss(client, grant), aud, nonce, popSigner)
+
+        private fun iss(client: Client, grant: Grant): ClientId? {
+            val useIss = when (grant) {
+                Grant.AuthorizationCode -> true
+                Grant.PreAuthorizedCodeGrant -> when (client) {
+                    is Client.Attested -> true
+                    is Client.Public -> false
+                }
+            }
+            return client.id.takeIf { useIss }
+        }
     }
 }
 
 internal class JwtProofBuilder(
     clock: Clock,
-    iss: ClientId,
+    iss: ClientId?,
     aud: CredentialIssuerId,
     nonce: CNonce,
     popSigner: PopSigner.Jwt,
@@ -86,7 +107,7 @@ internal class JwtProofBuilder(
 
     private fun claimSet(): JWTClaimsSet =
         JWTClaimsSet.Builder().apply {
-            issuer(iss)
+            iss?.let { issuer(it) }
             audience(aud.toString())
             claim("nonce", nonce.value)
             issueTime(Date.from(clock.instant()))

@@ -121,6 +121,7 @@ data class DeferredIssuanceStoredContextTO(
     @SerialName("access_token") val accessToken: AccessTokenTO,
     @SerialName("refresh_token") val refreshToken: RefreshTokenTO? = null,
     @SerialName("authorization_timestamp") val authorizationTimestamp: Long,
+    @SerialName("grant") val grant: Grant,
 ) {
 
     fun toDeferredIssuanceStoredContext(
@@ -165,6 +166,7 @@ data class DeferredIssuanceStoredContextTO(
                     timestamp = Instant.ofEpochSecond(authorizationTimestamp),
                     authorizationServerDpopNonce = null,
                     resourceServerDpopNonce = null,
+                    grant = grant,
                 ),
                 transactionId = TransactionId(transactionId),
             ),
@@ -203,6 +205,7 @@ data class DeferredIssuanceStoredContextTO(
                 accessToken = AccessTokenTO.from(authorizedTransaction.authorizedRequest.accessToken),
                 refreshToken = authorizedTransaction.authorizedRequest.refreshToken?.let { RefreshTokenTO.from(it) },
                 authorizationTimestamp = authorizedTransaction.authorizedRequest.timestamp.epochSecond,
+                grant = authorizedTransaction.authorizedRequest.grant,
             )
         }
 

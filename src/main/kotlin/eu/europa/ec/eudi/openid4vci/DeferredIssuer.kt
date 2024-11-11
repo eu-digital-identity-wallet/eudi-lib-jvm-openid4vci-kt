@@ -66,6 +66,7 @@ data class AuthorizedTransaction(
                 timestamp = authorizedRequest.timestamp,
                 authorizationServerDpopNonce = authorizedRequest.authorizationServerDpopNonce,
                 resourceServerDpopNonce = authorizedRequest.resourceServerDpopNonce,
+                grant = authorizedRequest.grant,
             )
         },
         transactionId = transactionId,
