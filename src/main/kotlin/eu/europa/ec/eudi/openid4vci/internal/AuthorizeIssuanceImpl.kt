@@ -95,7 +95,7 @@ internal class AuthorizeIssuanceImpl(
                     credConfigIdsAsAuthDetails,
                     dpopNonce,
                 ).getOrThrow()
-            authorizedRequest(credentialOffer, tokenResponse, newDpopNonce)
+            authorizedRequest(credentialOffer, tokenResponse, newDpopNonce, Grant.AuthorizationCode)
         }
 
     override suspend fun authorizeWithPreAuthorizationCode(
@@ -119,7 +119,7 @@ internal class AuthorizeIssuanceImpl(
                 credConfigIdsAsAuthDetails,
                 dpopNonce = null,
             ).getOrThrow()
-        authorizedRequest(credentialOffer, tokenResponse, newDpopNonce)
+        authorizedRequest(credentialOffer, tokenResponse, newDpopNonce, Grant.PreAuthorizedCodeGrant)
     }
 }
 
@@ -150,6 +150,7 @@ private fun authorizedRequest(
     offer: CredentialOffer,
     tokenResponse: TokenResponse,
     newDpopNonce: Nonce?,
+    grant: Grant,
 ): AuthorizedRequest {
     val offerRequiresProofs = offer.credentialConfigurationIdentifiers.any {
         val credentialConfiguration = offer.credentialIssuerMetadata.credentialConfigurationsSupported[it]
@@ -166,6 +167,7 @@ private fun authorizedRequest(
                 timestamp,
                 authorizationServerDpopNonce = newDpopNonce,
                 resourceServerDpopNonce = null,
+                grant = grant,
             )
 
         else ->
@@ -176,6 +178,7 @@ private fun authorizedRequest(
                 timestamp,
                 authorizationServerDpopNonce = newDpopNonce,
                 resourceServerDpopNonce = null,
+                grant = grant,
             )
     }
 }

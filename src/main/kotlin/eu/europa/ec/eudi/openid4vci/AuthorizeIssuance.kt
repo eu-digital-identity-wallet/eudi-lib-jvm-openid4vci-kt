@@ -37,6 +37,11 @@ data class AuthorizationRequestPrepared(
     val dpopNonce: Nonce?,
 ) : java.io.Serializable
 
+enum class Grant : java.io.Serializable {
+    AuthorizationCode,
+    PreAuthorizedCodeGrant,
+}
+
 /**
  * Sealed hierarchy of states describing an authorized issuance request. These states hold an access token issued by the
  * authorization server that protects the credential issuer.
@@ -50,8 +55,21 @@ sealed interface AuthorizedRequest : java.io.Serializable {
     val refreshToken: RefreshToken?
     val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?
     val timestamp: Instant
+
+    /**
+     * Authorization server-provided DPoP Nonce, if any
+     */
     val authorizationServerDpopNonce: Nonce?
+
+    /**
+     * Protected resource-provided DPoP Nonce, if any
+     */
     val resourceServerDpopNonce: Nonce?
+
+    /**
+     * The Grant through which the authorization was obtained
+     */
+    val grant: Grant
 
     fun isAccessTokenExpired(at: Instant): Boolean = accessToken.isExpired(timestamp, at)
     fun isRefreshTokenExpiredOrMissing(at: Instant): Boolean = refreshToken?.isExpired(timestamp, at) ?: true
@@ -65,13 +83,14 @@ sealed interface AuthorizedRequest : java.io.Serializable {
      */
     fun withCNonce(cNonce: CNonce): ProofRequired =
         ProofRequired(
-            accessToken,
-            refreshToken,
+            accessToken = accessToken,
+            refreshToken = refreshToken,
             cNonce = cNonce,
-            credentialIdentifiers,
-            timestamp,
+            credentialIdentifiers = credentialIdentifiers,
+            timestamp = timestamp,
             authorizationServerDpopNonce = authorizationServerDpopNonce,
             resourceServerDpopNonce = resourceServerDpopNonce,
+            grant = grant,
         )
 
     fun withRefreshedAccessToken(
@@ -111,6 +130,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
      * @param timestamp the point in time of the authorization (when tokens were issued)
      * @param authorizationServerDpopNonce Nonce value for DPoP provided by the Authorization Server
      * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
+     * @param grant the Grant through which the authorization was obtained
      */
     data class NoProofRequired(
         override val accessToken: AccessToken,
@@ -119,6 +139,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
         override val timestamp: Instant,
         override val authorizationServerDpopNonce: Nonce?,
         override val resourceServerDpopNonce: Nonce?,
+        override val grant: Grant,
     ) : AuthorizedRequest
 
     /**
@@ -132,6 +153,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
      * @param timestamp the point in time of the authorization (when tokens were issued)
      * @param authorizationServerDpopNonce Nonce value for DPoP provided by the Authorization Server
      * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
+     * @param grant the Grant through which the authorization was obtained
      */
     data class ProofRequired(
         override val accessToken: AccessToken,
@@ -141,6 +163,7 @@ sealed interface AuthorizedRequest : java.io.Serializable {
         override val timestamp: Instant,
         override val authorizationServerDpopNonce: Nonce?,
         override val resourceServerDpopNonce: Nonce?,
+        override val grant: Grant,
     ) : AuthorizedRequest
 }
 

@@ -41,7 +41,8 @@ internal class RequestIssuanceImpl(
         //
         // Update state
         //
-        val updatedAuthorizedRequest = this.withCNonceFrom(outcome).withResourceServerDpopNonce(newResourceServerDpopNonce)
+        val updatedAuthorizedRequest =
+            this.withCNonceFrom(outcome).withResourceServerDpopNonce(newResourceServerDpopNonce)
 
         //
         // Retry on invalid proof if we begin from NoProofRequired and issuer
@@ -104,15 +105,18 @@ internal class RequestIssuanceImpl(
                         }
                     }
                 }
-                popSigners.map { proofFactory(it, cNonce) }
+                popSigners.map { proofFactory(it, cNonce, grant) }
             }
         }
 
-    private fun proofFactory(proofSigner: PopSigner, cNonce: CNonce): ProofFactory = { credentialSupported ->
-        val iss = config.client.id
+    private fun proofFactory(
+        proofSigner: PopSigner,
+        cNonce: CNonce,
+        grant: Grant,
+    ): ProofFactory = { credentialSupported ->
         val aud = credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier
         val proofTypesSupported = credentialSupported.proofTypesSupported
-        ProofBuilder(proofTypesSupported, config.clock, iss, aud, cNonce, proofSigner).build()
+        ProofBuilder(proofTypesSupported, config.clock, config.client, grant, aud, cNonce, proofSigner).build()
     }
 
     private suspend fun buildRequest(
