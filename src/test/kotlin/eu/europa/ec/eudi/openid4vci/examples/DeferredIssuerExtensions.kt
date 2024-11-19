@@ -53,18 +53,16 @@ suspend fun DeferredIssuer.Companion.queryForDeferredCredential(
 @Serializable
 data class RefreshTokenTO(
     @Required @SerialName("refresh_token") val refreshToken: String,
-    @SerialName("expires_in") val expiresIn: Long? = null,
 ) {
 
     fun toRefreshToken(): RefreshToken {
-        val exp = expiresIn?.let { Duration.ofSeconds(it) }
-        return RefreshToken(refreshToken, exp)
+        return RefreshToken(refreshToken)
     }
 
     companion object {
 
         fun from(refreshToken: RefreshToken): RefreshTokenTO =
-            RefreshTokenTO(refreshToken.refreshToken, refreshToken.expiresIn?.toSeconds())
+            RefreshTokenTO(refreshToken.refreshToken)
     }
 }
 

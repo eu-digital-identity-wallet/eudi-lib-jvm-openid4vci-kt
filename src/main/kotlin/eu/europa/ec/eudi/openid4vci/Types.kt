@@ -141,19 +141,11 @@ sealed interface AccessToken : CanExpire, java.io.Serializable {
     }
 }
 
-data class RefreshToken(
-    val refreshToken: String,
-    override val expiresIn: Duration?,
-) : CanExpire, java.io.Serializable {
+@JvmInline
+value class RefreshToken(val refreshToken: String) : java.io.Serializable {
     init {
         require(refreshToken.isNotEmpty()) { "Refresh Token must not be empty" }
-        if (expiresIn != null) {
-            require(!expiresIn.isNegative) { "Expires in should be positive" }
-        }
     }
-
-    constructor(refreshToken: String, expiresInSec: Long?) :
-        this(refreshToken, expiresInSec?.let { Duration.ofSeconds(it) })
 }
 
 /**

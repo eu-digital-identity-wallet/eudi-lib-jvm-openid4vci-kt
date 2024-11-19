@@ -28,7 +28,7 @@ internal class RefreshAccessToken(
         val at = clock.instant()
         when {
             !isAccessTokenExpired(at) -> this
-            isRefreshTokenExpiredOrMissing(at) -> error("Refresh token is expired or missing")
+            refreshToken == null -> error("Refresh token was not provided")
             else -> refresh(this)
         }
     }
