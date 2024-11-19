@@ -23,7 +23,6 @@ import io.ktor.http.content.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import org.hamcrest.MatcherAssert.assertThat
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.*
@@ -66,9 +65,9 @@ class IssuanceSingleRequestTest {
 
                     val textContent = it.body as TextContent
                     val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
-                    assertThat(
-                        "Wrong credential request type",
+                    assertTrue(
                         issuanceRequestTO.format != null && issuanceRequestTO.format == FORMAT_MSO_MDOC,
+                        "Wrong credential request type",
                     )
                 },
             ),
@@ -239,9 +238,9 @@ class IssuanceSingleRequestTest {
                     issuanceRequest.proof?.let {
                         assertIs<Proof.Jwt>(issuanceRequest.proof)
                     }
-                    assertThat(
-                        "Expected mso_mdoc format based issuance request but was not.",
+                    assertTrue(
                         issuanceRequest.format != null && issuanceRequest.format == FORMAT_MSO_MDOC,
+                        "Expected mso_mdoc format based issuance request but was not.",
                     )
                 },
             ),
@@ -375,9 +374,9 @@ class IssuanceSingleRequestTest {
                     requestValidator = {
                         val textContent = it.body as TextContent
                         val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
-                        assertThat(
+                        assertNotNull(
+                            issuanceRequestTO.credentialIdentifier,
                             "Expected identifier based issuance request but credential_identifier is null",
-                            issuanceRequestTO.credentialIdentifier != null,
                         )
                     },
                 ),
@@ -416,9 +415,9 @@ class IssuanceSingleRequestTest {
                     requestValidator = {
                         val textContent = it.body as TextContent
                         val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
-                        assertThat(
+                        assertNotNull(
+                            issuanceRequestTO.credentialResponseEncryption,
                             "Expected identifier based issuance request but credential_identifier is null",
-                            issuanceRequestTO.credentialResponseEncryption != null,
                         )
                     },
                 ),
@@ -452,9 +451,10 @@ class IssuanceSingleRequestTest {
                     requestValidator = {
                         val textContent = it.body as TextContent
                         val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
-                        assertThat(
+                        assertNotNull(
+                            issuanceRequestTO.credentialIdentifier,
                             "Expected identifier based issuance request but credential_identifier is null",
-                            issuanceRequestTO.credentialIdentifier != null,
+
                         )
                     },
                 ),
@@ -489,9 +489,9 @@ class IssuanceSingleRequestTest {
                 requestValidator = {
                     val textContent = it.body as TextContent
                     val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
-                    assertThat(
+                    assertNotNull(
+                        issuanceRequestTO.credentialIdentifier,
                         "Expected identifier based issuance request but credential_identifier is null",
-                        issuanceRequestTO.credentialIdentifier != null,
                     )
                 },
             ),
