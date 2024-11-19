@@ -72,7 +72,6 @@ sealed interface AuthorizedRequest : java.io.Serializable {
     val grant: Grant
 
     fun isAccessTokenExpired(at: Instant): Boolean = accessToken.isExpired(timestamp, at)
-    fun isRefreshTokenExpiredOrMissing(at: Instant): Boolean = refreshToken?.isExpired(timestamp, at) ?: true
 
     /**
      * In case an 'invalid_proof' error response was received from issuer with
