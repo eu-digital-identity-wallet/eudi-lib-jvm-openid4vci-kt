@@ -318,7 +318,6 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
         ),
     ),
     BatchCredentialIssuance.Supported(batchSize = 2),
-    true,
     mapOf(
         CredentialConfigurationIdentifier("UniversityDegree_JWT") to universityDegreeJwt(),
         CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc") to mobileDrivingLicense(),

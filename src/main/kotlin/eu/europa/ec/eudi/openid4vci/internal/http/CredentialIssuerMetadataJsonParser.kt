@@ -379,7 +379,6 @@ private data class CredentialIssuerMetadataTO(
     @SerialName("notification_endpoint") val notificationEndpoint: String? = null,
     @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionTO? = null,
     @SerialName("batch_credential_issuance") val batchCredentialIssuance: BatchCredentialIssuanceTO? = null,
-    @SerialName("credential_identifiers_supported") val credentialIdentifiersSupported: Boolean = false,
     @SerialName("signed_metadata") val signedMetadata: String? = null,
     @SerialName("credential_configurations_supported") val credentialConfigurationsSupported: Map<String, CredentialSupportedTO> =
         emptyMap(),
@@ -435,7 +434,6 @@ private data class CredentialIssuerMetadataTO(
             notificationEndpoint,
             credentialResponseEncryption(),
             batchIssuance,
-            credentialIdentifiersSupported,
             credentialsSupported,
             display,
         )

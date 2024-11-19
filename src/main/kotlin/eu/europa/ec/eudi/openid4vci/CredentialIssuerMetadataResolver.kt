@@ -77,7 +77,6 @@ data class CredentialIssuerMetadata(
     val notificationEndpoint: CredentialIssuerEndpoint? = null,
     val credentialResponseEncryption: CredentialResponseEncryption = CredentialResponseEncryption.NotSupported,
     val batchCredentialIssuance: BatchCredentialIssuance = BatchCredentialIssuance.NotSupported,
-    val credentialIdentifiersSupported: Boolean = false,
     val credentialConfigurationsSupported: Map<CredentialConfigurationIdentifier, CredentialConfiguration>,
     val display: List<Display> = emptyList(),
 ) : Serializable {
