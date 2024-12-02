@@ -2,7 +2,7 @@
 coroutines = "1.9.0"
 dependency-check = "11.1.0"
 sonarqube = "5.1.0.4882"
-kotlin = "2.0.21"
+kotlin = "2.1.0"
 spotless = "6.25.0"
 nimbus-sdk = "11.20.1"
 ktor = "3.0.1"
