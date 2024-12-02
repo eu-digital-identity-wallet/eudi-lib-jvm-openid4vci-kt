@@ -111,7 +111,16 @@ private fun HttpsUrl.metadataUrl(metadata: String, lookup: Lookup): Url {
     return when (lookup) {
         Lookup.BySpecification ->
             URLBuilder(issuer).apply {
-                path("/${metadata.removePrefix("/").removeSuffix("/")}${issuer.pathSegments.joinToString("/")}")
+                val pathSegment =
+                    buildString {
+                        val joinedSegments = issuer.segments.joinToString(separator = "/")
+                        if (joinedSegments.isNotBlank()) {
+                            append("/")
+                        }
+                        append(joinedSegments)
+                    }
+
+                path("/${metadata.removePrefix("/").removeSuffix("/")}$pathSegment")
             }.build()
 
         Lookup.CommonDeviation ->
