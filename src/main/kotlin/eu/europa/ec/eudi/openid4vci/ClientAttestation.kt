@@ -85,12 +85,16 @@ value class ClientAttestationPoPJWT(val jwt: SignedJWT) {
 data class ClientAttestationPoPJWTSpec(
     val signingAlgorithm: JWSAlgorithm,
     val duration: Duration = 5.minutes,
-    val typ: String? = null,
+    val typ: String = TYPE,
     val jwsSigner: JWSSigner,
 ) {
     init {
         requireIsNotMAC(signingAlgorithm)
         require(duration.isPositive()) { "popJwtDuration must be positive" }
+    }
+
+    companion object {
+        const val TYPE: String = "oauth-client-attestation-pop+jwt"
     }
 }
 
