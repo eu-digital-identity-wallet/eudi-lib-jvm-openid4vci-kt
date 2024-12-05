@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
+import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSSigner
@@ -25,7 +26,6 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.requireIsNotMAC
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -35,6 +35,7 @@ import java.util.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
+@Suppress("UNUSED")
 internal fun selfSignedClient(
     clock: Clock = Clock.systemDefaultZone(),
     walletInstanceKey: ECKey,
@@ -63,8 +64,7 @@ internal fun selfSignedClient(
     val popJwtSpec = ClientAttestationPoPJWTSpec(
         JWSAlgorithm.ES256,
         duration,
-        null,
-        signer,
+        jwsSigner = signer,
     )
     return Client.Attested(clientAttestationJWT, popJwtSpec)
 }
@@ -76,6 +76,7 @@ internal fun selfSignedClient(
  * this might be a secure element (in case of a wallet residing on a smartphone)
  * or a Cloud-HSM (in case of a cloud Wallet)
  */
+@Suppress("UNUSED")
 @Serializable
 enum class KeyType {
     /**
@@ -126,6 +127,7 @@ enum class KeyType {
  *  to authorize access to the private key associated with the public key given in the cnf claim.
  *
  */
+@Suppress("UNUSED")
 @Serializable
 enum class UserAuthentication {
     /**
@@ -208,6 +210,7 @@ private class ClientAttestationJwtBuilder(
     private fun jwsHeader(): JWSHeader =
         JWSHeader.Builder(algorithm).apply {
             headerCustomization()
+            type(JOSEObjectType(TYPE))
         }.build()
 
     private fun claimSetForm(claims: ClientAttestationClaims): JWTClaimsSet =
@@ -222,6 +225,7 @@ private class ClientAttestationJwtBuilder(
         }.build()
 
     companion object {
+        const val TYPE: String = "oauth-client-attestation+jwt"
         fun ecKey256(
             clock: Clock,
             duration: Duration,
