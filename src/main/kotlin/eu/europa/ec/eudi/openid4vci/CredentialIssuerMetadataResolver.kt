@@ -19,6 +19,7 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import java.io.Serializable
+import java.net.URI
 import java.net.URL
 
 sealed interface CredentialResponseEncryption : Serializable {
@@ -95,7 +96,20 @@ data class CredentialIssuerMetadata(
     data class Display(
         val name: String? = null,
         val locale: String? = null,
-    ) : Serializable
+        val logo: Logo? = null,
+    ) : Serializable {
+        init {
+            require(name != null || logo != null) { "either name or logo must be provided" }
+        }
+
+        /**
+         * Logo information.
+         */
+        data class Logo(
+            val uri: URI? = null,
+            val alternativeText: String? = null,
+        ) : Serializable
+    }
 }
 
 fun CredentialIssuerMetadata.findMsoMdoc(docType: String): MsoMdocCredential? =

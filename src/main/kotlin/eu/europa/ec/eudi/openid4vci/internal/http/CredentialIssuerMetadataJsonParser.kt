@@ -527,12 +527,16 @@ private data class ClaimTO(
 private data class DisplayTO(
     @SerialName("name") val name: String? = null,
     @SerialName("locale") val locale: String? = null,
+    @SerialName("logo") val logo: LogoObject? = null,
 ) {
     /**
      * Converts a [DisplayTO] to a [CredentialIssuerMetadata.Display] instance.
      */
-    fun toDomain(): CredentialIssuerMetadata.Display =
-        CredentialIssuerMetadata.Display(name, locale)
+    fun toDomain(): CredentialIssuerMetadata.Display {
+        fun LogoObject.toLogo(): CredentialIssuerMetadata.Display.Logo =
+            CredentialIssuerMetadata.Display.Logo(uri?.let { URI.create(it) }, alternativeText)
+        return CredentialIssuerMetadata.Display(name, locale, logo?.toLogo())
+    }
 
     fun toClaimDisplay(): Claim.Display =
         Claim.Display(name, locale?.let { languageTag -> Locale.forLanguageTag(languageTag) })
