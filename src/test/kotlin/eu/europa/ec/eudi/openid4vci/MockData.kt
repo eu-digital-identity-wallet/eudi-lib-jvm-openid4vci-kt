@@ -324,7 +324,13 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
         CredentialConfigurationIdentifier("UniversityDegree_LDP_VC") to universityDegreeLdpVc(),
         CredentialConfigurationIdentifier("UniversityDegree_JWT_VC_JSON-LD") to universityDegreeJwtVcJsonLD(),
     ),
-    listOf(CredentialIssuerMetadata.Display("credential-issuer.example.com", "en-US")),
+    listOf(
+        CredentialIssuerMetadata.Display(
+            "credential-issuer.example.com",
+            "en-US",
+            CredentialIssuerMetadata.Display.Logo(URI.create("https://credential-issuer.example.com/logo.png"), "Credential Issuer Logo"),
+        ),
+    ),
 )
 
 /**
