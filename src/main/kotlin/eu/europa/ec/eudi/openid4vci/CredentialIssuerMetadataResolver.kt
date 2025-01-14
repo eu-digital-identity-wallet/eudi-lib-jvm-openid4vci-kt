@@ -98,10 +98,6 @@ data class CredentialIssuerMetadata(
         val locale: String? = null,
         val logo: Logo? = null,
     ) : Serializable {
-        init {
-            require(name != null || logo != null) { "either name or logo must be provided" }
-        }
-
         /**
          * Logo information.
          */
