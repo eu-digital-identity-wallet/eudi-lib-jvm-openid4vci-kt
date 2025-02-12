@@ -103,6 +103,15 @@ internal class DefaultCredentialOfferRequestResolver(
         val grants = credentialOffer.grants?.toGrants(credentialIssuerMetadata)
         val authorizationServer = grants?.authServer() ?: credentialIssuerMetadata.authorizationServers[0]
         val authorizationServerMetadata = fetchAuthServerMetaData(authorizationServer)
+        if (null == grants || grants is Grants.AuthorizationCode) {
+            ensureNotNull(authorizationServerMetadata.authorizationEndpointURI) {
+                val error =
+                    IllegalArgumentException(
+                        "Credential Offer requires Authorization Code Grant, but the Authorization Server does not support it",
+                    )
+                CredentialOfferRequestValidationError.InvalidGrants(error).toException()
+            }
+        }
 
         CredentialOffer(
             credentialIssuerId,

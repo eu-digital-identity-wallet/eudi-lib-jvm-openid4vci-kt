@@ -120,13 +120,17 @@ interface Issuer :
             }
 
             val authorizationEndpointClient =
-                AuthorizationEndpointClient(
-                    credentialOffer.credentialIssuerIdentifier,
-                    credentialOffer.authorizationServerMetadata,
-                    config,
-                    dPoPJwtFactory,
-                    ktorHttpClientFactory,
-                )
+                credentialOffer.authorizationServerMetadata
+                    .authorizationEndpointURI
+                    ?.let {
+                        AuthorizationEndpointClient(
+                            credentialOffer.credentialIssuerIdentifier,
+                            credentialOffer.authorizationServerMetadata,
+                            config,
+                            dPoPJwtFactory,
+                            ktorHttpClientFactory,
+                        )
+                    }
 
             val tokenEndpointClient =
                 TokenEndpointClient(
