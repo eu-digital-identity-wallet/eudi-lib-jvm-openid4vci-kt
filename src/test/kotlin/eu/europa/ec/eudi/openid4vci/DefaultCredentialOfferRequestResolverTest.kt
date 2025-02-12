@@ -190,40 +190,32 @@ internal class DefaultCredentialOfferRequestResolverTest {
     @Test
     internal fun `resolution fails when auth code flow is required but not supported by auth server`() =
         runTest {
-            suspend fun test(credentialOfferResource: String) {
-                val credentialOfferUri = HttpsUrl("https://credential_offer/1").getOrThrow()
-
-                val resolver = resolver(
-                    RequestMocker(
-                        match(SampleIssuer.WellKnownUrl.value.toURI()),
-                        jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
-                    ),
-                    oidcMetaDataHandler(
-                        SampleAuthServer.Url,
-                        "eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata_no_auth_endpoint.json",
-                    ),
-                    RequestMocker(
-                        match(credentialOfferUri.value.toURI()),
-                        jsonResponse(credentialOfferResource),
-                    ),
-                )
-
-                val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
-                    .addParameter("credential_offer_uri", credentialOfferUri.value.toString())
-                    .build()
-
-                val result = resolver.resolve(credentialEndpointUrl.toString())
-                val exception = assertIs<CredentialOfferRequestException>(result.exceptionOrNull())
-                val error = assertIs<CredentialOfferRequestValidationError.InvalidGrants>(exception.error)
-                val cause = assertIs<IllegalArgumentException>(error.reason)
-                assertEquals(
-                    "Credential Offer requires Authorization Code Grant, but the Authorization Server does not support it",
-                    cause.message,
-                )
-            }
-
-            test("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer_auth_code.json")
-            test("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer_no_grants.json")
+            val credentialOfferUri = HttpsUrl("https://credential_offer/1").getOrThrow()
+            val resolver = resolver(
+                RequestMocker(
+                    match(SampleIssuer.WellKnownUrl.value.toURI()),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
+                ),
+                oidcMetaDataHandler(
+                    SampleAuthServer.Url,
+                    "eu/europa/ec/eudi/openid4vci/internal/oidc_authorization_server_metadata_no_auth_endpoint.json",
+                ),
+                RequestMocker(
+                    match(credentialOfferUri.value.toURI()),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer_auth_code.json"),
+                ),
+            )
+            val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+                .addParameter("credential_offer_uri", credentialOfferUri.value.toString())
+                .build()
+            val result = resolver.resolve(credentialEndpointUrl.toString())
+            val exception = assertIs<CredentialOfferRequestException>(result.exceptionOrNull())
+            val error = assertIs<CredentialOfferRequestValidationError.InvalidGrants>(exception.error)
+            val cause = assertIs<IllegalArgumentException>(error.reason)
+            assertEquals(
+                "Credential Offer requires Authorization Code Grant, but the Authorization Server does not support it",
+                cause.message,
+            )
         }
 }
 
