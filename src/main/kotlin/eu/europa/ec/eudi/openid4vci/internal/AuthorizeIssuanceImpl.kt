@@ -37,12 +37,15 @@ internal data class TokenResponse(
 internal class AuthorizeIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     private val config: OpenId4VCIConfig,
-    private val authorizationEndpointClient: AuthorizationEndpointClient,
+    private val authorizationEndpointClient: AuthorizationEndpointClient?,
     private val tokenEndpointClient: TokenEndpointClient,
 ) : AuthorizeIssuance {
 
     override suspend fun prepareAuthorizationRequest(walletState: String?): Result<AuthorizationRequestPrepared> =
         runCatching {
+            requireNotNull(authorizationEndpointClient) {
+                "Authorization server does not support Authorization Code Flow"
+            }
             val (scopes, configurationIds) = scopesAndCredentialConfigurationIds()
             require(scopes.isNotEmpty() || configurationIds.isNotEmpty()) {
                 "Either scopes or credential configuration ids must be provided"

@@ -32,6 +32,11 @@ data class CredentialOffer(
 ) : Serializable {
     init {
         require(credentialConfigurationIdentifiers.isNotEmpty()) { "credentials must not be empty" }
+        if (grants is Grants.AuthorizationCode) {
+            requireNotNull(authorizationServerMetadata.authorizationEndpointURI) {
+                "Credential Offer requires Authorization Code Grant, but the Authorization Server does not support it"
+            }
+        }
     }
 }
 
