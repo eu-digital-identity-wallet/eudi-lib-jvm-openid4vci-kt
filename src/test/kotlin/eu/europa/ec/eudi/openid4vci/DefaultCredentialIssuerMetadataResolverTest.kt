@@ -26,6 +26,7 @@ import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 internal class DefaultCredentialIssuerMetadataResolverTest {
 
@@ -86,7 +87,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
     }
 
     @Test
-    internal fun `fails with when response encryption algorithms are not asymmetric`() = runTest {
+    internal fun `fails when response encryption algorithms are not asymmetric`() = runTest {
         val credentialIssuerId = CredentialIssuerId("https://issuer.com").getOrThrow()
         val resolver = resolver(
             credentialIssuerMetaDataHandler(
@@ -112,9 +113,48 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         )
         val metaData = assertDoesNotThrow { resolver.resolve(credentialIssuerId).getOrThrow() }
         assertEquals(credentialIssuerMetadata(), metaData)
-        println("End")
+    }
+
+    @Test
+    internal fun `valid key attestation requirements`() = runTest {
+        val credentialIssuerId = SampleIssuer.Id
+
+        val resolver = resolver(
+            credentialIssuerMetaDataHandler(
+                credentialIssuerId,
+                "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json",
+            ),
+        )
+        val credentialConfigs = assertDoesNotThrow {
+            resolver.resolve(credentialIssuerId).getOrThrow()
+        }.credentialConfigurationsSupported
+
+        assertTrue("Expected ") {
+            val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_JWT")
+            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.NoRequirement }
+        }
+
+        assertTrue("Expected ") {
+            val proofs = credentialConfigs.jwtProofTypeSupported("MobileDrivingLicense_msoMdoc")
+            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.RequiredNoConstraints }
+        }
+
+        assertTrue("Expected ") {
+            val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_LDP_VC")
+            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.Required }
+        }
+
+        assertTrue("Expected ") {
+            val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_JWT_VC_JSON-LD")
+            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.Required }
+        }
     }
 }
+
+private fun Map<CredentialConfigurationIdentifier, CredentialConfiguration>.jwtProofTypeSupported(
+    credentialConfigId: String,
+): List<ProofTypeMeta.Jwt>? =
+    this[CredentialConfigurationIdentifier(credentialConfigId)]?.proofTypesSupported?.values?.filterIsInstance<ProofTypeMeta.Jwt>()
 
 private fun resolver(request: RequestMocker, expectSuccessOnly: Boolean = false) =
     CredentialIssuerMetadataResolver(
