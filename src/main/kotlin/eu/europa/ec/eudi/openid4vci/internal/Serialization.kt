@@ -90,28 +90,6 @@ internal object ProofSerializer : KSerializer<Proof> {
     }
 }
 
-internal object ClaimSetSerializer : KSerializer<MsoMdocClaimSet> {
-
-    val internal = serializer<Map<Namespace, Map<ClaimName, JsonObject>>>()
-    override val descriptor: SerialDescriptor = internal.descriptor
-
-    override fun deserialize(decoder: Decoder): MsoMdocClaimSet = internal.deserialize(decoder).asMsoMdocClaimSet()
-
-    override fun serialize(encoder: Encoder, value: MsoMdocClaimSet) {
-        internal.serialize(encoder, value.toJson())
-    }
-
-    private fun Map<Namespace, Map<ClaimName, JsonObject>>.asMsoMdocClaimSet() =
-        flatMap { (nameSpace, cs) -> cs.map { (claimName, _) -> nameSpace to claimName } }
-            .let(::MsoMdocClaimSet)
-
-    private fun MsoMdocClaimSet.toJson(): Map<Namespace, Map<ClaimName, JsonObject>> =
-        groupBy { (nameSpace, _) -> nameSpace }
-            .mapValues { (_, vs) -> vs.associate { (_, claimName) -> claimName to emptyJsonObject } }
-
-    private val emptyJsonObject = JsonObject(emptyMap())
-}
-
 @OptIn(ExperimentalSerializationApi::class)
 internal object GrantedAuthorizationDetailsSerializer :
     KSerializer<Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>> {

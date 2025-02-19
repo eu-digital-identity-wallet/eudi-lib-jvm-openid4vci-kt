@@ -49,7 +49,6 @@ class IssuanceDeferredRequestTest {
 
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
-                null,
             )
             val popSigner = CryptoGenerator.rsaProofSigner()
             val (newAuthorizedRequest, outcome) =
@@ -92,7 +91,6 @@ class IssuanceDeferredRequestTest {
             assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
-                null,
             )
             val popSigner = CryptoGenerator.rsaProofSigner()
             val (newAuthorizedRequest, outcome) =
@@ -154,7 +152,6 @@ class IssuanceDeferredRequestTest {
             assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
-                null,
             )
             val popSigner = CryptoGenerator.rsaProofSigner()
             val (newAuthorized, outcome) =

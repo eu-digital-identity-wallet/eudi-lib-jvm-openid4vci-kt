@@ -138,9 +138,8 @@ internal class RequestIssuanceImpl(
 
         return when (requestPayload) {
             is IssuanceRequestPayload.ConfigurationBased -> {
-                CredentialIssuanceRequest.formatBased(
-                    credentialCfg,
-                    requestPayload.claimSet,
+                CredentialIssuanceRequest.byCredentialConfigurationId(
+                    requestPayload.credentialConfigurationIdentifier,
                     proofs,
                     responseEncryptionSpec,
                 )
@@ -148,7 +147,11 @@ internal class RequestIssuanceImpl(
 
             is IssuanceRequestPayload.IdentifierBased -> {
                 requestPayload.ensureAuthorized(authorizationDetails)
-                CredentialIssuanceRequest.byId(requestPayload.credentialIdentifier, proofs, responseEncryptionSpec)
+                CredentialIssuanceRequest.byCredentialId(
+                    requestPayload.credentialIdentifier,
+                    proofs,
+                    responseEncryptionSpec,
+                )
             }
         }
     }

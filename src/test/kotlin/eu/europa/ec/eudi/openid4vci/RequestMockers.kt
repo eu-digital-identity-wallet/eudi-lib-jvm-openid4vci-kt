@@ -191,7 +191,7 @@ private fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(request: H
         respond(
             content = """
                     {                                  
-                      "credential": "$credential",
+                      "credentials": [ {"credential": "$credential"} ],
                       "notification_id": "valbQc6p55LS",
                       "c_nonce": "wlbQc6pCJp",
                       "c_nonce_expires_in": 86400
@@ -259,7 +259,7 @@ fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(
         respond(
             content = """
                     {                     
-                      "credential": "credential_content",
+                      "credentials": [ { "credential": "credential_content"} ],
                       "c_nonce": "ERE%@^TGWYEYWEY",
                       "c_nonce_expires_in": 34
                     }

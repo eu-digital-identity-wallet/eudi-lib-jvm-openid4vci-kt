@@ -21,9 +21,7 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.fail
@@ -44,11 +42,17 @@ class IssuanceBatchRequestTest {
                         encryptedResponseDataBuilder(it) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
-                                    credentials = buildJsonArray {
-                                        add("issued_credential_content_mso_mdoc0")
-                                        add("issued_credential_content_mso_mdoc1")
-                                        add("issued_credential_content_mso_mdoc2")
-                                    },
+                                    credentials = listOf(
+                                        buildJsonObject {
+                                            put("credential", JsonPrimitive("issued_credential_content_mso_mdoc0"))
+                                        },
+                                        buildJsonObject {
+                                            put("credential", JsonPrimitive("issued_credential_content_mso_mdoc1"))
+                                        },
+                                        buildJsonObject {
+                                            put("credential", JsonPrimitive("issued_credential_content_mso_mdoc2"))
+                                        },
+                                    ),
                                     cNonce = "wlbQc6pCJp",
                                     cNonceExpiresInSeconds = 86400,
                                 ),
@@ -99,12 +103,4 @@ class IssuanceBatchRequestTest {
 fun reqs() =
     IssuanceRequestPayload.ConfigurationBased(
         CredentialConfigurationIdentifier(PID_MsoMdoc),
-        MsoMdocClaimSet(
-            claims = listOf(
-                "org.iso.18013.5.1" to "given_name",
-                "org.iso.18013.5.1" to "family_name",
-                "org.iso.18013.5.1" to "given_name",
-                "org.iso.18013.5.1" to "birth_date",
-            ),
-        ),
     ) to (0..2).map { CryptoGenerator.rsaProofSigner() }
