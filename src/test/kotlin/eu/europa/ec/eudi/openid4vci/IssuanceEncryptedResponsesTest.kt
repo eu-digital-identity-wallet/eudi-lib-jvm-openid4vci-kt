@@ -29,10 +29,7 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.*
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.util.*
 import kotlin.test.Test
@@ -179,7 +176,7 @@ class IssuanceEncryptedResponsesTest {
             with(issuer) {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
                 noProofRequired.request(requestPayload).getOrThrow()
             }
         }
@@ -216,7 +213,7 @@ class IssuanceEncryptedResponsesTest {
             with(issuer) {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
                 noProofRequired.request(requestPayload).getOrThrow()
             }
         }
@@ -248,7 +245,7 @@ class IssuanceEncryptedResponsesTest {
             with(issuer) {
                 val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
                 noProofRequired.request(requestPayload).getOrThrow()
             }
         }
@@ -266,7 +263,11 @@ class IssuanceEncryptedResponsesTest {
                         encryptedResponseDataBuilder(it) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
-                                    credential = JsonPrimitive("issued_credential"),
+                                    credentials = listOf(
+                                        buildJsonObject {
+                                            put("credential", "issued_credential")
+                                        },
+                                    ),
                                     notificationId = "fgh126lbHjtspVbn",
                                     cNonce = "wlbQc6pCJp",
                                     cNonceExpiresInSeconds = 86400,
@@ -301,13 +302,6 @@ class IssuanceEncryptedResponsesTest {
                     },
                 ),
             )
-            val claimSet = MsoMdocClaimSet(
-                claims = listOf(
-                    "org.iso.18013.5.1" to "given_name",
-                    "org.iso.18013.5.1" to "family_name",
-                    "org.iso.18013.5.1" to "birth_date",
-                ),
-            )
 
             val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
@@ -324,7 +318,7 @@ class IssuanceEncryptedResponsesTest {
             with(issuer) {
                 assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
                 val (_, outcome) = authorizedRequest.request(requestPayload).getOrThrow()
                 assertIs<SubmissionOutcome.Success>(outcome)
             }
@@ -343,9 +337,11 @@ class IssuanceEncryptedResponsesTest {
                         encryptedResponseDataBuilder(it) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
-                                    credentials = buildJsonArray {
-                                        add("${PID_MsoMdoc}_issued_credential")
-                                    },
+                                    credentials = listOf(
+                                        buildJsonObject {
+                                            put("credential", "${PID_MsoMdoc}_issued_credential")
+                                        },
+                                    ),
                                     cNonce = "wlbQc6pCJp",
                                     cNonceExpiresInSeconds = 86400,
                                 ),
@@ -401,7 +397,11 @@ class IssuanceEncryptedResponsesTest {
                         encryptedResponseDataBuilder(it) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
-                                    credentials = buildJsonArray { add("${PID_MsoMdoc}_issued_credential") },
+                                    credentials = listOf(
+                                        buildJsonObject {
+                                            put("credential", "${PID_MsoMdoc}_issued_credential")
+                                        },
+                                    ),
                                     cNonce = "wlbQc6pCJp",
                                     cNonceExpiresInSeconds = 86400,
                                 ),
@@ -505,7 +505,7 @@ class IssuanceEncryptedResponsesTest {
                 responseBuilder = {
                     val responseJson = """
                             {                     
-                              "credential": "credential_content",
+                              "credentials": [{ "credential": "credential_content" }],
                               "c_nonce": "ERE%@^TGWYEYWEY",
                               "c_nonce_expires_in": 34
                             }
@@ -536,7 +536,6 @@ class IssuanceEncryptedResponsesTest {
             assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
-                null,
             )
             val (newAuthorizedRequest, outcome) =
                 authorizedRequest.request(requestPayload).getOrThrow()
