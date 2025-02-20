@@ -53,25 +53,9 @@ data class DeferredIssuerConfig(
  * @param transactionId the id returned by deferred endpoint
  */
 data class AuthorizedTransaction(
-    val authorizedRequest: AuthorizedRequest.NoProofRequired,
+    val authorizedRequest: AuthorizedRequest,
     val transactionId: TransactionId,
-) {
-    constructor(authorizedRequest: AuthorizedRequest, transactionId: TransactionId) : this(
-        authorizedRequest = when (authorizedRequest) {
-            is AuthorizedRequest.NoProofRequired -> authorizedRequest
-            is AuthorizedRequest.ProofRequired -> AuthorizedRequest.NoProofRequired(
-                accessToken = authorizedRequest.accessToken,
-                refreshToken = authorizedRequest.refreshToken,
-                credentialIdentifiers = authorizedRequest.credentialIdentifiers,
-                timestamp = authorizedRequest.timestamp,
-                authorizationServerDpopNonce = authorizedRequest.authorizationServerDpopNonce,
-                resourceServerDpopNonce = authorizedRequest.resourceServerDpopNonce,
-                grant = authorizedRequest.grant,
-            )
-        },
-        transactionId = transactionId,
-    )
-}
+)
 
 /**
  * Represents what a wallet needs to keep to be
@@ -128,7 +112,6 @@ interface DeferredIssuer : QueryForDeferredCredential {
             val newCtx = when (outcome) {
                 is DeferredCredentialQueryOutcome.IssuancePending, is DeferredCredentialQueryOutcome.Errored -> {
                     if (newAuthorized != ctx.authorizedTransaction.authorizedRequest) {
-                        check(newAuthorized is AuthorizedRequest.NoProofRequired)
                         val newAuthorizedTransaction = ctx.authorizedTransaction.copy(authorizedRequest = newAuthorized)
                         ctx.copy(authorizedTransaction = newAuthorizedTransaction)
                     } else {

@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseUnparsable
+import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import io.ktor.client.engine.mock.*
@@ -28,27 +29,25 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.assertDoesNotThrow
-import org.junit.jupiter.api.assertInstanceOf
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.*
 
 class IssuanceSingleRequestTest {
 
     @Test
-    fun `when issuance requested with no proof then InvalidProof error is raised with c_nonce passed`() = runTest {
+    fun `when issuer responds with invalid_proof it is reflected in the submission outcomes`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
+            oiciWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
+            nonceEndpointMocker(),
             singleIssuanceRequestMocker(
                 responseBuilder = {
                     respond(
                         content = """
                             {
-                                "error": "invalid_proof",
-                                "c_nonce": "ERE%@^TGWYEYWEY",
-                                "c_nonce_expires_in": 34
+                                "error": "invalid_proof"
                             } 
                         """.trimIndent(),
                         status = HttpStatusCode.BadRequest,
@@ -83,88 +82,33 @@ class IssuanceSingleRequestTest {
         )
 
         with(issuer) {
-            when (authorizedRequest) {
-                is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-                    val (updatedAuthorizedRequest, outcome) = assertDoesNotThrow {
-                        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                        authorizedRequest.request(requestPayload, emptyList()).getOrThrow()
-                    }
-                    assertIs<AuthorizedRequest.ProofRequired>(updatedAuthorizedRequest)
-                    assertIs<SubmissionOutcome.Failed>(outcome)
-                    assertIs<CredentialIssuanceError.InvalidProof>(outcome.error)
-                }
-
-                is AuthorizedRequest.ProofRequired -> fail(
-                    "State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint",
-                )
+            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+            val (_, outcome) = assertDoesNotThrow {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
+                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
             }
+            assertIs<SubmissionOutcome.Failed>(outcome)
+            assertIs<CredentialIssuanceError.InvalidProof>(outcome.error)
         }
     }
 
     @Test
-    fun `when issuer responds with 'invalid_proof' and no c_nonce then ResponseUnparsable error is returned `() = runTest {
+    fun `when the requested credential is not included in the offer an IllegalArgumentException is thrown`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
+            oiciWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
-            singleIssuanceRequestMocker(
-                responseBuilder = {
-                    respond(
-                        content = """
-                            {
-                                "error": "invalid_proof"                               
-                            } 
-                        """.trimIndent(),
-                        status = HttpStatusCode.BadRequest,
-                        headers = headersOf(
-                            HttpHeaders.ContentType to listOf("application/json"),
-                        ),
-                    )
-                },
-            ),
-        )
-        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
-        )
-
-        with(issuer) {
-            when (authorizedRequest) {
-                is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-                    val (_, outcome) = assertDoesNotThrow {
-                        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                        authorizedRequest.request(requestPayload).getOrThrow()
-                    }
-                    assertIs<SubmissionOutcome.Failed>(outcome)
-                    assertIs<ResponseUnparsable>(outcome.error)
-                }
-
-                is AuthorizedRequest.ProofRequired -> fail(
-                    "State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint",
-                )
-            }
-        }
-    }
-
-    @Test
-    fun `when issuer used to request credential not included in offer an IllegalArgumentException is thrown`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker(),
-            tokenPostMocker(),
+            nonceEndpointMocker(),
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
             ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
-        assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
         val credentialConfigurationId = CredentialConfigurationIdentifier("UniversityDegree")
-        assertFailsWith<IllegalStateException> {
+        assertFailsWith<IllegalArgumentException> {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
             with(issuer) {
                 authorizedRequest.request(requestPayload, emptyList()).getOrThrow()
@@ -173,24 +117,138 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
-    fun `successful issuance of credential requested by credential configuration id`() = runTest {
-        val credential = "issued_credential_content_mso_mdoc"
+    fun `when the passed PoPSigners are more than the expected batch limit IssuerBatchSizeLimitExceeded is thrown`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
+            oiciWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
+            nonceEndpointMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        assertFailsWith<CredentialIssuanceError.IssuerBatchSizeLimitExceeded> {
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val popSigners = listOf(
+                    CryptoGenerator.rsaProofSigner(),
+                    CryptoGenerator.rsaProofSigner(),
+                    CryptoGenerator.rsaProofSigner(),
+                    CryptoGenerator.rsaProofSigner(),
+                )
+                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+            }
+        }
+    }
+
+    @Test
+    fun `when credential configuration config does not demand proofs, no proof is included in the request`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oiciWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(
+                requestValidator = {
+                    val textContent = it.body as TextContent
+                    val issuanceRequest = Json.decodeFromString<CredentialRequestTO>(textContent.text)
+                    assertNull(
+                        issuanceRequest.proof,
+                        "No proof expected to be sent with request but was sent.",
+                    )
+                },
+            ),
+        )
+
+        // In issuer metadata the 'MobileDrivingLicense_msoMdoc' credential is configured to demand no proofs
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferWithMDLMdoc_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            authorizedRequest.request(requestPayload, emptyList()).getOrThrow()
+        }
+    }
+
+    @Test
+    fun `when credential configuration config demands proofs and issuer has no nonce endpoint, expect proofs without nonce`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oiciWellKnownMocker(NO_NONCE_ENDPOINT),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            singleIssuanceRequestMocker(
+                requestValidator = {
+                    val textContent = it.body as TextContent
+                    val issuanceRequest = Json.decodeFromString<CredentialRequestTO>(textContent.text)
+                    assertNotNull(
+                        issuanceRequest.proof,
+                        "Proof expected to be sent but was not sent.",
+                    )
+                    assertIs<Proof.Jwt>(issuanceRequest.proof)
+                    val cNonce = issuanceRequest.proof.jwt.jwtClaimsSet.getStringClaim("nonce")
+                    assertNull(
+                        cNonce,
+                        "No c_nonce expected in proof but found one",
+                    )
+                },
+            ),
+        )
+
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            val popSigners = listOf(CryptoGenerator.rsaProofSigner())
+            authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+        }
+    }
+
+    @Test
+    fun `successful issuance of credential requested by credential configuration id`() = runTest {
+        val credential = "issued_credential_content_mso_mdoc"
+        val nonceValue = "c_nonce_from_endpoint"
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oiciWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(nonceValue),
             singleIssuanceRequestMocker(
                 credential = credential,
                 requestValidator = {
                     val textContent = it.body as TextContent
                     val issuanceRequest = Json.decodeFromString<CredentialRequestTO>(textContent.text)
-                    issuanceRequest.proof?.let {
-                        assertIs<Proof.Jwt>(issuanceRequest.proof)
-                    }
                     assertTrue(
                         issuanceRequest.credentialConfigurationId != null,
                         "Expected request by configuration id but was not.",
+                    )
+                    assertNotNull(
+                        issuanceRequest.proof,
+                        "Proof expected to be sent but was not sent.",
+                    )
+                    assertIs<Proof.Jwt>(issuanceRequest.proof)
+                    val cNonce = issuanceRequest.proof.jwt.jwtClaimsSet.getStringClaim("nonce")
+                    assertNotNull(
+                        cNonce,
+                        "c_nonce expected to be found in proof but was not",
+                    )
+                    assertEquals(
+                        cNonce,
+                        nonceValue,
+                        "Expected c_nonce $nonceValue but found $cNonce",
                     )
                 },
             ),
@@ -201,7 +259,6 @@ class IssuanceSingleRequestTest {
             ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
-        assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
         val popSigner = CryptoGenerator.rsaProofSigner()
@@ -214,9 +271,10 @@ class IssuanceSingleRequestTest {
     @Test
     fun `when token endpoint returns credential identifiers, issuance request must be IdentifierBasedIssuanceRequestTO`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
+            oiciWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
+            nonceEndpointMocker(),
             tokenPostMockerWithAuthDetails(
                 listOf(CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
             ),
@@ -237,6 +295,7 @@ class IssuanceSingleRequestTest {
             ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
+        val popSigners = listOf(CryptoGenerator.rsaProofSigner())
         val requestPayload = authorizedRequest.credentialIdentifiers?.let {
             IssuanceRequestPayload.IdentifierBased(
                 it.entries.first().key,
@@ -244,16 +303,17 @@ class IssuanceSingleRequestTest {
             )
         } ?: error("No credential identifier")
         with(issuer) {
-            authorizedRequest.request(requestPayload).getOrThrow()
+            authorizedRequest.request(requestPayload, popSigners).getOrThrow()
         }
     }
 
     @Test
     fun `when request is by credential id, this id must be in the list of identifiers returned from token endpoint`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
+            oiciWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
+            nonceEndpointMocker(),
             tokenPostMockerWithAuthDetails(
                 listOf(CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
             ),
@@ -288,10 +348,11 @@ class IssuanceSingleRequestTest {
     @Test
     fun `issuance request by credential id, is allowed only when token endpoint has returned credential identifiers`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
+            oiciWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
+            nonceEndpointMocker(),
             singleIssuanceRequestMocker(
                 credential = "credential",
                 requestValidator = {
@@ -324,9 +385,10 @@ class IssuanceSingleRequestTest {
     @Test
     fun `when token endpoint returns authorization_details they are parsed properly`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
+            oiciWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
+            nonceEndpointMocker(),
             tokenPostMockerWithAuthDetails(
                 listOf(CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
             ),
@@ -355,10 +417,11 @@ class IssuanceSingleRequestTest {
     @Test
     fun `when successful issuance response contains additional info, it is reflected in SubmissionOutcome_Success`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
+            oiciWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
+            nonceEndpointMocker(),
             singleIssuanceRequestMocker(
                 responseBuilder = {
                     respond(
@@ -373,9 +436,7 @@ class IssuanceSingleRequestTest {
                                        "infoStr": "valueStr",
                                        "infoArr": ["valueArr1", "valueArr2", "valueArr3"]                                       
                                    }],
-                                  "notification_id": "valbQc6p55LS",
-                                  "c_nonce": "wlbQc6pCJp",
-                                  "c_nonce_expires_in": 86400
+                                  "notification_id": "valbQc6p55LS"
                                 }
                         """.trimIndent(),
                         status = HttpStatusCode.OK,
@@ -391,13 +452,12 @@ class IssuanceSingleRequestTest {
             ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
-        assertInstanceOf<AuthorizedRequest.NoProofRequired>(authorizedRequest)
-
         with(issuer) {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val (_, outcome) = assertDoesNotThrow {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload).getOrThrow()
+                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
+                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
             }
             assertIs<SubmissionOutcome.Success>(outcome)
             assertTrue { outcome.credentials.size == 1 }
@@ -415,10 +475,11 @@ class IssuanceSingleRequestTest {
     @Test
     fun `when successful issuance response does not contain 'credential' attribute fails with ResponseUnparsable exception`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
+            oiciWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
+            nonceEndpointMocker(),
             singleIssuanceRequestMocker(
                 responseBuilder = {
                     respond(
@@ -427,9 +488,7 @@ class IssuanceSingleRequestTest {
                                   "credentials": [{
                                        "crdntial": "credential_content"                                                                          
                                    }],
-                                  "notification_id": "valbQc6p55LS",
-                                  "c_nonce": "wlbQc6pCJp",
-                                  "c_nonce_expires_in": 86400
+                                  "notification_id": "valbQc6p55LS"
                                 }
                         """.trimIndent(),
                         status = HttpStatusCode.OK,
@@ -445,14 +504,12 @@ class IssuanceSingleRequestTest {
             ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
-        assertInstanceOf<AuthorizedRequest.NoProofRequired>(authorizedRequest)
-
         with(issuer) {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-
             val ex = assertFailsWith<JsonConvertException> {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload).getOrThrow()
+                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
+                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
             }
             assertIs<ResponseUnparsable>(ex.cause)
         }

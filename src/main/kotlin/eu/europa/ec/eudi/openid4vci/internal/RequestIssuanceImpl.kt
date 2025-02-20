@@ -17,65 +17,67 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
+import eu.europa.ec.eudi.openid4vci.internal.http.NonceEndpointClient
+
+internal sealed interface CredentialProofsRequirement {
+
+    data object ProofNotRequired : CredentialProofsRequirement
+
+    sealed interface ProofRequired : CredentialProofsRequirement {
+
+        data object WithoutCNonce : ProofRequired
+
+        data object WithCNonce : ProofRequired
+    }
+}
 
 internal class RequestIssuanceImpl(
     private val credentialOffer: CredentialOffer,
     private val config: OpenId4VCIConfig,
     private val credentialEndpointClient: CredentialEndpointClient,
+    private val nonceEndpointClient: NonceEndpointClient?,
     private val batchCredentialIssuance: BatchCredentialIssuance,
     private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
 ) : RequestIssuance {
+
+    init {
+        val nonceEndpoint = credentialOffer.credentialIssuerMetadata.nonceEndpoint
+        if (nonceEndpoint != null && nonceEndpointClient == null) {
+            throw IllegalStateException("A nonce endpoint client needs to be configured if issuer advertises a nonce endpoint")
+        }
+        if (nonceEndpoint == null && nonceEndpointClient != null) {
+            throw IllegalStateException("A nonce endpoint client is configured although issuer does not advertises a nonce endpoint")
+        }
+    }
 
     override suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
         popSigners: List<PopSigner>,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
-        //
+        val credentialConfigId = requestPayload.credentialConfigurationIdentifier
+
+        // Deduct from credential configuration and issuer metadata if issuer requires proofs to be sent for the specific credential
+        val proofsRequirement = credentialConfigId.proofsRequirement()
+
         // Place the request
-        //
         val (outcome, newResourceServerDpopNonce) = placeIssuanceRequest(accessToken, resourceServerDpopNonce) {
-            val proofFactories = proofFactoriesForm(popSigners)
+            val proofFactories = proofFactoriesFrom(popSigners, proofsRequirement)
             buildRequest(requestPayload, proofFactories, credentialIdentifiers.orEmpty())
         }
 
-        //
-        // Update state
-        //
-        val updatedAuthorizedRequest =
-            this.withCNonceFrom(outcome).withResourceServerDpopNonce(newResourceServerDpopNonce)
-
-        //
-        // Retry on invalid proof if we begin from NoProofRequired and issuer
-        // replied with InvalidProof
-        //
-        val retryOnInvalidProof =
-            this is AuthorizedRequest.NoProofRequired &&
-                popSigners.isNotEmpty() &&
-                updatedAuthorizedRequest is AuthorizedRequest.ProofRequired &&
-                outcome.isInvalidProof()
-
-        suspend fun retry() =
-            updatedAuthorizedRequest.request(requestPayload, popSigners)
-                .getOrThrow()
-                .markInvalidProofIrrecoverable()
-
-        if (retryOnInvalidProof) retry()
-        else updatedAuthorizedRequest to outcome.toPub()
+        // Update state (maybe) with new Dpop Nonce from resource server
+        val updatedAuthorizedRequest = this.withResourceServerDpopNonce(newResourceServerDpopNonce)
+        updatedAuthorizedRequest to outcome.toPub()
     }
 
-    private fun AuthorizedRequest.withCNonceFrom(outcome: SubmissionOutcomeInternal): AuthorizedRequest {
-        val updated =
-            when (outcome) {
-                is SubmissionOutcomeInternal.Failed ->
-                    outcome.cNonceFromInvalidProof()?.let { newCNonce -> withCNonce(newCNonce) }
-
-                is SubmissionOutcomeInternal.Deferred ->
-                    outcome.cNonce?.let { withCNonce(it) }
-
-                is SubmissionOutcomeInternal.Success ->
-                    outcome.cNonce?.let { withCNonce(it) }
-            }
-        return updated ?: this
+    private fun CredentialConfigurationIdentifier.proofsRequirement(): CredentialProofsRequirement {
+        val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
+        val credentialConfiguration = credentialSupportedById(this)
+        return when {
+            credentialConfiguration.proofTypesSupported.values.isEmpty() -> CredentialProofsRequirement.ProofNotRequired
+            credentialIssuerMetadata.nonceEndpoint == null -> CredentialProofsRequirement.ProofRequired.WithoutCNonce
+            else -> CredentialProofsRequirement.ProofRequired.WithCNonce
+        }
     }
 
     private fun credentialSupportedById(credentialId: CredentialConfigurationIdentifier): CredentialConfiguration {
@@ -86,12 +88,15 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private fun AuthorizedRequest.proofFactoriesForm(popSigners: List<PopSigner>): List<ProofFactory> =
-        when (this) {
-            is AuthorizedRequest.NoProofRequired -> emptyList()
-            is AuthorizedRequest.ProofRequired -> {
+    private fun AuthorizedRequest.proofFactoriesFrom(
+        popSigners: List<PopSigner>,
+        proofsRequirement: CredentialProofsRequirement,
+    ): List<ProofFactory> =
+        when (proofsRequirement) {
+            is CredentialProofsRequirement.ProofNotRequired -> emptyList()
+            is CredentialProofsRequirement.ProofRequired -> {
                 when (val popSignersNo = popSigners.size) {
-                    0 -> error("At least a PopSigner is required in Authorized.ProofRequired")
+                    0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
                     1 -> Unit
                     else -> {
                         when (batchCredentialIssuance) {
@@ -105,17 +110,24 @@ internal class RequestIssuanceImpl(
                         }
                     }
                 }
-                popSigners.map { proofFactory(it, cNonce, grant) }
+                popSigners.map { proofFactory(it, proofsRequirement, grant) }
             }
         }
 
     private fun proofFactory(
         proofSigner: PopSigner,
-        cNonce: CNonce,
+        proofsRequirement: CredentialProofsRequirement.ProofRequired,
         grant: Grant,
     ): ProofFactory = { credentialSupported ->
         val aud = credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier
         val proofTypesSupported = credentialSupported.proofTypesSupported
+        val cNonce = when (proofsRequirement) {
+            CredentialProofsRequirement.ProofRequired.WithCNonce -> {
+                checkNotNull(nonceEndpointClient) { "Issuer does not provide nonce endpoint." }
+                nonceEndpointClient.getNonce().getOrThrow()
+            }
+            CredentialProofsRequirement.ProofRequired.WithoutCNonce -> null
+        }
         ProofBuilder(proofTypesSupported, config.clock, config.client, grant, aud, cNonce, proofSigner).build()
     }
 
@@ -193,13 +205,11 @@ internal sealed interface SubmissionOutcomeInternal {
 
     data class Success(
         val credentials: List<IssuedCredential>,
-        val cNonce: CNonce?,
         val notificationId: NotificationId?,
     ) : SubmissionOutcomeInternal
 
     data class Deferred(
         val transactionId: TransactionId,
-        val cNonce: CNonce?,
     ) : SubmissionOutcomeInternal
 
     data class Failed(
@@ -212,26 +222,4 @@ internal sealed interface SubmissionOutcomeInternal {
             is Deferred -> SubmissionOutcome.Deferred(transactionId)
             is Failed -> SubmissionOutcome.Failed(error)
         }
-
-    fun isInvalidProof(): Boolean =
-        null != cNonceFromInvalidProof()
-
-    fun cNonceFromInvalidProof(): CNonce? =
-        if (this is Failed && error is CredentialIssuanceError.InvalidProof) {
-            CNonce(error.cNonce, error.cNonceExpiresIn)
-        } else null
 }
-
-private fun AuthorizedRequestAnd<SubmissionOutcome>.markInvalidProofIrrecoverable() =
-    first to when (val outcome = second) {
-        is SubmissionOutcome.Failed ->
-            if (outcome.error is CredentialIssuanceError.InvalidProof) {
-                SubmissionOutcome.Failed(outcome.error.irrecoverable())
-            } else outcome
-
-        is SubmissionOutcome.Success -> outcome
-        is SubmissionOutcome.Deferred -> outcome
-    }
-
-private fun CredentialIssuanceError.InvalidProof.irrecoverable() =
-    CredentialIssuanceError.IrrecoverableInvalidProof(errorDescription)

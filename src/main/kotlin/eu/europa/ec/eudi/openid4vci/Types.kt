@@ -159,15 +159,12 @@ value class AuthorizationCode(val code: String) {
 }
 
 /**
- * A c_nonce related information as provided from issuance server.
+ * A c_nonce as provided from issuance server's nonce endpoint.
  *
  * @param value The c_nonce value
- * @param expiresInSeconds  Nonce time to live in seconds.
  */
-data class CNonce(
-    val value: String,
-    val expiresInSeconds: Long? = 5,
-) : java.io.Serializable {
+@JvmInline
+value class CNonce(val value: String) : java.io.Serializable {
     init {
         require(value.isNotEmpty()) { "Value cannot be empty" }
     }

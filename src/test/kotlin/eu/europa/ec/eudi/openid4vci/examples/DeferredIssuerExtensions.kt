@@ -182,7 +182,7 @@ data class DeferredIssuanceStoredContextTO(
                 responseEncryptionSpec = responseEncryptionSpec?.let { responseEncryption(it) },
             ),
             authorizedTransaction = AuthorizedTransaction(
-                authorizedRequest = AuthorizedRequest.NoProofRequired(
+                authorizedRequest = AuthorizedRequest(
                     accessToken = accessToken.toAccessToken(),
                     refreshToken = refreshToken?.toRefreshToken(),
                     credentialIdentifiers = emptyMap(),
@@ -215,7 +215,7 @@ data class DeferredIssuanceStoredContextTO(
                 credentialIssuerId = dCtx.config.credentialIssuerId.toString(),
                 clientId = dCtx.config.client.id,
                 clientAttestationJwt = dCtx.config.client.ifAttested { attestationJWT.jwt.serialize() },
-                clientAttestationPopType = dCtx.config.client.ifAttested { popJwtSpec.typ.toString() },
+                clientAttestationPopType = dCtx.config.client.ifAttested { popJwtSpec.typ },
                 clientAttestationPopDuration = dCtx.config.client.ifAttested { popJwtSpec.duration.inWholeSeconds },
                 clientAttestationPopAlgorithm = dCtx.config.client.ifAttested { popJwtSpec.signingAlgorithm.toJSONString() },
                 clientAttestationPopKeyId = dCtx.config.client.ifAttested { checkNotNull(clientAttestationPopKeyId) },

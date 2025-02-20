@@ -31,10 +31,11 @@ class IssuanceBatchRequestTest {
     @Test
     fun `successful batch issuance`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(encryptedResponses = EncryptedResponses.REQUIRED),
+            oiciWellKnownMocker(issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
+            nonceEndpointMocker(),
             singleIssuanceRequestMocker(
                 responseBuilder = {
                     val textContent = it?.body as TextContent
@@ -53,8 +54,6 @@ class IssuanceBatchRequestTest {
                                             put("credential", JsonPrimitive("issued_credential_content_mso_mdoc2"))
                                         },
                                     ),
-                                    cNonce = "wlbQc6pCJp",
-                                    cNonceExpiresInSeconds = 86400,
                                 ),
                             )
                         }
@@ -63,8 +62,6 @@ class IssuanceBatchRequestTest {
                             content = """
                             {
                                 "error": "invalid_proof",
-                                "c_nonce": "ERE%@^TGWYEYWEY",
-                                "c_nonce_expires_in": 34
                             } 
                             """.trimIndent(),
                             status = HttpStatusCode.BadRequest,

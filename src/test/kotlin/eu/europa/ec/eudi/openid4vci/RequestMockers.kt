@@ -26,7 +26,8 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
-import eu.europa.ec.eudi.openid4vci.EncryptedResponses.*
+import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.*
+import eu.europa.ec.eudi.openid4vci.internal.http.CNonceResponse
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.PushedAuthorizationRequestResponseTO
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenResponseTO
@@ -54,13 +55,15 @@ internal fun oauthMetaDataHandler(oauth2ServerUrl: HttpsUrl, oauth2MetaDataResou
     jsonResponse(oauth2MetaDataResource),
 )
 
-internal fun oidcWellKnownMocker(encryptedResponses: EncryptedResponses = NOT_SUPPORTED): RequestMocker = RequestMocker(
+internal fun oiciWellKnownMocker(issuerMetadataVersion: IssuerMetadataVersion = ENCRYPTION_NOT_SUPPORTED): RequestMocker = RequestMocker(
     requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
     responseBuilder = {
-        val content = when (encryptedResponses) {
-            REQUIRED -> getResourceAsText("well-known/openid-credential-issuer_encrypted_responses.json")
-            NOT_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_encryption_not_supported.json")
-            SUPPORTED_NOT_REQUIRED -> getResourceAsText("well-known/openid-credential-issuer_encryption_not_required.json")
+        val content = when (issuerMetadataVersion) {
+            ENCRYPTION_REQUIRED -> getResourceAsText("well-known/openid-credential-issuer_encrypted_responses.json")
+            ENCRYPTION_NOT_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_encryption_not_supported.json")
+            ENCRYPTION_SUPPORTED_NOT_REQUIRED -> getResourceAsText("well-known/openid-credential-issuer_encryption_not_required.json")
+            NO_NONCE_ENDPOINT -> getResourceAsText("well-known/openid-credential-issuer_no_nonce_endpoint.json")
+            NO_SCOPES -> getResourceAsText("well-known/openid-credential-issuer_no_scopes.json")
         }
         respond(
             content = content,
@@ -72,8 +75,12 @@ internal fun oidcWellKnownMocker(encryptedResponses: EncryptedResponses = NOT_SU
     },
 )
 
-enum class EncryptedResponses {
-    REQUIRED, NOT_SUPPORTED, SUPPORTED_NOT_REQUIRED
+enum class IssuerMetadataVersion {
+    ENCRYPTION_REQUIRED,
+    ENCRYPTION_NOT_SUPPORTED,
+    ENCRYPTION_SUPPORTED_NOT_REQUIRED,
+    NO_NONCE_ENDPOINT,
+    NO_SCOPES,
 }
 
 internal fun authServerWellKnownMocker(): RequestMocker = RequestMocker(
@@ -153,6 +160,26 @@ internal fun tokenPostMockerWithAuthDetails(
         requestValidator = validator,
     )
 
+internal fun nonceEndpointMocker(
+    nonceValue: String? = null,
+    validator: (request: HttpRequestData) -> Unit = {},
+): RequestMocker =
+    RequestMocker(
+        requestMatcher = endsWith("/nonce", HttpMethod.Post),
+        responseBuilder = {
+            respond(
+                content = Json.encodeToString(
+                    CNonceResponse(nonceValue ?: UUID.randomUUID().toString()),
+                ),
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("application/json"),
+                ),
+            )
+        },
+        requestValidator = validator,
+    )
+
 private fun authorizationDetails(
     configurationIds: List<CredentialConfigurationIdentifier>,
 ): Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> =
@@ -192,9 +219,7 @@ private fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(request: H
             content = """
                     {                                  
                       "credentials": [ {"credential": "$credential"} ],
-                      "notification_id": "valbQc6p55LS",
-                      "c_nonce": "wlbQc6pCJp",
-                      "c_nonce_expires_in": 86400
+                      "notification_id": "valbQc6p55LS"
                     }
             """.trimIndent(),
             status = HttpStatusCode.OK,
@@ -206,9 +231,7 @@ private fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(request: H
         respond(
             content = """
                     {
-                        "error": "invalid_proof",
-                        "c_nonce": "ERE%@^TGWYEYWEY",
-                        "c_nonce_expires_in": 34
+                        "error": "invalid_proof"
                     } 
             """.trimIndent(),
             status = HttpStatusCode.BadRequest,
@@ -238,9 +261,7 @@ fun MockRequestHandleScope.respondToIssuanceRequestWithDeferredResponseDataBuild
         respond(
             content = """
                     {
-                        "error": "invalid_proof",
-                        "c_nonce": "ERE%@^TGWYEYWEY",
-                        "c_nonce_expires_in": 34
+                        "error": "invalid_proof"
                     } 
             """.trimIndent(),
             status = HttpStatusCode.BadRequest,
@@ -259,9 +280,7 @@ fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(
         respond(
             content = """
                     {                     
-                      "credentials": [ { "credential": "credential_content"} ],
-                      "c_nonce": "ERE%@^TGWYEYWEY",
-                      "c_nonce_expires_in": 34
+                      "credentials": [ { "credential": "credential_content"} ]
                     }
             """.trimIndent(),
             status = HttpStatusCode.OK,

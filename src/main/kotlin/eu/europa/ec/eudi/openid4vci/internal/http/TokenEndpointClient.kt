@@ -40,8 +40,6 @@ internal sealed interface TokenResponseTO {
      *
      * @param accessToken The access token.
      * @param expiresIn Token time to live.
-     * @param cNonce    c_nonce returned from token endpoint.
-     * @param cNonceExpiresIn c_nonce time to live.
      */
     @Serializable
     data class Success(
@@ -49,8 +47,6 @@ internal sealed interface TokenResponseTO {
         @SerialName("access_token") val accessToken: String,
         @SerialName("refresh_token") val refreshToken: String? = null,
         @SerialName("expires_in") val expiresIn: Long? = null,
-        @SerialName("c_nonce") val cNonce: String? = null,
-        @SerialName("c_nonce_expires_in") val cNonceExpiresIn: Long? = null,
         @Serializable(with = GrantedAuthorizationDetailsSerializer::class)
         @SerialName(
             "authorization_details",
@@ -79,7 +75,6 @@ internal sealed interface TokenResponseTO {
                         useDPoP = DPoP.equals(other = tokenType, ignoreCase = true),
                     ),
                     refreshToken = refreshToken?.let { RefreshToken(it) },
-                    cNonce = cNonce?.let { CNonce(it, cNonceExpiresIn) },
                     authorizationDetails = authorizationDetails ?: emptyMap(),
                     timestamp = clock.instant(),
                 )
@@ -130,8 +125,7 @@ internal class TokenEndpointClient(
      * @param pkceVerifier  The code verifier that was used when submitting the Pushed Authorization Request.
      * @param credConfigIdsAsAuthDetails The list of [CredentialConfigurationIdentifier]s that have been passed to authorization server
      * as authorization details, part of a Rich Authorization Request.
-     * @return The result of the request as a pair of the access token and the optional c_nonce information returned
-     *      from token endpoint.
+     * @return The result of the request as a pair of the access token and the optional DPoP nonce returned by the endpoint.
      */
     suspend fun requestAccessTokenAuthFlow(
         authorizationCode: AuthorizationCode,
@@ -160,8 +154,9 @@ internal class TokenEndpointClient(
      *
      * @param preAuthorizedCode The pre-authorization code.
      * @param txCode  Extra transaction code to be passed if specified as required in the credential offer.
-     * @return The result of the request as a pair of the access token and the optional c_nonce information returned
-     *      from token endpoint.
+     * @param credConfigIdsAsAuthDetails  A list of credential configuration ids to be sent as 'authorization_details'.
+     * @param dpopNonce  A DPoP nonce.
+     * @return The result of the request as a pair of the access token and the optional DPoP nonce returned by the endpoint.
      */
     suspend fun requestAccessTokenPreAuthFlow(
         preAuthorizedCode: PreAuthorizedCode,

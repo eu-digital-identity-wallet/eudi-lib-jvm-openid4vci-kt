@@ -32,7 +32,7 @@ internal abstract class ProofBuilder<POP_SIGNER : PopSigner, out PROOF : Proof>(
     val clock: Clock,
     val iss: ClientId?,
     val aud: CredentialIssuerId,
-    val nonce: CNonce,
+    val nonce: CNonce?,
     val popSigner: POP_SIGNER,
 ) {
 
@@ -44,7 +44,7 @@ internal abstract class ProofBuilder<POP_SIGNER : PopSigner, out PROOF : Proof>(
             clock: Clock,
             iss: ClientId?,
             aud: CredentialIssuerId,
-            nonce: CNonce,
+            nonce: CNonce?,
             popSigner: PopSigner,
         ): ProofBuilder<*, *> {
             return when (popSigner) {
@@ -60,7 +60,7 @@ internal abstract class ProofBuilder<POP_SIGNER : PopSigner, out PROOF : Proof>(
             client: Client,
             grant: Grant,
             aud: CredentialIssuerId,
-            nonce: CNonce,
+            nonce: CNonce?,
             popSigner: PopSigner,
         ): ProofBuilder<*, *> =
             invoke(proofTypesSupported, clock, iss(client, grant), aud, nonce, popSigner)
@@ -82,7 +82,7 @@ internal class JwtProofBuilder(
     clock: Clock,
     iss: ClientId?,
     aud: CredentialIssuerId,
-    nonce: CNonce,
+    nonce: CNonce?,
     popSigner: PopSigner.Jwt,
 ) : ProofBuilder<PopSigner.Jwt, Proof.Jwt>(clock, iss, aud, nonce, popSigner) {
 
@@ -109,7 +109,7 @@ internal class JwtProofBuilder(
         JWTClaimsSet.Builder().apply {
             iss?.let { issuer(it) }
             audience(aud.toString())
-            claim("nonce", nonce.value)
+            nonce?.let { claim("nonce", nonce.value) }
             issueTime(Date.from(clock.instant()))
         }.build()
 

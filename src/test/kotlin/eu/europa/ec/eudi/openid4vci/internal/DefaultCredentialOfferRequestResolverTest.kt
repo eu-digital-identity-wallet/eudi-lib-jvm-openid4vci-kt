@@ -30,7 +30,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
     fun `resolve a credential offer passed by value that contains a pre-authorized code grant without transaction code`() = runTest {
-        mockedKtorHttpClientFactory(oidcWellKnownMocker(), authServerWellKnownMocker())
+        mockedKtorHttpClientFactory(oiciWellKnownMocker(), authServerWellKnownMocker())
             .invoke()
             .use { httpClient ->
                 val resolver = DefaultCredentialOfferRequestResolver(httpClient)
@@ -69,7 +69,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
     fun `resolve a credential offer passed by value that contains a pre-authorized code grant with transaction code`() = runTest {
-        mockedKtorHttpClientFactory(oidcWellKnownMocker(), authServerWellKnownMocker())
+        mockedKtorHttpClientFactory(oiciWellKnownMocker(), authServerWellKnownMocker())
             .invoke()
             .use { httpClient ->
                 val resolver = DefaultCredentialOfferRequestResolver(httpClient)
