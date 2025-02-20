@@ -27,10 +27,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonClassDiscriminator
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.*
 import java.net.URI
 import java.util.*
 
@@ -56,15 +53,22 @@ private sealed interface CredentialSupportedTO {
     val format: String
     val scope: String?
     val cryptographicBindingMethodsSupported: List<String>?
-    val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>?
+    val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>?
     val display: List<CredentialSupportedDisplayTO>?
 
     fun toDomain(): CredentialConfiguration
 }
 
 @Serializable
-private data class ProofSigningAlgorithmsSupportedTO(
+private data class ProofTypeSupportedMetaTO(
     @SerialName("proof_signing_alg_values_supported") val algorithms: List<String> = emptyList(),
+    @SerialName("key_attestations_required") val keyAttestationRequirement: KeyAttestationRequirementTO? = null,
+)
+
+@Serializable
+private data class KeyAttestationRequirementTO(
+    @SerialName("key_storage") val keyStorage: List<String>? = null,
+    @SerialName("user_authentication") val userAuthentication: List<String>? = null,
 )
 
 @Serializable
@@ -90,11 +94,10 @@ private data class MsdMdocCredentialTO(
     @SerialName("credential_crv_values_supported") val isoCredentialCurvesSupported: List<Int>? = null,
     @SerialName("policy") val isoPolicy: PolicyTO? = null,
     @SerialName("proof_types_supported")
-    override val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>? = null,
+    override val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
     @SerialName("doctype") @Required val docType: String,
-    @SerialName("claims") val claims: Map<String, Map<String, ClaimTO>>? = null,
-    @SerialName("order") val order: List<String>? = null,
+    @SerialName("claims") val claims: List<ClaimTO>? = null,
 ) : CredentialSupportedTO {
     init {
         require(format == FORMAT_MSO_MDOC) { "invalid format '$format'" }
@@ -114,23 +117,6 @@ private data class MsdMdocCredentialTO(
         val coseCurves = isoCredentialCurvesSupported.orEmpty().map { CoseCurve(it) }
         val policy = isoPolicy?.let { policy -> MsoMdocPolicy(policy.oneTimeUse, policy.batchSize) }
 
-        fun claims(): MsoMdocClaims = claims.orEmpty().mapValues { (_, claims) ->
-            claims.mapValues { (_, claim) ->
-                claim.let { claimObject ->
-                    Claim(
-                        claimObject.mandatory ?: false,
-                        claimObject.valueType,
-                        claimObject.display?.map { displayObject ->
-                            Claim.Display(
-                                displayObject.name,
-                                displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                            )
-                        } ?: emptyList(),
-                    )
-                }
-            }
-        }
-
         return MsoMdocCredential(
             scope,
             bindingMethods,
@@ -141,8 +127,7 @@ private data class MsdMdocCredentialTO(
             proofTypesSupported,
             display,
             docType,
-            claims(),
-            order.orEmpty(),
+            claims?.map { it.toDomain() }.orEmpty(),
         )
     }
 }
@@ -158,11 +143,10 @@ private data class SdJwtVcCredentialTO(
     @SerialName("credential_signing_alg_values_supported")
     val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("proof_types_supported")
-    override val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>? = null,
+    override val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
     @SerialName("vct") val type: String,
-    @SerialName("claims") val claims: Map<String, ClaimTO>? = null,
-    @SerialName("order") val order: List<String>? = null,
+    @SerialName("claims") val claims: List<ClaimTO>? = null,
 ) : CredentialSupportedTO {
     init {
         require(format == FORMAT_SD_JWT_VC) { "invalid format '$format'" }
@@ -183,21 +167,7 @@ private data class SdJwtVcCredentialTO(
             proofTypesSupported,
             display,
             type,
-            claims?.mapValues { (_, claim) ->
-                claim.let {
-                    Claim(
-                        it.mandatory ?: false,
-                        it.valueType,
-                        it.display.orEmpty().map { displayObject ->
-                            Claim.Display(
-                                displayObject.name,
-                                displayObject.locale?.let { languageTag -> Locale.forLanguageTag(languageTag) },
-                            )
-                        },
-                    )
-                }
-            },
-            order.orEmpty(),
+            claims?.map { it.toDomain() }.orEmpty(),
         )
     }
 }
@@ -206,13 +176,11 @@ private data class SdJwtVcCredentialTO(
 private data class W3CJsonLdCredentialDefinitionTO(
     @SerialName("@context") val context: List<String>,
     @SerialName("type") val types: List<String>,
-    @SerialName("credentialSubject") val credentialSubject: Map<String, ClaimTO>? = null,
 ) {
 
     fun toDomain(): W3CJsonLdCredentialDefinition = W3CJsonLdCredentialDefinition(
         context = context.map { URI(it).toURL() },
         type = types,
-        credentialSubject = credentialSubject?.toDomain(),
     )
 }
 
@@ -230,12 +198,10 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
     @SerialName("credential_signing_alg_values_supported")
     val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("proof_types_supported")
-    override val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>? = null,
+    override val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
-    @SerialName("@context") @Required val context: List<String> = emptyList(),
-    @SerialName("type") @Required val type: List<String> = emptyList(),
     @SerialName("credential_definition") @Required val credentialDefinition: W3CJsonLdCredentialDefinitionTO,
-    @SerialName("order") val order: List<String>? = null,
+    @SerialName("claims") val claims: List<ClaimTO>? = null,
 ) : CredentialSupportedTO {
     init {
         require(format == FORMAT_W3C_JSONLD_DATA_INTEGRITY) { "invalid format '$format'" }
@@ -254,10 +220,8 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
             credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
             proofTypesSupported = proofTypesSupported,
             display = display,
-            context = context,
-            type = type,
             credentialDefinition = credentialDefinition.toDomain(),
-            order = order.orEmpty(),
+            claims = claims?.map { it.toDomain() }.orEmpty(),
         )
     }
 }
@@ -276,11 +240,10 @@ private data class W3CJsonLdSignedJwtCredentialTO(
     @SerialName("credential_signing_alg_values_supported")
     val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("proof_types_supported")
-    override val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>? = null,
+    override val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
-    @SerialName("@context") @Required val context: List<String> = emptyList(),
     @SerialName("credential_definition") @Required val credentialDefinition: W3CJsonLdCredentialDefinitionTO,
-    @SerialName("order") val order: List<String>? = null,
+    @SerialName("claims") val claims: List<ClaimTO>? = null,
 ) : CredentialSupportedTO {
     init {
         require(format == FORMAT_W3C_JSONLD_SIGNED_JWT) { "invalid format '$format'" }
@@ -300,9 +263,8 @@ private data class W3CJsonLdSignedJwtCredentialTO(
             credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
             proofTypesSupported = proofTypesSupported,
             display = display,
-            context = context,
             credentialDefinition = credentialDefinition.toDomain(),
-            order = order.orEmpty(),
+            claims = claims?.map { it.toDomain() }.orEmpty(),
         )
     }
 }
@@ -321,10 +283,10 @@ private data class W3CSignedJwtCredentialTO(
     @SerialName("credential_signing_alg_values_supported")
     val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("proof_types_supported")
-    override val proofTypesSupported: Map<String, ProofSigningAlgorithmsSupportedTO>? = null,
+    override val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>? = null,
     @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
     @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
-    @SerialName("order") val order: List<String>? = null,
+    @SerialName("claims") val claims: List<ClaimTO>? = null,
 ) : CredentialSupportedTO {
     init {
         require(format == FORMAT_W3C_SIGNED_JWT) { "invalid format '$format'" }
@@ -338,7 +300,6 @@ private data class W3CSignedJwtCredentialTO(
         fun toDomain(): W3CSignedJwtCredential.CredentialDefinition =
             W3CSignedJwtCredential.CredentialDefinition(
                 type = types,
-                credentialSubject = credentialSubject?.toDomain(),
             )
     }
 
@@ -357,7 +318,7 @@ private data class W3CSignedJwtCredentialTO(
             proofTypesSupported = proofTypesSupported,
             display = display,
             credentialDefinition = credentialDefinition.toDomain(),
-            order = order.orEmpty(),
+            claims = claims?.map { it.toDomain() }.orEmpty(),
         )
     }
 }
@@ -375,6 +336,7 @@ private data class CredentialIssuerMetadataTO(
     @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
     @SerialName("authorization_servers") val authorizationServers: List<String>? = null,
     @SerialName("credential_endpoint") @Required val credentialEndpoint: String,
+    @SerialName("nonce_endpoint") val nonceEndpoint: String? = null,
     @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
     @SerialName("notification_endpoint") val notificationEndpoint: String? = null,
     @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionTO? = null,
@@ -399,6 +361,11 @@ private data class CredentialIssuerMetadataTO(
 
         val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
             .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialEndpoint)
+
+        val nonceEndpoint = nonceEndpoint?.let {
+            CredentialIssuerEndpoint(it)
+                .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNonceEndpoint)
+        }
 
         val deferredCredentialEndpoint = deferredCredentialEndpoint?.let {
             CredentialIssuerEndpoint(it)
@@ -430,6 +397,7 @@ private data class CredentialIssuerMetadataTO(
             credentialIssuerIdentifier,
             authorizationServers,
             credentialEndpoint,
+            nonceEndpoint,
             deferredCredentialEndpoint,
             notificationEndpoint,
             credentialResponseEncryption(),
@@ -471,6 +439,7 @@ private data class CredentialSupportedDisplayTO(
     @SerialName("logo") val logo: LogoObject? = null,
     @SerialName("description") val description: String? = null,
     @SerialName("background_color") val backgroundColor: String? = null,
+    @SerialName("background_image") val backgroundImage: BackgroundImageTO? = null,
     @SerialName("text_color") val textColor: String? = null,
 ) {
     /**
@@ -483,16 +452,28 @@ private data class CredentialSupportedDisplayTO(
                 alternativeText,
             )
 
+        fun BackgroundImageTO.toURI(): URI =
+            URI.create(uri)
+
         return Display(
             name,
             locale?.let { Locale.forLanguageTag(it) },
             logo?.toLogo(),
             description,
             backgroundColor,
+            backgroundImage?.toURI(),
             textColor,
         )
     }
 }
+
+/**
+ * Logo information.
+ */
+@Serializable
+private data class BackgroundImageTO(
+    @SerialName("uri") val uri: String,
+)
 
 /**
  * Logo information.
@@ -508,14 +489,14 @@ private data class LogoObject(
  */
 @Serializable
 private data class ClaimTO(
+    @SerialName("path") val path: JsonArray,
     @SerialName("mandatory") val mandatory: Boolean? = null,
-    @SerialName("value_type") val valueType: String? = null,
     @SerialName("display") val display: List<DisplayTO>? = null,
 ) {
     fun toDomain(): Claim =
         Claim(
             mandatory = mandatory ?: false,
-            valueType = valueType,
+            path = path.asClaimPath(),
             display = display?.map { it.toClaimDisplay() } ?: emptyList(),
         )
 }
@@ -542,10 +523,7 @@ private data class DisplayTO(
         Claim.Display(name, locale?.let { languageTag -> Locale.forLanguageTag(languageTag) })
 }
 
-private fun Map<String, ClaimTO>.toDomain(): Map<ClaimName, Claim?> =
-    mapValues { (_, claim) -> claim.toDomain() }
-
-private fun Map<String, ProofSigningAlgorithmsSupportedTO>?.toProofTypes(): ProofTypesSupported =
+private fun Map<String, ProofTypeSupportedMetaTO>?.toProofTypes(): ProofTypesSupported =
     when (this) {
         null -> ProofTypesSupported.Empty
         else -> {
@@ -554,17 +532,24 @@ private fun Map<String, ProofSigningAlgorithmsSupportedTO>?.toProofTypes(): Proo
         }
     }
 
-private fun proofTypeMeta(type: String, meta: ProofSigningAlgorithmsSupportedTO): ProofTypeMeta =
+private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTypeMeta =
     when (type) {
         "jwt" -> ProofTypeMeta.Jwt(
             algorithms = meta.algorithms.map {
                 JWSAlgorithm.parse(it)
             },
+            keyAttestationRequirement = meta.keyAttestationRequirement.toDomain(),
         )
 
         "ldp_vp" -> ProofTypeMeta.LdpVp
         else -> ProofTypeMeta.Unsupported(type)
     }
+
+private fun KeyAttestationRequirementTO?.toDomain(): KeyAttestationRequirement = when {
+    this == null -> KeyAttestationRequirement.NotRequired
+    this.keyStorage.isNullOrEmpty() && this.userAuthentication.isNullOrEmpty() -> KeyAttestationRequirement.RequiredNoConstraints
+    else -> KeyAttestationRequirement.Required(this.keyStorage.orEmpty(), this.userAuthentication.orEmpty())
+}
 
 /**
  * Utility method to convert a list of string to a list of [CryptographicBindingMethod].

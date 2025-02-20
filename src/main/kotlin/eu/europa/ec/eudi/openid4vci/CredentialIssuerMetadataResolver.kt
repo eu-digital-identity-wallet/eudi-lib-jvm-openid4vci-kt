@@ -74,6 +74,7 @@ data class CredentialIssuerMetadata(
     val credentialIssuerIdentifier: CredentialIssuerId,
     val authorizationServers: List<HttpsUrl> = listOf(credentialIssuerIdentifier.value),
     val credentialEndpoint: CredentialIssuerEndpoint,
+    val nonceEndpoint: CredentialIssuerEndpoint? = null,
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val notificationEndpoint: CredentialIssuerEndpoint? = null,
     val credentialResponseEncryption: CredentialResponseEncryption = CredentialResponseEncryption.NotSupported,
@@ -168,6 +169,11 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
      * The URL of the Credential Endpoint is not valid.
      */
     class InvalidCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+
+    /**
+     * The URL of the Nonce Endpoint is not valid.
+     */
+    class InvalidNonceEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The URL of the Deferred Credential Endpoint is not valid.
