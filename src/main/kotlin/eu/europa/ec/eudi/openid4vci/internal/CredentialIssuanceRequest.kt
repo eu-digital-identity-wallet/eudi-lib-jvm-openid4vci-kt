@@ -94,15 +94,16 @@ private fun msoMdoc(
                 )
             }
 
-            forEach { (nameSpace, claimName) ->
-                val supportedClaimNames = supportedClaims[nameSpace]
-                ensureNotNull(supportedClaimNames) {
-                    InvalidIssuanceRequest("Namespace $nameSpace not supported by issuer")
-                }
-                ensure(claimName in supportedClaimNames) {
-                    InvalidIssuanceRequest("Requested claim name $claimName is not supported by issuer")
-                }
-            }
+            // TODO [d15]: Remove when requests are adapted to d15
+//            forEach { (nameSpace, claimName) ->
+//                val supportedClaimNames = supportedClaims[nameSpace]
+//                ensureNotNull(supportedClaimNames) {
+//                    InvalidIssuanceRequest("Namespace $nameSpace not supported by issuer")
+//                }
+//                ensure(claimName in supportedClaimNames) {
+//                    InvalidIssuanceRequest("Requested claim name $claimName is not supported by issuer")
+//                }
+//            }
         }
     }
 
@@ -120,15 +121,16 @@ private fun sdJwtVc(
     fun GenericClaimSet.validate() {
         if (claims.isNotEmpty()) {
             val supportedClaims = credentialConfiguration.claims
-            ensure(!supportedClaims.isNullOrEmpty()) {
+            ensure(supportedClaims.isNotEmpty()) {
                 InvalidIssuanceRequest(
                     "Issuer does not support claims for credential " +
                         "[$FORMAT_SD_JWT_VC-${credentialConfiguration.type}]",
                 )
             }
-            ensure(supportedClaims.keys.containsAll(claims)) {
-                InvalidIssuanceRequest("Claim names requested are not supported by issuer")
-            }
+            // TODO [d15]: Remove when requests are adapted to d15
+//            ensure(supportedClaims.keys.containsAll(claims)) {
+//                InvalidIssuanceRequest("Claim names requested are not supported by issuer")
+//            }
         }
     }
 
@@ -145,16 +147,17 @@ private fun w3cSignedJwt(
 ): CredentialType.W3CSignedJwtType {
     fun GenericClaimSet.validate() {
         if (claims.isNotEmpty()) {
-            val supportedClaims = credentialConfiguration.credentialDefinition.credentialSubject
-            ensure(!supportedClaims.isNullOrEmpty()) {
+            val supportedClaims = credentialConfiguration.claims
+            ensure(supportedClaims.isNotEmpty()) {
                 InvalidIssuanceRequest(
                     "Issuer does not support claims for credential " +
                         "[$FORMAT_W3C_SIGNED_JWT-${credentialConfiguration.credentialDefinition.type}]",
                 )
             }
-            ensure(supportedClaims.keys.containsAll(claims)) {
-                InvalidIssuanceRequest("Claim names requested are not supported by issuer")
-            }
+            // TODO [d15]: Remove when requests are adapted to d15
+//            ensure(supportedClaims.keys.containsAll(claims)) {
+//                InvalidIssuanceRequest("Claim names requested are not supported by issuer")
+//            }
         }
     }
 

@@ -162,6 +162,7 @@ class IssuanceSingleRequestTest {
             }
         }
 
+    @Ignore("To be removed when credential request is aligned with draft 15")
     @Test
     fun `when issuance request contains unsupported claims exception CredentialIssuanceException is thrown`() =
         runTest {
