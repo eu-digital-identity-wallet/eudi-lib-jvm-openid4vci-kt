@@ -546,7 +546,7 @@ private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTy
     }
 
 private fun KeyAttestationRequirementTO?.toDomain(): KeyAttestationRequirement = when {
-    this == null -> KeyAttestationRequirement.NoRequirement
+    this == null -> KeyAttestationRequirement.NotRequired
     this.keyStorage.isNullOrEmpty() && this.userAuthentication.isNullOrEmpty() -> KeyAttestationRequirement.RequiredNoConstraints
     else -> KeyAttestationRequirement.Required(this.keyStorage.orEmpty(), this.userAuthentication.orEmpty())
 }

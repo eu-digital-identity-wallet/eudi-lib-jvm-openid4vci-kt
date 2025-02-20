@@ -84,7 +84,7 @@ internal fun universityDegreeJwt() = W3CSignedJwtCredential(
         setOf(
             ProofTypeMeta.Jwt(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
-                KeyAttestationRequirement.NoRequirement,
+                KeyAttestationRequirement.NotRequired,
             ),
         ),
     ),

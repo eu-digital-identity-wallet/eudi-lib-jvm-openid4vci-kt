@@ -75,8 +75,8 @@ sealed interface ProofTypeMeta : Serializable {
 
 sealed interface KeyAttestationRequirement {
 
-    data object NoRequirement : KeyAttestationRequirement {
-        private fun readResolve(): Any = NoRequirement
+    data object NotRequired : KeyAttestationRequirement {
+        private fun readResolve(): Any = NotRequired
     }
 
     data object RequiredNoConstraints : KeyAttestationRequirement {

@@ -131,7 +131,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         assertTrue("Expected ") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_JWT")
-            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.NoRequirement }
+            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.NotRequired }
         }
 
         assertTrue("Expected ") {
