@@ -31,7 +31,7 @@ import java.time.Duration
 import java.time.Instant
 
 const val FORMAT_MSO_MDOC = "mso_mdoc"
-const val FORMAT_SD_JWT_VC = "vc+sd-jwt"
+const val FORMAT_SD_JWT_VC = "dc+sd-jwt"
 const val FORMAT_W3C_JSONLD_DATA_INTEGRITY = "ldp_vc"
 const val FORMAT_W3C_JSONLD_SIGNED_JWT = "jwt_vc_json-ld"
 const val FORMAT_W3C_SIGNED_JWT = "jwt_vc_json"
