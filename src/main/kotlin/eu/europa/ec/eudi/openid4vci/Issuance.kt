@@ -19,8 +19,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.JWK
-import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -100,20 +98,6 @@ sealed interface SubmissionOutcome : java.io.Serializable {
 }
 
 /**
- * Interface to model the set of specific claims that need to be included in the issued credential.
- * This set of claims is modeled differently depending on the credential format.
- */
-sealed interface ClaimSet
-
-@Serializable(with = ClaimSetSerializer::class)
-class MsoMdocClaimSet(claims: List<Pair<Namespace, ClaimName>>) :
-    ClaimSet,
-    List<Pair<Namespace, ClaimName>> by claims
-
-@Serializable
-data class GenericClaimSet(val claims: List<ClaimName>) : ClaimSet
-
-/**
  * Sealed interface to model the payload of an issuance request. Issuance can be requested by providing the credential configuration
  * identifier and a claim set ot by providing a credential identifier retrieved from token endpoint while authorizing an issuance request.
  */
@@ -136,12 +120,9 @@ sealed interface IssuanceRequestPayload {
      * Credential configuration based request payload.
      *
      * @param credentialConfigurationIdentifier The credential configuration identifier
-     * @param claimSet  Optional parameter to specify the specific set of claims that are requested to be included in the
-     *          credential to be issued.
      */
     data class ConfigurationBased(
         override val credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
-        val claimSet: ClaimSet? = null,
     ) : IssuanceRequestPayload
 }
 
@@ -151,16 +132,6 @@ typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
  * An interface for submitting a credential issuance request.
  */
 interface RequestIssuance {
-
-    @Deprecated(
-        message = "Method deprecated and will be removed in a future release",
-        replaceWith = ReplaceWith("request(requestPayload, popSigner?.let(::listOf).orEmpty()"),
-    )
-    suspend fun AuthorizedRequest.requestSingle(
-        requestPayload: IssuanceRequestPayload,
-        popSigner: PopSigner?,
-    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> =
-        request(requestPayload, popSigner?.let(::listOf).orEmpty())
 
     /**
      * Places a request to the credential issuance endpoint.

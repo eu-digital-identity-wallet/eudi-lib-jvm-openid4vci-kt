@@ -103,10 +103,9 @@ suspend fun Issuer.submitCredentialRequest(
     authorizedRequest: AuthorizedRequest,
     credentialConfigurationId: CredentialConfigurationIdentifier =
         credentialOffer.credentialConfigurationIdentifiers.first(),
-    claimSet: ClaimSet? = null,
     batchOption: BatchOption,
 ): AuthorizedRequestAnd<SubmissionOutcome> {
-    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
+    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
     val proofsNo =
         when (batchOption) {
             BatchOption.DontUse -> 1
@@ -152,7 +151,6 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
     env: ENV,
     enableHttpLogging: Boolean,
     credCfgId: CredentialConfigurationIdentifier = credentialOffer.credentialConfigurationIdentifiers.first(),
-    claimSetToRequest: ClaimSet? = null,
     batchOption: BatchOption,
 ) where
       ENV : HasTestUser<USER>,
@@ -160,7 +158,7 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
     coroutineScope {
         val authorizedReq = authorizeUsingAuthorizationCodeFlow(env, enableHttpLogging)
         val (updatedAuthorizedReq, outcome) =
-            submitCredentialRequest(authorizedReq, credCfgId, claimSetToRequest, batchOption)
+            submitCredentialRequest(authorizedReq, credCfgId, batchOption)
 
         ensureIssued(updatedAuthorizedReq, outcome)
     }
@@ -168,12 +166,11 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
 suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
     txCode: String?,
     credCfgId: CredentialConfigurationIdentifier,
-    claimSetToRequest: ClaimSet?,
     batchOption: BatchOption,
 ) = coroutineScope {
     val (authorized, outcome) = run {
         val authorizedRequest = authorizeWithPreAuthorizationCode(txCode).getOrThrow()
-        submitCredentialRequest(authorizedRequest, credCfgId, claimSetToRequest, batchOption)
+        submitCredentialRequest(authorizedRequest, credCfgId, batchOption)
     }
 
     ensureIssued(authorized, outcome)
@@ -231,7 +228,6 @@ suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
     credCfgId: CredentialConfigurationIdentifier,
     enableHttpLogging: Boolean = false,
     batchOption: BatchOption = BatchOption.DontUse,
-    claimSetToRequest: (CredentialConfiguration) -> ClaimSet? = { null },
 ) where
       ENV : HasTestUser<USER>,
       ENV : CanAuthorizeIssuance<USER>,
@@ -249,7 +245,6 @@ suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
             env = this@testIssuanceWithAuthorizationCodeFlow,
             enableHttpLogging = enableHttpLogging,
             batchOption = batchOption,
-            claimSetToRequest = claimSetToRequest.invoke(credCfg),
         )
     }
 }
@@ -260,7 +255,6 @@ suspend fun <ENV, USER> ENV.testIssuanceWithPreAuthorizedCodeFlow(
     credentialOfferEndpoint: String? = null,
     enableHttpLogging: Boolean = false,
     batchOption: BatchOption,
-    claimSetToRequest: (CredentialConfiguration) -> ClaimSet? = { null },
 ) where ENV : CanBeUsedWithVciLib, ENV : HasTestUser<USER>, ENV : CanRequestForCredentialOffer<USER> {
     val credentialOfferUri = requestPreAuthorizedCodeGrantOffer(
         setOf(credCfgId),
@@ -273,7 +267,7 @@ suspend fun <ENV, USER> ENV.testIssuanceWithPreAuthorizedCodeFlow(
     with(issuer) {
         val credCfg = credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credCfgId]
         assertNotNull(credCfg)
-        testIssuanceWithPreAuthorizedCodeFlow(txCode, credCfgId, claimSetToRequest(credCfg), batchOption)
+        testIssuanceWithPreAuthorizedCodeFlow(txCode, credCfgId, batchOption)
     }
 }
 
