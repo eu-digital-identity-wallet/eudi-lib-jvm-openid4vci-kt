@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialResponseSuccessTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -22,9 +24,7 @@ import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlin.test.Test
-import kotlin.test.assertIs
-import kotlin.test.fail
+import kotlin.test.*
 
 class IssuanceBatchRequestTest {
 
@@ -71,7 +71,29 @@ class IssuanceBatchRequestTest {
                         )
                     }
                 },
-            ) {},
+                requestValidator = {
+                    val textContent = it.body as TextContent
+                    val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
+                    assertNull(
+                        issuanceRequestTO.proof,
+                        "Multiple proofs expected but received one proof",
+                    )
+                    assertNotNull(
+                        issuanceRequestTO.proofs,
+                        "Multiple proofs expected but received one proof",
+                    )
+                    val jwtProofs = issuanceRequestTO.proofs.jwtProofs
+                    assertNotNull(jwtProofs, "Jwt Proofs expected")
+                    val distinctNonces = jwtProofs
+                        .map { SignedJWT.parse(it) }
+                        .map { it.jwtClaimsSet.getStringClaim("nonce") }
+                        .distinct()
+
+                    assertTrue("In the context of an issuance request all proofs must contain the same nonce, but they don't") {
+                        distinctNonces.size == 1
+                    }
+                },
+            ),
         )
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(

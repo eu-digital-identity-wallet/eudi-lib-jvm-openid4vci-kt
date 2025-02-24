@@ -88,7 +88,7 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private fun AuthorizedRequest.proofFactoriesFrom(
+    private suspend fun AuthorizedRequest.proofFactoriesFrom(
         popSigners: List<PopSigner>,
         proofsRequirement: CredentialProofsRequirement,
     ): List<ProofFactory> =
@@ -110,24 +110,27 @@ internal class RequestIssuanceImpl(
                         }
                     }
                 }
-                popSigners.map { proofFactory(it, proofsRequirement, grant) }
+                val cNonce = proofsRequirement.cNonce()
+                popSigners.map { proofFactory(it, cNonce, grant) }
+            }
+        }
+
+    private suspend fun CredentialProofsRequirement.ProofRequired.cNonce(): CNonce? =
+        when (this) {
+            CredentialProofsRequirement.ProofRequired.WithoutCNonce -> null
+            CredentialProofsRequirement.ProofRequired.WithCNonce -> {
+                checkNotNull(nonceEndpointClient) { "Issuer does not provide nonce endpoint." }
+                nonceEndpointClient.getNonce().getOrThrow()
             }
         }
 
     private fun proofFactory(
         proofSigner: PopSigner,
-        proofsRequirement: CredentialProofsRequirement.ProofRequired,
+        cNonce: CNonce?,
         grant: Grant,
     ): ProofFactory = { credentialSupported ->
         val aud = credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier
         val proofTypesSupported = credentialSupported.proofTypesSupported
-        val cNonce = when (proofsRequirement) {
-            CredentialProofsRequirement.ProofRequired.WithCNonce -> {
-                checkNotNull(nonceEndpointClient) { "Issuer does not provide nonce endpoint." }
-                nonceEndpointClient.getNonce().getOrThrow()
-            }
-            CredentialProofsRequirement.ProofRequired.WithoutCNonce -> null
-        }
         ProofBuilder(proofTypesSupported, config.clock, config.client, grant, aud, cNonce, proofSigner).build()
     }
 
