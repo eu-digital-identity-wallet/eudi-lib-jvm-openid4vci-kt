@@ -19,7 +19,7 @@ import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.NonceEndpointClient
 
-internal sealed interface CredentialProofsRequirement {
+private sealed interface CredentialProofsRequirement {
 
     data object ProofNotRequired : CredentialProofsRequirement
 

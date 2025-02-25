@@ -193,6 +193,15 @@ the `refresh_token` and authorization and/or resource server DPoP nonce if provi
 
 ### Authorization code flow
 
+```mermaid
+---
+title: Authorization Code Flow state transision diagram
+---
+stateDiagram-v2
+    [*] --> AuthorizationRequestPrepared: prepareAuthorizationRequest
+    AuthorizationRequestPrepared --> AuthorizedRequest: authorizeWithAuthorizationCode
+```
+
 #### Authorization code flow preconditions
 
 In addition to the [common authorization preconditions](#authorize-wallet-for-issuance-preconditions)
@@ -247,6 +256,14 @@ val authorizedRequest =
 > Function `authorizeWithAuthorizationCode` supports this via parameter `authDetailsOption: AccessTokenOption`
 
 ### Pre-authorized code flow
+
+```mermaid
+---
+title: PreAuthorization Code Flow state transision diagram
+---
+stateDiagram-v2
+    [*] --> AuthorizedRequest: authorizeWithPreAuthorizationCode
+```
 
 #### Pre-authorized code flow preconditions
 
@@ -657,11 +674,10 @@ can be requested using `authorization_details` or `scope` parameter when using a
 Though for `authorization_details` we don't support the `format` attribute and its specializations per format.
 Only `credential_configuration_id` attribute is supported.
 
-### Wallet and key attestations
+### Key attestations
 
 Current version of the library does not support [key attestations](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-15.html#appendix-D) 
 neither as a [proof type](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-15.html#section-8.2.1.3) nor as a `key_attestation` header in JWT proofs.
-Also current version of library does not support wallet attestations as specified [here](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-15.html#appendix-E)  
 
 ## How to contribute
 

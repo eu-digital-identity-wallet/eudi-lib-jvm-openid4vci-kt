@@ -63,6 +63,7 @@ value class CredentialConfigurationIdentifier(val value: String) {
     init {
         require(value.isNotEmpty()) { "value cannot be empty" }
     }
+    override fun toString(): String = value
 }
 
 @JvmInline
@@ -71,6 +72,7 @@ value class CredentialIdentifier(val value: String) {
     init {
         require(value.isNotEmpty()) { "value cannot be empty" }
     }
+    override fun toString(): String = value
 }
 
 /**
@@ -146,6 +148,7 @@ value class RefreshToken(val refreshToken: String) : java.io.Serializable {
     init {
         require(refreshToken.isNotEmpty()) { "Refresh Token must not be empty" }
     }
+    override fun toString(): String = refreshToken
 }
 
 /**
@@ -156,6 +159,7 @@ value class AuthorizationCode(val code: String) {
     init {
         require(code.isNotEmpty()) { "Authorization code must not be empty" }
     }
+    override fun toString(): String = code
 }
 
 /**
@@ -168,6 +172,7 @@ value class CNonce(val value: String) : java.io.Serializable {
     init {
         require(value.isNotEmpty()) { "Value cannot be empty" }
     }
+    override fun toString(): String = value
 }
 
 /**
@@ -180,6 +185,7 @@ value class TransactionId(val value: String) {
     init {
         require(value.isNotEmpty()) { "Value cannot be empty" }
     }
+    override fun toString(): String = value
 }
 
 /**
@@ -192,6 +198,7 @@ value class NotificationId(val value: String) {
     init {
         require(value.isNotEmpty()) { "Value cannot be empty" }
     }
+    override fun toString(): String = value
 }
 
 /**
@@ -262,6 +269,7 @@ value class Scope(val value: String) {
     init {
         require(value.isNotEmpty()) { "Scope value cannot be empty" }
     }
+    override fun toString(): String = value
 }
 
 typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata
@@ -304,4 +312,9 @@ value class CoseCurve(val value: Int) {
  * Nonce (single use) value provided either by the Authorization or Resource server.
  */
 @JvmInline
-value class Nonce(val value: String)
+value class Nonce(val value: String) {
+    init {
+        require(value.isNotEmpty()) { "Nonce value cannot be empty" }
+    }
+    override fun toString(): String = value
+}
