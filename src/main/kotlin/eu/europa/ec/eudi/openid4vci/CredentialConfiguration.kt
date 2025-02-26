@@ -173,8 +173,6 @@ data class Claim(
         @SerialName("locale") val locale: Locale? = null,
     ) : Serializable
 }
-typealias Namespace = String
-typealias ClaimName = String
 
 data class MsoMdocPolicy(val oneTimeUse: Boolean, val batchSize: Int?) : Serializable
 

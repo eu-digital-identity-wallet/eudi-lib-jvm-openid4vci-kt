@@ -135,19 +135,11 @@ interface RequestIssuance {
 
     /**
      * Places a request to the credential issuance endpoint.
-     * Method will attempt to automatically retry submission in case
-     * - Initial authorization state is [AuthorizedRequest.NoProofRequired] and
-     * - one or more [popSigners] haven been provided
      *
-     * @receiver the current authorization state
      * @param requestPayload the payload of the request
-     * @param popSigners one or more signers for the proofs to be sent.
-     * Although this is an optional parameter, only required in case the present authorization state is [AuthorizedRequest.ProofRequired],
-     * caller is advised to provide it, to allow the method to automatically retry
-     * in case of [CredentialIssuanceError.InvalidProof]
-     *
-     * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh c_nonce and/or
-     * updated Resource-Server DPoP Nonce) and the [SubmissionOutcome]
+     * @param popSigners one or more signers for the proofs to be sent. Required when requested credential's configuration requires proof.
+     * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh updated Resource-Server DPoP Nonce)
+     * and the [SubmissionOutcome]
      */
     suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
@@ -245,12 +237,10 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     ) : CredentialIssuanceError(message)
 
     /**
-     * Issuer rejected the issuance request because no c_nonce was provided along with the proof.
-     * A fresh c_nonce is provided by the issuer.
+     * Issuer rejected the issuance request because no or invalid proof(s) were provided or at least one of the key proofs does
+     * not contain a c_nonce value.
      */
     data class InvalidProof(
-        val cNonce: String,
-        val cNonceExpiresIn: Long? = 5,
         val errorDescription: String? = null,
     ) : CredentialIssuanceError("Invalid Proof")
 
@@ -330,6 +320,11 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
      * Issuance server response is un-parsable
      */
     data class ResponseUnparsable(val error: String) : CredentialIssuanceError("ResponseUnparsable")
+
+    /**
+     * Request to nonce endpoint of issuer failed
+     */
+    data class CNonceRequestFailed(val error: String) : CredentialIssuanceError("CNonceRequestFailed")
 
     /**
      * Sealed hierarchy of errors related to proof generation

@@ -35,7 +35,7 @@ class RichAuthorizationRequestTest {
     fun `when AuthorizationDetailsInTokenRequest is Include in pre-authorization flow expect authorization_details`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
             authServerWellKnownMocker(),
-            oidcWellKnownMocker(),
+            oiciWellKnownMocker(),
             parPostMocker {
                 fail("No pushed authorization request should have been sent in case of pre-authorized code flow")
             },
@@ -76,7 +76,7 @@ class RichAuthorizationRequestTest {
     fun `when config is FAVOR_SCOPES, auth details option is Include and all credentials have scopes no authorization_details expected`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                oidcWellKnownMocker(),
+                oiciWellKnownMocker(),
                 authServerWellKnownMocker(),
                 parPostMocker { request ->
                     val form = with(request) { parPostApplyAssertionsAndGetFormData(false) }

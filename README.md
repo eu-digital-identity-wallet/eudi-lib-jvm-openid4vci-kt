@@ -20,10 +20,9 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
 ## Overview
 
 This is a Kotlin library, targeting JVM, that supports
-the [OpenId4VCI (draft 14)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-14.html) protocol.
+the [OpenId4VCI (draft 15)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-15.html) protocol.
 
 In particular, the library focuses on the wallet's role in and provides the following features:
-
 
 | Feature                                                                                         | Coverage                                                                                                               |
 |-------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
@@ -44,6 +43,11 @@ In particular, the library focuses on the wallet's role in and provides the foll
 | [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)             | ✅                                                                                                                      |
 | [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                               | ✅                                                                                                                      |
 | Wallet authentication                                                                           | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth2-attestation-based-client-authentication)     |
+| Use issuer's nonce endpoint to get c_nonce for proofs                                           | ✅      |
+| `attestation` proof type                                                                        | ❌      |
+| `key_attestation` to the JWT Proof (JOSE header)                                                | ❌      |
+| Wallet attestation                                                                              | ❌      |
+
 
 ## Disclaimer
 
@@ -180,12 +184,8 @@ perhaps is more convenient since it includes fewer steps.
 
 At the end of the use case, wallet will have an `AuthorizedRequest` instance.
 
-Depending on the capabilities of the token endpoint, this `AuthorizedRequest` will be either 
-- `ProofRequired` : That's the case where Token Endpoint provided a `c_nonce` attribute
-- `NoProofRequired` : Otherwise.
-
-`AuthorizedRequest` will contain the `access_token` (bearer or [DPoP](#demonstrating-proof-of-possession-dpop)), and, if provided,
-the `refresh_token` and `c_nonce`
+`AuthorizedRequest` will contain the `access_token` (bearer or [DPoP](#demonstrating-proof-of-possession-dpop)), if provided 
+the `refresh_token` and authorization and/or resource server DPoP nonce if provided.
 
 #### Authorize wallet for issuance next steps
 
@@ -193,17 +193,13 @@ the `refresh_token` and `c_nonce`
 
 ### Authorization code flow
 
-```mermaid 
+```mermaid
 ---
 title: Authorization Code Flow state transision diagram
 ---
 stateDiagram-v2
-    state c_nonce_returned <<choice>>
     [*] --> AuthorizationRequestPrepared: prepareAuthorizationRequest
-    AuthorizationRequestPrepared --> c_nonce_exists: authorizeWithAuthorizationCode
-    c_nonce_exists --> c_nonce_returned
-    c_nonce_returned --> AuthorizedRequest.ProofRequired : yes
-c_nonce_returned --> AuthorizedRequest.NoProofRequired : no
+    AuthorizationRequestPrepared --> AuthorizedRequest: authorizeWithAuthorizationCode
 ```
 
 #### Authorization code flow preconditions
@@ -219,7 +215,7 @@ In addition to the [common authorization preconditions](#authorize-wallet-for-is
 Library prepares this URL as follows
    - If [PAR](#pushed-authorization-requests) endpoint is advertised it will place a PAR request and assemble the URL for the authorization endpoint
    - If PAR endpoint is not supported (or disabled), it will assemble the URL, as normally, for the authorization endpoint
-   - In both case [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce) will be used
+   - In both cases [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce) will be used
 2. Wallet/Caller opens the mobile's browser to the URL calculated in the previous step
 3. User interacts with the authorization server via mobile device agent, typically providing his authorization
 4. On success, authorization redirects to a wallet provided `redirect_uri`, providing the `code` and a `state` parameters
@@ -261,16 +257,12 @@ val authorizedRequest =
 
 ### Pre-authorized code flow
 
-```mermaid 
+```mermaid
 ---
 title: PreAuthorization Code Flow state transision diagram
 ---
 stateDiagram-v2
-    state c_nonce_returned <<choice>>
-    [*] --> c_nonce_exists: authorizeWithPreAuthorizationCode
-    c_nonce_exists --> c_nonce_returned
-    c_nonce_returned --> AuthorizedRequest.ProofRequired : yes
-c_nonce_returned --> AuthorizedRequest.NoProofRequired : no
+    [*] --> AuthorizedRequest: authorizeWithPreAuthorizationCode
 ```
 
 #### Pre-authorized code flow preconditions
@@ -320,17 +312,15 @@ a specific credential identifier in case token endpoint provided an `authorizati
 - An instance of `AuthorizedRequest` is available
 - Wallet/Caller has decided for which `credential_configuration_id` - found in the offer - the request will be placed for
 - Wallet/Caller has decided which `credential_identifier` - optional attribute found in the `AuthorizedRequest` - the request will be placed for
-- Wallet/Caller has decided if a subset of the claims will be requested or all.
 - Wallet/Caller is ready to provide one or more suitable Proof signers for JWT proofs, if applicable
 
 #### Place credential request steps
 
-1. Wallet/caller using the library assemble the request providing a `credential_configuration_id` and optionally a `credential_identifier`
+1. Wallet/caller using the library assembles the request providing a `credential_configuration_id` and/or optionally a `credential_identifier`
 2. Wallet/caller using the `Issuer` and `AuthorizedRequest` place the request 
 3. Library places the appropriate request against the Credential Endpoint of the Credential Issuer
 4. Library receives the Credential Issuer response and maps it to a `SubmissionOutcome`
 5. Wallet/caller gets back the `SubmissionOutcome` for further processing
-6. Wallet/caller may have to introspect the outcome to assemble a fresh `AuthorizedRequest` carrying possibly a fresh `c_nonce` 
 
 #### Place credential request outcome
 
@@ -338,7 +328,7 @@ The result of placing a request is represented by a `SubmissionOutcome` as follo
 
 - `SubmissionOutcome.Sucess` This represents one or more issued credentials, or
 - `SubmissionOutcome.Deferred` This indicates a deferred issuance and contains a `transaction_id`
-- `SubmissionOutcome.Failed` indication that credential issuer rejected the request, including the `invalid_proof` case.
+- `SubmissionOutcome.Failed` indication that credential issuer rejected the request.
 
 In case of an unexpected error, a runtime exception will be raised.
 
@@ -368,26 +358,16 @@ val (updatedAuthorizedRequest, outcome) =
 > [!TIP]
 > If more than one `popSigner` are passed to function `request` 
 > multiple instances of the credential will be issued, provided that
-> credential issuer supports batch issuance.
+> credential issuer supports batch issuance. 
 
 > [!NOTE]
->
->The ability of the token endpoint  to provide a `c_nonce` is an
-optional feature specified in the OpenId4VCI specification. 
->
->According to the specification, the wallet must be able to receive a 
-`c_nonce` primarily via the credential issuance response, which is represented by `SubmissionOutcome`
-in the library.
->
->For this reason, it is not uncommon that the first request to the credential issuance endpoint
-will have as an outcome `Failed` with an error `InvalidProof`. 
-That's typical if credential issuer's token endpoint doesn't provide a `c_nonce` and 
-proof is required for the requested credential.
->
->The library will automatically try to handle the invalid proof response and place a second request 
-which includes proofs. This can be done only if caller has provided a `popSigner` while 
-invoking `request()`. In case, that this second request fails with `invalid_proof` 
-library will report as `IrrecoverableInvalidProof`.
+> 
+> Library evaluates if proofs are needed to be sent   
+> - If pop signers are provided from caller.
+> - If the requested credential's configuration states so.
+> 
+> If issuer advertises a nonce endpoint library will use it to include a nonce in the generated proofs.  
+
 
 #### Place credential request next steps
 
@@ -693,6 +673,11 @@ Current version of the library supports all metadata specified there except `sig
 can be requested using `authorization_details` or `scope` parameter when using authorization code flow. The current version of the library supports usage of both parameters.
 Though for `authorization_details` we don't support the `format` attribute and its specializations per format.
 Only `credential_configuration_id` attribute is supported.
+
+### Key attestations
+
+Current version of the library does not support [key attestations](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-15.html#appendix-D) 
+neither as a [proof type](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-15.html#section-8.2.1.3) nor as a `key_attestation` header in JWT proofs.
 
 ## How to contribute
 

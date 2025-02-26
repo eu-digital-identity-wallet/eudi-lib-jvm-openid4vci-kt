@@ -129,8 +129,6 @@ internal data class CredentialResponseSuccessTO(
     @SerialName("credentials") val credentials: List<JsonObject>? = null,
     @SerialName("transaction_id") val transactionId: String? = null,
     @SerialName("notification_id") val notificationId: String? = null,
-    @SerialName("c_nonce") val cNonce: String? = null,
-    @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
 ) {
     init {
         if (!credentials.isNullOrEmpty()) {
@@ -153,7 +151,6 @@ internal data class CredentialResponseSuccessTO(
     }
 
     fun toDomain(): SubmissionOutcomeInternal {
-        val cNonce = cNonce?.let { CNonce(cNonce, cNonceExpiresInSeconds) }
         val transactionId = transactionId?.let { TransactionId(it) }
         val notificationId = notificationId?.let(::NotificationId)
 
@@ -169,11 +166,10 @@ internal data class CredentialResponseSuccessTO(
         return when {
             issuedCredentials.isNotEmpty() -> SubmissionOutcomeInternal.Success(
                 issuedCredentials,
-                cNonce,
                 notificationId,
             )
 
-            transactionId != null -> SubmissionOutcomeInternal.Deferred(transactionId, cNonce)
+            transactionId != null -> SubmissionOutcomeInternal.Deferred(transactionId)
             else -> error("Cannot happen")
         }
     }
@@ -186,8 +182,6 @@ internal data class CredentialResponseSuccessTO(
                 credentials = claims["credentials"]?.let { Json.decodeFromJsonElement<List<JsonObject>>(it) },
                 transactionId = jwtClaimsSet.getStringClaim("transaction_id"),
                 notificationId = jwtClaimsSet.getStringClaim("notification_id"),
-                cNonce = jwtClaimsSet.getStringClaim("c_nonce"),
-                cNonceExpiresInSeconds = jwtClaimsSet.getLongClaim("c_nonce_expires_in"),
             )
         }
     }
@@ -303,17 +297,11 @@ internal enum class NotificationEventTO {
 internal data class GenericErrorResponseTO(
     @SerialName("error") val error: String,
     @SerialName("error_description") val errorDescription: String? = null,
-    @SerialName("c_nonce") val cNonce: String? = null,
-    @SerialName("c_nonce_expires_in") val cNonceExpiresInSeconds: Long? = null,
     @SerialName("interval") val interval: Long? = null,
 ) {
 
     fun toIssuanceError(): CredentialIssuanceError = when (error) {
-        "invalid_proof" ->
-            cNonce
-                ?.let { InvalidProof(cNonce, cNonceExpiresInSeconds, errorDescription) }
-                ?: ResponseUnparsable("Issuer responded with invalid_proof error but no c_nonce was provided")
-
+        "invalid_proof" -> InvalidProof(errorDescription)
         "issuance_pending" ->
             interval
                 ?.let { DeferredCredentialIssuancePending(interval) }

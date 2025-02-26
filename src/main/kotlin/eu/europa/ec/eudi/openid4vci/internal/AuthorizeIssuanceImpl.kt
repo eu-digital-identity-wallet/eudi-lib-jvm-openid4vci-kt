@@ -18,8 +18,6 @@ package eu.europa.ec.eudi.openid4vci.internal
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.AccessTokenOption.AsRequested
 import eu.europa.ec.eudi.openid4vci.AccessTokenOption.Limited
-import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.NoProofRequired
-import eu.europa.ec.eudi.openid4vci.AuthorizedRequest.ProofRequired
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidAuthorizationState
 import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationEndpointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
@@ -29,7 +27,6 @@ import com.nimbusds.oauth2.sdk.id.State as NimbusState
 internal data class TokenResponse(
     val accessToken: AccessToken,
     val refreshToken: RefreshToken?,
-    val cNonce: CNonce?,
     val authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> = emptyMap(),
     val timestamp: Instant,
 )
@@ -87,19 +84,27 @@ internal class AuthorizeIssuanceImpl(
         authorizationCode: AuthorizationCode,
         serverState: String,
         authDetailsOption: AccessTokenOption,
-    ): Result<AuthorizedRequest> =
-        runCatching {
-            ensure(serverState == state) { InvalidAuthorizationState() }
-            val credConfigIdsAsAuthDetails = identifiersSentAsAuthDetails.filter(authDetailsOption)
-            val (tokenResponse, newDpopNonce) =
-                tokenEndpointClient.requestAccessTokenAuthFlow(
-                    authorizationCode,
-                    pkceVerifier,
-                    credConfigIdsAsAuthDetails,
-                    dpopNonce,
-                ).getOrThrow()
-            authorizedRequest(credentialOffer, tokenResponse, newDpopNonce, Grant.AuthorizationCode)
-        }
+    ): Result<AuthorizedRequest> = runCatching {
+        ensure(serverState == state) { InvalidAuthorizationState() }
+        val credConfigIdsAsAuthDetails = identifiersSentAsAuthDetails.filter(authDetailsOption)
+        val (tokenResponse, newDpopNonce) =
+            tokenEndpointClient.requestAccessTokenAuthFlow(
+                authorizationCode,
+                pkceVerifier,
+                credConfigIdsAsAuthDetails,
+                dpopNonce,
+            ).getOrThrow()
+
+        AuthorizedRequest(
+            accessToken = tokenResponse.accessToken,
+            refreshToken = tokenResponse.refreshToken,
+            credentialIdentifiers = tokenResponse.authorizationDetails,
+            timestamp = tokenResponse.timestamp,
+            authorizationServerDpopNonce = newDpopNonce,
+            resourceServerDpopNonce = null,
+            grant = Grant.AuthorizationCode,
+        )
+    }
 
     override suspend fun authorizeWithPreAuthorizationCode(
         txCode: String?,
@@ -122,7 +127,16 @@ internal class AuthorizeIssuanceImpl(
                 credConfigIdsAsAuthDetails,
                 dpopNonce = null,
             ).getOrThrow()
-        authorizedRequest(credentialOffer, tokenResponse, newDpopNonce, Grant.PreAuthorizedCodeGrant)
+
+        AuthorizedRequest(
+            accessToken = tokenResponse.accessToken,
+            refreshToken = tokenResponse.refreshToken,
+            credentialIdentifiers = tokenResponse.authorizationDetails,
+            timestamp = tokenResponse.timestamp,
+            authorizationServerDpopNonce = newDpopNonce,
+            resourceServerDpopNonce = null,
+            grant = Grant.PreAuthorizedCodeGrant,
+        )
     }
 }
 
@@ -146,43 +160,6 @@ private fun TxCode.validate(txCode: String?) {
         requireNotNull(txCode.toIntOrNull()) {
             "Issuers expects transaction code to be numeric but is not."
         }
-    }
-}
-
-private fun authorizedRequest(
-    offer: CredentialOffer,
-    tokenResponse: TokenResponse,
-    newDpopNonce: Nonce?,
-    grant: Grant,
-): AuthorizedRequest {
-    val offerRequiresProofs = offer.credentialConfigurationIdentifiers.any {
-        val credentialConfiguration = offer.credentialIssuerMetadata.credentialConfigurationsSupported[it]
-        credentialConfiguration != null && credentialConfiguration.proofTypesSupported.values.isNotEmpty()
-    }
-    val (accessToken, refreshToken, cNonce, authorizationDetails, timestamp) = tokenResponse
-    return when {
-        cNonce != null && offerRequiresProofs ->
-            ProofRequired(
-                accessToken,
-                refreshToken,
-                cNonce = cNonce,
-                authorizationDetails,
-                timestamp,
-                authorizationServerDpopNonce = newDpopNonce,
-                resourceServerDpopNonce = null,
-                grant = grant,
-            )
-
-        else ->
-            NoProofRequired(
-                accessToken,
-                refreshToken,
-                authorizationDetails,
-                timestamp,
-                authorizationServerDpopNonce = newDpopNonce,
-                resourceServerDpopNonce = null,
-                grant = grant,
-            )
     }
 }
 
