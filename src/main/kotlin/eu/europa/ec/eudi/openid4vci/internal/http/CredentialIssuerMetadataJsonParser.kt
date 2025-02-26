@@ -495,7 +495,7 @@ private data class ClaimTO(
 ) {
     fun toDomain(): Claim =
         Claim(
-            mandatory = mandatory ?: false,
+            mandatory = mandatory == true,
             path = path.asClaimPath(),
             display = display?.map { it.toClaimDisplay() } ?: emptyList(),
         )
@@ -511,12 +511,12 @@ private data class DisplayTO(
     @SerialName("logo") val logo: LogoObject? = null,
 ) {
     /**
-     * Converts a [DisplayTO] to a [CredentialIssuerMetadata.Display] instance.
+     * Converts a [DisplayTO] to a [Display] instance.
      */
-    fun toDomain(): CredentialIssuerMetadata.Display {
-        fun LogoObject.toLogo(): CredentialIssuerMetadata.Display.Logo =
-            CredentialIssuerMetadata.Display.Logo(uri?.let { URI.create(it) }, alternativeText)
-        return CredentialIssuerMetadata.Display(name, locale, logo?.toLogo())
+    fun toDomain(): Display {
+        fun LogoObject.toLogo(): Display.Logo =
+            Display.Logo(uri?.let { URI.create(it) }, alternativeText)
+        return Display(name ?: "", locale?.let { Locale.forLanguageTag(it) }, logo?.toLogo())
     }
 
     fun toClaimDisplay(): Claim.Display =
