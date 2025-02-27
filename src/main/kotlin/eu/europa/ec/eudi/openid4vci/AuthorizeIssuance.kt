@@ -45,52 +45,26 @@ enum class Grant : java.io.Serializable {
 /**
  * Sealed hierarchy of states describing an authorized issuance request. These states hold an access token issued by the
  * authorization server that protects the credential issuer.
+ *
+ * @param accessToken Access token authorizing the request(s) to issue credential(s)
+ * @param refreshToken Refresh token to refresh the access token, if needed
+ * @param credentialIdentifiers authorization details, if provided by the token endpoint
+ * @param authorizationServerDpopNonce Nonce value for DPoP provided by the Authorization Server
+ * @param timestamp the point in time of the authorization (when tokens were issued)
+ * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
+ * @param grant The Grant through which the authorization was obtained
  */
-sealed interface AuthorizedRequest : java.io.Serializable {
-
-    /**
-     * Access token authorizing the request(s) to issue credential(s)
-     */
-    val accessToken: AccessToken
-    val refreshToken: RefreshToken?
-    val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?
-    val timestamp: Instant
-
-    /**
-     * Authorization server-provided DPoP Nonce, if any
-     */
-    val authorizationServerDpopNonce: Nonce?
-
-    /**
-     * Protected resource-provided DPoP Nonce, if any
-     */
-    val resourceServerDpopNonce: Nonce?
-
-    /**
-     * The Grant through which the authorization was obtained
-     */
-    val grant: Grant
+data class AuthorizedRequest(
+    val accessToken: AccessToken,
+    val refreshToken: RefreshToken?,
+    val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
+    val timestamp: Instant,
+    val authorizationServerDpopNonce: Nonce?,
+    val resourceServerDpopNonce: Nonce?,
+    val grant: Grant,
+) : java.io.Serializable {
 
     fun isAccessTokenExpired(at: Instant): Boolean = accessToken.isExpired(timestamp, at)
-
-    /**
-     * In case an 'invalid_proof' error response was received from issuer with
-     * fresh c_nonce
-     *
-     * @param cNonce    The c_nonce provided from issuer along the 'invalid_proof' error code.
-     * @return The new state of the request.
-     */
-    fun withCNonce(cNonce: CNonce): ProofRequired =
-        ProofRequired(
-            accessToken = accessToken,
-            refreshToken = refreshToken,
-            cNonce = cNonce,
-            credentialIdentifiers = credentialIdentifiers,
-            timestamp = timestamp,
-            authorizationServerDpopNonce = authorizationServerDpopNonce,
-            resourceServerDpopNonce = resourceServerDpopNonce,
-            grant = grant,
-        )
 
     fun withRefreshedAccessToken(
         refreshedAccessToken: AccessToken,
@@ -98,72 +72,15 @@ sealed interface AuthorizedRequest : java.io.Serializable {
         at: Instant,
         newAuthorizationServerDpopNonce: Nonce?,
     ): AuthorizedRequest =
-        when (this) {
-            is NoProofRequired -> copy(
-                accessToken = refreshedAccessToken,
-                refreshToken = newRefreshToken ?: refreshToken,
-                timestamp = at,
-                authorizationServerDpopNonce = newAuthorizationServerDpopNonce,
-            )
-
-            is ProofRequired -> copy(
-                accessToken = refreshedAccessToken,
-                refreshToken = newRefreshToken ?: refreshToken,
-                timestamp = at,
-                authorizationServerDpopNonce = newAuthorizationServerDpopNonce,
-            )
-        }
+        copy(
+            accessToken = refreshedAccessToken,
+            refreshToken = newRefreshToken ?: refreshToken,
+            timestamp = at,
+            authorizationServerDpopNonce = newAuthorizationServerDpopNonce,
+        )
 
     fun withResourceServerDpopNonce(newResourceServerDpopNonce: Nonce?): AuthorizedRequest =
-        when (this) {
-            is NoProofRequired -> copy(resourceServerDpopNonce = newResourceServerDpopNonce)
-            is ProofRequired -> copy(resourceServerDpopNonce = newResourceServerDpopNonce)
-        }
-
-    /**
-     * Issuer authorized issuance
-     *
-     * @param accessToken Access token authorizing credential issuance
-     * @param refreshToken Refresh token to refresh the access token, if needed
-     * @param credentialIdentifiers authorization details, if provided by the token endpoint
-     * @param timestamp the point in time of the authorization (when tokens were issued)
-     * @param authorizationServerDpopNonce Nonce value for DPoP provided by the Authorization Server
-     * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
-     * @param grant the Grant through which the authorization was obtained
-     */
-    data class NoProofRequired(
-        override val accessToken: AccessToken,
-        override val refreshToken: RefreshToken?,
-        override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
-        override val timestamp: Instant,
-        override val authorizationServerDpopNonce: Nonce?,
-        override val resourceServerDpopNonce: Nonce?,
-        override val grant: Grant,
-    ) : AuthorizedRequest
-
-    /**
-     * Issuer authorized issuance and required the provision of proof of holder's binding to be provided
-     * along with the request
-     *
-     * @param accessToken  Access token authorizing certificate issuance
-     * @param refreshToken Refresh token to refresh the access token, if needed
-     * @param cNonce Nonce value provided by issuer to be included in proof of holder's binding
-     * @param credentialIdentifiers authorization details, if provided by the token endpoint
-     * @param timestamp the point in time of the authorization (when tokens were issued)
-     * @param authorizationServerDpopNonce Nonce value for DPoP provided by the Authorization Server
-     * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
-     * @param grant the Grant through which the authorization was obtained
-     */
-    data class ProofRequired(
-        override val accessToken: AccessToken,
-        override val refreshToken: RefreshToken?,
-        val cNonce: CNonce,
-        override val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
-        override val timestamp: Instant,
-        override val authorizationServerDpopNonce: Nonce?,
-        override val resourceServerDpopNonce: Nonce?,
-        override val grant: Grant,
-    ) : AuthorizedRequest
+        copy(resourceServerDpopNonce = newResourceServerDpopNonce)
 }
 
 sealed interface AccessTokenOption {

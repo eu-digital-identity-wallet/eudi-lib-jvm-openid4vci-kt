@@ -159,10 +159,17 @@ interface Issuer :
                         dPoPJwtFactory,
                         ktorHttpClientFactory,
                     )
+                val nonceEndpointClient = credentialOffer.credentialIssuerMetadata.nonceEndpoint?.let {
+                    NonceEndpointClient(
+                        credentialOffer.credentialIssuerMetadata.nonceEndpoint,
+                        ktorHttpClientFactory,
+                    )
+                }
                 RequestIssuanceImpl(
                     credentialOffer,
                     config,
                     credentialEndpointClient,
+                    nonceEndpointClient,
                     credentialOffer.credentialIssuerMetadata.batchCredentialIssuance,
                     responseEncryptionSpec,
                 )

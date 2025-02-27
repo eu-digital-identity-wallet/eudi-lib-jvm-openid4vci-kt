@@ -54,6 +54,13 @@ val CredentialOfferWithJwtVcJson_NO_GRANTS = """
         }
 """.trimIndent()
 
+val CredentialOfferWithMDLMdoc_NO_GRANTS = """
+        {
+          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+          "credential_configuration_ids": ["$MDL_MsoMdoc"]
+        }
+""".trimIndent()
+
 val CredentialOfferMixedDocTypes_PRE_AUTH_GRANT = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",

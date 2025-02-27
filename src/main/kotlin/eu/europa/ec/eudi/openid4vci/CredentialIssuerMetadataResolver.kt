@@ -19,7 +19,6 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import java.io.Serializable
-import java.net.URI
 import java.net.URL
 
 sealed interface CredentialResponseEncryption : Serializable {
@@ -74,6 +73,7 @@ data class CredentialIssuerMetadata(
     val credentialIssuerIdentifier: CredentialIssuerId,
     val authorizationServers: List<HttpsUrl> = listOf(credentialIssuerIdentifier.value),
     val credentialEndpoint: CredentialIssuerEndpoint,
+    val nonceEndpoint: CredentialIssuerEndpoint? = null,
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val notificationEndpoint: CredentialIssuerEndpoint? = null,
     val credentialResponseEncryption: CredentialResponseEncryption = CredentialResponseEncryption.NotSupported,
@@ -89,25 +89,9 @@ data class CredentialIssuerMetadata(
     inline fun <reified T : CredentialConfiguration> findByFormat(predicate: (T) -> Boolean): Map<CredentialConfigurationIdentifier, T> {
         return credentialConfigurationsSupported.mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }.toMap()
     }
-
-    /**
-     * The display properties of the Credential Issuer.
-     */
-    data class Display(
-        val name: String? = null,
-        val locale: String? = null,
-        val logo: Logo? = null,
-    ) : Serializable {
-        /**
-         * Logo information.
-         */
-        data class Logo(
-            val uri: URI? = null,
-            val alternativeText: String? = null,
-        ) : Serializable
-    }
 }
 
+@Suppress("not used")
 fun CredentialIssuerMetadata.findMsoMdoc(docType: String): MsoMdocCredential? =
     findByFormat<MsoMdocCredential> { it.docType == docType }.values.firstOrNull()
 
@@ -168,6 +152,11 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
      * The URL of the Credential Endpoint is not valid.
      */
     class InvalidCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+
+    /**
+     * The URL of the Nonce Endpoint is not valid.
+     */
+    class InvalidNonceEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The URL of the Deferred Credential Endpoint is not valid.

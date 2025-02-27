@@ -30,13 +30,12 @@ class IssuanceNotificationTest {
     fun `when issuance response contains notification_id, it is present in and can be used for notifications`() = runTest {
         val credential = "issued_credential_content_sd_jwt_vc"
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
+            oiciWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
-            singleIssuanceRequestMocker(
-                credential = credential,
-            ),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(credential),
             RequestMocker(
                 requestMatcher = endsWith("/notification", HttpMethod.Post),
                 responseBuilder = {
@@ -69,36 +68,31 @@ class IssuanceNotificationTest {
             ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
         with(issuer) {
-            when (authorizedRequest) {
-                is AuthorizedRequest.NoProofRequired -> {
-                    val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-                    val popSigner = CryptoGenerator.rsaProofSigner()
-                    val (newAuthorizedRequest, outcome) =
-                        authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
-                    assertIs<SubmissionOutcome.Success>(outcome)
+            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            val popSigner = CryptoGenerator.rsaProofSigner()
+            val (newAuthorizedRequest, outcome) =
+                authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
+            assertIs<SubmissionOutcome.Success>(outcome)
 
-                    val issuedCredential = outcome.credentials.firstOrNull()
-                    assertIs<IssuedCredential>(issuedCredential)
-                    val notId = outcome.notificationId
-                    assertNotNull(notId)
+            val issuedCredential = outcome.credentials.firstOrNull()
+            assertIs<IssuedCredential>(issuedCredential)
+            val notId = outcome.notificationId
+            assertNotNull(notId)
 
-                    newAuthorizedRequest.notify(
-                        CredentialIssuanceEvent.Accepted(
-                            id = notId,
-                            description = "Credential received and validated",
-                        ),
-                    )
-                }
-                else -> fail("State should be Authorized.NoProofRequired when no c_nonce returned from token endpoint")
-            }
+            newAuthorizedRequest.notify(
+                CredentialIssuanceEvent.Accepted(
+                    id = notId,
+                    description = "Credential received and validated",
+                ),
+            )
         }
     }
 
     @Test
     fun `when notification request failed, a Result failure is returned`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(),
+            oiciWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),

@@ -19,8 +19,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.JWK
-import eu.europa.ec.eudi.openid4vci.internal.ClaimSetSerializer
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -100,20 +98,6 @@ sealed interface SubmissionOutcome : java.io.Serializable {
 }
 
 /**
- * Interface to model the set of specific claims that need to be included in the issued credential.
- * This set of claims is modeled differently depending on the credential format.
- */
-sealed interface ClaimSet
-
-@Serializable(with = ClaimSetSerializer::class)
-class MsoMdocClaimSet(claims: List<Pair<Namespace, ClaimName>>) :
-    ClaimSet,
-    List<Pair<Namespace, ClaimName>> by claims
-
-@Serializable
-data class GenericClaimSet(val claims: List<ClaimName>) : ClaimSet
-
-/**
  * Sealed interface to model the payload of an issuance request. Issuance can be requested by providing the credential configuration
  * identifier and a claim set ot by providing a credential identifier retrieved from token endpoint while authorizing an issuance request.
  */
@@ -136,12 +120,9 @@ sealed interface IssuanceRequestPayload {
      * Credential configuration based request payload.
      *
      * @param credentialConfigurationIdentifier The credential configuration identifier
-     * @param claimSet  Optional parameter to specify the specific set of claims that are requested to be included in the
-     *          credential to be issued.
      */
     data class ConfigurationBased(
         override val credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
-        val claimSet: ClaimSet? = null,
     ) : IssuanceRequestPayload
 }
 
@@ -152,31 +133,13 @@ typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
  */
 interface RequestIssuance {
 
-    @Deprecated(
-        message = "Method deprecated and will be removed in a future release",
-        replaceWith = ReplaceWith("request(requestPayload, popSigner?.let(::listOf).orEmpty()"),
-    )
-    suspend fun AuthorizedRequest.requestSingle(
-        requestPayload: IssuanceRequestPayload,
-        popSigner: PopSigner?,
-    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> =
-        request(requestPayload, popSigner?.let(::listOf).orEmpty())
-
     /**
      * Places a request to the credential issuance endpoint.
-     * Method will attempt to automatically retry submission in case
-     * - Initial authorization state is [AuthorizedRequest.NoProofRequired] and
-     * - one or more [popSigners] haven been provided
      *
-     * @receiver the current authorization state
      * @param requestPayload the payload of the request
-     * @param popSigners one or more signers for the proofs to be sent.
-     * Although this is an optional parameter, only required in case the present authorization state is [AuthorizedRequest.ProofRequired],
-     * caller is advised to provide it, to allow the method to automatically retry
-     * in case of [CredentialIssuanceError.InvalidProof]
-     *
-     * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh c_nonce and/or
-     * updated Resource-Server DPoP Nonce) and the [SubmissionOutcome]
+     * @param popSigners one or more signers for the proofs to be sent. Required when requested credential's configuration requires proof.
+     * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh updated Resource-Server DPoP Nonce)
+     * and the [SubmissionOutcome]
      */
     suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
@@ -274,12 +237,10 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     ) : CredentialIssuanceError(message)
 
     /**
-     * Issuer rejected the issuance request because no c_nonce was provided along with the proof.
-     * A fresh c_nonce is provided by the issuer.
+     * Issuer rejected the issuance request because no or invalid proof(s) were provided or at least one of the key proofs does
+     * not contain a c_nonce value.
      */
     data class InvalidProof(
-        val cNonce: String,
-        val cNonceExpiresIn: Long? = 5,
         val errorDescription: String? = null,
     ) : CredentialIssuanceError("Invalid Proof")
 
@@ -359,6 +320,11 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
      * Issuance server response is un-parsable
      */
     data class ResponseUnparsable(val error: String) : CredentialIssuanceError("ResponseUnparsable")
+
+    /**
+     * Request to nonce endpoint of issuer failed
+     */
+    data class CNonceRequestFailed(val error: String) : CredentialIssuanceError("CNonceRequestFailed")
 
     /**
      * Sealed hierarchy of errors related to proof generation

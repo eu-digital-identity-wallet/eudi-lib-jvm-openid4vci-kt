@@ -71,7 +71,7 @@ private suspend fun submit(
 ): AuthorizedRequestAnd<List<IssuedCredential>> {
     with(issuer) {
         val proofSigners = popSigners(credentialConfigurationId, proofsNo = 1)
-        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
+        val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
         val (newAuthorized, outcome) =
             authorized.request(requestPayload, proofSigners).getOrThrow()
 

@@ -29,10 +29,7 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.*
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.util.*
 import kotlin.test.Test
@@ -40,7 +37,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class IssuanceEncryptedResponsesTest {
+class IssuanceIssuerMetadataVersionTest {
 
     @Test
     fun `when encryption algorithm is not supported by issuer then throw ResponseEncryptionAlgorithmNotSupportedByIssuer`() =
@@ -49,7 +46,7 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oidcWellKnownMocker(EncryptedResponses.REQUIRED),
+                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             )
             val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
@@ -75,7 +72,7 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oidcWellKnownMocker(EncryptedResponses.REQUIRED),
+                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             )
             val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
@@ -101,7 +98,7 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oidcWellKnownMocker(EncryptedResponses.NOT_SUPPORTED),
+                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_NOT_SUPPORTED),
             )
             val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
@@ -130,7 +127,7 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oidcWellKnownMocker(EncryptedResponses.SUPPORTED_NOT_REQUIRED),
+                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED),
             )
 
             assertFailsWith<WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated>(
@@ -154,7 +151,8 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oidcWellKnownMocker(EncryptedResponses.NOT_SUPPORTED),
+                nonceEndpointMocker(),
+                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_NOT_SUPPORTED),
                 singleIssuanceRequestMocker(
                     requestValidator = {
                         val textContent = it.body as TextContent
@@ -177,10 +175,10 @@ class IssuanceEncryptedResponsesTest {
             )
 
             with(issuer) {
-                val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-                noProofRequired.request(requestPayload).getOrThrow()
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
+                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
             }
         }
 
@@ -191,8 +189,23 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oidcWellKnownMocker(EncryptedResponses.SUPPORTED_NOT_REQUIRED),
+                nonceEndpointMocker(),
+                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED),
                 singleIssuanceRequestMocker(
+                    responseBuilder = {
+                        encryptedResponseDataBuilder(it) {
+                            Json.encodeToString(
+                                CredentialResponseSuccessTO(
+                                    credentials = listOf(
+                                        buildJsonObject {
+                                            put("credential", "issued_credential")
+                                        },
+                                    ),
+                                    notificationId = "fgh126lbHjtspVbn",
+                                ),
+                            )
+                        }
+                    },
                     requestValidator = {
                         val textContent = it.body as TextContent
                         val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
@@ -214,10 +227,10 @@ class IssuanceEncryptedResponsesTest {
             )
 
             with(issuer) {
-                val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-                noProofRequired.request(requestPayload).getOrThrow()
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
+                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
             }
         }
 
@@ -228,7 +241,8 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oidcWellKnownMocker(EncryptedResponses.SUPPORTED_NOT_REQUIRED),
+                nonceEndpointMocker(),
+                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED),
                 singleIssuanceRequestMocker(
                     requestValidator = {
                         val textContent = it.body as TextContent
@@ -246,10 +260,10 @@ class IssuanceEncryptedResponsesTest {
             )
 
             with(issuer) {
-                val noProofRequired = authorizedRequest as AuthorizedRequest.NoProofRequired
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, null)
-                noProofRequired.request(requestPayload).getOrThrow()
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
+                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
             }
         }
 
@@ -260,16 +274,20 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oidcWellKnownMocker(EncryptedResponses.REQUIRED),
+                nonceEndpointMocker(),
+                nonceEndpointMocker(),
+                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
                         encryptedResponseDataBuilder(it) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
-                                    credential = JsonPrimitive("issued_credential"),
+                                    credentials = listOf(
+                                        buildJsonObject {
+                                            put("credential", "issued_credential")
+                                        },
+                                    ),
                                     notificationId = "fgh126lbHjtspVbn",
-                                    cNonce = "wlbQc6pCJp",
-                                    cNonceExpiresInSeconds = 86400,
                                 ),
                             )
                         }
@@ -301,13 +319,6 @@ class IssuanceEncryptedResponsesTest {
                     },
                 ),
             )
-            val claimSet = MsoMdocClaimSet(
-                claims = listOf(
-                    "org.iso.18013.5.1" to "given_name",
-                    "org.iso.18013.5.1" to "family_name",
-                    "org.iso.18013.5.1" to "birth_date",
-                ),
-            )
 
             val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
@@ -322,10 +333,10 @@ class IssuanceEncryptedResponsesTest {
             )
 
             with(issuer) {
-                assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSet)
-                val (_, outcome) = authorizedRequest.request(requestPayload).getOrThrow()
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
+                val (_, outcome) = authorizedRequest.request(requestPayload, popSigners).getOrThrow()
                 assertIs<SubmissionOutcome.Success>(outcome)
             }
         }
@@ -337,17 +348,18 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oidcWellKnownMocker(EncryptedResponses.REQUIRED),
+                nonceEndpointMocker(),
+                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
                         encryptedResponseDataBuilder(it) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
-                                    credentials = buildJsonArray {
-                                        add("${PID_MsoMdoc}_issued_credential")
-                                    },
-                                    cNonce = "wlbQc6pCJp",
-                                    cNonceExpiresInSeconds = 86400,
+                                    credentials = listOf(
+                                        buildJsonObject {
+                                            put("credential", "${PID_MsoMdoc}_issued_credential")
+                                        },
+                                    ),
                                 ),
                             )
                         }
@@ -384,7 +396,8 @@ class IssuanceEncryptedResponsesTest {
 
             with(issuer) {
                 val payload = IssuanceRequestPayload.ConfigurationBased(CredentialConfigurationIdentifier(PID_MsoMdoc))
-                authorizedRequest.request(payload).getOrThrow()
+                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
+                authorizedRequest.request(payload, popSigners).getOrThrow()
             }
         }
 
@@ -395,15 +408,18 @@ class IssuanceEncryptedResponsesTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oidcWellKnownMocker(EncryptedResponses.REQUIRED),
+                nonceEndpointMocker(),
+                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
                         encryptedResponseDataBuilder(it) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
-                                    credentials = buildJsonArray { add("${PID_MsoMdoc}_issued_credential") },
-                                    cNonce = "wlbQc6pCJp",
-                                    cNonceExpiresInSeconds = 86400,
+                                    credentials = listOf(
+                                        buildJsonObject {
+                                            put("credential", "${PID_MsoMdoc}_issued_credential")
+                                        },
+                                    ),
                                 ),
                             )
                         }
@@ -427,7 +443,7 @@ class IssuanceEncryptedResponsesTest {
             val (_, outcome) = with(issuer) {
                 authorizedRequest.request(
                     IssuanceRequestPayload.ConfigurationBased(CredentialConfigurationIdentifier(PID_MsoMdoc)),
-                    emptyList(),
+                    listOf(CryptoGenerator.rsaProofSigner()),
                 ).getOrThrow()
             }
             assertIs<SubmissionOutcome.Success>(outcome)
@@ -437,10 +453,11 @@ class IssuanceEncryptedResponsesTest {
     fun `when issuance request mandates encrypted responses and deferred response is not encrypted, throw InvalidResponseContentType`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                oidcWellKnownMocker(EncryptedResponses.REQUIRED),
+                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
+                nonceEndpointMocker(),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
                         encryptedResponseDataBuilder(it) {
@@ -466,12 +483,12 @@ class IssuanceEncryptedResponsesTest {
             )
 
             with(issuer) {
-                assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                     CredentialConfigurationIdentifier(PID_SdJwtVC),
                 )
+                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
                 val (newAuthorizedRequest, outcome) =
-                    authorizedRequest.request(requestPayload).getOrThrow()
+                    authorizedRequest.request(requestPayload, popSigners).getOrThrow()
                 assertIs<SubmissionOutcome.Deferred>(outcome)
 
                 assertFailsWith<CredentialIssuanceError.InvalidResponseContentType>(
@@ -490,10 +507,11 @@ class IssuanceEncryptedResponsesTest {
             encryptionMethod = EncryptionMethod.A128CBC_HS256,
         )
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oidcWellKnownMocker(EncryptedResponses.REQUIRED),
+            oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
+            nonceEndpointMocker(),
             singleIssuanceRequestMocker(
                 responseBuilder = {
                     encryptedResponseDataBuilder(it) {
@@ -505,9 +523,7 @@ class IssuanceEncryptedResponsesTest {
                 responseBuilder = {
                     val responseJson = """
                             {                     
-                              "credential": "credential_content",
-                              "c_nonce": "ERE%@^TGWYEYWEY",
-                              "c_nonce_expires_in": 34
+                              "credentials": [{ "credential": "credential_content" }]
                             }
                     """.trimIndent()
                     respond(
@@ -533,13 +549,12 @@ class IssuanceEncryptedResponsesTest {
         )
 
         with(issuer) {
-            assertIs<AuthorizedRequest.NoProofRequired>(authorizedRequest)
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
-                null,
             )
+            val popSigners = listOf(CryptoGenerator.rsaProofSigner())
             val (newAuthorizedRequest, outcome) =
-                authorizedRequest.request(requestPayload).getOrThrow()
+                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
             assertIs<SubmissionOutcome.Deferred>(outcome)
 
             val (_, deferredOutcome) =

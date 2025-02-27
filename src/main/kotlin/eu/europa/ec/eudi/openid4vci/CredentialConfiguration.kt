@@ -57,7 +57,10 @@ enum class ProofType : Serializable {
 }
 
 sealed interface ProofTypeMeta : Serializable {
-    data class Jwt(val algorithms: List<JWSAlgorithm>) : ProofTypeMeta {
+    data class Jwt(
+        val algorithms: List<JWSAlgorithm>,
+        val keyAttestationRequirement: KeyAttestationRequirement,
+    ) : ProofTypeMeta {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of JWT cannot be empty" }
         }
@@ -68,6 +71,28 @@ sealed interface ProofTypeMeta : Serializable {
     }
 
     data class Unsupported(val type: String) : ProofTypeMeta
+}
+
+sealed interface KeyAttestationRequirement {
+
+    data object NotRequired : KeyAttestationRequirement {
+        private fun readResolve(): Any = NotRequired
+    }
+
+    data object RequiredNoConstraints : KeyAttestationRequirement {
+        private fun readResolve(): Any = RequiredNoConstraints
+    }
+
+    data class Required(
+        val keyStorageConstraints: List<String>,
+        val userAuthenticationConstraints: List<String>,
+    ) : KeyAttestationRequirement {
+        init {
+            require(keyStorageConstraints.isNotEmpty() || userAuthenticationConstraints.isNotEmpty()) {
+                "Either key storage or user authentication constraints must be provided"
+            }
+        }
+    }
 }
 
 fun ProofTypeMeta.type(): ProofType? = when (this) {
@@ -103,6 +128,7 @@ data class Display(
     val logo: Logo? = null,
     val description: String? = null,
     val backgroundColor: CssColor? = null,
+    val backgroundImage: URI? = null,
     val textColor: CssColor? = null,
 ) : Serializable {
 
@@ -124,6 +150,7 @@ sealed interface CredentialConfiguration : Serializable {
     val credentialSigningAlgorithmsSupported: List<String>
     val proofTypesSupported: ProofTypesSupported
     val display: List<Display>
+    val claims: List<Claim>?
 }
 
 /**
@@ -131,8 +158,8 @@ sealed interface CredentialConfiguration : Serializable {
  */
 @kotlinx.serialization.Serializable
 data class Claim(
+    @SerialName("path") val path: ClaimPath,
     @SerialName("mandatory") val mandatory: Boolean? = false,
-    @SerialName("value_type") val valueType: String? = null,
     @SerialName("display") val display: List<Display> = emptyList(),
 ) : Serializable {
 
@@ -146,14 +173,6 @@ data class Claim(
         @SerialName("locale") val locale: Locale? = null,
     ) : Serializable
 }
-typealias Namespace = String
-typealias ClaimName = String
-typealias MsoMdocClaims = Map<Namespace, Map<ClaimName, Claim>>
-
-fun MsoMdocClaims.toClaimSet(): MsoMdocClaimSet = MsoMdocClaimSet(
-    mapValues { (_, claims) -> claims.keys.toList() }
-        .flatMap { (nameSpace, claims) -> claims.map { claimName -> nameSpace to claimName } },
-)
 
 data class MsoMdocPolicy(val oneTimeUse: Boolean, val batchSize: Int?) : Serializable
 
@@ -170,8 +189,7 @@ data class MsoMdocCredential(
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val display: List<Display> = emptyList(),
     val docType: String,
-    val claims: MsoMdocClaims = emptyMap(),
-    val order: List<ClaimName> = emptyList(),
+    override val claims: List<Claim> = emptyList(),
 ) : CredentialConfiguration
 
 data class SdJwtVcCredential(
@@ -181,14 +199,12 @@ data class SdJwtVcCredential(
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val display: List<Display> = emptyList(),
     val type: String,
-    val claims: Map<ClaimName, Claim?>?,
-    val order: List<ClaimName> = emptyList(),
+    override val claims: List<Claim> = emptyList(),
 ) : CredentialConfiguration
 
 data class W3CJsonLdCredentialDefinition(
     val context: List<URL>,
     val type: List<String>,
-    val credentialSubject: Map<ClaimName, Claim?>?,
 )
 
 /**
@@ -200,10 +216,8 @@ data class W3CJsonLdDataIntegrityCredential(
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val display: List<Display> = emptyList(),
-    val context: List<String> = emptyList(),
-    val type: List<String> = emptyList(),
     val credentialDefinition: W3CJsonLdCredentialDefinition,
-    val order: List<ClaimName> = emptyList(),
+    override val claims: List<Claim> = emptyList(),
 ) : CredentialConfiguration
 
 /**
@@ -215,9 +229,8 @@ data class W3CJsonLdSignedJwtCredential(
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val display: List<Display> = emptyList(),
-    val context: List<String> = emptyList(),
     val credentialDefinition: W3CJsonLdCredentialDefinition,
-    val order: List<ClaimName> = emptyList(),
+    override val claims: List<Claim> = emptyList(),
 ) : CredentialConfiguration
 
 /**
@@ -230,11 +243,10 @@ data class W3CSignedJwtCredential(
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val display: List<Display> = emptyList(),
     val credentialDefinition: CredentialDefinition,
-    val order: List<ClaimName> = emptyList(),
+    override val claims: List<Claim> = emptyList(),
 ) : CredentialConfiguration {
 
     data class CredentialDefinition(
         val type: List<String>,
-        val credentialSubject: Map<ClaimName, Claim?>?,
     )
 }
