@@ -318,3 +318,24 @@ value class Nonce(val value: String) {
     }
     override fun toString(): String = value
 }
+
+/**
+ * Checks if a [X509Certificate] chain is trusted or not.
+ */
+fun interface CertificateChainTrust {
+    fun isTrusted(chain: List<X509Certificate>): Boolean
+}
+
+/**
+ * Mechanism a Wallet can establish trust with a JWT Issuer.
+ */
+sealed interface IssuerTrust {
+
+    data class ByPublicKey(val jwk: JWK) : IssuerTrust {
+        init {
+            require(!jwk.isPrivate) { "Only public JWKs are supported" }
+        }
+    }
+
+    data class ByCertificateChain(val certificateChainTrust: CertificateChainTrust) : IssuerTrust
+}

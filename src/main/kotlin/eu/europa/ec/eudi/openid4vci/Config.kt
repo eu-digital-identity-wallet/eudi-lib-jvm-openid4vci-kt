@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.ParUsage.*
 import java.net.URI
 import java.time.Clock
 
@@ -76,6 +77,7 @@ data class OpenId4VCIConfig(
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
+    val issuerMetadataPolicy: IssuerMetadataPolicy,
 ) {
 
     constructor(
@@ -88,6 +90,7 @@ data class OpenId4VCIConfig(
         clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
+        issuerMetadataPolicy: IssuerMetadataPolicy,
     ) : this(
         Client.Public(clientId),
         authFlowRedirectionURI,
@@ -98,6 +101,7 @@ data class OpenId4VCIConfig(
         clientAttestationPoPBuilder,
         parUsage,
         clock,
+        issuerMetadataPolicy,
     )
 
     init {
@@ -193,4 +197,26 @@ data class EcConfig(
 enum class AuthorizeIssuanceConfig {
     FAVOR_SCOPES,
     AUTHORIZATION_DETAILS,
+}
+
+/**
+ * Wallet's policy concerning the metadata of the Credential Issuer.
+ */
+sealed interface IssuerMetadataPolicy {
+
+    /**
+     * Credential Issuer **must** provide signed metadata. Only values from signed metadata are used.
+     */
+    data class RequireSigned(val issuerTrust: IssuerTrust) : IssuerMetadataPolicy
+
+    /**
+     * Credential Issuer **may** provide signed metadata. If signed metadata are provided, values conveyed in the singed
+     * metadata take precedence over their corresponding unsigned counterparts.
+     */
+    data class PreferSigned(val issuerTrust: IssuerTrust) : IssuerMetadataPolicy
+
+    /**
+     * Signed metadata are ignored. Only values conveyed using plain json elements are used.
+     */
+    data object RequireUnsigned : IssuerMetadataPolicy
 }

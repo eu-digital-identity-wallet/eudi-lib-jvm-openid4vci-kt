@@ -82,6 +82,7 @@ private enum class InputModeTO {
 
 internal class DefaultCredentialOfferRequestResolver(
     private val httpClient: HttpClient,
+    private val issuerMetadataPolicy: IssuerMetadataPolicy,
 ) : CredentialOfferRequestResolver {
     override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> = runCatching {
         val credentialOffer = fetchOffer(request)
@@ -140,7 +141,7 @@ internal class DefaultCredentialOfferRequestResolver(
     }
 
     private suspend fun fetchIssuerMetaData(credentialIssuerId: CredentialIssuerId): CredentialIssuerMetadata =
-        with(DefaultCredentialIssuerMetadataResolver(httpClient)) {
+        with(DefaultCredentialIssuerMetadataResolver(httpClient, issuerMetadataPolicy)) {
             resolve(credentialIssuerId)
                 .getOrElse { throw UnableToResolveCredentialIssuerMetadata(it).toException() }
         }

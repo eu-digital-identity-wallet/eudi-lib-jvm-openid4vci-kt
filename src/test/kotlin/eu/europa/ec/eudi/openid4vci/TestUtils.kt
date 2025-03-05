@@ -94,6 +94,7 @@ val OpenId4VCIConfiguration = OpenId4VCIConfig(
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
     credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+    issuerMetadataPolicy = IssuerMetadataPolicy.RequireUnsigned,
 )
 
 suspend fun authorizeRequestForCredentialOffer(

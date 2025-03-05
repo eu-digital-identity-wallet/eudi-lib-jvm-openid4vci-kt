@@ -279,7 +279,7 @@ class RichAuthorizationRequestTest {
         ktorHttpClientFactory: KtorHttpClientFactory,
         credentialOfferStr: String,
     ): CredentialOffer {
-        return CredentialOfferRequestResolver(ktorHttpClientFactory = ktorHttpClientFactory)
+        return CredentialOfferRequestResolver(ktorHttpClientFactory, IssuerMetadataPolicy.RequireUnsigned)
             .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
             .getOrThrow()
     }

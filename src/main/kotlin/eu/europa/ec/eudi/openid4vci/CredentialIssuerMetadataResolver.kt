@@ -131,6 +131,16 @@ sealed class CredentialIssuerMetadataError(cause: Throwable) : Throwable(cause),
      * Indicates the Credential Issuer metadata could not be parsed.
      */
     class NonParseableCredentialIssuerMetadata(cause: Throwable) : CredentialIssuerMetadataError(cause)
+
+    /**
+     * Indicates the Credential Issuer does not provide signed metadata.
+     */
+    class MissingSignedMetadata() : CredentialIssuerMetadataError(IllegalArgumentException("missing signed_metadata"))
+
+    /**
+     * Indicates the signed metadata of the Credential Issuer are not valid.
+     */
+    class InvalidSignedMetadata(cause: Throwable) : CredentialIssuerMetadataError(cause)
 }
 
 /**
@@ -212,9 +222,10 @@ fun interface CredentialIssuerMetadataResolver {
          */
         operator fun invoke(
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            issuerMetadataPolicy: IssuerMetadataPolicy,
         ): CredentialIssuerMetadataResolver = CredentialIssuerMetadataResolver { issuerId ->
             ktorHttpClientFactory.invoke().use { httpClient ->
-                val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
+                val resolver = DefaultCredentialIssuerMetadataResolver(httpClient, issuerMetadataPolicy)
                 resolver.resolve(issuerId)
             }
         }

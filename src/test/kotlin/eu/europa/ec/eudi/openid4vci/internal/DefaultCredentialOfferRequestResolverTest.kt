@@ -33,7 +33,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
         mockedKtorHttpClientFactory(oiciWellKnownMocker(), authServerWellKnownMocker())
             .invoke()
             .use { httpClient ->
-                val resolver = DefaultCredentialOfferRequestResolver(httpClient)
+                val resolver = DefaultCredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.RequireUnsigned)
                 val credentialOfferJson =
                     """
                     {
@@ -72,7 +72,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
         mockedKtorHttpClientFactory(oiciWellKnownMocker(), authServerWellKnownMocker())
             .invoke()
             .use { httpClient ->
-                val resolver = DefaultCredentialOfferRequestResolver(httpClient)
+                val resolver = DefaultCredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.RequireUnsigned)
                 val credentialOfferJson =
                     """
                     {

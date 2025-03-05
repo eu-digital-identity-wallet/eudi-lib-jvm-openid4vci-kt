@@ -73,11 +73,12 @@ interface Issuer :
          */
         suspend fun metaData(
             httpClient: HttpClient,
+            issuerMetadataPolicy: IssuerMetadataPolicy,
             credentialIssuerId: CredentialIssuerId,
         ): Pair<CredentialIssuerMetadata, List<CIAuthorizationServerMetadata>> = coroutineScope {
             with(httpClient) {
                 val issuerMetadata = run {
-                    val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
+                    val resolver = DefaultCredentialIssuerMetadataResolver(httpClient, issuerMetadataPolicy)
                     resolver.resolve(credentialIssuerId).getOrThrow()
                 }
                 val authorizationServersMetadata =
@@ -261,7 +262,7 @@ interface Issuer :
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Result<Issuer> = runCatching {
-            val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory)
+            val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory, config.issuerMetadataPolicy)
             val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUri).getOrThrow()
             make(config, credentialOffer, ktorHttpClientFactory, responseEncryptionSpecFactory).getOrThrow()
         }
@@ -295,7 +296,7 @@ interface Issuer :
             }
 
             val (credentialIssuerMetadata, authServersMetadata) =
-                ktorHttpClientFactory().use { httpClient -> metaData(httpClient, credentialIssuerId) }
+                ktorHttpClientFactory().use { httpClient -> metaData(httpClient, config.issuerMetadataPolicy, credentialIssuerId) }
 
             val credentialOffer =
                 CredentialOffer(

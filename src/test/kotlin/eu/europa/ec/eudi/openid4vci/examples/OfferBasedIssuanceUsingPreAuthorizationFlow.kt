@@ -26,7 +26,8 @@ fun main(): Unit = runBlocking {
         client = Client.Public("218232426"),
         authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
         keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-        CredentialResponseEncryptionPolicy.SUPPORTED,
+        credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+        issuerMetadataPolicy = IssuerMetadataPolicy.RequireUnsigned,
     )
     val credentialOfferUrl =
         "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Ftrial.authlete.net" +
