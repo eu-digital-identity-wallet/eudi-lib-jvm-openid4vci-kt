@@ -26,7 +26,10 @@ import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.assertDoesNotThrow
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 internal class DefaultCredentialIssuerMetadataResolverTest {
 
@@ -88,7 +91,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
     @Test
     internal fun `fails when response encryption algorithms are not asymmetric`() = runTest {
-        val credentialIssuerId = CredentialIssuerId("https://issuer.com").getOrThrow()
+        val credentialIssuerId = SampleIssuer.Id
+
         val resolver = resolver(
             credentialIssuerMetaDataHandler(
                 credentialIssuerId,

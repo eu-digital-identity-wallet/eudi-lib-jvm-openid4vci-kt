@@ -67,21 +67,15 @@ internal object CredentialIssuerMetadataJsonParser {
         return when (policy) {
             is IssuerMetadataPolicy.RequireSigned -> {
                 val signedMetadata = signedMetadata(policy.issuerTrust) ?: throw CredentialIssuerMetadataError.MissingSignedMetadata()
-                signedMetadata.toDomain()
+                signedMetadata.toDomain(issuer)
             }
 
             is IssuerMetadataPolicy.PreferSigned -> {
                 val signedMetadata = signedMetadata(policy.issuerTrust)
-                signedMetadata?.mergeWith(metadata)?.toDomain() ?: metadata.toDomain()
+                signedMetadata?.mergeWith(metadata)?.toDomain(issuer) ?: metadata.toDomain(issuer)
             }
 
-            IssuerMetadataPolicy.IgnoreSigned -> metadata.toDomain()
-        }.also { metaData ->
-            ensure(metaData.credentialIssuerIdentifier == issuer) {
-                InvalidCredentialIssuerId(
-                    IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
-                )
-            }
+            IssuerMetadataPolicy.IgnoreSigned -> metadata.toDomain(issuer)
         }
     }
 }
@@ -656,13 +650,19 @@ private fun CredentialIssuerMetadataTO.mergeWith(other: CredentialIssuerMetadata
 /**
  * Converts and validates [CredentialIssuerMetadataTO] as [CredentialIssuerMetadata] instance.
  */
-private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
+private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuerId): CredentialIssuerMetadata {
     fun ensureHttpsUrl(s: String, ex: (Throwable) -> Throwable) = HttpsUrl(s).ensureSuccess(ex)
 
     val credentialIssuerIdentifier = ensureNotNull(credentialIssuerIdentifier) {
         InvalidCredentialIssuerId(IllegalArgumentException("missing credential_issuer"))
     }.let {
         CredentialIssuerId(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialIssuerId)
+    }.also {
+        ensure(it == expectedIssuer) {
+            InvalidCredentialIssuerId(
+                IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
+            )
+        }
     }
 
     val authorizationServers = (authorizationServers)
