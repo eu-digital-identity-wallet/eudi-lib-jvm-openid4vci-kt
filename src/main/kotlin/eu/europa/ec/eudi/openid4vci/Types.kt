@@ -323,7 +323,7 @@ value class Nonce(val value: String) {
  * Checks if a [X509Certificate] chain is trusted or not.
  */
 fun interface CertificateChainTrust {
-    fun isTrusted(chain: List<X509Certificate>): Boolean
+    suspend fun isTrusted(chain: List<X509Certificate>): Boolean
 }
 
 /**

@@ -119,7 +119,7 @@ private fun CredentialIssuerId.wellKnown() = URLBuilder(Url(value.value.toURI())
  * @param issuerTrust trust anchor for the issuer of the signed metadata
  * @param issuer the id of the Credential Issuer whose signed metadata to parse
  */
-private fun parseAndVerifySignedMetadata(
+private suspend fun parseAndVerifySignedMetadata(
     jwt: String,
     issuerTrust: IssuerTrust,
     issuer: CredentialIssuerId,
@@ -139,7 +139,7 @@ private fun parseAndVerifySignedMetadata(
 /**
  * Verifies [jwt] is signed by a trusted issuer.
  */
-private fun IssuerTrust.verify(jwt: SignedJWT): Boolean {
+private suspend fun IssuerTrust.verify(jwt: SignedJWT): Boolean {
     fun JWK.jwsVerifier(): JWSVerifier =
         when (this) {
             is RSAKey -> RSASSAVerifier(this)
