@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.ParUsage.*
 import java.net.URI
 import java.time.Clock
 
@@ -66,6 +65,7 @@ sealed interface Client : java.io.Serializable {
  * @param clientAttestationPoPBuilder a way to build a [ClientAttestationPoPJWT]
  * @param parUsage whether to use PAR in case of authorization code grant
  * @param clock Wallet's clock
+ * @param issuerMetadataPolicy policy concerning signed metadata usage
  */
 data class OpenId4VCIConfig(
     val client: Client,
@@ -77,7 +77,7 @@ data class OpenId4VCIConfig(
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
-    val issuerMetadataPolicy: IssuerMetadataPolicy,
+    val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.RequireUnsigned,
 ) {
 
     constructor(
@@ -90,7 +90,7 @@ data class OpenId4VCIConfig(
         clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
-        issuerMetadataPolicy: IssuerMetadataPolicy,
+        issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.RequireUnsigned,
     ) : this(
         Client.Public(clientId),
         authFlowRedirectionURI,
