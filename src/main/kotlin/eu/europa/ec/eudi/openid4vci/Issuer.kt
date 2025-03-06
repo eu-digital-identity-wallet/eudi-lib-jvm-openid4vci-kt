@@ -66,20 +66,21 @@ interface Issuer :
          * of [CIAuthorizationServerMetadata][OAUTH2 server(s) metadata] used by the issuer
          *
          * @param httpClient The client to fetch the metadata
-         * @param credentialIssuerId The id of the credential issuer.
+         * @param credentialIssuerId The id of the credential issuer
+         * @param policy policy for signed metadata
          *
          * @return the issuer's [CredentialIssuerMetadata] and list
          *  of [CIAuthorizationServerMetadata][OAUTH2 server(s) metadata] used by the issuer
          */
         suspend fun metaData(
             httpClient: HttpClient,
-            issuerMetadataPolicy: IssuerMetadataPolicy,
             credentialIssuerId: CredentialIssuerId,
+            policy: IssuerMetadataPolicy,
         ): Pair<CredentialIssuerMetadata, List<CIAuthorizationServerMetadata>> = coroutineScope {
             with(httpClient) {
                 val issuerMetadata = run {
-                    val resolver = DefaultCredentialIssuerMetadataResolver(httpClient, issuerMetadataPolicy)
-                    resolver.resolve(credentialIssuerId).getOrThrow()
+                    val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
+                    resolver.resolve(credentialIssuerId, policy).getOrThrow()
                 }
                 val authorizationServersMetadata =
                     issuerMetadata.authorizationServers.distinct().map { authServerUrl ->
@@ -296,7 +297,7 @@ interface Issuer :
             }
 
             val (credentialIssuerMetadata, authServersMetadata) =
-                ktorHttpClientFactory().use { httpClient -> metaData(httpClient, config.issuerMetadataPolicy, credentialIssuerId) }
+                ktorHttpClientFactory().use { httpClient -> metaData(httpClient, credentialIssuerId, config.issuerMetadataPolicy) }
 
             val credentialOffer =
                 CredentialOffer(

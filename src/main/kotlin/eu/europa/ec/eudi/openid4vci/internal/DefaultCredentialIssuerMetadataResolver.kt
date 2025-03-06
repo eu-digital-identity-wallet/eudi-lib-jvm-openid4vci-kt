@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vci.internal
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.crypto.Ed25519Verifier
@@ -53,10 +52,12 @@ import java.util.*
 
 internal class DefaultCredentialIssuerMetadataResolver(
     private val httpClient: HttpClient,
-    private val issuerMetadataPolicy: IssuerMetadataPolicy,
 ) : CredentialIssuerMetadataResolver {
 
-    override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> = runCatching {
+    override suspend fun resolve(
+        issuer: CredentialIssuerId,
+        policy: IssuerMetadataPolicy,
+    ): Result<CredentialIssuerMetadata> = runCatching {
         val wellKnownUrl = issuer.wellKnown()
         val json = try {
             httpClient.get(wellKnownUrl).body<String>()
@@ -65,25 +66,30 @@ internal class DefaultCredentialIssuerMetadataResolver(
         }
 
         val unsignedMetadata = try {
-            JsonSupport.decodeFromString<UnsignedCredentialIssuerMetadataTO>(json)
+            JsonSupport.decodeFromString<CredentialIssuerMetadataTO>(json)
         } catch (t: Throwable) {
             throw CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(t)
         }
 
-        when (issuerMetadataPolicy) {
+        when (policy) {
             is IssuerMetadataPolicy.RequireSigned -> {
-                val signedMetadataJwt =
-                    unsignedMetadata.signedMetadata ?: throw CredentialIssuerMetadataError.MissingSignedMetadata()
-                val signedMetadata =
-                    parseAndVerifySignedMetadata(signedMetadataJwt, issuerMetadataPolicy.issuerTrust, issuer)
-                        .getOrElse { throw CredentialIssuerMetadataError.InvalidSignedMetadata(it) }
-                signedMetadata.toDomain(null)
+                val signedMetadataJwt = unsignedMetadata.signedMetadata ?: throw CredentialIssuerMetadataError.MissingSignedMetadata()
+                val signedMetadata = parseAndVerifySignedMetadata(
+                    signedMetadataJwt,
+                    policy.issuerTrust,
+                    issuer,
+                ).getOrElse { throw CredentialIssuerMetadataError.InvalidSignedMetadata(it) }
+
+                signedMetadata.toDomain()
             }
 
             is IssuerMetadataPolicy.PreferSigned -> {
                 val signedMetadata = unsignedMetadata.signedMetadata?.let { signedMetadataJwt ->
-                    parseAndVerifySignedMetadata(signedMetadataJwt, issuerMetadataPolicy.issuerTrust, issuer)
-                        .getOrElse { throw CredentialIssuerMetadataError.InvalidSignedMetadata(it) }
+                    parseAndVerifySignedMetadata(
+                        signedMetadataJwt,
+                        policy.issuerTrust,
+                        issuer,
+                    ).getOrElse { throw CredentialIssuerMetadataError.InvalidSignedMetadata(it) }
                 }
 
                 signedMetadata?.toDomain(unsignedMetadata) ?: unsignedMetadata.toDomain()
@@ -117,26 +123,24 @@ private fun parseAndVerifySignedMetadata(
     jwt: String,
     issuerTrust: IssuerTrust,
     issuer: CredentialIssuerId,
-): Result<SignedCredentialIssuerMetadataTO> = runCatching {
+): Result<CredentialIssuerMetadataTO> = runCatching {
     val signedJwt = SignedJWT.parse(jwt)
-    val signatureVerifier = signedJwt.header.signedMetadataSignatureVerifier(issuerTrust)
-    val claimSetVerifier = signedMetadataClaimSetVerifier(issuer)
 
-    require(signedJwt.verify(signatureVerifier)) { "signature verification of signed metadata failed" }
+    require(issuerTrust.verify(signedJwt)) { "signature verification of signed metadata failed" }
+
     val claimSet = signedJwt.jwtClaimsSet
+    val claimSetVerifier = signedMetadataClaimSetVerifier(issuer)
     claimSetVerifier.verify(claimSet, null)
 
     val json = JSONObjectUtils.toJSONString(claimSet.toJSONObject())
-    JsonSupport.decodeFromString<SignedCredentialIssuerMetadataTO>(json)
+    JsonSupport.decodeFromString<CredentialIssuerMetadataTO>(json)
 }
 
 /**
- * Extracts a [JWSVerifier] for signed metadata.
- *
- * Uses either 'jwk' or 'x5c' and verifies it as trusted against [issuerTrust].
+ * Verifies [jwt] is signed by a trusted issuer.
  */
-private fun JWSHeader.signedMetadataSignatureVerifier(issuerTrust: IssuerTrust): JWSVerifier {
-    fun JWK.signatureVerifier(): JWSVerifier =
+private fun IssuerTrust.verify(jwt: SignedJWT): Boolean {
+    fun JWK.jwsVerifier(): JWSVerifier =
         when (this) {
             is RSAKey -> RSASSAVerifier(this)
             is ECKey -> ECDSAVerifier(this)
@@ -145,32 +149,47 @@ private fun JWSHeader.signedMetadataSignatureVerifier(issuerTrust: IssuerTrust):
             else -> throw IllegalArgumentException("Unsupported JWK type '${this.javaClass}'")
         }
 
-    fun X509Certificate.signatureVerifier(): JWSVerifier = JWK.parse(this).signatureVerifier()
+    fun X509Certificate.jwsVerifier(): JWSVerifier = JWK.parse(this).jwsVerifier()
 
-    return when (issuerTrust) {
+    val jwsVerifier = when (this) {
         is IssuerTrust.ByPublicKey -> {
-            val jwk = requireNotNull(jwk) { "missing 'jwk' header claim" }
-            require(issuerTrust.jwk == jwk) { "jwk in 'jwk' header claim is not trusted" }
-            jwk.signatureVerifier()
+            val headerJwk = requireNotNull(jwt.header.jwk) { "missing 'jwk' header claim" }
+            require(jwk == headerJwk) { "jwk in 'jwk' header claim is not trusted" }
+            jwk.jwsVerifier()
         }
 
         is IssuerTrust.ByCertificateChain -> {
-            val encodedCertChain = requireNotNull(x509CertChain) { "missing 'x5c' header claim" }
-            val certChain = X509CertChainUtils.parse(encodedCertChain)
-            require(issuerTrust.certificateChainTrust.isTrusted(certChain)) {
+            val certChain = requireNotNull(jwt.header.x509CertChain) {
+                "missing 'x5c' header claim"
+            }.let { X509CertChainUtils.parse(it) }
+            require(certificateChainTrust.isTrusted(certChain)) {
                 "certificate chain in 'x5c' header claim is not trusted"
             }
-            certChain.first().signatureVerifier()
+            certChain.first().jwsVerifier()
         }
     }
+
+    return jwt.verify(jwsVerifier)
 }
 
+/**
+ * Gets a [JWTClaimsSetVerifier] for the claims of a Signed JWT that contains the signed metadata of a Credential Issuer.
+ *
+ * The verifier:
+ * 1. Accepts all audiences
+ * 2. Requires 'sub' claim to be [subject]
+ * 3. Requires 'iat', 'iss', 'sub' claims to be present
+ * 4. Ensures 'signed_metadata' claim is not present
+ * 5. Ensures the claim set can be used according to 'exp' and 'nbf' if present
+ */
 private fun signedMetadataClaimSetVerifier(subject: CredentialIssuerId): JWTClaimsSetVerifier<SecurityContext> =
     DefaultJWTClaimsVerifier(
+        null,
         JWTClaimsSet.Builder()
             .subject(subject.value.value.toExternalForm())
             .build(),
         setOf("iat", "iss", "sub"),
+        setOf("signed_metadata"),
     )
 
 /**
@@ -463,7 +482,7 @@ private data class BatchCredentialIssuanceTO(
  * Unvalidated unsigned metadata of a Credential Issuer.
  */
 @Serializable
-private data class UnsignedCredentialIssuerMetadataTO(
+private data class CredentialIssuerMetadataTO(
     @SerialName("credential_issuer") val credentialIssuerIdentifier: String? = null,
     @SerialName("authorization_servers") val authorizationServers: List<String>? = null,
     @SerialName("credential_endpoint")val credentialEndpoint: String? = null,
@@ -476,73 +495,6 @@ private data class UnsignedCredentialIssuerMetadataTO(
     @SerialName("credential_configurations_supported") val credentialConfigurationsSupported: Map<String, CredentialSupportedTO>? = null,
     @SerialName("display") val display: List<DisplayTO>? = null,
 )
-
-/**
- * Converts and validates [UnsignedCredentialIssuerMetadataTO] as [CredentialIssuerMetadata] instance.
- */
-private fun UnsignedCredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
-    fun ensureHttpsUrl(s: String, ex: (Throwable) -> Throwable) = HttpsUrl(s).ensureSuccess(ex)
-
-    ensureNotNull(credentialIssuerIdentifier) {
-        InvalidCredentialIssuerId(IllegalArgumentException("missing credential_issuer"))
-    }
-    val credentialIssuerIdentifier = CredentialIssuerId(credentialIssuerIdentifier)
-        .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialIssuerId)
-
-    val authorizationServers = authorizationServers
-        ?.map { ensureHttpsUrl(it, CredentialIssuerMetadataValidationError::InvalidAuthorizationServer) }
-        ?: listOf(credentialIssuerIdentifier.value)
-
-    ensureNotNull(credentialEndpoint) {
-        CredentialIssuerMetadataValidationError.InvalidCredentialEndpoint(IllegalArgumentException("missing credential_endpoint"))
-    }
-    val credentialEndpoint = CredentialIssuerEndpoint(credentialEndpoint)
-        .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialEndpoint)
-
-    val nonceEndpoint = nonceEndpoint?.let {
-        CredentialIssuerEndpoint(it)
-            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNonceEndpoint)
-    }
-
-    val deferredCredentialEndpoint = deferredCredentialEndpoint?.let {
-        CredentialIssuerEndpoint(it)
-            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidDeferredCredentialEndpoint)
-    }
-    val notificationEndpoint = notificationEndpoint?.let {
-        CredentialIssuerEndpoint(it)
-            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
-    }
-
-    ensure(!credentialConfigurationsSupported.isNullOrEmpty()) {
-        CredentialIssuerMetadataValidationError.CredentialsSupportedRequired()
-    }
-    val credentialsSupported = credentialConfigurationsSupported.map { (id, credentialSupportedTO) ->
-        val credentialId = CredentialConfigurationIdentifier(id)
-        val credential = runCatching { credentialSupportedTO.toDomain() }
-            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
-        credentialId to credential
-    }.toMap()
-
-    val display = display?.map(DisplayTO::toDomain) ?: emptyList()
-    val batchIssuance = batchCredentialIssuance?.let {
-        runCatching { BatchCredentialIssuance.Supported(it.batchSize) }.ensureSuccess {
-            CredentialIssuerMetadataValidationError.InvalidBatchSize()
-        }
-    } ?: BatchCredentialIssuance.NotSupported
-
-    return CredentialIssuerMetadata(
-        credentialIssuerIdentifier,
-        authorizationServers,
-        credentialEndpoint,
-        nonceEndpoint,
-        deferredCredentialEndpoint,
-        notificationEndpoint,
-        credentialResponseEncryption.toDomain(),
-        batchIssuance,
-        credentialsSupported,
-        display,
-    )
-}
 
 /**
  * Converts this [CredentialResponseEncryptionTO] to a [CredentialResponseEncryption].
@@ -714,88 +666,68 @@ private fun JsonPrimitive.toCoseAlgorithm(): CoseAlgorithm? {
 }
 
 /**
- * Unvalidated signed metadata of a Credential Issuer.
- */
-@Serializable
-private data class SignedCredentialIssuerMetadataTO(
-    @SerialName("credential_issuer") val credentialIssuerIdentifier: String? = null,
-    @SerialName("authorization_servers") val authorizationServers: List<String>? = null,
-    @SerialName("credential_endpoint")val credentialEndpoint: String? = null,
-    @SerialName("nonce_endpoint") val nonceEndpoint: String? = null,
-    @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
-    @SerialName("notification_endpoint") val notificationEndpoint: String? = null,
-    @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionTO? = null,
-    @SerialName("batch_credential_issuance") val batchCredentialIssuance: BatchCredentialIssuanceTO? = null,
-    @SerialName("credential_configurations_supported") val credentialConfigurationsSupported: Map<String, CredentialSupportedTO>? = null,
-    @SerialName("display") val display: List<DisplayTO>? = null,
-)
-
-/**
- * Converts and validates [SignedCredentialIssuerMetadataTO] as [CredentialIssuerMetadata] instance.
+ * Converts and validates [CredentialIssuerMetadataTO] as [CredentialIssuerMetadata] instance.
  *
- * Values missing from [this] are taken from [unsignedMetadataTO] when provided.
+ * Values missing from [this] are taken from [fallback] when provided.
  */
-private fun SignedCredentialIssuerMetadataTO.toDomain(unsignedMetadataTO: UnsignedCredentialIssuerMetadataTO?): CredentialIssuerMetadata {
+private fun CredentialIssuerMetadataTO.toDomain(
+    fallback: CredentialIssuerMetadataTO? = null,
+): CredentialIssuerMetadata {
     fun ensureHttpsUrl(s: String, ex: (Throwable) -> Throwable) = HttpsUrl(s).ensureSuccess(ex)
 
-    val credentialIssuerIdentifier = ensureNotNull(credentialIssuerIdentifier ?: unsignedMetadataTO?.credentialIssuerIdentifier) {
+    val credentialIssuerIdentifier = ensureNotNull(credentialIssuerIdentifier ?: fallback?.credentialIssuerIdentifier) {
         InvalidCredentialIssuerId(IllegalArgumentException("missing credential_issuer"))
     }.let {
-        CredentialIssuerId(it)
-            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialIssuerId)
+        CredentialIssuerId(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialIssuerId)
     }
 
-    val authorizationServers = (authorizationServers ?: unsignedMetadataTO?.authorizationServers)
+    val authorizationServers = (authorizationServers ?: fallback?.authorizationServers)
         ?.map { ensureHttpsUrl(it, CredentialIssuerMetadataValidationError::InvalidAuthorizationServer) }
         ?: listOf(credentialIssuerIdentifier.value)
 
-    val credentialEndpoint = ensureNotNull(credentialEndpoint ?: unsignedMetadataTO?.credentialEndpoint) {
+    val credentialEndpoint = ensureNotNull(credentialEndpoint ?: fallback?.credentialEndpoint) {
         CredentialIssuerMetadataValidationError.InvalidCredentialEndpoint(IllegalArgumentException("missing credential_endpoint"))
     }.let {
-        CredentialIssuerEndpoint(it)
-            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialEndpoint)
+        CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialEndpoint)
     }
 
-    val nonceEndpoint = (nonceEndpoint ?: unsignedMetadataTO?.nonceEndpoint)?.let {
-        CredentialIssuerEndpoint(it)
-            .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNonceEndpoint)
-    }
-
-    val deferredCredentialEndpoint = (deferredCredentialEndpoint ?: unsignedMetadataTO?.deferredCredentialEndpoint)
+    val nonceEndpoint = (nonceEndpoint ?: fallback?.nonceEndpoint)
         ?.let {
-            CredentialIssuerEndpoint(it)
-                .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidDeferredCredentialEndpoint)
+            CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNonceEndpoint)
         }
 
-    val notificationEndpoint = (notificationEndpoint ?: unsignedMetadataTO?.notificationEndpoint)
+    val deferredCredentialEndpoint = (deferredCredentialEndpoint ?: fallback?.deferredCredentialEndpoint)
         ?.let {
-            CredentialIssuerEndpoint(it)
-                .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
+            CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidDeferredCredentialEndpoint)
         }
 
-    val credentialsSupported = (credentialConfigurationsSupported ?: unsignedMetadataTO?.credentialConfigurationsSupported)
+    val notificationEndpoint = (notificationEndpoint ?: fallback?.notificationEndpoint)
+        ?.let {
+            CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
+        }
+
+    val credentialsSupported = (credentialConfigurationsSupported ?: fallback?.credentialConfigurationsSupported)
         ?.map { (id, credentialSupportedTO) ->
             val credentialId = CredentialConfigurationIdentifier(id)
-            val credential = runCatching { credentialSupportedTO.toDomain() }
-                .ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
+            val credential = runCatching {
+                credentialSupportedTO.toDomain()
+            }.ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
             credentialId to credential
         }?.toMap()
-    ensure(!credentialsSupported.isNullOrEmpty()) {
-        CredentialIssuerMetadataValidationError.CredentialsSupportedRequired()
-    }
+    ensure(!credentialsSupported.isNullOrEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired() }
 
-    val display = (display ?: unsignedMetadataTO?.display)
+    val display = (display ?: fallback?.display)
         ?.map(DisplayTO::toDomain)
         ?: emptyList()
 
-    val batchIssuance = (batchCredentialIssuance ?: unsignedMetadataTO?.batchCredentialIssuance)
+    val batchIssuance = (batchCredentialIssuance ?: fallback?.batchCredentialIssuance)
         ?.let {
-            runCatching { BatchCredentialIssuance.Supported(it.batchSize) }.ensureSuccess {
-                CredentialIssuerMetadataValidationError.InvalidBatchSize()
-            }
+            runCatching {
+                BatchCredentialIssuance.Supported(it.batchSize)
+            }.ensureSuccess { CredentialIssuerMetadataValidationError.InvalidBatchSize() }
         } ?: BatchCredentialIssuance.NotSupported
 
-    val credentialResponseEncryption = (credentialResponseEncryption ?: unsignedMetadataTO?.credentialResponseEncryption).toDomain()
+    val credentialResponseEncryption = (credentialResponseEncryption ?: fallback?.credentialResponseEncryption).toDomain()
 
     return CredentialIssuerMetadata(
         credentialIssuerIdentifier,

@@ -54,7 +54,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             expectSuccessOnly = true,
         )
         assertFailsWith<UnableToFetchCredentialIssuerMetadata> {
-            resolver.resolve(SampleIssuer.Id).getOrThrow()
+            resolver.resolve(SampleIssuer.Id, IssuerMetadataPolicy.RequireUnsigned).getOrThrow()
         }
     }
 
@@ -67,7 +67,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             ),
         )
         assertFailsWith<NonParseableCredentialIssuerMetadata> {
-            resolver.resolve(SampleIssuer.Id).getOrThrow()
+            resolver.resolve(SampleIssuer.Id, IssuerMetadataPolicy.RequireUnsigned).getOrThrow()
         }
     }
 
@@ -82,7 +82,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         )
 
         assertFailsWith<InvalidCredentialIssuerId> {
-            resolver.resolve(credentialIssuerId).getOrThrow()
+            resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.RequireUnsigned).getOrThrow()
         }
     }
 
@@ -97,7 +97,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         )
         assertFailsWith<CredentialResponseAsymmetricEncryptionAlgorithmsRequired> {
-            resolver.resolve(credentialIssuerId).getOrThrow()
+            resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.RequireUnsigned).getOrThrow()
         }
     }
 
@@ -111,7 +111,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                 "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json",
             ),
         )
-        val metaData = assertDoesNotThrow { resolver.resolve(credentialIssuerId).getOrThrow() }
+        val metaData = assertDoesNotThrow { resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.RequireUnsigned).getOrThrow() }
         assertEquals(credentialIssuerMetadata(), metaData)
     }
 
@@ -126,7 +126,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             ),
         )
         val credentialConfigs = assertDoesNotThrow {
-            resolver.resolve(credentialIssuerId).getOrThrow()
+            resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.RequireUnsigned).getOrThrow()
         }.credentialConfigurationsSupported
 
         assertTrue("Expected ") {
@@ -159,5 +159,4 @@ private fun Map<CredentialConfigurationIdentifier, CredentialConfiguration>.jwtP
 private fun resolver(request: RequestMocker, expectSuccessOnly: Boolean = false) =
     CredentialIssuerMetadataResolver(
         mockedKtorHttpClientFactory(request, expectSuccessOnly = expectSuccessOnly),
-        IssuerMetadataPolicy.RequireUnsigned,
     )

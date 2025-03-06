@@ -213,7 +213,7 @@ fun interface CredentialIssuerMetadataResolver {
     /**
      * Tries to fetch and validate the metadata of a Credential Issuer.
      */
-    suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata>
+    suspend fun resolve(issuer: CredentialIssuerId, policy: IssuerMetadataPolicy): Result<CredentialIssuerMetadata>
 
     companion object {
 
@@ -222,11 +222,10 @@ fun interface CredentialIssuerMetadataResolver {
          */
         operator fun invoke(
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
-            issuerMetadataPolicy: IssuerMetadataPolicy,
-        ): CredentialIssuerMetadataResolver = CredentialIssuerMetadataResolver { issuerId ->
+        ): CredentialIssuerMetadataResolver = CredentialIssuerMetadataResolver { issuerId, policy ->
             ktorHttpClientFactory.invoke().use { httpClient ->
-                val resolver = DefaultCredentialIssuerMetadataResolver(httpClient, issuerMetadataPolicy)
-                resolver.resolve(issuerId)
+                val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
+                resolver.resolve(issuerId, policy)
             }
         }
     }

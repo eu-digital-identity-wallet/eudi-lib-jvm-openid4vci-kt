@@ -318,7 +318,7 @@ suspend fun <ENV : HasIssuerId> ENV.testMetaDataResolution(
 ): Pair<CredentialIssuerMetadata, List<CIAuthorizationServerMetadata>> = coroutineScope {
     createHttpClient(enableHttpLogging).use { httpClient ->
         try {
-            Issuer.metaData(httpClient, IssuerMetadataPolicy.RequireUnsigned, issuerId)
+            Issuer.metaData(httpClient, issuerId, IssuerMetadataPolicy.RequireUnsigned)
         } catch (t: Throwable) {
             when (t) {
                 is CredentialIssuerMetadataError -> fail("Credential Issuer Metadata error", cause = t.cause)

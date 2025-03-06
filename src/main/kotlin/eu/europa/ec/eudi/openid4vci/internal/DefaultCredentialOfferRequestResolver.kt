@@ -141,8 +141,8 @@ internal class DefaultCredentialOfferRequestResolver(
     }
 
     private suspend fun fetchIssuerMetaData(credentialIssuerId: CredentialIssuerId): CredentialIssuerMetadata =
-        with(DefaultCredentialIssuerMetadataResolver(httpClient, issuerMetadataPolicy)) {
-            resolve(credentialIssuerId)
+        with(DefaultCredentialIssuerMetadataResolver(httpClient)) {
+            resolve(credentialIssuerId, issuerMetadataPolicy)
                 .getOrElse { throw UnableToResolveCredentialIssuerMetadata(it).toException() }
         }
 
