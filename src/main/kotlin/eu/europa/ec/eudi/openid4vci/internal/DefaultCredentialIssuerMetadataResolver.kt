@@ -65,14 +65,14 @@ internal class DefaultCredentialIssuerMetadataResolver(
             throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
         }
 
-        val unsignedMetadata = try {
+        val metadata = try {
             JsonSupport.decodeFromString<CredentialIssuerMetadataTO>(json)
         } catch (t: Throwable) {
             throw CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(t)
         }
 
         suspend fun signedMetadata(issuerTrust: IssuerTrust): CredentialIssuerMetadataTO? =
-            unsignedMetadata.signedMetadata?.let { signedMetadataJwt ->
+            metadata.signedMetadata?.let { signedMetadataJwt ->
                 parseAndVerifySignedMetadata(
                     signedMetadataJwt,
                     issuerTrust,
@@ -88,10 +88,10 @@ internal class DefaultCredentialIssuerMetadataResolver(
 
             is IssuerMetadataPolicy.PreferSigned -> {
                 val signedMetadata = signedMetadata(policy.issuerTrust)
-                signedMetadata?.toDomain(unsignedMetadata) ?: unsignedMetadata.toDomain()
+                signedMetadata?.toDomain(metadata) ?: metadata.toDomain()
             }
 
-            IssuerMetadataPolicy.RequireUnsigned -> unsignedMetadata.toDomain()
+            IssuerMetadataPolicy.RequireUnsigned -> metadata.toDomain()
         }.also { metaData ->
             ensure(metaData.credentialIssuerIdentifier == issuer) {
                 InvalidCredentialIssuerId(
