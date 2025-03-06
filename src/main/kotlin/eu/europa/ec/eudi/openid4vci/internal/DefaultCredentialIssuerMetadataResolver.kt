@@ -148,11 +148,7 @@ private suspend fun IssuerTrust.verify(jwt: SignedJWT): Boolean {
     fun X509Certificate.jwsVerifier(): JWSVerifier = JWK.parse(this).jwsVerifier()
 
     val jwsVerifier = when (this) {
-        is IssuerTrust.ByPublicKey -> {
-            val headerJwk = requireNotNull(jwt.header.jwk) { "missing 'jwk' header claim" }
-            require(jwk == headerJwk) { "jwk in 'jwk' header claim is not trusted" }
-            jwk.jwsVerifier()
-        }
+        is IssuerTrust.ByPublicKey -> jwk.jwsVerifier()
 
         is IssuerTrust.ByCertificateChain -> {
             val certChain = requireNotNull(jwt.header.x509CertChain) {
