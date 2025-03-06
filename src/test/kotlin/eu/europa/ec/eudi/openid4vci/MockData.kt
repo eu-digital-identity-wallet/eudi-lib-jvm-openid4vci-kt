@@ -345,6 +345,38 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
 )
 
 /**
+ * Gets the [CredentialIssuerMetadata] used throughout the tests when signed metadata are used.
+ */
+internal fun credentialIssuerSignedMetadata() = CredentialIssuerMetadata(
+    SampleIssuer.Id,
+    listOf(SampleAuthServer.Url),
+    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/credentials").getOrThrow(),
+    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/nonce").getOrThrow(),
+    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/credentials/deferred").getOrThrow(),
+    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/notification").getOrThrow(),
+    CredentialResponseEncryption.Required(
+        SupportedEncryptionAlgorithmsAndMethods(
+            listOf(JWEAlgorithm.RSA_OAEP_256),
+            listOf(EncryptionMethod.XC20P),
+        ),
+    ),
+    BatchCredentialIssuance.Supported(batchSize = 15),
+    mapOf(
+        CredentialConfigurationIdentifier("UniversityDegree_JWT") to universityDegreeJwt(),
+        CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc") to mobileDrivingLicense(),
+        CredentialConfigurationIdentifier("UniversityDegree_LDP_VC") to universityDegreeLdpVc(),
+        CredentialConfigurationIdentifier("UniversityDegree_JWT_VC_JSON-LD") to universityDegreeJwtVcJsonLD(),
+    ),
+    listOf(
+        Display(
+            name = "credential-issuer.example.com",
+            locale = Locale.forLanguageTag("en-US"),
+            logo = Display.Logo(URI.create("https://credential-issuer.example.com/logo.png"), "Credential Issuer Logo"),
+        ),
+    ),
+)
+
+/**
  * Gets the [OpenID Connect Authorization Server metadata][CIAuthorizationServerMetadata] used throughout the tests.
  */
 internal fun oidcAuthorizationServerMetadata(): OIDCProviderMetadata = OIDCProviderMetadata(
