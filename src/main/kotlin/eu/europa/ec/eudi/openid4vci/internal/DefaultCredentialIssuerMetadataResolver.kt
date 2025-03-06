@@ -88,7 +88,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
 
             is IssuerMetadataPolicy.PreferSigned -> {
                 val signedMetadata = signedMetadata(policy.issuerTrust)
-                signedMetadata?.toDomain(metadata) ?: metadata.toDomain()
+                signedMetadata?.mergeWith(metadata)?.toDomain() ?: metadata.toDomain()
             }
 
             IssuerMetadataPolicy.IgnoreSigned -> metadata.toDomain()
@@ -662,68 +662,75 @@ private fun JsonPrimitive.toCoseAlgorithm(): CoseAlgorithm? {
 }
 
 /**
- * Converts and validates [CredentialIssuerMetadataTO] as [CredentialIssuerMetadata] instance.
- *
- * Values missing from [this] are taken from [fallback] when provided.
+ * Merges the values of [this] with [other] giving precedence to the values of [this].
  */
-private fun CredentialIssuerMetadataTO.toDomain(
-    fallback: CredentialIssuerMetadataTO? = null,
-): CredentialIssuerMetadata {
+private fun CredentialIssuerMetadataTO.mergeWith(other: CredentialIssuerMetadataTO): CredentialIssuerMetadataTO =
+    CredentialIssuerMetadataTO(
+        credentialIssuerIdentifier = credentialIssuerIdentifier ?: other.credentialIssuerIdentifier,
+        authorizationServers = authorizationServers ?: other.authorizationServers,
+        credentialEndpoint = credentialEndpoint ?: other.credentialEndpoint,
+        nonceEndpoint = nonceEndpoint ?: other.nonceEndpoint,
+        deferredCredentialEndpoint = deferredCredentialEndpoint ?: other.deferredCredentialEndpoint,
+        notificationEndpoint = notificationEndpoint ?: other.notificationEndpoint,
+        credentialResponseEncryption = credentialResponseEncryption ?: other.credentialResponseEncryption,
+        batchCredentialIssuance = batchCredentialIssuance ?: other.batchCredentialIssuance,
+        signedMetadata = signedMetadata ?: other.signedMetadata,
+        credentialConfigurationsSupported = credentialConfigurationsSupported ?: other.credentialConfigurationsSupported,
+        display = display ?: other.display,
+    )
+
+/**
+ * Converts and validates [CredentialIssuerMetadataTO] as [CredentialIssuerMetadata] instance.
+ */
+private fun CredentialIssuerMetadataTO.toDomain(): CredentialIssuerMetadata {
     fun ensureHttpsUrl(s: String, ex: (Throwable) -> Throwable) = HttpsUrl(s).ensureSuccess(ex)
 
-    val credentialIssuerIdentifier = ensureNotNull(credentialIssuerIdentifier ?: fallback?.credentialIssuerIdentifier) {
+    val credentialIssuerIdentifier = ensureNotNull(credentialIssuerIdentifier) {
         InvalidCredentialIssuerId(IllegalArgumentException("missing credential_issuer"))
     }.let {
         CredentialIssuerId(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialIssuerId)
     }
 
-    val authorizationServers = (authorizationServers ?: fallback?.authorizationServers)
+    val authorizationServers = (authorizationServers)
         ?.map { ensureHttpsUrl(it, CredentialIssuerMetadataValidationError::InvalidAuthorizationServer) }
         ?: listOf(credentialIssuerIdentifier.value)
 
-    val credentialEndpoint = ensureNotNull(credentialEndpoint ?: fallback?.credentialEndpoint) {
+    val credentialEndpoint = ensureNotNull(credentialEndpoint) {
         CredentialIssuerMetadataValidationError.InvalidCredentialEndpoint(IllegalArgumentException("missing credential_endpoint"))
     }.let {
         CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialEndpoint)
     }
 
-    val nonceEndpoint = (nonceEndpoint ?: fallback?.nonceEndpoint)
-        ?.let {
-            CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNonceEndpoint)
-        }
+    val nonceEndpoint = nonceEndpoint?.let {
+        CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNonceEndpoint)
+    }
 
-    val deferredCredentialEndpoint = (deferredCredentialEndpoint ?: fallback?.deferredCredentialEndpoint)
-        ?.let {
-            CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidDeferredCredentialEndpoint)
-        }
+    val deferredCredentialEndpoint = deferredCredentialEndpoint?.let {
+        CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidDeferredCredentialEndpoint)
+    }
 
-    val notificationEndpoint = (notificationEndpoint ?: fallback?.notificationEndpoint)
-        ?.let {
-            CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
-        }
+    val notificationEndpoint = notificationEndpoint?.let {
+        CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
+    }
 
-    val credentialsSupported = (credentialConfigurationsSupported ?: fallback?.credentialConfigurationsSupported)
-        ?.map { (id, credentialSupportedTO) ->
-            val credentialId = CredentialConfigurationIdentifier(id)
-            val credential = runCatching {
-                credentialSupportedTO.toDomain()
-            }.ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
-            credentialId to credential
-        }?.toMap()
+    val credentialsSupported = credentialConfigurationsSupported?.map { (id, credentialSupportedTO) ->
+        val credentialId = CredentialConfigurationIdentifier(id)
+        val credential = runCatching {
+            credentialSupportedTO.toDomain()
+        }.ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
+        credentialId to credential
+    }?.toMap()
     ensure(!credentialsSupported.isNullOrEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired() }
 
-    val display = (display ?: fallback?.display)
-        ?.map(DisplayTO::toDomain)
-        ?: emptyList()
+    val display = display?.map(DisplayTO::toDomain) ?: emptyList()
 
-    val batchIssuance = (batchCredentialIssuance ?: fallback?.batchCredentialIssuance)
-        ?.let {
-            runCatching {
-                BatchCredentialIssuance.Supported(it.batchSize)
-            }.ensureSuccess { CredentialIssuerMetadataValidationError.InvalidBatchSize() }
-        } ?: BatchCredentialIssuance.NotSupported
+    val batchIssuance = batchCredentialIssuance?.let {
+        runCatching {
+            BatchCredentialIssuance.Supported(it.batchSize)
+        }.ensureSuccess { CredentialIssuerMetadataValidationError.InvalidBatchSize() }
+    } ?: BatchCredentialIssuance.NotSupported
 
-    val credentialResponseEncryption = (credentialResponseEncryption ?: fallback?.credentialResponseEncryption).toDomain()
+    val credentialResponseEncryption = credentialResponseEncryption.toDomain()
 
     return CredentialIssuerMetadata(
         credentialIssuerIdentifier,
