@@ -15,11 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataResolver
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
+import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialIssuerMetadataJsonParser
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -29,7 +25,11 @@ import io.ktor.http.*
 internal class DefaultCredentialIssuerMetadataResolver(
     private val httpClient: HttpClient,
 ) : CredentialIssuerMetadataResolver {
-    override suspend fun resolve(issuer: CredentialIssuerId): Result<CredentialIssuerMetadata> = runCatching {
+
+    override suspend fun resolve(
+        issuer: CredentialIssuerId,
+        policy: IssuerMetadataPolicy,
+    ): Result<CredentialIssuerMetadata> = runCatching {
         val wellKnownUrl = issuer.wellKnown()
         val json = try {
             httpClient.get(wellKnownUrl).body<String>()
@@ -37,13 +37,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
             throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
         }
 
-        CredentialIssuerMetadataJsonParser.parseMetaData(json).also { metaData ->
-            ensure(metaData.credentialIssuerIdentifier == issuer) {
-                InvalidCredentialIssuerId(
-                    IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
-                )
-            }
-        }
+        CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer, policy)
     }
 }
 

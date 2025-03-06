@@ -295,9 +295,10 @@ fun interface CredentialOfferRequestResolver {
          */
         operator fun invoke(
             ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            issuerMetadataPolicy: IssuerMetadataPolicy,
         ): CredentialOfferRequestResolver = CredentialOfferRequestResolver { request ->
             ktorHttpClientFactory().use { httpClient ->
-                val resolver = DefaultCredentialOfferRequestResolver(httpClient)
+                val resolver = DefaultCredentialOfferRequestResolver(httpClient, issuerMetadataPolicy)
                 resolver.resolve(request)
             }
         }
