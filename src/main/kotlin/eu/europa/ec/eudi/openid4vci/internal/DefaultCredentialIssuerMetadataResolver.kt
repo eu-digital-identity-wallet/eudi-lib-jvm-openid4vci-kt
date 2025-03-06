@@ -91,7 +91,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 signedMetadata?.toDomain(metadata) ?: metadata.toDomain()
             }
 
-            IssuerMetadataPolicy.RequireUnsigned -> metadata.toDomain()
+            IssuerMetadataPolicy.IgnoreSigned -> metadata.toDomain()
         }.also { metaData ->
             ensure(metaData.credentialIssuerIdentifier == issuer) {
                 InvalidCredentialIssuerId(

@@ -54,7 +54,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             expectSuccessOnly = true,
         )
         assertFailsWith<UnableToFetchCredentialIssuerMetadata> {
-            resolver.resolve(SampleIssuer.Id, IssuerMetadataPolicy.RequireUnsigned).getOrThrow()
+            resolver.resolve(SampleIssuer.Id, IssuerMetadataPolicy.IgnoreSigned).getOrThrow()
         }
     }
 
@@ -67,7 +67,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             ),
         )
         assertFailsWith<NonParseableCredentialIssuerMetadata> {
-            resolver.resolve(SampleIssuer.Id, IssuerMetadataPolicy.RequireUnsigned).getOrThrow()
+            resolver.resolve(SampleIssuer.Id, IssuerMetadataPolicy.IgnoreSigned).getOrThrow()
         }
     }
 
@@ -82,7 +82,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         )
 
         assertFailsWith<InvalidCredentialIssuerId> {
-            resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.RequireUnsigned).getOrThrow()
+            resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow()
         }
     }
 
@@ -97,7 +97,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         )
         assertFailsWith<CredentialResponseAsymmetricEncryptionAlgorithmsRequired> {
-            resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.RequireUnsigned).getOrThrow()
+            resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow()
         }
     }
 
@@ -111,7 +111,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                 "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json",
             ),
         )
-        val metaData = assertDoesNotThrow { resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.RequireUnsigned).getOrThrow() }
+        val metaData = assertDoesNotThrow { resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow() }
         assertEquals(credentialIssuerMetadata(), metaData)
     }
 
@@ -126,7 +126,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             ),
         )
         val credentialConfigs = assertDoesNotThrow {
-            resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.RequireUnsigned).getOrThrow()
+            resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow()
         }.credentialConfigurationsSupported
 
         assertTrue("Expected ") {

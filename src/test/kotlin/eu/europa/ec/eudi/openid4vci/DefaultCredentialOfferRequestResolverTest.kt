@@ -240,5 +240,5 @@ private var oidcMetadataHandler =
 private fun resolver(vararg request: RequestMocker): CredentialOfferRequestResolver =
     CredentialOfferRequestResolver(
         mockedKtorHttpClientFactory(requestMockers = request),
-        IssuerMetadataPolicy.RequireUnsigned,
+        IssuerMetadataPolicy.IgnoreSigned,
     )

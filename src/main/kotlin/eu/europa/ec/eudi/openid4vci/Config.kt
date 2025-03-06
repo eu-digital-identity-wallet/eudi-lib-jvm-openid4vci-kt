@@ -77,7 +77,7 @@ data class OpenId4VCIConfig(
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
-    val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.RequireUnsigned,
+    val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
 ) {
 
     constructor(
@@ -90,7 +90,7 @@ data class OpenId4VCIConfig(
         clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
-        issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.RequireUnsigned,
+        issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     ) : this(
         Client.Public(clientId),
         authFlowRedirectionURI,
@@ -218,5 +218,5 @@ sealed interface IssuerMetadataPolicy {
     /**
      * Signed metadata are ignored. Only values conveyed using plain json elements are used.
      */
-    data object RequireUnsigned : IssuerMetadataPolicy
+    data object IgnoreSigned : IssuerMetadataPolicy
 }
