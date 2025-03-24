@@ -12,7 +12,7 @@ java = "17"
 ktlint = "0.50.0"
 dokka = "2.0.0"
 maven-publish = "0.31.0"
-logback = "1.5.17"
+logback = "1.5.18"
 
 [libraries]
 nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
