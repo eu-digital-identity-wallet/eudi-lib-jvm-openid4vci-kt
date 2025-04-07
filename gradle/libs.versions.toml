@@ -1,7 +1,7 @@
 [versions]
 coroutines = "1.9.0"
-dependency-check = "12.1.0"
-sonarqube = "6.0.1.5171"
+dependency-check = "12.1.1"
+sonarqube = "6.1.0.5360"
 kotlin = "2.0.21"
 spotless = "7.0.2"
 nimbus-sdk = "11.20.1"
