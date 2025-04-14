@@ -1,9 +1,9 @@
 [versions]
 coroutines = "1.9.0"
-dependency-check = "12.1.0"
-sonarqube = "6.0.1.5171"
+dependency-check = "12.1.1"
+sonarqube = "6.1.0.5360"
 kotlin = "2.0.21"
-spotless = "7.0.2"
+spotless = "7.0.3"
 nimbus-sdk = "11.20.1"
 ktor = "3.0.1"
 jsoup = "1.19.1"
@@ -11,7 +11,7 @@ cbor = "0.9"
 java = "17"
 ktlint = "0.50.0"
 dokka = "2.0.0"
-maven-publish = "0.30.0"
+maven-publish = "0.31.0"
 logback = "1.5.18"
 
 [libraries]
