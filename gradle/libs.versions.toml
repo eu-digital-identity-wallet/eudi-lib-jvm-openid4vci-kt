@@ -1,7 +1,6 @@
 [versions]
 coroutines = "1.9.0"
 dependency-check = "12.1.0"
-sonarqube = "6.0.1.5171"
 kotlin = "2.0.21"
 spotless = "7.0.2"
 nimbus-sdk = "11.20.1"
@@ -13,6 +12,7 @@ ktlint = "0.50.0"
 dokka = "2.0.0"
 maven-publish = "0.30.0"
 logback = "1.5.18"
+kover = "0.9.1"
 
 [libraries]
 nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
@@ -32,7 +32,7 @@ logback-classic = {module="ch.qos.logback:logback-classic", version.ref="logback
 
 [plugins]
 dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependency-check" }
-sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
