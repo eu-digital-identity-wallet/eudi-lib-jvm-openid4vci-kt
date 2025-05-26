@@ -16,7 +16,9 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.crypto.RSASSASigner
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.keyAttestationJwt
 import kotlinx.coroutines.test.runTest
 import java.time.Clock
 import kotlin.test.*
@@ -60,6 +62,58 @@ internal class ProofBuilderTest {
 
         val signer = CryptoGenerator.rsaProofSigner(signingAlgorithm)
         assertFailsWith(CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported::class) {
+            JwtProofBuilder.check(signer, credentialConfiguration.proofTypesSupported)
+        }
+    }
+
+    @Test
+    fun `proof is generated when issuer requires a key attestation which is provided`() = runTest {
+        val signingAlgorithm = JWSAlgorithm.RS256
+        val credentialConfiguration = mobileDrivingLicense()
+        val proofTypeMeta = credentialConfiguration.proofTypesSupported
+            .values.filterIsInstance<ProofTypeMeta.Jwt>()
+            .firstOrNull()
+        assertNotNull(proofTypeMeta)
+
+        assertTrue { signingAlgorithm in proofTypeMeta.algorithms }
+
+        val signer = CryptoGenerator.rsaProofSigner(
+            signingAlgorithm,
+            bindingKeyProvider = { jwk ->
+                JwtBindingKey.KeyAttestation(
+                    keyAttestationJwt(
+                        JWSAlgorithm.RS256,
+                        jwk.toPublicJWK(),
+                        RSASSASigner(
+                            jwk.toRSAKey(),
+                        ),
+                    ),
+                )
+            },
+        )
+
+        JwtProofBuilder(
+            Clock.systemDefaultZone(),
+            iss = "https://wallet",
+            aud = CredentialIssuerId("https://issuer").getOrThrow(),
+            nonce = CNonce("nonce"),
+            signer,
+        ).build()
+    }
+
+    @Test
+    fun `proof is not generated when issuer requires a key attestation which is not provided`() = runTest {
+        val signingAlgorithm = JWSAlgorithm.RS256
+        val credentialConfiguration = mobileDrivingLicense()
+        val proofTypeMeta = credentialConfiguration.proofTypesSupported
+            .values.filterIsInstance<ProofTypeMeta.Jwt>()
+            .firstOrNull()
+        assertNotNull(proofTypeMeta)
+
+        assertTrue { signingAlgorithm in proofTypeMeta.algorithms }
+
+        val signer = CryptoGenerator.rsaProofSigner(signingAlgorithm)
+        assertFailsWith(CredentialIssuanceError.ProofGenerationError.ProofTypeKeyAttestationRequired::class) {
             JwtProofBuilder.check(signer, credentialConfiguration.proofTypesSupported)
         }
     }

@@ -21,8 +21,6 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
-import eu.europa.ec.eudi.openid4vci.AccessToken.Bearer
-import eu.europa.ec.eudi.openid4vci.AccessToken.DPoP
 import kotlinx.serialization.Serializable
 import java.net.URI
 import java.net.URL
@@ -208,7 +206,7 @@ value class NotificationId(val value: String) {
 sealed interface JwtBindingKey {
 
     /**
-     * A JWK biding key
+     * A JWK binding key
      */
     @JvmInline
     value class Jwk(
@@ -220,7 +218,7 @@ sealed interface JwtBindingKey {
     }
 
     /**
-     * A Did biding key
+     * A Did binding key
      */
     @JvmInline
     value class Did(
@@ -228,7 +226,7 @@ sealed interface JwtBindingKey {
     ) : JwtBindingKey
 
     /**
-     * An X509 biding key
+     * An X509 binding key
      */
     @JvmInline
     value class X509(
@@ -236,6 +234,27 @@ sealed interface JwtBindingKey {
     ) : JwtBindingKey {
         init {
             require(chain.isNotEmpty()) { "Certificate chain cannot be empty" }
+        }
+    }
+
+    /**
+     * A key attestation binding key
+     *
+     * @param keyAttestationJWT The key attestation JWT
+     * @param keyIndex The 0-based index of the key in the Key Attestation JWT attested keys
+     */
+    data class KeyAttestation(
+        val keyAttestationJWT: KeyAttestationJWT,
+        val keyIndex: Int = 0,
+    ) : JwtBindingKey {
+        init {
+            require(keyIndex >= 0) { "Key index must be non-negative" }
+            require(keyAttestationJWT.attestedKeys.size > keyIndex) {
+                "Key index must be less than the number of attested keys"
+            }
+            requireNotNull(keyAttestationJWT.jwt.jwtClaimsSet.expirationTime) {
+                "Key attestation JWT must have an expiration time"
+            }
         }
     }
 }

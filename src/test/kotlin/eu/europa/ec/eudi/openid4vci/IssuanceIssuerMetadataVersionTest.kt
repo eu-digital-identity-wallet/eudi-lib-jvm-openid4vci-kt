@@ -527,7 +527,7 @@ class IssuanceIssuerMetadataVersionTest {
                             }
                     """.trimIndent()
                     respond(
-                        content = encypt(
+                        content = encrypt(
                             JWTClaimsSet.parse(responseJson),
                             responseEncryption.jwk,
                             responseEncryption.algorithm,

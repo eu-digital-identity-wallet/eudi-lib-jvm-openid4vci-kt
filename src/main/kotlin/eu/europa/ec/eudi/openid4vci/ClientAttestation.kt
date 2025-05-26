@@ -121,7 +121,7 @@ fun interface ClientAttestationPoPBuilder {
     }
 }
 
-private fun SignedJWT.ensureSignedNotMAC() {
+internal fun SignedJWT.ensureSignedNotMAC() {
     check(state == JWSObject.State.SIGNED || state == JWSObject.State.VERIFIED) {
         "Provided JWT is not signed"
     }
