@@ -101,6 +101,10 @@ internal class JwtProofBuilder(
             is JwtBindingKey.Jwk -> headerBuilder.jwk(key.jwk.toPublicJWK())
             is JwtBindingKey.Did -> headerBuilder.keyID(key.identity)
             is JwtBindingKey.X509 -> headerBuilder.x509CertChain(key.chain.map { Base64.encode(it.encoded) })
+            is JwtBindingKey.KeyAttestation -> {
+                headerBuilder.keyID(key.keyIndex.toString())
+                headerBuilder.customParam("key_attestation", key.keyAttestationJWT.jwt.serialize())
+            }
         }
         return headerBuilder.build()
     }
@@ -125,6 +129,16 @@ internal class JwtProofBuilder(
             val proofTypeSigningAlgorithmsSupported = spec.algorithms
             ensure(popSigner.algorithm in proofTypeSigningAlgorithmsSupported) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported()
+            }
+            when (spec.keyAttestationRequirement) {
+                is KeyAttestationRequirement.Required,
+                is KeyAttestationRequirement.RequiredNoConstraints,
+                -> {
+                    ensure(popSigner.bindingKey is JwtBindingKey.KeyAttestation) {
+                        CredentialIssuanceError.ProofGenerationError.ProofTypeKeyAttestationRequired()
+                    }
+                }
+                is KeyAttestationRequirement.NotRequired -> Unit
             }
         }
     }
