@@ -16,14 +16,14 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.JWSSigner
-import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.internal.DefaultClientAttestationPoPBuilder
 import eu.europa.ec.eudi.openid4vci.internal.cnf
 import eu.europa.ec.eudi.openid4vci.internal.cnfJwk
+import eu.europa.ec.eudi.openid4vci.internal.ensureSignedNotMAC
+import eu.europa.ec.eudi.openid4vci.internal.requireIsNotMAC
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
 import java.time.Clock
@@ -120,16 +120,3 @@ fun interface ClientAttestationPoPBuilder {
         val Default: ClientAttestationPoPBuilder = DefaultClientAttestationPoPBuilder
     }
 }
-
-internal fun SignedJWT.ensureSignedNotMAC() {
-    check(state == JWSObject.State.SIGNED || state == JWSObject.State.VERIFIED) {
-        "Provided JWT is not signed"
-    }
-    val alg = requireNotNull(header.algorithm) { "Invalid JWT misses header alg" }
-    requireIsNotMAC(alg)
-}
-
-internal fun requireIsNotMAC(alg: JWSAlgorithm) =
-    require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
-
-private fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
