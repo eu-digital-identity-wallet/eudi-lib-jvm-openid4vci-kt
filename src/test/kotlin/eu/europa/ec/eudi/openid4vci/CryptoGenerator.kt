@@ -15,11 +15,18 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vci.KeyAttestationJWT.Companion.KEY_ATTESTATION_JWT_TYPE
 import java.security.Signature
+import java.time.Instant.now
 import java.util.*
 
 object CryptoGenerator {
@@ -36,29 +43,40 @@ object CryptoGenerator {
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
 
-    fun rsaProofSigner(signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256): PopSigner.Jwt =
-        rsaKeyAndJwtProofSigner(signingAlgorithm).second
+    fun rsaProofSigner(
+        signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256,
+        bindingKeyProvider: (JWK) -> JwtBindingKey = { JwtBindingKey.Jwk(it.toPublicJWK()) },
+    ): PopSigner.Jwt =
+        rsaKeyAndJwtProofSigner(signingAlgorithm, bindingKeyProvider).second
 
-    fun rsaKeyAndJwtProofSigner(signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256): Pair<JWK, PopSigner.Jwt> {
+    fun rsaKeyAndJwtProofSigner(
+        signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256,
+        bindingKeyProvider: (JWK) -> JwtBindingKey = { JwtBindingKey.Jwk(it.toPublicJWK()) },
+    ): Pair<JWK, PopSigner.Jwt> {
         val keyPair = randomRSASigningKey(2048)
-        val bindingKey = JwtBindingKey.Jwk(keyPair.toPublicJWK())
+        val bindingKey = bindingKeyProvider(keyPair)
         return keyPair to PopSigner.jwtPopSigner(keyPair, signingAlgorithm, bindingKey)
     }
 
-    fun ecProofSigner(curve: Curve = Curve.P_256, alg: JWSAlgorithm = JWSAlgorithm.ES256): PopSigner.Jwt {
+    fun ecProofSigner(
+        curve: Curve = Curve.P_256,
+        alg: JWSAlgorithm = JWSAlgorithm.ES256,
+        bindingKeyProvider: (JWK) -> JwtBindingKey = { JwtBindingKey.Jwk(it.toPublicJWK()) },
+    ): PopSigner.Jwt {
         require(alg in JWSAlgorithm.Family.EC)
         val keyPair = randomECSigningKey(curve)
-        val bindingKey = JwtBindingKey.Jwk(keyPair.toPublicJWK())
+        val bindingKey = bindingKeyProvider(keyPair)
         return PopSigner.jwtPopSigner(keyPair, alg, bindingKey)
     }
 
     fun ecKeyAndJwtProofSigner(
         curve: Curve = Curve.P_256,
         alg: JWSAlgorithm = JWSAlgorithm.ES256,
+        bindingKeyProvider: (JWK) -> JwtBindingKey = { JwtBindingKey.Jwk(it.toPublicJWK()) },
     ): Pair<JWK, PopSigner.Jwt> {
         require(alg in JWSAlgorithm.Family.EC)
         val keyPair = randomECSigningKey(curve)
-        val bindingKey = JwtBindingKey.Jwk(keyPair.toPublicJWK())
+        val bindingKey = bindingKeyProvider(keyPair)
         return keyPair to PopSigner.jwtPopSigner(keyPair, alg, bindingKey)
     }
 
@@ -95,4 +113,23 @@ object CryptoGenerator {
     ): PopSigner? =
         credentialConfiguration.proofTypesSupported.values
             .firstNotNullOfOrNull { keyAndPopSigner(it)?.second }
+
+    fun keyAttestationJwt(
+        alg: JWSAlgorithm = JWSAlgorithm.ES256,
+        jwk: JWK,
+        signer: JWSSigner,
+    ) = run {
+        val signedJwt = SignedJWT(
+            JWSHeader.Builder(alg)
+                .type(JOSEObjectType(KEY_ATTESTATION_JWT_TYPE))
+                .build(),
+            JWTClaimsSet.Builder()
+                .issueTime(Date())
+                .claim("attested_keys", listOf(jwk.toPublicJWK().toJSONObject()))
+                .expirationTime(Date.from(now().plus(java.time.Duration.ofSeconds(60))))
+                .build(),
+        )
+        signedJwt.sign(signer)
+        KeyAttestationJWT(signedJwt)
+    }
 }
