@@ -72,7 +72,7 @@ private class KeyAttestationJWTTest {
         )
         signedJwt.sign(signer)
         val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(signedJwt) }
-        assertEquals("Invalid Key Attestation JWT. Misses iat claim", exception.message)
+        assertEquals("Invalid Key Attestation JWT. Misses `iat` claim", exception.message)
     }
 
     @Test
@@ -87,7 +87,7 @@ private class KeyAttestationJWTTest {
         )
         signedJwt.sign(signer)
         val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(signedJwt) }
-        assertEquals("Invalid Key Attestation JWT. Misses attested_keys claim", exception.message)
+        assertEquals("Invalid Key Attestation JWT. Misses `attested_keys` claim", exception.message)
     }
 
     @Test

@@ -17,18 +17,21 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vci.internal.ensureSignedNotMAC
 
-@JvmInline
-value class KeyAttestationJWT(val jwt: SignedJWT) {
+data class KeyAttestationJWT(val jwt: SignedJWT) {
 
     init {
         jwt.ensureSignedNotMAC()
         require(jwt.header.type != null && jwt.header.type.type.equals(KEY_ATTESTATION_JWT_TYPE)) {
             "Invalid Key Attestation JWT. Type must be set to `$KEY_ATTESTATION_JWT_TYPE`"
         }
-        requireNotNull(jwt.jwtClaimsSet.issueTime) { "Invalid Key Attestation JWT. Misses iat claim" }
+        requireNotNull(jwt.jwtClaimsSet.issueTime) { "Invalid Key Attestation JWT. Misses `iat` claim" }
         requireNotNull(jwt.jwtClaimsSet.getListClaim("attested_keys")) {
-            "Invalid Key Attestation JWT. Misses attested_keys claim"
+            "Invalid Key Attestation JWT. Misses `attested_keys` claim"
+        }
+        require(jwt.jwtClaimsSet.getListClaim("attested_keys").isNotEmpty()) {
+            "Invalid Key Attestation JWT. `attested_keys` claim must not be empty"
         }
     }
 
@@ -36,8 +39,9 @@ value class KeyAttestationJWT(val jwt: SignedJWT) {
         const val KEY_ATTESTATION_JWT_TYPE = "keyattestation+jwt"
     }
 
-    val attestedKeys: List<JWK>
-        get() = jwt.jwtClaimsSet.getListClaim("attested_keys").map {
+    val attestedKeys: List<JWK> by lazy {
+        jwt.jwtClaimsSet.getListClaim("attested_keys").map {
             JWK.parse(it as Map<String, Any>)
         }
+    }
 }
