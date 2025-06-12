@@ -37,10 +37,7 @@ import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vci.internal.ensureSuccess
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Required
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import java.net.URI
 import java.security.cert.X509Certificate
@@ -48,7 +45,11 @@ import java.util.*
 
 internal object CredentialIssuerMetadataJsonParser {
 
-    suspend fun parseMetaData(json: String, issuer: CredentialIssuerId, policy: IssuerMetadataPolicy): CredentialIssuerMetadata {
+    suspend fun parseMetaData(
+        json: String,
+        issuer: CredentialIssuerId,
+        policy: IssuerMetadataPolicy,
+    ): CredentialIssuerMetadata {
         val metadata = try {
             JsonSupport.decodeFromString<CredentialIssuerMetadataTO>(json)
         } catch (t: Throwable) {
@@ -66,7 +67,8 @@ internal object CredentialIssuerMetadataJsonParser {
 
         return when (policy) {
             is IssuerMetadataPolicy.RequireSigned -> {
-                val signedMetadata = signedMetadata(policy.issuerTrust) ?: throw CredentialIssuerMetadataError.MissingSignedMetadata()
+                val signedMetadata =
+                    signedMetadata(policy.issuerTrust) ?: throw CredentialIssuerMetadataError.MissingSignedMetadata()
                 signedMetadata.toDomain(issuer)
             }
 
@@ -449,16 +451,52 @@ private data class BatchCredentialIssuanceTO(
 private data class CredentialIssuerMetadataTO(
     @SerialName("credential_issuer") val credentialIssuerIdentifier: String? = null,
     @SerialName("authorization_servers") val authorizationServers: List<String>? = null,
-    @SerialName("credential_endpoint")val credentialEndpoint: String? = null,
+    @SerialName("credential_endpoint") val credentialEndpoint: String? = null,
     @SerialName("nonce_endpoint") val nonceEndpoint: String? = null,
     @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
     @SerialName("notification_endpoint") val notificationEndpoint: String? = null,
     @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionTO? = null,
     @SerialName("batch_credential_issuance") val batchCredentialIssuance: BatchCredentialIssuanceTO? = null,
     @SerialName("signed_metadata") val signedMetadata: String? = null,
+    @Serializable(with = KeepKnownConfigurations::class)
     @SerialName("credential_configurations_supported") val credentialConfigurationsSupported: Map<String, CredentialSupportedTO>? = null,
     @SerialName("display") val display: List<DisplayTO>? = null,
 )
+
+private object KeepKnownConfigurations : JsonTransformingSerializer<Map<String, CredentialSupportedTO>>(serializer()) {
+
+    override fun transformDeserialize(element: JsonElement): JsonElement {
+        val obj = element.jsonObject
+        val keysToRemove = obj.keysOfUnknownCfgs()
+        return if (keysToRemove.isEmpty()) obj
+        else JsonObject(obj.toMutableMap().apply { keysToRemove.forEach { remove(it) } })
+    }
+
+    private fun Map<String, JsonElement>.keysOfUnknownCfgs(): Set<String> =
+        buildSet {
+            this@keysOfUnknownCfgs.forEach { (k, cfg) ->
+                if (!cfg.isKnown()) add(k)
+            }
+        }
+
+    private val knownFormats =
+        setOf(
+            FORMAT_MSO_MDOC,
+            FORMAT_SD_JWT_VC,
+            FORMAT_W3C_SIGNED_JWT,
+            FORMAT_W3C_JSONLD_SIGNED_JWT,
+            FORMAT_W3C_JSONLD_DATA_INTEGRITY,
+        )
+    private fun JsonElement.isKnown(): Boolean =
+        when (this) {
+            is JsonObject -> {
+                val format = get("format")?.takeIf { it is JsonPrimitive }?.jsonPrimitive?.contentOrNull
+                format != null && format in knownFormats
+            }
+
+            else -> false
+        }
+}
 
 /**
  * Converts this [CredentialResponseEncryptionTO] to a [CredentialResponseEncryption].
@@ -643,7 +681,8 @@ private fun CredentialIssuerMetadataTO.mergeWith(other: CredentialIssuerMetadata
         credentialResponseEncryption = credentialResponseEncryption ?: other.credentialResponseEncryption,
         batchCredentialIssuance = batchCredentialIssuance ?: other.batchCredentialIssuance,
         signedMetadata = signedMetadata ?: other.signedMetadata,
-        credentialConfigurationsSupported = credentialConfigurationsSupported ?: other.credentialConfigurationsSupported,
+        credentialConfigurationsSupported = credentialConfigurationsSupported
+            ?: other.credentialConfigurationsSupported,
         display = display ?: other.display,
     )
 
