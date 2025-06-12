@@ -64,6 +64,7 @@ internal fun oiciWellKnownMocker(issuerMetadataVersion: IssuerMetadataVersion = 
             ENCRYPTION_SUPPORTED_NOT_REQUIRED -> getResourceAsText("well-known/openid-credential-issuer_encryption_not_required.json")
             NO_NONCE_ENDPOINT -> getResourceAsText("well-known/openid-credential-issuer_no_nonce_endpoint.json")
             NO_SCOPES -> getResourceAsText("well-known/openid-credential-issuer_no_scopes.json")
+            CONTAINS_DEPRECATED_METHOD -> getResourceAsText("well-known/openid-credential-issuer_contains_invalid_configuration.json")
         }
         respond(
             content = content,
@@ -81,6 +82,7 @@ enum class IssuerMetadataVersion {
     ENCRYPTION_SUPPORTED_NOT_REQUIRED,
     NO_NONCE_ENDPOINT,
     NO_SCOPES,
+    CONTAINS_DEPRECATED_METHOD,
 }
 
 internal fun authServerWellKnownMocker(): RequestMocker = RequestMocker(
