@@ -563,6 +563,25 @@ class IssuanceIssuerMetadataVersionTest {
             assertIs<DeferredCredentialQueryOutcome.Issued>(deferredOutcome)
         }
     }
+
+    @Test
+    fun `when metadata response contains four valid and one unknown format, skip it and deserialize everything else`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            oiciWellKnownMocker(IssuerMetadataVersion.CONTAINS_DEPRECATED_METHOD),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+            responseEncryptionSpecFactory = { _, _ -> null },
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+        )
+        assertTrue("Deserialization did not discard unknown format credential_configurations_supported values") {
+            issuer.credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported.count() == 4
+        }
+    }
 }
 
 fun randomRSAEncryptionKey(size: Int): RSAKey = RSAKeyGenerator(size)
