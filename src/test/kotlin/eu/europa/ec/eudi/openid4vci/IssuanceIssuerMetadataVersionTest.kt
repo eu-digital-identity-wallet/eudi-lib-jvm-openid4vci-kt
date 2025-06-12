@@ -565,7 +565,7 @@ class IssuanceIssuerMetadataVersionTest {
     }
 
     @Test
-    fun `when metadata response contains four valid and one unknown or invalid or removed format, skip it and deserialize everything else`() = runTest {
+    fun `when metadata response contains four valid and one unknown format, skip it and deserialize everything else`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
             authServerWellKnownMocker(),
             parPostMocker(),
