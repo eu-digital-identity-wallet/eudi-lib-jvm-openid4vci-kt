@@ -21,27 +21,42 @@ import eu.europa.ec.eudi.openid4vci.internal.ensureSignedNotMAC
 
 data class KeyAttestationJWT(val jwt: SignedJWT) {
 
+    val attestedKeys: List<JWK>
+
     init {
         jwt.ensureSignedNotMAC()
         require(jwt.header.type != null && jwt.header.type.type.equals(KEY_ATTESTATION_JWT_TYPE)) {
             "Invalid Key Attestation JWT. Type must be set to `$KEY_ATTESTATION_JWT_TYPE`"
         }
         requireNotNull(jwt.jwtClaimsSet.issueTime) { "Invalid Key Attestation JWT. Misses `iat` claim" }
-        requireNotNull(jwt.jwtClaimsSet.getListClaim("attested_keys")) {
-            "Invalid Key Attestation JWT. Misses `attested_keys` claim"
-        }
-        require(jwt.jwtClaimsSet.getListClaim("attested_keys").isNotEmpty()) {
+
+        val attestedKeysClaimEntries = jwt.jwtClaimsSet.getListClaim("attested_keys")
+        requireNotNull(attestedKeysClaimEntries) { "Invalid Key Attestation JWT. Misses `attested_keys` claim" }
+        require(attestedKeysClaimEntries.isNotEmpty()) {
             "Invalid Key Attestation JWT. `attested_keys` claim must not be empty"
+        }
+
+        this.attestedKeys = attestedKeysClaimEntries.mapIndexed { index, keyObject ->
+            require(keyObject is Map<*, *>) {
+                "Invalid Key Attestation JWT. Item at index $index in `attested_keys` is not a JSON object."
+            }
+            try {
+                @Suppress("UNCHECKED_CAST")
+                val jwk = JWK.parse(keyObject as Map<String, Any>)
+                require(!jwk.isPrivate) {
+                    "Invalid Key Attestation JWT. Item at index $index in `attested_keys` must be a public key."
+                }
+                jwk
+            } catch (e: java.text.ParseException) {
+                throw IllegalArgumentException(
+                    "Invalid Key Attestation JWT. Item at index $index in `attested_keys` is not a valid JWK: ${e.message}",
+                    e,
+                )
+            }
         }
     }
 
     companion object {
         const val KEY_ATTESTATION_JWT_TYPE = "keyattestation+jwt"
-    }
-
-    val attestedKeys: List<JWK> by lazy {
-        jwt.jwtClaimsSet.getListClaim("attested_keys").map {
-            JWK.parse(it as Map<String, Any>)
-        }
     }
 }

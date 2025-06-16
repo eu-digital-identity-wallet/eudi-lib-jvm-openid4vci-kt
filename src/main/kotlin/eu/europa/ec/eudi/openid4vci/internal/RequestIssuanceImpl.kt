@@ -95,7 +95,16 @@ internal class RequestIssuanceImpl(
         when (proofsRequirement) {
             is CredentialProofsRequirement.ProofNotRequired -> emptyList()
             is CredentialProofsRequirement.ProofRequired -> {
-                when (val popSignersNo = popSigners.size) {
+                val keysCount = popSigners.map {
+                    when (it) { is PopSigner.Jwt -> it.bindingKey }
+                }.map {
+                    when (it) {
+                        is JwtBindingKey.Jwk, is JwtBindingKey.Did, is JwtBindingKey.X509 -> 1
+                        is JwtBindingKey.KeyAttestation -> it.keyAttestationJWT.attestedKeys.size
+                    }
+                }.count()
+
+                when (keysCount) {
                     0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
                     1 -> Unit
                     else -> {
@@ -103,7 +112,7 @@ internal class RequestIssuanceImpl(
                             BatchCredentialIssuance.NotSupported -> CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
                             is BatchCredentialIssuance.Supported -> {
                                 val maxBatchSize = batchCredentialIssuance.batchSize
-                                ensure(popSignersNo <= maxBatchSize) {
+                                ensure(keysCount <= maxBatchSize) {
                                     CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
                                 }
                             }

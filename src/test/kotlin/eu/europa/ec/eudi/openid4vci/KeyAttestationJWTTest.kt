@@ -55,8 +55,7 @@ private class KeyAttestationJWTTest {
                 .build(),
             JWTClaimsSet.Builder()
                 .build(),
-        )
-        signedJwt.sign(signer)
+        ).apply { sign(signer) }
         val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(signedJwt) }
         assertEquals("Invalid Key Attestation JWT. Type must be set to `$KEY_ATTESTATION_JWT_TYPE`", exception.message)
     }
@@ -69,8 +68,7 @@ private class KeyAttestationJWTTest {
                 .build(),
             JWTClaimsSet.Builder()
                 .build(),
-        )
-        signedJwt.sign(signer)
+        ).apply { sign(signer) }
         val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(signedJwt) }
         assertEquals("Invalid Key Attestation JWT. Misses `iat` claim", exception.message)
     }
@@ -84,8 +82,7 @@ private class KeyAttestationJWTTest {
             JWTClaimsSet.Builder()
                 .issueTime(Date())
                 .build(),
-        )
-        signedJwt.sign(signer)
+        ).apply { sign(signer) }
         val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(signedJwt) }
         assertEquals("Invalid Key Attestation JWT. Misses `attested_keys` claim", exception.message)
     }
@@ -100,8 +97,7 @@ private class KeyAttestationJWTTest {
                 .issueTime(Date())
                 .claim("attested_keys", listOf(ecKeyJwk.toPublicJWK().toJSONObject()))
                 .build(),
-        )
-        signedJwt.sign(signer)
+        ).apply { sign(signer) }
         KeyAttestationJWT(signedJwt)
     }
 }

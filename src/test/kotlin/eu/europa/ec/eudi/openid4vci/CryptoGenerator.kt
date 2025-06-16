@@ -123,13 +123,12 @@ object CryptoGenerator {
             JWSHeader.Builder(alg)
                 .type(JOSEObjectType(KEY_ATTESTATION_JWT_TYPE))
                 .build(),
-            JWTClaimsSet.Builder()
-                .issueTime(Date())
-                .claim("attested_keys", listOf(jwk.toPublicJWK().toJSONObject()))
-                .expirationTime(Date.from(now().plus(java.time.Duration.ofSeconds(60))))
-                .build(),
-        )
-        signedJwt.sign(signer)
+            JWTClaimsSet.Builder().apply {
+                issueTime(Date.from(now()))
+                claim("attested_keys", listOf(jwk.toPublicJWK().toJSONObject()))
+                expirationTime(Date.from(now().plusSeconds(60)))
+            }.build(),
+        ).apply { sign(signer) }
         KeyAttestationJWT(signedJwt)
     }
 }
