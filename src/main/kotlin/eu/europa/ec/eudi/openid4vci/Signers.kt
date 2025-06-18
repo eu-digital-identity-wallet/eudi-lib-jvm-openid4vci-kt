@@ -129,10 +129,16 @@ class DefaultSingleJwtSigner<Claims, PUB>(
     }
 
     private fun ByteArray.transcodeSignatureToConcat(signingAlgorithm: String): ByteArray {
-        val outputLen = when (signingAlgorithm) {
-            "SHA256withECDSA" -> 64
-            "SHA384withECDSA" -> 96
-            "SHA512withECDSA" -> 132
+        val alg = signingAlgorithm.toJoseAlg()
+
+        if (!JWSAlgorithm.Family.EC.contains(alg)) {
+            return this
+        }
+
+        val outputLen = when (alg) {
+            JWSAlgorithm.ES256 -> 64
+            JWSAlgorithm.ES384 -> 96
+            JWSAlgorithm.ES512 -> 132
             else -> error("Unsupported algorithm for JWS signature transcoding: $signingAlgorithm")
         }
         return ECDSA.transcodeSignatureToConcat(this, outputLen)
