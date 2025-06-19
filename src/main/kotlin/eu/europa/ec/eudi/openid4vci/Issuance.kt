@@ -186,6 +186,10 @@ sealed interface PopSigner {
                     is JwtBindingKey.Did -> true // Would require DID resolution which is out of scope
                     is JwtBindingKey.Jwk -> privateKey.toPublicJWK() == publicKey.jwk
                     is JwtBindingKey.X509 -> privateKey.toPublicJWK() == JWK.parse(publicKey.chain.first())
+                    is JwtBindingKey.KeyAttestation -> {
+                        privateKey.toPublicJWK().toJSONObject() ==
+                            publicKey.keyAttestationJWT.attestedKeys[publicKey.keyIndex].toJSONObject()
+                    }
                 },
             ) { "Public/private key don't match" }
 
@@ -341,6 +345,12 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
          */
         class ProofTypeSigningAlgorithmNotSupported :
             ProofGenerationError("ProofTypeSigningAlgorithmNotSupported")
+
+        /**
+         * Proof type requires key attestation, but it is not provided.
+         */
+        class ProofTypeKeyAttestationRequired :
+            ProofGenerationError("ProofTypeKeyAttestationRequired")
     }
 
     /**

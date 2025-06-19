@@ -65,6 +65,7 @@ internal fun oiciWellKnownMocker(issuerMetadataVersion: IssuerMetadataVersion = 
             NO_NONCE_ENDPOINT -> getResourceAsText("well-known/openid-credential-issuer_no_nonce_endpoint.json")
             NO_SCOPES -> getResourceAsText("well-known/openid-credential-issuer_no_scopes.json")
             CONTAINS_DEPRECATED_METHOD -> getResourceAsText("well-known/openid-credential-issuer_contains_invalid_configuration.json")
+            KEY_ATTESTATION_REQUIRED -> getResourceAsText("well-known/openid-credential-issuer_key_attestation_required.json")
         }
         respond(
             content = content,
@@ -83,6 +84,7 @@ enum class IssuerMetadataVersion {
     NO_NONCE_ENDPOINT,
     NO_SCOPES,
     CONTAINS_DEPRECATED_METHOD,
+    KEY_ATTESTATION_REQUIRED,
 }
 
 internal fun authServerWellKnownMocker(): RequestMocker = RequestMocker(
@@ -319,7 +321,7 @@ fun MockRequestHandleScope.encryptedResponseDataBuilder(
     val (jwk, alg, enc) = extractEncryptionSpec(request)
     val responseJson = successResponseJsonProvider()
     return respond(
-        content = encypt(JWTClaimsSet.parse(responseJson), jwk, alg, enc).getOrThrow(),
+        content = encrypt(JWTClaimsSet.parse(responseJson), jwk, alg, enc).getOrThrow(),
         status = HttpStatusCode.OK,
         headers = headersOf(
             HttpHeaders.ContentType to listOf("application/jwt"),
@@ -341,7 +343,7 @@ private fun extractEncryptionSpec(request: HttpRequestData?): Triple<JWK, JWEAlg
     return Triple(jwk, alg, enc)
 }
 
-fun encypt(claimSet: JWTClaimsSet, jwk: JWK, alg: JWEAlgorithm, enc: EncryptionMethod): Result<String> =
+fun encrypt(claimSet: JWTClaimsSet, jwk: JWK, alg: JWEAlgorithm, enc: EncryptionMethod): Result<String> =
     runCatching {
         randomRSAEncryptionKey(2048)
         val header =
