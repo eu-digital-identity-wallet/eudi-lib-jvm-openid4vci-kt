@@ -115,7 +115,8 @@ interface BatchSigner<out PUB> {
                         signingAlgorithm,
                         it.key,
                         secureRandom,
-                        provider)
+                        provider,
+                    )
                     SignOp(signingAlgorithm, sign, it.value)
                 }
                 return BatchSignOp(signOps)

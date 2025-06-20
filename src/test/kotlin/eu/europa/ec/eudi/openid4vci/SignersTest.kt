@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.Serializable
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,7 +25,6 @@ class SignersTest {
 
     @Test
     fun `sign jwt proofs and verify`() = runTest {
-
         val ecKeys = List(5) { CryptoGenerator.randomECSigningKey(Curve.P_256) }
 
         val jwtProofSigner = JwtProofsSigner(

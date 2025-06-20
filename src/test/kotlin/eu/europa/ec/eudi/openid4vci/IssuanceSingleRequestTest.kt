@@ -370,7 +370,7 @@ class IssuanceSingleRequestTest {
                         issuanceRequestTO.credentialIdentifier,
                         "Expected identifier based issuance request but credential_identifier is null",
 
-                        )
+                    )
                 },
             ),
         )
