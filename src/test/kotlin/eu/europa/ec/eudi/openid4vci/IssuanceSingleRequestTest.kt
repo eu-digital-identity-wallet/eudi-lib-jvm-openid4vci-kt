@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseUnparsable
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
 import eu.europa.ec.eudi.openid4vci.internal.Proof
@@ -85,8 +86,15 @@ class IssuanceSingleRequestTest {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val (_, outcome) = assertDoesNotThrow {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                val ecKeys = List(3) { CryptoGenerator.randomECSigningKey(Curve.P_256) }
+                val jwtProofsSigner = JwtProofsSigner(
+                    BatchSigner.fromNimbusEcKeys(
+                        ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
+                        secureRandom = null,
+                        provider = null,
+                    ),
+                )
+                authorizedRequest.request(requestPayload, jwtProofsSigner).getOrThrow()
             }
             assertIs<SubmissionOutcome.Failed>(outcome)
             assertIs<CredentialIssuanceError.InvalidProof>(outcome.error)
@@ -362,7 +370,7 @@ class IssuanceSingleRequestTest {
                         issuanceRequestTO.credentialIdentifier,
                         "Expected identifier based issuance request but credential_identifier is null",
 
-                    )
+                        )
                 },
             ),
         )

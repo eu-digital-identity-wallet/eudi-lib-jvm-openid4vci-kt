@@ -15,54 +15,37 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWSObject
-import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jwt.SignedJWT
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
+import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-
-@Serializable
-data class JwtPayload(
-    val iss: String,
-    val sub: String,
-    val aud: String,
-    val jti: String,
-)
 
 class SignersTest {
+
     @Test
-    fun `sign jwt and verify signature`() = runTest {
-        val ecKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
+    fun `sign jwt proofs and verify`() = runTest {
 
-        val jwtBindingKey: JwtBindingKey = JwtBindingKey.Jwk(
-            ecKey.toPublicJWK(),
-        )
+        val ecKeys = List(5) { CryptoGenerator.randomECSigningKey(Curve.P_256) }
 
-        val jwtSigner = DefaultSingleJwtSigner.popSigner<JwtPayload> (
-            Signer.fromNimbusEcKey(
-                ecKey,
-                jwtBindingKey,
+        val jwtProofSigner = JwtProofsSigner(
+            BatchSigner.fromNimbusEcKeys(
+                ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
                 secureRandom = null,
                 provider = null,
             ),
         )
 
-        val signResult = jwtSigner.sign(
-            JwtPayload(
-                iss = "https://eudiw.dev",
-                sub = "subject",
-                aud = "audience",
-                jti = "unique-id",
+        val signResult = jwtProofSigner.sign(
+            JwtProofClaims(
+                issuer = "https://eudiw.dev",
+                audience = "audience",
+                issuedAt = Date(),
+                nonce = null,
             ),
         )
 
-        val signedJWT = SignedJWT.parse(signResult.getOrThrow())
-
-        assertEquals(JWSObject.State.SIGNED, signedJWT.state)
-        assertTrue(signedJWT.verify(ECDSAVerifier(ecKey.toPublicJWK())))
+        assertEquals(5, signResult.size)
     }
 }

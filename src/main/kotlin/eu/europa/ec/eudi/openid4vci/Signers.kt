@@ -19,9 +19,14 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.impl.ECDSA
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vci.internal.NumericDateSerializer
+import eu.europa.ec.eudi.openid4vci.internal.asJsonElement
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlinx.serialization.serializer
 import java.security.SecureRandom
@@ -71,11 +76,14 @@ data class SignOp<out PUB>(
     val publicMaterial: PUB,
 )
 
+data class BatchSignOp<out PUB>(
+    val operations: List<SignOp<PUB>>,
+)
+
 fun interface Signer<out PUB> {
     suspend fun authenticate(): SignOp<PUB>
 
     companion object {
-
         fun <PUB> forEcPrivateKey(
             signingAlgorithm: String,
             privateKey: ECPrivateKey,
@@ -86,6 +94,31 @@ fun interface Signer<out PUB> {
             override suspend fun authenticate(): SignOp<PUB> {
                 val sign = SignOperation.forJavaEcPrivateKey(signingAlgorithm, privateKey, secureRandom, provider)
                 return SignOp(signingAlgorithm, sign, publicMaterial)
+            }
+        }
+    }
+}
+
+interface BatchSigner<out PUB> {
+    suspend fun authenticate(): BatchSignOp<PUB>
+
+    companion object {
+        fun <PUB> forEcPrivateKeys(
+            signingAlgorithm: String,
+            ecKeyPairs: Map<ECPrivateKey, PUB>,
+            secureRandom: SecureRandom?,
+            provider: String?,
+        ): BatchSigner<PUB> = object : BatchSigner<PUB> {
+            override suspend fun authenticate(): BatchSignOp<PUB> {
+                val signOps = ecKeyPairs.map {
+                    val sign = SignOperation.forJavaEcPrivateKey(
+                        signingAlgorithm,
+                        it.key,
+                        secureRandom,
+                        provider)
+                    SignOp(signingAlgorithm, sign, it.value)
+                }
+                return BatchSignOp(signOps)
             }
         }
     }
@@ -107,7 +140,11 @@ class DefaultSingleJwtSigner<Claims, PUB>(
         val (signingAlgorithm, operation, publicMaterial) = signer.authenticate()
 
         val headerJson = buildJsonObject {
-            put("alg", signingAlgorithm.toJoseAlg().name)
+            requireNotNull(signingAlgorithm.toJoseECAlg()) {
+                "Unsupported signing algorithm: $signingAlgorithm"
+            }.let {
+                put("alg", it.name)
+            }
             customizeHeader(publicMaterial)
         }
         val claimsJson = Json.encodeToJsonElement(serializer, claims).jsonObject
@@ -120,28 +157,10 @@ class DefaultSingleJwtSigner<Claims, PUB>(
         val signingInput: ByteArray = "$headerB64.$claimsB64".toByteArray(Charsets.US_ASCII)
 
         val signatureB64 = operation.sign(signingInput).map {
-            it.transcodeSignatureToConcat(signingAlgorithm)
-        }.map {
-            base64UrlEncoder.encodeToString(it)
+            base64UrlEncoder.encodeToString(it.transcodeSignatureToConcat(signingAlgorithm))
         }.getOrThrow()
 
         "$headerB64.$claimsB64.$signatureB64"
-    }
-
-    private fun ByteArray.transcodeSignatureToConcat(signingAlgorithm: String): ByteArray {
-        val alg = signingAlgorithm.toJoseAlg()
-
-        if (!JWSAlgorithm.Family.EC.contains(alg)) {
-            return this
-        }
-
-        val outputLen = when (alg) {
-            JWSAlgorithm.ES256 -> 64
-            JWSAlgorithm.ES384 -> 96
-            JWSAlgorithm.ES512 -> 132
-            else -> error("Unsupported algorithm for JWS signature transcoding: $signingAlgorithm")
-        }
-        return ECDSA.transcodeSignatureToConcat(this, outputLen)
     }
 
     companion object {
@@ -149,37 +168,80 @@ class DefaultSingleJwtSigner<Claims, PUB>(
             signer: Signer<PUB>,
             noinline customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
         ): DefaultSingleJwtSigner<Claims, PUB> = DefaultSingleJwtSigner(serializer(), signer, customizeHeader)
-
-        inline fun <reified Claims> popSigner(
-            signer: Signer<JwtBindingKey>,
-        ): DefaultSingleJwtSigner<Claims, JwtBindingKey> =
-            DefaultSingleJwtSigner(serializer(), signer) { jwtBindingKey ->
-                put("typ", "openid4vci-proof+jwt")
-                when (jwtBindingKey) {
-                    is JwtBindingKey.Did -> {
-                        put("kid", jwtBindingKey.identity)
-                    }
-                    is JwtBindingKey.Jwk -> {
-                        put(
-                            "jwk",
-                            Json.parseToJsonElement(jwtBindingKey.jwk.toPublicJWK().toJSONString()),
-                        )
-                    }
-                    is JwtBindingKey.X509 -> {
-                        TODO()
-                    }
-                }
-            }
     }
 }
 
-data class BatchSignOp<out KeyInfo>(
-    val alg: String,
-    val operations: List<SignOp<KeyInfo>>,
+@Serializable
+data class JwtProofClaims(
+    @SerialName("aud") val audience: String,
+    @Serializable(with = NumericDateSerializer::class)
+    @SerialName("iat") val issuedAt: Date,
+    @SerialName("iss") val issuer: String?,
+    @SerialName("nonce") val nonce: String?, // TODO GD use CNonce type
 )
 
-interface BatchSigner<out KeyInfo> {
-    suspend fun authenticate(): BatchSignOp<KeyInfo>
+class JwtProofsSigner(
+    private val signer: BatchSigner<JwtBindingKey>,
+    private val customizeHeader: JsonObjectBuilder.(JwtBindingKey) -> Unit = {},
+) {
+    suspend fun sign(claims: JwtProofClaims): List<Pair<JwtBindingKey, SignedJWT>> {
+        val (operations) = signer.authenticate()
+
+        return operations.map { signOp ->
+            val (alg, operation, pubKey) = signOp
+            val headerJson = buildJsonObject {
+                requireNotNull(alg.toJoseECAlg()) {
+                    "Unsupported signing algorithm: $alg"
+                }.let {
+                    put("alg", it.name)
+                }
+                put("typ", "openid4vci-proof+jwt")
+                when (pubKey) {
+                    is JwtBindingKey.Did -> {
+                        put("kid", pubKey.identity)
+                    }
+                    is JwtBindingKey.Jwk -> {
+                        put("jwk", pubKey.jwk.asJsonElement())
+                    }
+                    is JwtBindingKey.X509 -> {
+                        put("x5c", pubKey.chain.asJsonElement())
+                    }
+                }
+                customizeHeader(pubKey)
+            }
+            val claimsJson = Json.encodeToJsonElement(claims).jsonObject
+
+            // Base64Url encode header and claims
+            val base64UrlEncoder = Base64.getUrlEncoder().withoutPadding()
+            val headerB64 = base64UrlEncoder.encodeToString(headerJson.toString().toByteArray(Charsets.UTF_8))
+            val claimsB64 = base64UrlEncoder.encodeToString(claimsJson.toString().toByteArray(Charsets.UTF_8))
+
+            val signingInput: ByteArray = "$headerB64.$claimsB64".toByteArray(Charsets.US_ASCII)
+
+            val signatureB64 = operation.sign(signingInput).map { signature ->
+                base64UrlEncoder.encodeToString(signature.transcodeSignatureToConcat(alg))
+            }.getOrThrow()
+
+            val jwtString = "$headerB64.$claimsB64.$signatureB64"
+            Pair(pubKey, SignedJWT.parse(jwtString))
+        }
+    }
+}
+
+private fun ByteArray.transcodeSignatureToConcat(signingAlgorithm: String): ByteArray {
+    val alg = signingAlgorithm.toJoseECAlg()
+
+    if (!JWSAlgorithm.Family.EC.contains(alg)) {
+        return this
+    }
+
+    val outputLen = when (alg) {
+        JWSAlgorithm.ES256 -> 64
+        JWSAlgorithm.ES384 -> 96
+        JWSAlgorithm.ES512 -> 132
+        else -> error("Unsupported algorithm for JWS signature transcoding: $signingAlgorithm")
+    }
+    return ECDSA.transcodeSignatureToConcat(this, outputLen)
 }
 
 //
@@ -203,6 +265,26 @@ internal fun <KI> Signer.Companion.fromNimbusEcKey(
     )
 }
 
+internal fun <PUB> BatchSigner.Companion.fromNimbusEcKeys(
+    ecKeyPairs: Map<ECKey, PUB>,
+    secureRandom: SecureRandom?,
+    provider: String?,
+): BatchSigner<PUB> {
+    require(ecKeyPairs.isNotEmpty()) { "At least one EC key pair must be provided" }
+    ecKeyPairs.forEach {
+        require(it.key.isPrivate) { "All EC keys must be private keys" }
+    }
+    val signatureAlgorithm = ecKeyPairs.entries.first().key.curve.toJavaSigningAlg()
+    return forEcPrivateKeys(
+        signatureAlgorithm,
+        ecKeyPairs.map {
+            it.key.toECPrivateKey() to it.value
+        }.toMap(),
+        secureRandom,
+        provider,
+    )
+}
+
 private fun Curve.toJavaSigningAlg(): String {
     return when (this) {
         Curve.P_256 -> "SHA256withECDSA"
@@ -213,9 +295,9 @@ private fun Curve.toJavaSigningAlg(): String {
     }
 }
 
-private fun String.toJoseAlg(): JWSAlgorithm = when (this) {
+private fun String.toJoseECAlg(): JWSAlgorithm? = when (this) {
     "SHA256withECDSA" -> JWSAlgorithm.ES256
     "SHA384withECDSA" -> JWSAlgorithm.ES384
     "SHA512withECDSA" -> JWSAlgorithm.ES512
-    else -> error("Unsupported Java algorithm: $this")
+    else -> null
 }
