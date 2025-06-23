@@ -46,6 +46,11 @@ sealed interface CryptographicBindingMethod : Serializable {
      * DID method.
      */
     data class DID(val method: String) : CryptographicBindingMethod
+
+    /**
+     * Other format
+     */
+    data class Other(val value: String) : CryptographicBindingMethod
 }
 
 /**

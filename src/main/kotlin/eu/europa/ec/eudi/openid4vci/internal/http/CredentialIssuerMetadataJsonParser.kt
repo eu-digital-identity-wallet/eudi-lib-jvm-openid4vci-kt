@@ -656,7 +656,7 @@ private fun cryptographicBindingMethodOf(s: String): CryptographicBindingMethod 
         s == "jwk" -> CryptographicBindingMethod.JWK
         s == "cose_key" -> CryptographicBindingMethod.COSE
         s.startsWith("did") -> CryptographicBindingMethod.DID(s)
-        else -> error("Unknown Cryptographic Binding Method '$s'")
+        else -> CryptographicBindingMethod.Other(s)
     }
 
 private fun JsonPrimitive.toCoseAlgorithm(): CoseAlgorithm? {
