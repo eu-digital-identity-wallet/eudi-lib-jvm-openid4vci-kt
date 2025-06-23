@@ -27,6 +27,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 import java.security.cert.X509Certificate
+import java.time.Instant
 import java.util.*
 
 fun JWK.asJsonElement(): JsonElement = Json.parseToJsonElement(this.toPublicJWK().toJSONString())
@@ -35,17 +36,15 @@ fun List<X509Certificate>.asJsonElement(): JsonArray = JsonArray(
     this.map { Json.encodeToJsonElement(Base64.getEncoder().encodeToString(it.encoded)) }, // TODO GD verify if this is correct
 )
 
-object NumericDateSerializer : KSerializer<Date> {
+object NumericInstantSerializer : KSerializer<Instant> {
     override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("NumericDate", PrimitiveKind.LONG)
+        PrimitiveSerialDescriptor("NumericInstant", PrimitiveKind.LONG)
 
-    override fun serialize(encoder: Encoder, value: Date) {
-        val seconds = value.time / 1000
-        encoder.encodeLong(seconds)
+    override fun serialize(encoder: Encoder, value: Instant) {
+        encoder.encodeLong(value.epochSecond)
     }
 
-    override fun deserialize(decoder: Decoder): Date {
-        val seconds = decoder.decodeLong()
-        return Date(seconds * 1000)
+    override fun deserialize(decoder: Decoder): Instant {
+        return Instant.ofEpochSecond(decoder.decodeLong())
     }
 }

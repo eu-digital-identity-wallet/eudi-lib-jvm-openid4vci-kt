@@ -15,10 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.NonceEndpointClient
-import java.util.Date
+import java.time.Instant
 
 private sealed interface CredentialProofsRequirement {
 
@@ -185,12 +186,12 @@ internal class RequestIssuanceImpl(
         proofsSigner.sign(
             JwtProofClaims(
                 audience = aud.toString(),
-                issuedAt = Date(),
+                issuedAt = Instant.now(),
                 issuer = null, // TODO GD
                 nonce = cNonce?.value,
             ),
         ).map {
-            Proof.Jwt(it.second)
+            Proof.Jwt(SignedJWT.parse(it.second))
         }
     }
 

@@ -16,15 +16,46 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jwt.SignedJWT
 import kotlinx.coroutines.test.runTest
-import java.util.*
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class SignersTest {
 
     @Test
-    fun `sign jwt proofs and verify`() = runTest {
+    fun `sign single jwt proof`() = runTest {
+        val ecKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
+
+        val jwtProofSigner = JwtProofSigner(
+            Signer.fromNimbusEcKey(
+                ecKey,
+                JwtBindingKey.Jwk(ecKey.toPublicJWK()),
+                secureRandom = null,
+                provider = null,
+            ),
+        )
+
+        val signResult = jwtProofSigner.sign(
+            JwtProofClaims(
+                issuer = "https://eudiw.dev",
+                audience = "audience",
+                issuedAt = Instant.now(),
+                nonce = null,
+            ),
+        )
+
+        val signedJwt = SignedJWT.parse(signResult)
+
+        assertEquals(
+            ecKey.toPublicJWK().toJSONString(),
+            signedJwt.header.jwk.toJSONString(),
+        )
+    }
+
+    @Test
+    fun `sign batch jwt proofs and verify`() = runTest {
         val ecKeys = List(5) { CryptoGenerator.randomECSigningKey(Curve.P_256) }
 
         val jwtProofSigner = JwtProofsSigner(
@@ -39,7 +70,7 @@ class SignersTest {
             JwtProofClaims(
                 issuer = "https://eudiw.dev",
                 audience = "audience",
-                issuedAt = Date(),
+                issuedAt = Instant.now(),
                 nonce = null,
             ),
         )

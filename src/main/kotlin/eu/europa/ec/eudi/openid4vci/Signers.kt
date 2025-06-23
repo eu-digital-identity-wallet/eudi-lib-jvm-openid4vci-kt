@@ -19,8 +19,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.impl.ECDSA
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.internal.NumericDateSerializer
+import eu.europa.ec.eudi.openid4vci.internal.NumericInstantSerializer
 import eu.europa.ec.eudi.openid4vci.internal.asJsonElement
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,6 +31,7 @@ import kotlinx.serialization.serializer
 import java.security.SecureRandom
 import java.security.Signature
 import java.security.interfaces.ECPrivateKey
+import java.time.Instant
 import java.util.*
 
 fun interface SignOperation {
@@ -125,106 +125,122 @@ interface BatchSigner<out PUB> {
     }
 }
 
-fun interface SingleJwtSigner<in Claims> {
-    suspend fun sign(claims: Claims): Result<String>
+internal fun interface JwtSigner<in Claims> {
+    suspend fun sign(claims: Claims): String
+
+    companion object {
+        inline operator fun <reified Claims, PUB> invoke(
+            signer: Signer<PUB>,
+            noinline customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
+        ): JwtSigner<Claims> = DefaultJwtSigner(serializer(), signer, customizeHeader)
+    }
 }
 
-class DefaultSingleJwtSigner<Claims, PUB>(
+private suspend fun <PUB> SignOp<PUB>.signJwt(header: JsonObject, claims: JsonObject): String {
+    // Base64Url encode header and claims
+    val base64UrlEncoder = Base64.getUrlEncoder().withoutPadding()
+    val headerB64 = base64UrlEncoder.encodeToString(header.toString().toByteArray(Charsets.UTF_8))
+    val claimsB64 = base64UrlEncoder.encodeToString(claims.toString().toByteArray(Charsets.UTF_8))
+
+    val signingInput: ByteArray = "$headerB64.$claimsB64".toByteArray(Charsets.US_ASCII)
+
+    val signatureB64 = operation.sign(signingInput).map {
+        base64UrlEncoder.encodeToString(it.transcodeSignatureToConcat(signingAlgorithm))
+    }.getOrThrow()
+
+    return "$headerB64.$claimsB64.$signatureB64"
+}
+
+internal class DefaultJwtSigner<Claims, PUB>(
     private val serializer: KSerializer<Claims>,
     private val signer: Signer<PUB>,
     private val customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-) : SingleJwtSigner<Claims> {
+) : JwtSigner<Claims> {
 
     override suspend fun sign(
         claims: Claims,
-    ): Result<String> = runCatching {
-        val (signingAlgorithm, operation, publicMaterial) = signer.authenticate()
+    ): String = run {
+        val signOp = signer.authenticate()
 
         val headerJson = buildJsonObject {
-            requireNotNull(signingAlgorithm.toJoseECAlg()) {
-                "Unsupported signing algorithm: $signingAlgorithm"
+            requireNotNull(signOp.signingAlgorithm.toJoseECAlg()) {
+                "Unsupported signing algorithm: $signOp.signingAlgorithm"
             }.let {
                 put("alg", it.name)
             }
-            customizeHeader(publicMaterial)
+            customizeHeader(signOp.publicMaterial)
         }
         val claimsJson = Json.encodeToJsonElement(serializer, claims).jsonObject
 
-        // Base64Url encode header and claims
-        val base64UrlEncoder = Base64.getUrlEncoder().withoutPadding()
-        val headerB64 = base64UrlEncoder.encodeToString(headerJson.toString().toByteArray(Charsets.UTF_8))
-        val claimsB64 = base64UrlEncoder.encodeToString(claimsJson.toString().toByteArray(Charsets.UTF_8))
-
-        val signingInput: ByteArray = "$headerB64.$claimsB64".toByteArray(Charsets.US_ASCII)
-
-        val signatureB64 = operation.sign(signingInput).map {
-            base64UrlEncoder.encodeToString(it.transcodeSignatureToConcat(signingAlgorithm))
-        }.getOrThrow()
-
-        "$headerB64.$claimsB64.$signatureB64"
+        signOp.signJwt(headerJson, claimsJson)
     }
 
     companion object {
         inline operator fun <reified Claims, PUB> invoke(
             signer: Signer<PUB>,
             noinline customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-        ): DefaultSingleJwtSigner<Claims, PUB> = DefaultSingleJwtSigner(serializer(), signer, customizeHeader)
+        ): DefaultJwtSigner<Claims, PUB> = DefaultJwtSigner(serializer(), signer, customizeHeader)
     }
 }
 
 @Serializable
 data class JwtProofClaims(
     @SerialName("aud") val audience: String,
-    @Serializable(with = NumericDateSerializer::class)
-    @SerialName("iat") val issuedAt: Date,
+    @Serializable(with = NumericInstantSerializer::class)
+    @SerialName("iat") val issuedAt: Instant,
     @SerialName("iss") val issuer: String?,
     @SerialName("nonce") val nonce: String?, // TODO GD use CNonce type
 )
+
+private fun JsonObjectBuilder.jwtProofHeader(key: JwtBindingKey) {
+    put("typ", "openid4vci-proof+jwt")
+    when (key) {
+        is JwtBindingKey.Did -> {
+            put("kid", key.identity)
+        }
+        is JwtBindingKey.Jwk -> {
+            put("jwk", key.jwk.asJsonElement())
+        }
+        is JwtBindingKey.X509 -> {
+            put("x5c", key.chain.asJsonElement())
+        }
+    }
+}
+
+class JwtProofSigner(
+    private val signer: Signer<JwtBindingKey>,
+    private val customizeHeader: JsonObjectBuilder.(JwtBindingKey) -> Unit = {},
+) {
+    suspend fun sign(claims: JwtProofClaims): String {
+        return JwtSigner<JwtProofClaims, JwtBindingKey>(
+            signer,
+        ) { pubKey ->
+            jwtProofHeader(pubKey)
+            customizeHeader(pubKey)
+        }.sign(claims)
+    }
+}
 
 class JwtProofsSigner(
     private val signer: BatchSigner<JwtBindingKey>,
     private val customizeHeader: JsonObjectBuilder.(JwtBindingKey) -> Unit = {},
 ) {
-    suspend fun sign(claims: JwtProofClaims): List<Pair<JwtBindingKey, SignedJWT>> {
-        val (operations) = signer.authenticate()
+    suspend fun sign(claims: JwtProofClaims): List<Pair<JwtBindingKey, String>> {
+        val operations = signer.authenticate().operations
+        val claimsJson = Json.encodeToJsonElement(claims).jsonObject
 
         return operations.map { signOp ->
-            val (alg, operation, pubKey) = signOp
+            val (alg, _, pubKey) = signOp
             val headerJson = buildJsonObject {
                 requireNotNull(alg.toJoseECAlg()) {
                     "Unsupported signing algorithm: $alg"
                 }.let {
                     put("alg", it.name)
                 }
-                put("typ", "openid4vci-proof+jwt")
-                when (pubKey) {
-                    is JwtBindingKey.Did -> {
-                        put("kid", pubKey.identity)
-                    }
-                    is JwtBindingKey.Jwk -> {
-                        put("jwk", pubKey.jwk.asJsonElement())
-                    }
-                    is JwtBindingKey.X509 -> {
-                        put("x5c", pubKey.chain.asJsonElement())
-                    }
-                }
+                jwtProofHeader(pubKey)
                 customizeHeader(pubKey)
             }
-            val claimsJson = Json.encodeToJsonElement(claims).jsonObject
-
-            // Base64Url encode header and claims
-            val base64UrlEncoder = Base64.getUrlEncoder().withoutPadding()
-            val headerB64 = base64UrlEncoder.encodeToString(headerJson.toString().toByteArray(Charsets.UTF_8))
-            val claimsB64 = base64UrlEncoder.encodeToString(claimsJson.toString().toByteArray(Charsets.UTF_8))
-
-            val signingInput: ByteArray = "$headerB64.$claimsB64".toByteArray(Charsets.US_ASCII)
-
-            val signatureB64 = operation.sign(signingInput).map { signature ->
-                base64UrlEncoder.encodeToString(signature.transcodeSignatureToConcat(alg))
-            }.getOrThrow()
-
-            val jwtString = "$headerB64.$claimsB64.$signatureB64"
-            Pair(pubKey, SignedJWT.parse(jwtString))
+            pubKey to signOp.signJwt(headerJson, claimsJson)
         }
     }
 }
