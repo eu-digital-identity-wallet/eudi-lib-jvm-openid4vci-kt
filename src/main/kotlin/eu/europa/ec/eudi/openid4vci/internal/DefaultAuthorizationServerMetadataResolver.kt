@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.oauth2.sdk.`as`.AuthorizationServerMetadata
 import com.nimbusds.oauth2.sdk.id.Issuer
-import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
 import eu.europa.ec.eudi.openid4vci.AuthorizationServerMetadataResolutionException
 import eu.europa.ec.eudi.openid4vci.AuthorizationServerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
@@ -32,29 +31,9 @@ internal class DefaultAuthorizationServerMetadataResolver(
     private val httpClient: HttpClient,
 ) : AuthorizationServerMetadataResolver {
     override suspend fun resolve(authServerUrl: HttpsUrl): Result<CIAuthorizationServerMetadata> =
-        fetchOidcServerMetadata(authServerUrl)
-            .recoverCatching { fetchOauthServerMetadata(authServerUrl).getOrThrow() }
+        fetchOauthServerMetadata(authServerUrl)
             .mapCatching { it.apply { expectIssuer(authServerUrl) } }
             .mapError(::AuthorizationServerMetadataResolutionException)
-
-    /**
-     * Tries to fetch the [CIAuthorizationServerMetadata] for the provided [OpenID Connect Authorization Server][issuer].
-     * The well-known location __/.well-known/openid-configuration__ is used.
-     */
-    private suspend fun fetchOidcServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
-        runCatching {
-            val url = issuer.metadataUrl(
-                metadata = "/.well-known/openid-configuration",
-                lookup = Lookup.BySpecification,
-            )
-            fetchAndParse(url, OIDCProviderMetadata::parse)
-        }.recoverCatching {
-            val url = issuer.metadataUrl(
-                metadata = "/.well-known/openid-configuration",
-                lookup = Lookup.CommonDeviation,
-            )
-            fetchAndParse(url, OIDCProviderMetadata::parse)
-        }
 
     /**
      * Tries to fetch the [CIAuthorizationServerMetadata] for the provided [OAuth2 Authorization Server][issuer].
@@ -64,13 +43,6 @@ internal class DefaultAuthorizationServerMetadataResolver(
         runCatching {
             val url = issuer.metadataUrl(
                 metadata = "/.well-known/oauth-authorization-server",
-                lookup = Lookup.BySpecification,
-            )
-            fetchAndParse(url, AuthorizationServerMetadata::parse)
-        }.recoverCatching {
-            val url = issuer.metadataUrl(
-                metadata = "/.well-known/oauth-authorization-server",
-                lookup = Lookup.CommonDeviation,
             )
             fetchAndParse(url, AuthorizationServerMetadata::parse)
         }
@@ -92,40 +64,23 @@ private fun CIAuthorizationServerMetadata.expectIssuer(expected: HttpsUrl) =
     require(issuer == Issuer(expected.value.toURI())) { "issuer does not match the expected value" }
 
 /**
- * How metadata lookup should be performed.
- */
-private enum class Lookup {
-    BySpecification,
-    CommonDeviation,
-}
-
-/**
  * Gets a well-known metadata URL of an issuer.
  *
  * @receiver the Issuer
  * @param metadata the well-known metadata URL to get
- * @param lookup whether to produce a spec-compliant URL or not
  */
-private fun HttpsUrl.metadataUrl(metadata: String, lookup: Lookup): Url {
+private fun HttpsUrl.metadataUrl(metadata: String): Url {
     val issuer = Url(this.value.toString())
-    return when (lookup) {
-        Lookup.BySpecification ->
-            URLBuilder(issuer).apply {
-                val pathSegment =
-                    buildString {
-                        val joinedSegments = issuer.segments.joinToString(separator = "/")
-                        if (joinedSegments.isNotBlank()) {
-                            append("/")
-                        }
-                        append(joinedSegments)
-                    }
+    return URLBuilder(issuer).apply {
+        val pathSegment =
+            buildString {
+                val joinedSegments = issuer.segments.joinToString(separator = "/")
+                if (joinedSegments.isNotBlank()) {
+                    append("/")
+                }
+                append(joinedSegments)
+            }
 
-                path("/${metadata.removePrefix("/").removeSuffix("/")}$pathSegment")
-            }.build()
-
-        Lookup.CommonDeviation ->
-            URLBuilder(issuer)
-                .appendPathSegments("/${metadata.removePrefix("/").removeSuffix("/")}", encodeSlash = false)
-                .build()
-    }
+        path("/${metadata.removePrefix("/").removeSuffix("/")}$pathSegment")
+    }.build()
 }
