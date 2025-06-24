@@ -75,7 +75,7 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
         val cause = assertIs<ClientRequestException>(error.cause)
         assertEquals(HttpStatusCode.NotFound, cause.response.status)
 
-        // Verify the URL that was tried, is the common lookup for oauth2 authorization server metadata.
+        // Verify the URL that was tried is the common lookup for oauth2 authorization server metadata.
         assertEquals(
             "https://keycloak.netcompany.com/.well-known/oauth-authorization-server/realms/pid-issuer-realm",
             cause.response.request.url.toString(),
