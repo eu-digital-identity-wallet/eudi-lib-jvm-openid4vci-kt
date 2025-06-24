@@ -41,8 +41,8 @@ internal class DefaultAuthorizationServerMetadataResolver(
      */
     private suspend fun fetchOauthServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
         runCatching {
-            val url = issuer.metadataUrl(
-                metadata = "/.well-known/oauth-authorization-server",
+            val url = issuer.wellKnownUrl(
+                wellKnownPath = "/.well-known/oauth-authorization-server",
             )
             fetchAndParse(url, AuthorizationServerMetadata::parse)
         }
@@ -67,20 +67,20 @@ private fun CIAuthorizationServerMetadata.expectIssuer(expected: HttpsUrl) =
  * Gets a well-known metadata URL of an issuer.
  *
  * @receiver the Issuer
- * @param metadata the well-known metadata URL to get
+ * @param wellKnownPath the well-known metadata URL to get
  */
-private fun HttpsUrl.metadataUrl(metadata: String): Url {
+internal fun HttpsUrl.wellKnownUrl(wellKnownPath: String): Url {
     val issuer = Url(this.value.toString())
-    return URLBuilder(issuer).apply {
-        val pathSegment =
-            buildString {
-                val joinedSegments = issuer.segments.joinToString(separator = "/")
-                if (joinedSegments.isNotBlank()) {
-                    append("/")
-                }
-                append(joinedSegments)
-            }
+    val pathSegment = buildString {
+        append("/${wellKnownPath.removePrefixAndSuffix("/")}")
+        val joinedSegments = issuer.segments.joinToString(separator = "/")
+        if (joinedSegments.isNotBlank()) {
+            append("/")
+        }
+        append(joinedSegments)
+    }
 
-        path("/${metadata.removePrefix("/").removeSuffix("/")}$pathSegment")
-    }.build()
+    return URLBuilder(issuer).apply { path(pathSegment) }.build()
 }
+
+private fun String.removePrefixAndSuffix(s: CharSequence): String = removePrefix(s).removeSuffix(s)
