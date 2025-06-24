@@ -66,7 +66,7 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
     }
 
     @Test
-    internal fun `fails when none of the possible urls returns the metadata`() = runTest {
+    internal fun `fails when url does not return the metadata`() = runTest {
         val issuer = HttpsUrl("https://keycloak.netcompany.com/realms/pid-issuer-realm").getOrThrow()
         val resolver = AuthorizationServerMetadataResolver(mockedKtorHttpClientFactory(expectSuccessOnly = true))
         val error = assertFailsWith<AuthorizationServerMetadataResolutionException> {
@@ -75,7 +75,7 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
         val cause = assertIs<ClientRequestException>(error.cause)
         assertEquals(HttpStatusCode.NotFound, cause.response.status)
 
-        // Verify the last URL that was tried, is the common lookup for oauth2 authorization server metadata.
+        // Verify the URL that was tried, is the common lookup for oauth2 authorization server metadata.
         assertEquals(
             "https://keycloak.netcompany.com/.well-known/oauth-authorization-server/realms/pid-issuer-realm",
             cause.response.request.url.toString(),
