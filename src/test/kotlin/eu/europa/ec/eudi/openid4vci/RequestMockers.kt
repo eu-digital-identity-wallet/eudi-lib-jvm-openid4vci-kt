@@ -83,7 +83,9 @@ enum class IssuerMetadataVersion {
 }
 
 internal fun authServerWellKnownMocker(): RequestMocker = RequestMocker(
-    requestMatcher = endsWith("/.well-known/oauth-authorization-server", HttpMethod.Get),
+    requestMatcher = { request ->
+        request.url.encodedPath.contains("/.well-known/oauth-authorization-server") && request.method == HttpMethod.Get
+    },
     responseBuilder = {
         respond(
             content = getResourceAsText("well-known/openid-configuration.json"),
