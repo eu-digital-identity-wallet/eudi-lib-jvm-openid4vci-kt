@@ -84,7 +84,7 @@ class DPoPJwtFactory(
 
         /**
          * Tries to create a [DPoPJwtFactory] given a [signer] and the [oauthServerMetadata]
-         * of the OAUTH2 or OIDC server.
+         * of the OAuth 2.0 authorization server.
          *
          * The factory will be created in case the server supports DPoP (this is indicated by a not empty array
          * ` dpop_signing_alg_values_supported` and in addition if the [signer] uses a supported algorithm
@@ -105,8 +105,7 @@ class DPoPJwtFactory(
 
         /**
          * Tries to create a [DPoPJwtFactory] given a [signer] and the
-         * [supportedDPopAlgorithms]
-         * of the OAUTH2 or OIDC server.
+         * [supportedDPopAlgorithms] of the OAuth 2.0 Authorization Server.
          *
          * The factory will be created in case the server supports DPoP (this is indicated by a not empty array
          * ` dpop_signing_alg_values_supported` and in addition if the [signer] uses a supported algorithm

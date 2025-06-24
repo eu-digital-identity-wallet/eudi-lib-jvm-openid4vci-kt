@@ -121,7 +121,7 @@ class RichAuthorizationRequestTest {
     fun `when config is FAVOR_SCOPES, auth details option is Include and some credentials have no scopes, expect authorization_details`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                // Oidc Well Known Mocker
+                // Credential Issuer Metadata Well Known Mocker
                 RequestMocker(
                     requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
                     responseBuilder = {
@@ -179,7 +179,7 @@ class RichAuthorizationRequestTest {
     fun `when FAVOR_SCOPES, auth details option is DoNotInclude and credentials have no scope attribute, no authorization_details`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                // Oidc Well Known Mocker
+                // Credential Issuer Metadata Well Known Mocker
                 RequestMocker(
                     requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
                     responseBuilder = {
