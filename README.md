@@ -70,7 +70,7 @@ As a wallet/caller having an out-of-band knowledge of a credential issuer,
 use the library to initiate issuance:
 
 - Fetch and validate the Credential Issuer Metadata
-- Fetch and validate the OAUTH2 or OIDC metadata used by the Credential Issuer
+- Fetch and validate the OAuth 2.0 Authorization Server metadata used by the Credential Issuer
 - Ensure that out-of-band knowledge is valid
 
 This is equivalent to [resolving a credential offer](#resolve-a-credential-offer), having authorization code grant, without issuer state.
@@ -128,7 +128,7 @@ This resolution includes the following
 - Check and validate the structure of the URI
 - Fetch the actual contents of the offer, in case URI points by reference to the offer
 - Fetch and validate the Credential Issuer Metadata
-- Fetch and validate the OAUTH2 or OIDC metadata used by the Credential Issuer
+- Fetch and validate the OAuth 2.0 Authorization Server metadata used by the Credential Issuer
 - Ensure that credential offer is aligned to both the above metadata & wallet issuance configuration
 
 #### Resolve a credential offer successful outcome:
@@ -694,7 +694,7 @@ involved, follow the guidelines found in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Third-party component licenses
 
-* OAUTH2 & OIDC Support: [Nimbus OAuth 2.0 SDK with OpenID Connect extensions](https://connect2id.com/products/nimbus-oauth-openid-connect-sdk)
+* OAuth 2.0 support: [Nimbus OAuth 2.0 SDK with OpenID Connect extensions](https://connect2id.com/products/nimbus-oauth-openid-connect-sdk)
 * URI parsing: [Uri KMP](https://github.com/eygraber/uri-kmp)
 * Http Client: [Ktor](https://ktor.io/)
 * Json: [Kotlinx Serialization](https://github.com/Kotlin/kotlinx.serialization)

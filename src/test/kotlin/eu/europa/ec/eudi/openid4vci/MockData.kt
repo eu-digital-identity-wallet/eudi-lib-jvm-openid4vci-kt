@@ -28,11 +28,7 @@ import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod
 import com.nimbusds.oauth2.sdk.ciba.BackChannelTokenDeliveryMode
 import com.nimbusds.oauth2.sdk.id.Issuer
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
-import com.nimbusds.openid.connect.sdk.SubjectType
-import com.nimbusds.openid.connect.sdk.claims.ACR
-import com.nimbusds.openid.connect.sdk.claims.ClaimType
-import com.nimbusds.openid.connect.sdk.op.OIDCProviderEndpointMetadata
-import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata
+import eu.europa.ec.eudi.openid4vci.internal.wellKnownUrl
 import io.ktor.http.*
 import java.net.URI
 import java.util.*
@@ -44,7 +40,6 @@ object SampleIssuer {
 
 object SampleAuthServer {
     val Url = HttpsUrl("https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm").getOrThrow()
-    val OidcWellKnownUrl = oidcAuthorizationServerMetadataUrl(Url)
     val OAuthWellKnownUrl = oauthAuthorizationServerMetadataUrl(Url)
 }
 
@@ -52,18 +47,7 @@ object SampleAuthServer {
  * Get the URL for fetching the metadata of the OAuth Authorization Server used throughout the tests.
  */
 internal fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: HttpsUrl) = HttpsUrl(
-    URLBuilder(authorizationServerIssuer.value.toString()).appendPathSegments(
-        "/.well-known/oauth-authorization-server",
-        encodeSlash = false,
-    ).buildString(),
-).getOrThrow()
-
-/**
- * Get the URL for fetching the metadata of the OpenID Connect Authorization Server used throughout the tests.
- */
-internal fun oidcAuthorizationServerMetadataUrl(authorizationServerIssuer: HttpsUrl) = HttpsUrl(
-    URLBuilder(authorizationServerIssuer.value.toString()).appendPathSegments("/.well-known/openid-configuration", encodeSlash = false)
-        .buildString(),
+    authorizationServerIssuer.wellKnownUrl("/.well-known/oauth-authorization-server").toString(),
 ).getOrThrow()
 
 /**
@@ -377,322 +361,17 @@ internal fun credentialIssuerSignedMetadata() = CredentialIssuerMetadata(
 )
 
 /**
- * Gets the [OpenID Connect Authorization Server metadata][CIAuthorizationServerMetadata] used throughout the tests.
- */
-internal fun oidcAuthorizationServerMetadata(): OIDCProviderMetadata = OIDCProviderMetadata(
-    Issuer(SampleAuthServer.Url.value.toURI()),
-    listOf(
-        "public",
-        "pairwise",
-    ).map { SubjectType.parse(it) },
-    URI.create("https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm/protocol/openid-connect/certs"),
-).apply {
-    val realmBaseUrl = "https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm"
-    val oidcProtocolBaseUrl = "$realmBaseUrl/protocol/openid-connect"
-    authorizationEndpointURI = URI.create("$oidcProtocolBaseUrl/auth")
-    tokenEndpointURI = URI.create("$oidcProtocolBaseUrl/token")
-    introspectionEndpointURI = URI.create("$oidcProtocolBaseUrl/token/introspect")
-    userInfoEndpointURI = URI.create("$oidcProtocolBaseUrl/userinfo")
-    endSessionEndpointURI = URI.create("$oidcProtocolBaseUrl/logout")
-    setSupportsFrontChannelLogoutSession(true)
-    setSupportsFrontChannelLogout(true)
-    checkSessionIframeURI = URI.create("$oidcProtocolBaseUrl/login-status-iframe.html")
-    grantTypes = listOf(
-        "authorization_code",
-        "implicit",
-        "refresh_token",
-        "password",
-        "client_credentials",
-        "urn:ietf:params:oauth:grant-type:device_code",
-        "urn:openid:params:grant-type:ciba",
-    ).map { GrantType(it) }
-    acRs = listOf(
-        "0",
-        "1",
-    ).map { ACR(it) }
-    responseTypes = listOf(
-        "code",
-        "none",
-        "id_token",
-        "token",
-        "id_token token",
-        "code id_token",
-        "code token",
-        "code id_token token",
-    ).map { ResponseType(*it.split(" ").toTypedArray()) }
-    idTokenJWSAlgs = listOf(
-        "PS384",
-        "ES384",
-        "RS384",
-        "HS256",
-        "HS512",
-        "ES256",
-        "RS256",
-        "HS384",
-        "ES512",
-        "PS256",
-        "PS512",
-        "RS512",
-    ).map { JWSAlgorithm(it) }
-    idTokenJWEAlgs = listOf(
-        "RSA-OAEP",
-        "RSA-OAEP-256",
-        "RSA1_5",
-    ).map { JWEAlgorithm(it) }
-    idTokenJWEEncs = listOf(
-        "A256GCM",
-        "A192GCM",
-        "A128GCM",
-        "A128CBC-HS256",
-        "A192CBC-HS384",
-        "A256CBC-HS512",
-    ).map { EncryptionMethod(it) }
-    userInfoJWSAlgs = listOf(
-        "PS384",
-        "ES384",
-        "RS384",
-        "HS256",
-        "HS512",
-        "ES256",
-        "RS256",
-        "HS384",
-        "ES512",
-        "PS256",
-        "PS512",
-        "RS512",
-        "none",
-    ).map { JWSAlgorithm(it) }
-    userInfoJWEAlgs = listOf(
-        "RSA-OAEP",
-        "RSA-OAEP-256",
-        "RSA1_5",
-    ).map { JWEAlgorithm(it) }
-    userInfoJWEEncs = listOf(
-        "A256GCM",
-        "A192GCM",
-        "A128GCM",
-        "A128CBC-HS256",
-        "A192CBC-HS384",
-        "A256CBC-HS512",
-    ).map { EncryptionMethod(it) }
-    requestObjectJWSAlgs = listOf(
-        "PS384",
-        "ES384",
-        "RS384",
-        "HS256",
-        "HS512",
-        "ES256",
-        "RS256",
-        "HS384",
-        "ES512",
-        "PS256",
-        "PS512",
-        "RS512",
-        "none",
-    ).map { JWSAlgorithm(it) }
-    requestObjectJWEAlgs = listOf(
-        "RSA-OAEP",
-        "RSA-OAEP-256",
-        "RSA1_5",
-    ).map { JWEAlgorithm(it) }
-    requestObjectJWEEncs = listOf(
-        "A256GCM",
-        "A192GCM",
-        "A128GCM",
-        "A128CBC-HS256",
-        "A192CBC-HS384",
-        "A256CBC-HS512",
-    ).map { EncryptionMethod(it) }
-    responseModes = listOf(
-        "query",
-        "fragment",
-        "form_post",
-        "query.jwt",
-        "fragment.jwt",
-        "form_post.jwt",
-        "jwt",
-    ).map { ResponseMode(it) }
-    registrationEndpointURI = URI.create("$realmBaseUrl/clients-registrations/openid-connect")
-    tokenEndpointAuthMethods = listOf(
-        "private_key_jwt",
-        "client_secret_basic",
-        "client_secret_post",
-        "tls_client_auth",
-        "client_secret_jwt",
-    ).map { ClientAuthenticationMethod(it) }
-    tokenEndpointJWSAlgs = listOf(
-        "PS384",
-        "ES384",
-        "RS384",
-        "HS256",
-        "HS512",
-        "ES256",
-        "RS256",
-        "HS384",
-        "ES512",
-        "PS256",
-        "PS512",
-        "RS512",
-    ).map { JWSAlgorithm(it) }
-    introspectionEndpointAuthMethods = listOf(
-        "private_key_jwt",
-        "client_secret_basic",
-        "client_secret_post",
-        "tls_client_auth",
-        "client_secret_jwt",
-    ).map { ClientAuthenticationMethod(it) }
-    introspectionEndpointJWSAlgs = listOf(
-        "PS384",
-        "ES384",
-        "RS384",
-        "HS256",
-        "HS512",
-        "ES256",
-        "RS256",
-        "HS384",
-        "ES512",
-        "PS256",
-        "PS512",
-        "RS512",
-    ).map { JWSAlgorithm(it) }
-    authorizationJWSAlgs = listOf(
-        "PS384",
-        "ES384",
-        "RS384",
-        "HS256",
-        "HS512",
-        "ES256",
-        "RS256",
-        "HS384",
-        "ES512",
-        "PS256",
-        "PS512",
-        "RS512",
-    ).map { JWSAlgorithm(it) }
-    authorizationJWEAlgs = listOf(
-        "RSA-OAEP",
-        "RSA-OAEP-256",
-        "RSA1_5",
-    ).map { JWEAlgorithm(it) }
-    authorizationJWEEncs = listOf(
-        "A256GCM",
-        "A192GCM",
-        "A128GCM",
-        "A128CBC-HS256",
-        "A192CBC-HS384",
-        "A256CBC-HS512",
-    ).map { EncryptionMethod(it) }
-    claims = listOf(
-        "aud",
-        "sub",
-        "iss",
-        "auth_time",
-        "name",
-        "given_name",
-        "family_name",
-        "preferred_username",
-        "email",
-        "acr",
-    )
-    claimTypes = listOf(
-        "normal",
-    ).map { ClaimType.parse(it) }
-    setSupportsClaimsParams(true)
-    scopes = Scope(
-        "openid",
-        "eu.europa.ec.eudiw.pid_sd-jwt-vc",
-        "web-origins",
-        "eu.europa.ec.eudiw.pid_mso_mdoc",
-        "offline_access",
-        "roles",
-    )
-    setSupportsRequestParam(true)
-    setSupportsRequestURIParam(true)
-    setRequiresRequestURIRegistration(true)
-    codeChallengeMethods = listOf(
-        "plain",
-        "S256",
-    ).map { CodeChallengeMethod.parse(it) }
-    setSupportsTLSClientCertificateBoundAccessTokens(true)
-    dPoPJWSAlgs = listOf(
-        "PS384",
-        "ES384",
-        "RS384",
-        "ES256",
-        "RS256",
-        "ES512",
-        "PS256",
-        "PS512",
-        "RS512",
-    ).map { JWSAlgorithm(it) }
-    revocationEndpointURI = URI.create("$oidcProtocolBaseUrl/revoke")
-    revocationEndpointAuthMethods = listOf(
-        "private_key_jwt",
-        "client_secret_basic",
-        "client_secret_post",
-        "tls_client_auth",
-        "client_secret_jwt",
-    ).map { ClientAuthenticationMethod(it) }
-    revocationEndpointJWSAlgs = listOf(
-        "PS384",
-        "ES384",
-        "RS384",
-        "HS256",
-        "HS512",
-        "ES256",
-        "RS256",
-        "HS384",
-        "ES512",
-        "PS256",
-        "PS512",
-        "RS512",
-    ).map { JWSAlgorithm(it) }
-    setSupportsBackChannelLogout(true)
-    setSupportsBackChannelLogoutSession(true)
-    deviceAuthorizationEndpointURI = URI.create("$oidcProtocolBaseUrl/auth/device")
-    backChannelTokenDeliveryModes = listOf(
-        "poll",
-        "ping",
-    ).map { BackChannelTokenDeliveryMode(it) }
-    backChannelAuthenticationEndpointURI = URI.create("$oidcProtocolBaseUrl/ext/ciba/auth")
-    backChannelAuthenticationRequestJWSAlgs = listOf(
-        "PS384",
-        "ES384",
-        "RS384",
-        "ES256",
-        "RS256",
-        "ES512",
-        "PS256",
-        "PS512",
-        "RS512",
-    ).map { JWSAlgorithm(it) }
-    requiresPushedAuthorizationRequests(false)
-    pushedAuthorizationRequestEndpointURI = URI.create("$oidcProtocolBaseUrl/ext/par/request")
-    mtlsEndpointAliases = OIDCProviderEndpointMetadata().apply {
-        tokenEndpointURI = URI.create("$oidcProtocolBaseUrl/token")
-        revocationEndpointURI = URI.create("$oidcProtocolBaseUrl/revoke")
-        introspectionEndpointURI = URI.create("$oidcProtocolBaseUrl/token/introspect")
-        deviceAuthorizationEndpointURI = URI.create("$oidcProtocolBaseUrl/auth/device")
-        registrationEndpointURI = URI.create("$realmBaseUrl/clients-registrations/openid-connect")
-        userInfoEndpointURI = URI.create("$oidcProtocolBaseUrl/userinfo")
-        pushedAuthorizationRequestEndpointURI = URI.create("$oidcProtocolBaseUrl/ext/par/request")
-        backChannelAuthenticationEndpointURI = URI.create("$oidcProtocolBaseUrl/ext/ciba/auth")
-    }
-    setSupportsAuthorizationResponseIssuerParam(true)
-}
-
-/**
- * Gets the [OpenID Connect Authorization Server metadata][CIAuthorizationServerMetadata] used throughout the tests.
+ * Gets the [OAuth2 Connect Authorization Server metadata][CIAuthorizationServerMetadata] used throughout the tests.
  */
 internal fun oauthAuthorizationServerMetadata(): AuthorizationServerMetadata = AuthorizationServerMetadata(
     Issuer(SampleAuthServer.Url.value.toURI()),
 ).apply {
     val realmBaseUrl = "https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm"
-    val oidcProtocolBaseUrl = "$realmBaseUrl/protocol/openid-connect"
-    authorizationEndpointURI = URI.create("$oidcProtocolBaseUrl/auth")
-    tokenEndpointURI = URI.create("$oidcProtocolBaseUrl/token")
-    introspectionEndpointURI = URI.create("$oidcProtocolBaseUrl/token/introspect")
-    jwkSetURI = URI.create("$oidcProtocolBaseUrl/certs")
+    val protocolBaseUrl = "$realmBaseUrl/protocol/openid-connect"
+    authorizationEndpointURI = URI.create("$protocolBaseUrl/auth")
+    tokenEndpointURI = URI.create("$protocolBaseUrl/token")
+    introspectionEndpointURI = URI.create("$protocolBaseUrl/token/introspect")
+    jwkSetURI = URI.create("$protocolBaseUrl/certs")
     grantTypes = listOf(
         "authorization_code",
         "implicit",
@@ -846,7 +525,7 @@ internal fun oauthAuthorizationServerMetadata(): AuthorizationServerMetadata = A
         "PS512",
         "RS512",
     ).map { JWSAlgorithm(it) }
-    revocationEndpointURI = URI.create("$oidcProtocolBaseUrl/revoke")
+    revocationEndpointURI = URI.create("$protocolBaseUrl/revoke")
     revocationEndpointAuthMethods = listOf(
         "private_key_jwt",
         "client_secret_basic",
@@ -868,12 +547,12 @@ internal fun oauthAuthorizationServerMetadata(): AuthorizationServerMetadata = A
         "PS512",
         "RS512",
     ).map { JWSAlgorithm(it) }
-    deviceAuthorizationEndpointURI = URI.create("$oidcProtocolBaseUrl/auth/device")
+    deviceAuthorizationEndpointURI = URI.create("$protocolBaseUrl/auth/device")
     backChannelTokenDeliveryModes = listOf(
         "poll",
         "ping",
     ).map { BackChannelTokenDeliveryMode(it) }
-    backChannelAuthenticationEndpointURI = URI.create("$oidcProtocolBaseUrl/ext/ciba/auth")
+    backChannelAuthenticationEndpointURI = URI.create("$protocolBaseUrl/ext/ciba/auth")
     backChannelAuthenticationRequestJWSAlgs = listOf(
         "PS384",
         "ES384",
@@ -886,15 +565,15 @@ internal fun oauthAuthorizationServerMetadata(): AuthorizationServerMetadata = A
         "RS512",
     ).map { JWSAlgorithm(it) }
     requiresPushedAuthorizationRequests(false)
-    pushedAuthorizationRequestEndpointURI = URI.create("$oidcProtocolBaseUrl/ext/par/request")
+    pushedAuthorizationRequestEndpointURI = URI.create("$protocolBaseUrl/ext/par/request")
     mtlsEndpointAliases = AuthorizationServerEndpointMetadata().apply {
-        tokenEndpointURI = URI.create("$oidcProtocolBaseUrl/token")
-        revocationEndpointURI = URI.create("$oidcProtocolBaseUrl/revoke")
-        introspectionEndpointURI = URI.create("$oidcProtocolBaseUrl/token/introspect")
-        deviceAuthorizationEndpointURI = URI.create("$oidcProtocolBaseUrl/auth/device")
+        tokenEndpointURI = URI.create("$protocolBaseUrl/token")
+        revocationEndpointURI = URI.create("$protocolBaseUrl/revoke")
+        introspectionEndpointURI = URI.create("$protocolBaseUrl/token/introspect")
+        deviceAuthorizationEndpointURI = URI.create("$protocolBaseUrl/auth/device")
         registrationEndpointURI = URI.create("$realmBaseUrl/clients-registrations/openid-connect")
-        pushedAuthorizationRequestEndpointURI = URI.create("$oidcProtocolBaseUrl/ext/par/request")
-        backChannelAuthenticationEndpointURI = URI.create("$oidcProtocolBaseUrl/ext/ciba/auth")
+        pushedAuthorizationRequestEndpointURI = URI.create("$protocolBaseUrl/ext/par/request")
+        backChannelAuthenticationEndpointURI = URI.create("$protocolBaseUrl/ext/ciba/auth")
     }
     setSupportsAuthorizationResponseIssuerParam(true)
 }

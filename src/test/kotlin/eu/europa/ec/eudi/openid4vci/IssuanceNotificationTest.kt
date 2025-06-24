@@ -30,7 +30,7 @@ class IssuanceNotificationTest {
     fun `when issuance response contains notification_id, it is present in and can be used for notifications`() = runTest {
         val credential = "issued_credential_content_sd_jwt_vc"
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oiciWellKnownMocker(),
+            credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
@@ -92,7 +92,7 @@ class IssuanceNotificationTest {
     @Test
     fun `when notification request failed, a Result failure is returned`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oiciWellKnownMocker(),
+            credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),

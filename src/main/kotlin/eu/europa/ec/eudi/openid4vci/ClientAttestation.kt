@@ -108,7 +108,7 @@ fun interface ClientAttestationPoPBuilder {
      * Builds a PoP JWT
      *
      * @param clock wallet's clock
-     * @param authServerId the issuer claim of the OAUTH2/OIDC server to which
+     * @param authServerId the issuer claim of the OAuth 2.0 authorization server to which
      * the attestation will be presented for authentication.
      * @receiver the client for which to create the PoP
      *

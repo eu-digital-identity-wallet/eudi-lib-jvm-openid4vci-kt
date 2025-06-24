@@ -4,8 +4,6 @@
   "introspection_endpoint": "https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm/protocol/openid-connect/token/introspect",
   "userinfo_endpoint": "https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm/protocol/openid-connect/userinfo",
   "end_session_endpoint": "https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm/protocol/openid-connect/logout",
-  "frontchannel_logout_session_supported": true,
-  "frontchannel_logout_supported": true,
   "jwks_uri": "https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm/protocol/openid-connect/certs",
   "check_session_iframe": "https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm/protocol/openid-connect/login-status-iframe.html",
   "grant_types_supported": [
@@ -16,75 +14,13 @@
     "urn:ietf:params:oauth:grant-type:device_code",
     "urn:openid:params:grant-type:ciba"
   ],
-  "acr_values_supported": [
-    "0",
-    "1"
-  ],
   "response_types_supported": [
     "none",
     "id_token",
     "token",
     "id_token token"
   ],
-  "subject_types_supported": [
-    "public",
-    "pairwise"
-  ],
-  "id_token_signing_alg_values_supported": [
-    "PS384",
-    "ES384",
-    "RS384",
-    "HS256",
-    "HS512",
-    "ES256",
-    "RS256",
-    "HS384",
-    "ES512",
-    "PS256",
-    "PS512",
-    "RS512"
-  ],
-  "id_token_encryption_alg_values_supported": [
-    "RSA-OAEP",
-    "RSA-OAEP-256",
-    "RSA1_5"
-  ],
-  "id_token_encryption_enc_values_supported": [
-    "A256GCM",
-    "A192GCM",
-    "A128GCM",
-    "A128CBC-HS256",
-    "A192CBC-HS384",
-    "A256CBC-HS512"
-  ],
-  "userinfo_signing_alg_values_supported": [
-    "PS384",
-    "ES384",
-    "RS384",
-    "HS256",
-    "HS512",
-    "ES256",
-    "RS256",
-    "HS384",
-    "ES512",
-    "PS256",
-    "PS512",
-    "RS512",
-    "none"
-  ],
-  "userinfo_encryption_alg_values_supported": [
-    "RSA-OAEP",
-    "RSA-OAEP-256",
-    "RSA1_5"
-  ],
-  "userinfo_encryption_enc_values_supported": [
-    "A256GCM",
-    "A192GCM",
-    "A128GCM",
-    "A128CBC-HS256",
-    "A192CBC-HS384",
-    "A256CBC-HS512"
-  ],
+
   "request_object_signing_alg_values_supported": [
     "PS384",
     "ES384",
@@ -165,21 +101,6 @@
     "PS512",
     "RS512"
   ],
-  "claims_supported": [
-    "aud",
-    "sub",
-    "iss",
-    "auth_time",
-    "name",
-    "given_name",
-    "family_name",
-    "preferred_username",
-    "email",
-    "acr"
-  ],
-  "claim_types_supported": [
-    "normal"
-  ],
   "claims_parameter_supported": true,
   "scopes_supported": [
     "openid",
@@ -230,8 +151,6 @@
     "PS512",
     "RS512"
   ],
-  "backchannel_logout_supported": true,
-  "backchannel_logout_session_supported": true,
   "backchannel_token_delivery_modes_supported": [
     "poll",
     "ping"

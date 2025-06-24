@@ -45,17 +45,14 @@ internal fun credentialIssuerMetaDataHandler(id: CredentialIssuerId, resource: S
     jsonResponse(resource),
 )
 
-internal fun oidcMetaDataHandler(oidcServerUrl: HttpsUrl, oidcMetaDataResource: String): RequestMocker = RequestMocker(
-    match(oidcAuthorizationServerMetadataUrl(oidcServerUrl).value.toURI()),
-    jsonResponse(oidcMetaDataResource),
-)
-
 internal fun oauthMetaDataHandler(oauth2ServerUrl: HttpsUrl, oauth2MetaDataResource: String): RequestMocker = RequestMocker(
     match(oauthAuthorizationServerMetadataUrl(oauth2ServerUrl).value.toURI()),
     jsonResponse(oauth2MetaDataResource),
 )
 
-internal fun oiciWellKnownMocker(issuerMetadataVersion: IssuerMetadataVersion = ENCRYPTION_NOT_SUPPORTED): RequestMocker = RequestMocker(
+internal fun credentialIssuerMetadataWellKnownMocker(
+    issuerMetadataVersion: IssuerMetadataVersion = ENCRYPTION_NOT_SUPPORTED,
+): RequestMocker = RequestMocker(
     requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
     responseBuilder = {
         val content = when (issuerMetadataVersion) {
@@ -86,7 +83,9 @@ enum class IssuerMetadataVersion {
 }
 
 internal fun authServerWellKnownMocker(): RequestMocker = RequestMocker(
-    requestMatcher = endsWith("/.well-known/openid-configuration", HttpMethod.Get),
+    requestMatcher = { request ->
+        request.url.encodedPath.contains("/.well-known/oauth-authorization-server") && request.method == HttpMethod.Get
+    },
     responseBuilder = {
         respond(
             content = getResourceAsText("well-known/openid-configuration.json"),
