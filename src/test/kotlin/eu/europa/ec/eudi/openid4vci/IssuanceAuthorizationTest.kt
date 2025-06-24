@@ -35,7 +35,7 @@ class IssuanceAuthorizationTest {
     @Test
     fun `successful authorization with authorization code flow (wallet initiated)`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oiciWellKnownMocker(),
+            credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker { request ->
                 val form = with(request) { parPostApplyAssertionsAndGetFormData(false) }
@@ -72,7 +72,7 @@ class IssuanceAuthorizationTest {
     fun `successful authorization with authorization code flow`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                oiciWellKnownMocker(),
+                credentialIssuerMetadataWellKnownMocker(),
                 authServerWellKnownMocker(),
                 parPostMocker { request ->
                     val form = with(request) { parPostApplyAssertionsAndGetFormData(false) }
@@ -109,7 +109,7 @@ class IssuanceAuthorizationTest {
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
-                oiciWellKnownMocker(),
+                credentialIssuerMetadataWellKnownMocker(),
                 parPostMocker {
                     fail("No pushed authorization request should have been sent in case of pre-authorized code flow")
                 },
@@ -133,7 +133,7 @@ class IssuanceAuthorizationTest {
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
-                oiciWellKnownMocker(),
+                credentialIssuerMetadataWellKnownMocker(),
             )
 
             val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
@@ -163,7 +163,7 @@ class IssuanceAuthorizationTest {
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
-                oiciWellKnownMocker(),
+                credentialIssuerMetadataWellKnownMocker(),
             )
 
             val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
@@ -193,7 +193,7 @@ class IssuanceAuthorizationTest {
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
-                oiciWellKnownMocker(),
+                credentialIssuerMetadataWellKnownMocker(),
                 RequestMocker(
                     requestMatcher = endsWith("/ext/par/request", HttpMethod.Post),
                     responseBuilder = {
@@ -238,7 +238,7 @@ class IssuanceAuthorizationTest {
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
-                oiciWellKnownMocker(),
+                credentialIssuerMetadataWellKnownMocker(),
                 parPostMocker(),
                 RequestMocker(
                     requestMatcher = endsWith("/token", HttpMethod.Post),
@@ -288,7 +288,7 @@ class IssuanceAuthorizationTest {
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
-                oiciWellKnownMocker(),
+                credentialIssuerMetadataWellKnownMocker(),
                 parPostMocker(),
                 RequestMocker(
                     requestMatcher = endsWith("/token", HttpMethod.Post),

@@ -27,7 +27,7 @@ class IssuanceDeferredRequestTest {
     @Test
     fun `when issuer responds with invalid_transaction_id, response should be of type Errored`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oiciWellKnownMocker(),
+            credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
@@ -68,7 +68,7 @@ class IssuanceDeferredRequestTest {
     @Test
     fun `when issuer responds with issuance_pending, response should be of type IssuancePending`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oiciWellKnownMocker(),
+            credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
@@ -110,7 +110,7 @@ class IssuanceDeferredRequestTest {
     @Test
     fun `when deferred request is valid, credential must be issued`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oiciWellKnownMocker(),
+            credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),

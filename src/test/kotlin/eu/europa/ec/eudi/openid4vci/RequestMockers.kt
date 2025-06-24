@@ -50,7 +50,9 @@ internal fun oauthMetaDataHandler(oauth2ServerUrl: HttpsUrl, oauth2MetaDataResou
     jsonResponse(oauth2MetaDataResource),
 )
 
-internal fun oiciWellKnownMocker(issuerMetadataVersion: IssuerMetadataVersion = ENCRYPTION_NOT_SUPPORTED): RequestMocker = RequestMocker(
+internal fun credentialIssuerMetadataWellKnownMocker(
+    issuerMetadataVersion: IssuerMetadataVersion = ENCRYPTION_NOT_SUPPORTED,
+): RequestMocker = RequestMocker(
     requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
     responseBuilder = {
         val content = when (issuerMetadataVersion) {

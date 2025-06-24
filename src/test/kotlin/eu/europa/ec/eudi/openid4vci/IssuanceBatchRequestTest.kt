@@ -31,7 +31,7 @@ class IssuanceBatchRequestTest {
     @Test
     fun `successful batch issuance`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oiciWellKnownMocker(issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_REQUIRED),
+            credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),

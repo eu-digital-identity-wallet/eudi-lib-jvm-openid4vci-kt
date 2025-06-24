@@ -46,7 +46,7 @@ class IssuanceIssuerMetadataVersionTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             )
             val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
@@ -72,7 +72,7 @@ class IssuanceIssuerMetadataVersionTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             )
             val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
@@ -98,7 +98,7 @@ class IssuanceIssuerMetadataVersionTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_NOT_SUPPORTED),
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_NOT_SUPPORTED),
             )
             val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
@@ -127,7 +127,7 @@ class IssuanceIssuerMetadataVersionTest {
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
-                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED),
             )
 
             assertFailsWith<WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated>(
@@ -152,7 +152,7 @@ class IssuanceIssuerMetadataVersionTest {
                 parPostMocker(),
                 tokenPostMocker(),
                 nonceEndpointMocker(),
-                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_NOT_SUPPORTED),
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_NOT_SUPPORTED),
                 singleIssuanceRequestMocker(
                     requestValidator = {
                         val textContent = it.body as TextContent
@@ -190,7 +190,7 @@ class IssuanceIssuerMetadataVersionTest {
                 parPostMocker(),
                 tokenPostMocker(),
                 nonceEndpointMocker(),
-                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
                         encryptedResponseDataBuilder(it) {
@@ -242,7 +242,7 @@ class IssuanceIssuerMetadataVersionTest {
                 parPostMocker(),
                 tokenPostMocker(),
                 nonceEndpointMocker(),
-                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED),
                 singleIssuanceRequestMocker(
                     requestValidator = {
                         val textContent = it.body as TextContent
@@ -276,7 +276,7 @@ class IssuanceIssuerMetadataVersionTest {
                 tokenPostMocker(),
                 nonceEndpointMocker(),
                 nonceEndpointMocker(),
-                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
                         encryptedResponseDataBuilder(it) {
@@ -349,7 +349,7 @@ class IssuanceIssuerMetadataVersionTest {
                 parPostMocker(),
                 tokenPostMocker(),
                 nonceEndpointMocker(),
-                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
                         encryptedResponseDataBuilder(it) {
@@ -409,7 +409,7 @@ class IssuanceIssuerMetadataVersionTest {
                 parPostMocker(),
                 tokenPostMocker(),
                 nonceEndpointMocker(),
-                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
                         encryptedResponseDataBuilder(it) {
@@ -453,7 +453,7 @@ class IssuanceIssuerMetadataVersionTest {
     fun `when issuance request mandates encrypted responses and deferred response is not encrypted, throw InvalidResponseContentType`() =
         runTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-                oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
@@ -507,7 +507,7 @@ class IssuanceIssuerMetadataVersionTest {
             encryptionMethod = EncryptionMethod.A128CBC_HS256,
         )
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
-            oiciWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
@@ -571,7 +571,7 @@ class IssuanceIssuerMetadataVersionTest {
             parPostMocker(),
             tokenPostMocker(),
             nonceEndpointMocker(),
-            oiciWellKnownMocker(IssuerMetadataVersion.CONTAINS_DEPRECATED_METHOD),
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.CONTAINS_DEPRECATED_METHOD),
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
