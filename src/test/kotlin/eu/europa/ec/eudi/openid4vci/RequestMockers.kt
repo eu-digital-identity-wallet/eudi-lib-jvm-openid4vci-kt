@@ -45,11 +45,6 @@ internal fun credentialIssuerMetaDataHandler(id: CredentialIssuerId, resource: S
     jsonResponse(resource),
 )
 
-internal fun oidcMetaDataHandler(oidcServerUrl: HttpsUrl, oidcMetaDataResource: String): RequestMocker = RequestMocker(
-    match(oidcAuthorizationServerMetadataUrl(oidcServerUrl).value.toURI()),
-    jsonResponse(oidcMetaDataResource),
-)
-
 internal fun oauthMetaDataHandler(oauth2ServerUrl: HttpsUrl, oauth2MetaDataResource: String): RequestMocker = RequestMocker(
     match(oauthAuthorizationServerMetadataUrl(oauth2ServerUrl).value.toURI()),
     jsonResponse(oauth2MetaDataResource),
@@ -86,7 +81,7 @@ enum class IssuerMetadataVersion {
 }
 
 internal fun authServerWellKnownMocker(): RequestMocker = RequestMocker(
-    requestMatcher = endsWith("/.well-known/openid-configuration", HttpMethod.Get),
+    requestMatcher = endsWith("/.well-known/oauth-authorization-server", HttpMethod.Get),
     responseBuilder = {
         respond(
             content = getResourceAsText("well-known/openid-configuration.json"),
