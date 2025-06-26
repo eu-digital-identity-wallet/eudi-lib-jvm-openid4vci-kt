@@ -18,12 +18,14 @@ package eu.europa.ec.eudi.openid4vci.examples
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import kotlinx.coroutines.runBlocking
+import java.net.URLEncoder
 
 fun main(): Unit = runBlocking {
     val credentialOfferUrl = "eudi-openid4ci://?credential_offer=%7B%22" +
         "credential_issuer%22:%22https://dev.issuer-backend.eudiw.dev%22,%22" +
         "credential_configuration_ids%22:[%22${PidDevIssuer.PID_MsoMdoc_config_id.value}%22," +
-        "%22${PidDevIssuer.PID_SdJwtVC_config_id.value}%22,%22${PidDevIssuer.MDL_config_id.value}%22]," +
+        "%22${PidDevIssuer.PID_SdJwtVC_config_id.value}%22,%22${PidDevIssuer.MDL_config_id.value}%22," +
+        "%22${URLEncoder.encode(PidDevIssuer.EHIC_config_id.value, Charsets.UTF_8)}%22]," +
         "%22grants%22:%7B%22authorization_code%22:%7B%22" +
         "authorization_server%22:%22https://dev.authenticate.eudiw.dev/realms/pid-issuer-realm%22%7D%7D%7D"
 

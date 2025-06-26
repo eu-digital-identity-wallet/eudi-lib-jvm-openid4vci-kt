@@ -45,10 +45,12 @@ internal object PidDevIssuer :
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_vc_sd_jwt")
     val PID_MsoMdoc_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_mso_mdoc")
     val MDL_config_id = CredentialConfigurationIdentifier("org.iso.18013.5.1.mDL")
+    val EHIC_config_id = CredentialConfigurationIdentifier("urn:eudi:ehic:1:dc+sd-jwt")
 
     val AllCredentialConfigurationIds = listOf(
         PID_SdJwtVC_config_id,
         PID_MsoMdoc_config_id,
         MDL_config_id,
+        EHIC_config_id,
     )
 }

@@ -33,7 +33,7 @@ class PidDevIssuerTest {
     }
 
     @Test @Ignore
-    fun `Issue PID in sd-jwt-vc using authorize code flow and JWT proofs`() = runTest {
+    fun `Issue PID in sd-jwt vc using authorize code flow and JWT proofs`() = runTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
             PidDevIssuer.PID_SdJwtVC_config_id,
             enableHttpLogging = false,
@@ -45,6 +45,15 @@ class PidDevIssuerTest {
     fun `Issue mDL in mso_mdoc using authorize code flow and JWT proofs`() = runTest {
         PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
             PidDevIssuer.MDL_config_id,
+            enableHttpLogging = false,
+            batchOption = BatchOption.Specific(2),
+        )
+    }
+
+    @Test @Ignore
+    fun `Issue EHIC in sd-jwt vc using authorize code flow and JWT proofs`() = runTest {
+        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
+            PidDevIssuer.EHIC_config_id,
             enableHttpLogging = false,
             batchOption = BatchOption.Specific(2),
         )
