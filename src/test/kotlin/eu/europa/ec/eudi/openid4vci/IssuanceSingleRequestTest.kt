@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseUnparsable
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.rsaProofSigner
+import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
@@ -512,6 +514,30 @@ class IssuanceSingleRequestTest {
                 authorizedRequest.request(requestPayload, popSigners).getOrThrow()
             }
             assertIs<ResponseUnparsable>(ex.cause)
+        }
+    }
+
+    @Test
+    fun `when the issuer demands a key attestation, it should be included in the JWT proof`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            oiciWellKnownMocker(KEY_ATTESTATION_REQUIRED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        assertFailsWith<CredentialIssuanceError.ProofGenerationError.ProofTypeKeyAttestationRequired> {
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val popSigners = listOf(rsaProofSigner())
+                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+            }
         }
     }
 }
