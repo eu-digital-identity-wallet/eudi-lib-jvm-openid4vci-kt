@@ -141,9 +141,18 @@ interface RequestIssuance {
      * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh updated Resource-Server DPoP Nonce)
      * and the [SubmissionOutcome]
      */
+    @Deprecated(
+        "Use request method with JwtProofsSigner instead",
+        ReplaceWith("request(requestPayload, proofsSigner)"),
+    )
     suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
         popSigners: List<PopSigner> = emptyList(),
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
+
+    suspend fun AuthorizedRequest.request(
+        requestPayload: IssuanceRequestPayload,
+        proofsSigner: JwtProofsSigner?,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 }
 
