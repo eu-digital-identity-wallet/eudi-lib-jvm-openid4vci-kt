@@ -17,6 +17,10 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vci.internal.JwtProofSigner
+import eu.europa.ec.eudi.openid4vci.internal.JwtProofsSigner
+import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
+import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
 import kotlinx.coroutines.test.runTest
 import java.time.Instant
 import kotlin.test.Test
