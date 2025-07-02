@@ -15,26 +15,13 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.NumericInstantSerializer
 import eu.europa.ec.eudi.openid4vci.internal.header
 import eu.europa.ec.eudi.openid4vci.internal.signJwt
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.serializer
-import java.time.Instant
-
-@Serializable
-data class JwtProofClaims(
-    @SerialName("aud") val audience: String,
-    @Serializable(with = NumericInstantSerializer::class)
-    @SerialName("iat") val issuedAt: Instant,
-    @SerialName("iss") val issuer: String?,
-    @SerialName("nonce") val nonce: String?, // TODO GD use CNonce type
-)
 
 fun interface SignOperation {
     suspend fun sign(input: ByteArray): Result<ByteArray>
@@ -52,27 +39,27 @@ data class BatchSignOp<out PUB>(
     val operations: List<SignOp<PUB>>,
 )
 
-interface BatchSigner<PUB> {
-
-    suspend fun authenticate(): BatchSignOp<PUB>
-
-    suspend fun release(signOps: BatchSignOp<PUB>?)
-
-    companion object
-}
-
-interface Signer<PUB> {
+interface Signer<out PUB> {
 
     suspend fun authenticate(): SignOp<PUB>
 
-    suspend fun release(signOp: SignOp<PUB>?)
+    suspend fun release(signOp: SignOp<@UnsafeVariance PUB>?)
 
     companion object
 }
 
-/////////////////
+interface BatchSigner<out PUB> {
+
+    suspend fun authenticate(): BatchSignOp<PUB>
+
+    suspend fun release(signOps: BatchSignOp<@UnsafeVariance PUB>?)
+
+    companion object
+}
+
+// ///////////////
 // JWT Signers //
-/////////////////
+// ///////////////
 
 fun interface JwtSigner<in Claims> {
     suspend fun sign(claims: Claims): String

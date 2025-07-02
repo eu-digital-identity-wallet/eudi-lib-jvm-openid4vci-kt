@@ -73,19 +73,25 @@ internal class RequestIssuanceImpl(
         updatedAuthorizedRequest to outcome.toPub()
     }
 
-    override suspend fun AuthorizedRequest.requestWithJwtProofs(
+    override suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
-        proofsSigner: BatchSigner<JwtBindingKey>?,
+        proofsSpec: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
         val credentialConfigId = requestPayload.credentialConfigurationIdentifier
 
         // Place the request
         val (outcome, newResourceServerDpopNonce) = placeIssuanceRequest(accessToken, resourceServerDpopNonce) {
-            proofsSigner?.use { signOps ->
-                val proofsFactory = proofsFactoryFrom(signOps, credentialConfigId)
-                buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
-            } ?:
-                buildRequest(requestPayload, null, credentialIdentifiers.orEmpty())
+            when (proofsSpec) {
+                is ProofsSpecification.NoProofs -> buildRequest(requestPayload, null, credentialIdentifiers.orEmpty())
+                is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
+                    proofsSpec.proofsSigner.use { signOps ->
+                        val proofsFactory = proofsFactoryFrom(signOps, credentialConfigId)
+                        buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
+                    }
+                }
+                is ProofsSpecification.JwtProofs.WithKeyAttestation -> TODO()
+                is ProofsSpecification.AttestationProof -> TODO()
+            }
         }
 
         // Update state (maybe) with new Dpop Nonce from resource server
@@ -257,8 +263,8 @@ internal class RequestIssuanceImpl(
             proofsFactory(credentialCfg)
         }?.also {
             it.forEach { proof -> credentialCfg.assertProofSupported(proof) }
-        } ?:
-            emptyList()
+        }
+            ?: emptyList()
 
         return when (requestPayload) {
             is IssuanceRequestPayload.ConfigurationBased -> {

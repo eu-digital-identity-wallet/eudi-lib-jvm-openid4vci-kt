@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2023 European Commission
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JWSAlgorithm
@@ -69,7 +84,6 @@ internal suspend fun <PUB> SignOp<PUB>.signJwt(header: JsonObject, claims: JsonO
     return "$headerB64.$claimsB64.$signatureB64"
 }
 
-
 internal fun ByteArray.transcodeSignatureToConcat(signingAlgorithm: String): ByteArray {
     val alg = signingAlgorithm.toJoseECAlg()
 
@@ -122,7 +136,7 @@ internal fun SignOperation.Companion.forJavaEcPrivateKey(
         }
     }
 
-internal fun <PUB> Signer.Companion.forEcPrivateKey(
+internal fun <PUB> Signer.Companion.fromEcPrivateKey(
     signingAlgorithm: String,
     privateKey: ECPrivateKey,
     publicMaterial: PUB,
@@ -140,7 +154,7 @@ internal fun <PUB> Signer.Companion.forEcPrivateKey(
     }
 }
 
-internal fun <PUB> BatchSigner.Companion.forEcPrivateKeys(
+internal fun <PUB> BatchSigner.Companion.fromEcPrivateKeys(
     signingAlgorithm: String,
     ecKeyPairs: Map<ECPrivateKey, PUB>,
     secureRandom: SecureRandom?,
@@ -172,7 +186,7 @@ internal fun <KI> Signer.Companion.fromNimbusEcKey(
 ): Signer<KI> {
     require(ecPrivateKey.isPrivate)
     val signatureAlgorithm = ecPrivateKey.curve.toJavaSigningAlg()
-    return forEcPrivateKey(
+    return fromEcPrivateKey(
         signatureAlgorithm,
         ecPrivateKey.toECPrivateKey(),
         keyInfo,
@@ -191,7 +205,7 @@ internal fun <PUB> BatchSigner.Companion.fromNimbusEcKeys(
         require(it.key.isPrivate) { "All EC keys must be private keys" }
     }
     val signatureAlgorithm = ecKeyPairs.entries.first().key.curve.toJavaSigningAlg()
-    return forEcPrivateKeys(
+    return fromEcPrivateKeys(
         signatureAlgorithm,
         ecKeyPairs.map {
             it.key.toECPrivateKey() to it.value

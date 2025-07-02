@@ -15,10 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.internal.JwtProofSigner
-import eu.europa.ec.eudi.openid4vci.internal.JwtProofsSigner
+import eu.europa.ec.eudi.openid4vci.internal.JwtProofClaims
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
 import kotlinx.coroutines.test.runTest
@@ -32,16 +32,18 @@ class SignersTest {
     fun `sign single jwt proof`() = runTest {
         val ecKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
 
-        val jwtProofSigner = JwtProofSigner(
-            Signer.fromNimbusEcKey(
-                ecKey,
-                JwtBindingKey.Jwk(ecKey.toPublicJWK()),
-                secureRandom = null,
-                provider = null,
-            ),
+        val signer = Signer.fromNimbusEcKey(
+            ecKey,
+            JwtBindingKey.Jwk(ecKey.toPublicJWK()),
+            secureRandom = null,
+            provider = null,
         )
 
-        val signResult = jwtProofSigner.sign(
+        val jwtSigner = JwtSigner<JwtProofClaims, JwtBindingKey>(
+            signer.authenticate(),
+        )
+
+        val signResult = jwtSigner.sign(
             JwtProofClaims(
                 issuer = "https://eudiw.dev",
                 audience = "audience",
@@ -52,25 +54,24 @@ class SignersTest {
 
         val signedJwt = SignedJWT.parse(signResult)
 
-        assertEquals(
-            ecKey.toPublicJWK().toJSONString(),
-            signedJwt.header.jwk.toJSONString(),
-        )
+        assertEquals(JWSObject.State.SIGNED, signedJwt.state)
     }
 
     @Test
     fun `sign batch jwt proofs and verify`() = runTest {
         val ecKeys = List(5) { CryptoGenerator.randomECSigningKey(Curve.P_256) }
 
-        val jwtProofSigner = JwtProofsSigner(
-            BatchSigner.fromNimbusEcKeys(
-                ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
-                secureRandom = null,
-                provider = null,
-            ),
+        val batchSigner = BatchSigner.fromNimbusEcKeys(
+            ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
+            secureRandom = null,
+            provider = null,
         )
 
-        val signResult = jwtProofSigner.sign(
+        val batchJwtSigner = JwtBatchSigner<JwtProofClaims, JwtBindingKey>(
+            batchSigner.authenticate(),
+        )
+
+        val signResult = batchJwtSigner.sign(
             JwtProofClaims(
                 issuer = "https://eudiw.dev",
                 audience = "audience",

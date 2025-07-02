@@ -128,26 +128,25 @@ sealed interface IssuanceRequestPayload {
 
 typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
 
-//sealed interface ProofsSpecification {
-//
-//    data object NoProofs: ProofsSpecification
-//
-//    sealed interface JwtProofs: ProofsSpecification {
-//
-//        data class NoKeyAttestation(
-//            val proofsSigner: BatchSigner<JwtBindingKey>,
-//        ): JwtProofs
-//
-//        data class WithKeyAttestation(
-//            proofsSigner: Signer<KeyAttestation>,
-//        ): JwtProofs
-//    }
-//
-//    data class AttestationProof(
-//        attestation: KeyAttestation,
-//    ): ProofsSpecification
-//
-//}
+sealed interface ProofsSpecification {
+
+    data object NoProofs : ProofsSpecification
+
+    sealed interface JwtProofs : ProofsSpecification {
+
+        data class NoKeyAttestation(
+            val proofsSigner: BatchSigner<JwtBindingKey>,
+        ) : JwtProofs
+
+        data class WithKeyAttestation(
+            val proofsSigner: Signer<KeyAttestation>,
+        ) : JwtProofs
+    }
+
+    data class AttestationProof(
+        val attestation: KeyAttestation,
+    ) : ProofsSpecification
+}
 
 /**
  * An interface for submitting a credential issuance request.
@@ -171,15 +170,10 @@ interface RequestIssuance {
         popSigners: List<PopSigner> = emptyList(),
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 
-    suspend fun AuthorizedRequest.requestWithJwtProofs(
+    suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
-        proofsSigner: BatchSigner<JwtBindingKey>?
+        proofsSpec: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
-
-//    suspend fun AuthorizedRequest.request(
-//        requestPayload: IssuanceRequestPayload,
-//        proofsSpec: ProofsSpecification,
-//    ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 }
 
 sealed interface PopSigner {

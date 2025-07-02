@@ -240,6 +240,8 @@ sealed interface JwtBindingKey {
     }
 }
 
+class KeyAttestation
+
 data class IssuanceResponseEncryptionSpec(
     val jwk: JWK,
     val algorithm: JWEAlgorithm,

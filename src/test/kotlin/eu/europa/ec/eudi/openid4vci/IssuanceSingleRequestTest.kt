@@ -93,7 +93,7 @@ class IssuanceSingleRequestTest {
                     secureRandom = null,
                     provider = null,
                 )
-                authorizedRequest.requestWithJwtProofs(requestPayload, batchSigner).getOrThrow()
+                authorizedRequest.request(requestPayload, ProofsSpecification.JwtProofs.NoKeyAttestation(batchSigner)).getOrThrow()
             }
             assertIs<SubmissionOutcome.Failed>(outcome)
             assertIs<CredentialIssuanceError.InvalidProof>(outcome.error)
@@ -369,7 +369,7 @@ class IssuanceSingleRequestTest {
                         issuanceRequestTO.credentialIdentifier,
                         "Expected identifier based issuance request but credential_identifier is null",
 
-                        )
+                    )
                 },
             ),
         )
