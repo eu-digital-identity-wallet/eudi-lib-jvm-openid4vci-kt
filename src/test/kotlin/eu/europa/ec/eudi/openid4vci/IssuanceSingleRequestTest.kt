@@ -17,9 +17,9 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseUnparsable
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
 import eu.europa.ec.eudi.openid4vci.internal.Proof
-import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -87,13 +87,7 @@ class IssuanceSingleRequestTest {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val (_, outcome) = assertDoesNotThrow {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val ecKeys = List(3) { CryptoGenerator.randomECSigningKey(Curve.P_256) }
-                val batchSigner = BatchSigner.fromNimbusEcKeys(
-                    ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
-                    secureRandom = null,
-                    provider = null,
-                )
-                authorizedRequest.request(requestPayload, ProofsSpecification.JwtProofs.NoKeyAttestation(batchSigner)).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 3)).getOrThrow()
             }
             assertIs<SubmissionOutcome.Failed>(outcome)
             assertIs<CredentialIssuanceError.InvalidProof>(outcome.error)
@@ -115,10 +109,10 @@ class IssuanceSingleRequestTest {
         )
 
         val credentialConfigurationId = CredentialConfigurationIdentifier("UniversityDegree")
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<IllegalStateException> {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
             with(issuer) {
-                authorizedRequest.request(requestPayload, emptyList()).getOrThrow()
+                authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
             }
         }
     }
@@ -141,13 +135,7 @@ class IssuanceSingleRequestTest {
         assertFailsWith<CredentialIssuanceError.IssuerBatchSizeLimitExceeded> {
             with(issuer) {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val popSigners = listOf(
-                    CryptoGenerator.rsaProofSigner(),
-                    CryptoGenerator.rsaProofSigner(),
-                    CryptoGenerator.rsaProofSigner(),
-                    CryptoGenerator.rsaProofSigner(),
-                )
-                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 4)).getOrThrow()
             }
         }
     }
@@ -181,7 +169,7 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, emptyList()).getOrThrow()
+            authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
         }
     }
 
@@ -218,8 +206,7 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-            authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+            authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
         }
     }
 
@@ -268,9 +255,8 @@ class IssuanceSingleRequestTest {
 
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-        val popSigner = CryptoGenerator.rsaProofSigner()
         val (_, outcome) = with(issuer) {
-            authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
+            authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
         }
         assertIs<SubmissionOutcome.Success>(outcome)
     }
@@ -302,7 +288,6 @@ class IssuanceSingleRequestTest {
             ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
-        val popSigners = listOf(CryptoGenerator.rsaProofSigner())
         val requestPayload = authorizedRequest.credentialIdentifiers?.let {
             IssuanceRequestPayload.IdentifierBased(
                 it.entries.first().key,
@@ -310,7 +295,7 @@ class IssuanceSingleRequestTest {
             )
         } ?: error("No credential identifier")
         with(issuer) {
-            authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+            authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
         }
     }
 
@@ -347,7 +332,7 @@ class IssuanceSingleRequestTest {
         )
         assertThrows<IllegalStateException> {
             with(issuer) {
-                authorizedRequest.request(requestPayload).getOrThrow()
+                authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
             }
         }
     }
@@ -384,7 +369,7 @@ class IssuanceSingleRequestTest {
         )
         assertThrows<IllegalStateException> {
             with(issuer) {
-                authorizedRequest.request(requestPayload).getOrThrow()
+                authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
             }
         }
     }
@@ -463,8 +448,7 @@ class IssuanceSingleRequestTest {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val (_, outcome) = assertDoesNotThrow {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
             }
             assertIs<SubmissionOutcome.Success>(outcome)
             assertTrue { outcome.credentials.size == 1 }
@@ -515,8 +499,7 @@ class IssuanceSingleRequestTest {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val ex = assertFailsWith<JsonConvertException> {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
             }
             assertIs<ResponseUnparsable>(ex.cause)
         }
