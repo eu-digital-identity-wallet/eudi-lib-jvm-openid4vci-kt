@@ -19,6 +19,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
 import java.security.Signature
 import java.util.*
 
@@ -95,4 +96,17 @@ object CryptoGenerator {
     ): PopSigner? =
         credentialConfiguration.proofTypesSupported.values
             .firstNotNullOfOrNull { keyAndPopSigner(it)?.second }
+
+    fun proofsSpecForEcKeys(
+        curve: Curve = Curve.P_256,
+        num: Int = 1,
+    ): ProofsSpecification {
+        val ecKeys = List(num) { randomECSigningKey(curve) }
+        val batchSigner = BatchSigner.fromNimbusEcKeys(
+            ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
+            secureRandom = null,
+            provider = null,
+        )
+        return ProofsSpecification.JwtProofs.NoKeyAttestation(batchSigner)
+    }
 }

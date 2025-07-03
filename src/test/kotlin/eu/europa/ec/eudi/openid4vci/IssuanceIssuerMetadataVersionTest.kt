@@ -17,11 +17,13 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialResponseSuccessTO
 import io.ktor.client.engine.mock.*
@@ -177,8 +179,7 @@ class IssuanceIssuerMetadataVersionTest {
             with(issuer) {
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
             }
         }
 
@@ -229,8 +230,7 @@ class IssuanceIssuerMetadataVersionTest {
             with(issuer) {
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
             }
         }
 
@@ -262,8 +262,7 @@ class IssuanceIssuerMetadataVersionTest {
             with(issuer) {
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
             }
         }
 
@@ -335,8 +334,7 @@ class IssuanceIssuerMetadataVersionTest {
             with(issuer) {
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-                val (_, outcome) = authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                val (_, outcome) = authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
                 assertIs<SubmissionOutcome.Success>(outcome)
             }
         }
@@ -396,8 +394,7 @@ class IssuanceIssuerMetadataVersionTest {
 
             with(issuer) {
                 val payload = IssuanceRequestPayload.ConfigurationBased(CredentialConfigurationIdentifier(PID_MsoMdoc))
-                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-                authorizedRequest.request(payload, popSigners).getOrThrow()
+                authorizedRequest.request(payload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
             }
         }
 
@@ -443,7 +440,7 @@ class IssuanceIssuerMetadataVersionTest {
             val (_, outcome) = with(issuer) {
                 authorizedRequest.request(
                     IssuanceRequestPayload.ConfigurationBased(CredentialConfigurationIdentifier(PID_MsoMdoc)),
-                    listOf(CryptoGenerator.rsaProofSigner()),
+                    proofsSpecForEcKeys(Curve.P_256),
                 ).getOrThrow()
             }
             assertIs<SubmissionOutcome.Success>(outcome)
@@ -486,9 +483,8 @@ class IssuanceIssuerMetadataVersionTest {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                     CredentialConfigurationIdentifier(PID_SdJwtVC),
                 )
-                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
                 val (newAuthorizedRequest, outcome) =
-                    authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                    authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
                 assertIs<SubmissionOutcome.Deferred>(outcome)
 
                 assertFailsWith<CredentialIssuanceError.InvalidResponseContentType>(
@@ -552,9 +548,8 @@ class IssuanceIssuerMetadataVersionTest {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
             )
-            val popSigners = listOf(CryptoGenerator.rsaProofSigner())
             val (newAuthorizedRequest, outcome) =
-                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
             assertIs<SubmissionOutcome.Deferred>(outcome)
 
             val (_, deferredOutcome) =
