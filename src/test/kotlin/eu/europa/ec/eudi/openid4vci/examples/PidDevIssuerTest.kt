@@ -15,56 +15,79 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
+import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.DisplayName
 import kotlin.test.Ignore
 import kotlin.test.Test
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.measureTime
 
 @DisplayName("PID DEV Issuer Test")
 class PidDevIssuerTest {
 
     @Test @Ignore
     fun `Issue PID in mso_mdoc using authorize code flow and JWT proofs`() = runTest {
-        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
+        repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.PID_MsoMdoc_config_id,
-            enableHttpLogging = false,
-            batchOption = BatchOption.Specific(2),
+            BatchOption.Specific(2),
         )
     }
 
     @Test @Ignore
-    fun `Issue PID in sd-jwt vc using authorize code flow and JWT proofs`() = runTest {
-        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
+    fun `Issue PID in sd-jwt vc using authorize code flow and JWT proofs`() = runTest(timeout = 5.minutes) {
+        repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.PID_SdJwtVC_config_id,
-            enableHttpLogging = false,
-            batchOption = BatchOption.Specific(2),
+            BatchOption.Specific(2),
         )
     }
 
     @Test @Ignore
     fun `Issue mDL in mso_mdoc using authorize code flow and JWT proofs`() = runTest {
-        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
+        repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.MDL_config_id,
-            enableHttpLogging = false,
-            batchOption = BatchOption.Specific(2),
+            BatchOption.Specific(2),
         )
     }
 
     @Test @Ignore
     fun `Issue EHIC in sd-jwt vc jws json flattened using authorize code flow and JWT proofs`() = runTest {
-        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
+        repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.EHIC_JwsJson_config_id,
-            enableHttpLogging = false,
-            batchOption = BatchOption.Specific(2),
+            BatchOption.Specific(2),
         )
     }
 
     @Test @Ignore
     fun `Issue EHIC in sd-jwt vc compact using authorize code flow and JWT proofs`() = runTest {
-        PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
+        repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.EHIC_Compact_config_id,
-            enableHttpLogging = false,
-            batchOption = BatchOption.Specific(2),
+            BatchOption.Specific(2),
         )
+    }
+}
+
+private suspend fun repeatBatchIssuanceUsingAuthorizationCodeFlow(
+    credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
+    batchOption: BatchOption,
+    enableHttpLogging: Boolean = false,
+    repetitions: UInt = 1u,
+    delayBetweenRepetitions: Duration = 0.seconds,
+) {
+    require(repetitions > 0u) { "repetitions must be greater than 0" }
+
+    repeat(repetitions.toInt()) {
+        val duration = measureTime {
+            PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
+                credentialConfigurationIdentifier,
+                enableHttpLogging = enableHttpLogging,
+                batchOption = batchOption,
+            )
+        }
+        println("It took ${duration.inWholeMilliseconds} milliseconds to issue ${credentialConfigurationIdentifier.value}")
+        delay(delayBetweenRepetitions)
     }
 }
