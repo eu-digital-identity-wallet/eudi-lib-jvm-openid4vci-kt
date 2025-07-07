@@ -68,8 +68,7 @@ fun interface JwtSigner<in Claims> {
         inline operator fun <reified Claims, PUB> invoke(
             signOp: SignOp<PUB>,
             noinline customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-            noinline assertions: SignOp<PUB>.() -> Unit = {},
-        ): JwtSigner<Claims> = DefaultJwtSigner(serializer(), signOp, customizeHeader, assertions)
+        ): JwtSigner<Claims> = DefaultJwtSigner(serializer(), signOp, customizeHeader)
     }
 }
 
@@ -81,7 +80,6 @@ fun interface JwtBatchSigner<in Claims> {
         inline operator fun <reified Claims, PUB> invoke(
             signOps: BatchSignOp<PUB>,
             noinline customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-            noinline assertions: SignOp<PUB>.() -> Unit = {},
         ): JwtBatchSigner<Claims> =
             object : JwtBatchSigner<Claims> {
 
@@ -91,7 +89,6 @@ fun interface JwtBatchSigner<in Claims> {
                             serializer = serializer<Claims>(),
                             signOp = signOp,
                             customizeHeader = customizeHeader,
-                            assertions = assertions,
                         ).sign(claims)
                     }
             }
@@ -102,13 +99,11 @@ class DefaultJwtSigner<Claims, PUB>(
     private val serializer: KSerializer<Claims>,
     private val signOp: SignOp<PUB>,
     private val customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-    private val assertions: SignOp<PUB>.() -> Unit = {},
 ) : JwtSigner<Claims> {
 
     override suspend fun sign(
         claims: Claims,
     ): String = run {
-        signOp.apply { assertions }
         val header = signOp.header(customizeHeader)
         val payload = Json.encodeToJsonElement(serializer, claims).jsonObject
         signOp.signJwt(header, payload)

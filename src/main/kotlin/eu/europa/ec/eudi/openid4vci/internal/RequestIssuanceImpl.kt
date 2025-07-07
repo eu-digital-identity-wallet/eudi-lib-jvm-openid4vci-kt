@@ -89,8 +89,8 @@ internal class RequestIssuanceImpl(
                         buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
                     }
                 }
-                is ProofsSpecification.JwtProofs.WithKeyAttestation -> TODO()
-                is ProofsSpecification.AttestationProof -> TODO()
+                is ProofsSpecification.JwtProofs.WithKeyAttestation -> error("JWT Proofs with key attestation not yet supported")
+                is ProofsSpecification.AttestationProof -> error("Attestation proofs not yet supported")
             }
         }
 
@@ -177,11 +177,12 @@ internal class RequestIssuanceImpl(
                     }
                 }
                 val credentialConfiguration = credentialSupportedById(credentialConfigId)
-
-                val cNonce = proofsRequirement.cNonce()
-                val proofsSigner = JwtProofsSigner(proofsSigner) {
-                    assertAlgorithmsAreSupported(credentialConfiguration.proofTypesSupported)
+                // Check signing algorithms compatibility
+                proofsSigner.operations.forEach {
+                    it.assertAlgorithmsAreSupported(credentialConfiguration.proofTypesSupported)
                 }
+                val cNonce = proofsRequirement.cNonce()
+                val proofsSigner = JwtProofsSigner(proofsSigner)
                 proofsFactory(proofsSigner, cNonce, grant)
             }
         }
