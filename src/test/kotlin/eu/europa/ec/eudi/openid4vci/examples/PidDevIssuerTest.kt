@@ -22,7 +22,6 @@ import org.junit.jupiter.api.DisplayName
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.measureTime
 
@@ -38,7 +37,7 @@ class PidDevIssuerTest {
     }
 
     @Test @Ignore
-    fun `Issue PID in sd-jwt vc using authorize code flow and JWT proofs`() = runTest(timeout = 5.minutes) {
+    fun `Issue PID in sd-jwt vc using authorize code flow and JWT proofs`() = runTest {
         repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.PID_SdJwtVC_config_id,
             BatchOption.Specific(2),
