@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
@@ -85,7 +86,8 @@ internal class RequestIssuanceImpl(
                 is ProofsSpecification.NoProofs -> buildRequest(requestPayload, null, credentialIdentifiers.orEmpty())
                 is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
                     proofsSpec.proofsSigner.use { signOps ->
-                        val proofsFactory = proofsFactoryFrom(signOps, credentialConfigId)
+                        val javaAlgorithm = proofsSpec.proofsSigner.javaAlgorithm
+                        val proofsFactory = jwtProofsFactoryFrom(signOps, javaAlgorithm, credentialConfigId)
                         buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
                     }
                 }
@@ -148,8 +150,9 @@ internal class RequestIssuanceImpl(
             }
         }
 
-    private suspend fun AuthorizedRequest.proofsFactoryFrom(
-        proofsSigner: BatchSignOp<JwtBindingKey>?,
+    private suspend fun AuthorizedRequest.jwtProofsFactoryFrom(
+        proofsSigner: BatchSignOperation<JwtBindingKey>?,
+        javaSigningAlgorithm: String,
         credentialConfigId: CredentialConfigurationIdentifier,
     ): ProofsFactory? {
         // Deduct from credential configuration and issuer metadata if issuer requires proofs to be sent for the specific credential
@@ -157,44 +160,54 @@ internal class RequestIssuanceImpl(
 
         return when (proofsRequirement) {
             is CredentialProofsRequirement.ProofNotRequired -> null
+
             is CredentialProofsRequirement.ProofRequired -> {
                 requireNotNull(proofsSigner) {
-                    "A JwtProofsSigner is required when proofs are required: $proofsRequirement"
+                    "A ProofsSigner is required when proofs are required"
                 }
-                when (val popSignersNo = proofsSigner.operations.size) {
-                    0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
-                    1 -> Unit
-                    else -> {
-                        when (batchCredentialIssuance) {
-                            BatchCredentialIssuance.NotSupported -> CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
-                            is BatchCredentialIssuance.Supported -> {
-                                val maxBatchSize = batchCredentialIssuance.batchSize
-                                ensure(popSignersNo <= maxBatchSize) {
-                                    CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
-                                }
-                            }
-                        }
-                    }
-                }
-                val credentialConfiguration = credentialSupportedById(credentialConfigId)
-                // Check signing algorithms compatibility
-                proofsSigner.operations.forEach {
-                    it.assertAlgorithmsAreSupported(credentialConfiguration.proofTypesSupported)
-                }
+                proofsSigner.assertMatchesBatchIssuanceBatchSize()
+
+                // Check signing algorithm compatibility
+                val joseAlg = javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
+
                 val cNonce = proofsRequirement.cNonce()
-                val proofsSigner = JwtProofsSigner(proofsSigner)
+                val proofsSigner = JwtProofsSigner(joseAlg, proofsSigner)
                 proofsFactory(proofsSigner, cNonce, grant)
             }
         }
     }
 
-    private fun SignOperation<JwtBindingKey>.assertAlgorithmsAreSupported(proofTypesSupported: ProofTypesSupported) {
+    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize() {
+        when (val popSignersNo = operations.size) {
+            0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
+            1 -> Unit
+            else -> {
+                when (batchCredentialIssuance) {
+                    BatchCredentialIssuance.NotSupported -> CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+                    is BatchCredentialIssuance.Supported -> {
+                        val maxBatchSize = batchCredentialIssuance.batchSize
+                        ensure(popSignersNo <= maxBatchSize) {
+                            CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun String.toSupportedJoseAlgorithm(credentialConfigId: CredentialConfigurationIdentifier): JWSAlgorithm {
+        val proofTypesSupported = credentialSupportedById(credentialConfigId).proofTypesSupported
         val spec = proofTypesSupported.values.filterIsInstance<ProofTypeMeta.Jwt>().firstOrNull()
-        spec?.let {
+        ensureNotNull(spec) {
+            CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported()
+        }
+        return spec.let {
+            val joseSigningAlgorithm = this.toJoseAlg()
             val proofTypeSigningAlgorithmsSupported = spec.algorithms
-            ensure(algorithm.toJoseAlg() in proofTypeSigningAlgorithmsSupported) {
+            ensure(joseSigningAlgorithm in proofTypeSigningAlgorithmsSupported) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported()
             }
+            joseSigningAlgorithm
         }
     }
 
@@ -243,7 +256,7 @@ internal class RequestIssuanceImpl(
                 nonce = cNonce?.value,
             ),
         ).map {
-            Proof.Jwt(SignedJWT.parse(it))
+            Proof.Jwt(SignedJWT.parse(it.second))
         }
     }
 

@@ -44,7 +44,7 @@ internal suspend fun <PUB, R> Signer<PUB>.use(block: suspend (SignOperation<PUB>
 }
 
 @OptIn(ExperimentalContracts::class)
-internal suspend fun <PUB, R> BatchSigner<PUB>.use(block: suspend (BatchSignOp<PUB>) -> R): R {
+internal suspend fun <PUB, R> BatchSigner<PUB>.use(block: suspend (BatchSignOperation<PUB>) -> R): R {
     contract {
         callsInPlace(block, InvocationKind.AT_MOST_ONCE)
     }
@@ -57,18 +57,15 @@ internal suspend fun <PUB, R> BatchSigner<PUB>.use(block: suspend (BatchSignOp<P
     }
 }
 
-internal fun ByteArray.transcodeSignatureToConcat(signingAlgorithm: String): ByteArray {
-    val alg = signingAlgorithm.toJoseECAlg()
-
+internal fun ByteArray.transcodeSignatureToConcat(alg: JWSAlgorithm): ByteArray {
     if (!JWSAlgorithm.Family.EC.contains(alg)) {
         return this
     }
-
     val outputLen = when (alg) {
         JWSAlgorithm.ES256 -> 64
         JWSAlgorithm.ES384 -> 96
         JWSAlgorithm.ES512 -> 132
-        else -> error("Unsupported algorithm for JWS signature transcoding: $signingAlgorithm")
+        else -> error("Unsupported algorithm for JWS signature transcoding: ${alg.name}")
     }
     return ECDSA.transcodeSignatureToConcat(this, outputLen)
 }
@@ -115,9 +112,12 @@ internal fun <PUB> Signer.Companion.fromEcPrivateKey(
     provider: String?,
 ): Signer<PUB> = object : Signer<PUB> {
 
+    override val javaAlgorithm: String
+        get() = signingAlgorithm
+
     override suspend fun authenticate(): SignOperation<PUB> {
         val sign = SignFunction.forJavaEcPrivateKey(signingAlgorithm, privateKey, secureRandom, provider)
-        return SignOperation(signingAlgorithm, sign, publicMaterial)
+        return SignOperation(sign, publicMaterial)
     }
 
     override suspend fun release(signOperation: SignOperation<PUB>?) {
@@ -131,7 +131,11 @@ internal fun <PUB> BatchSigner.Companion.fromEcPrivateKeys(
     secureRandom: SecureRandom?,
     provider: String?,
 ): BatchSigner<PUB> = object : BatchSigner<PUB> {
-    override suspend fun authenticate(): BatchSignOp<PUB> {
+
+    override val javaAlgorithm: String
+        get() = signingAlgorithm
+
+    override suspend fun authenticate(): BatchSignOperation<PUB> {
         val signOperations = ecKeyPairs.map {
             val sign = SignFunction.forJavaEcPrivateKey(
                 signingAlgorithm,
@@ -139,12 +143,12 @@ internal fun <PUB> BatchSigner.Companion.fromEcPrivateKeys(
                 secureRandom,
                 provider,
             )
-            SignOperation(signingAlgorithm, sign, it.value)
+            SignOperation(sign, it.value)
         }
-        return BatchSignOp(signOperations)
+        return BatchSignOperation(signOperations)
     }
 
-    override suspend fun release(signOps: BatchSignOp<PUB>?) {
+    override suspend fun release(signOps: BatchSignOperation<PUB>?) {
         // Nothing to do for releasing
     }
 }
@@ -186,7 +190,7 @@ internal fun <PUB> BatchSigner.Companion.fromNimbusEcKeys(
     )
 }
 
-private fun Curve.toJavaSigningAlg(): String {
+internal fun Curve.toJavaSigningAlg(): String {
     return when (this) {
         Curve.P_256 -> "SHA256withECDSA"
         Curve.P_384 -> "SHA384withECDSA"

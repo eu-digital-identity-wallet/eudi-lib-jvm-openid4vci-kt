@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.jose.JWSAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -31,21 +32,25 @@ internal data class JwtProofClaims(
 )
 
 internal class JwtProofSigner(
+    private val algorithm: JWSAlgorithm,
     private val signOperation: SignOperation<JwtBindingKey>,
 ) {
     suspend fun sign(claims: JwtProofClaims): String =
         JwtSigner<JwtProofClaims, JwtBindingKey>(
-            signOp = signOperation,
-            customizeHeader = { pubKey -> jwtProofHeader(pubKey) },
+            signOperation = signOperation,
+            algorithm = algorithm,
+            customizeHeader = { key -> jwtProofHeader(key) },
         ).sign(claims)
 }
 
 internal class JwtProofsSigner(
-    private val batchSignOp: BatchSignOp<JwtBindingKey>,
+    private val algorithm: JWSAlgorithm,
+    private val batchSignOperation: BatchSignOperation<JwtBindingKey>,
 ) {
     suspend fun sign(claims: JwtProofClaims): List<Pair<JwtBindingKey, String>> =
         JwtBatchSigner<JwtProofClaims, JwtBindingKey>(
-            signOps = batchSignOp,
+            algorithm = algorithm,
+            batchSignOperation = batchSignOperation,
             customizeHeader = { pubKey -> jwtProofHeader(pubKey) },
         ).sign(claims)
 }

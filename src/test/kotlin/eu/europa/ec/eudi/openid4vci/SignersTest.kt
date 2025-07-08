@@ -18,9 +18,13 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vci.internal.JwtBatchSigner
 import eu.europa.ec.eudi.openid4vci.internal.JwtProofClaims
+import eu.europa.ec.eudi.openid4vci.internal.JwtSigner
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
+import eu.europa.ec.eudi.openid4vci.internal.toJavaSigningAlg
+import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
 import kotlinx.coroutines.test.runTest
 import java.time.Instant
 import kotlin.test.Test
@@ -40,7 +44,8 @@ class SignersTest {
         )
 
         val jwtSigner = JwtSigner<JwtProofClaims, JwtBindingKey>(
-            signer.authenticate(),
+            algorithm = Curve.P_256.toJavaSigningAlg().toJoseAlg(),
+            signOperation = signer.authenticate(),
         )
 
         val signResult = jwtSigner.sign(
@@ -68,7 +73,8 @@ class SignersTest {
         )
 
         val batchJwtSigner = JwtBatchSigner<JwtProofClaims, JwtBindingKey>(
-            batchSigner.authenticate(),
+            algorithm = Curve.P_256.toJavaSigningAlg().toJoseAlg(),
+            batchSignOperation = batchSigner.authenticate(),
         )
 
         val signResult = batchJwtSigner.sign(

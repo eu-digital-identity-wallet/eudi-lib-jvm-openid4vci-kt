@@ -1,6 +1,22 @@
+/*
+ * Copyright (c) 2023 European Commission
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import eu.europa.ec.eudi.openid4vci.BatchSignOp
+import com.nimbusds.jose.JWSAlgorithm
+import eu.europa.ec.eudi.openid4vci.BatchSignOperation
 import eu.europa.ec.eudi.openid4vci.SignOperation
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -11,7 +27,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.serializer
 import java.util.Base64
-
 
 /**
  * Represents an interface for signing JSON Web Tokens (JWTs). The interface provides the functionality to
@@ -25,16 +40,19 @@ internal interface JwtSigner<in Claims, out PUB> {
     suspend fun sign(claims: Claims): String
 
     companion object {
+
         operator fun <Claims, PUB> invoke(
             serializer: KSerializer<Claims>,
             signOperation: SignOperation<PUB>,
+            algorithm: JWSAlgorithm,
             customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-        ): JwtSigner<Claims, PUB> = DefaultJwtSigner(serializer, signOperation, customizeHeader)
+        ): JwtSigner<Claims, PUB> = DefaultJwtSigner(serializer, signOperation, algorithm, customizeHeader)
 
         inline operator fun <reified Claims, PUB> invoke(
             signOperation: SignOperation<PUB>,
+            algorithm: JWSAlgorithm,
             noinline customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-        ): JwtSigner<Claims, PUB> = invoke(serializer(), signOperation, customizeHeader)
+        ): JwtSigner<Claims, PUB> = invoke(serializer(), signOperation, algorithm, customizeHeader)
     }
 }
 
@@ -52,30 +70,32 @@ internal fun interface JwtBatchSigner<in Claims, out PUB> {
 
         operator fun <Claims, PUB> invoke(
             serializer: KSerializer<Claims>,
-            signOps: BatchSignOp<PUB>,
+            batchSignOperation: BatchSignOperation<PUB>,
+            algorithm: JWSAlgorithm,
             customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
         ): JwtBatchSigner<Claims, PUB> =
             object : JwtBatchSigner<Claims, PUB> {
 
-                override suspend fun sign(claims: Claims): List<Pair<PUB,String>> =
-                    signOps.operations.map { signOp ->
-                        val jwtSigner = JwtSigner(serializer, signOp, customizeHeader)
+                override suspend fun sign(claims: Claims): List<Pair<PUB, String>> =
+                    batchSignOperation.operations.map { signOperation ->
+                        val jwtSigner = JwtSigner(serializer, signOperation, algorithm, customizeHeader)
                         val jwt = jwtSigner.sign(claims)
                         jwtSigner.publicMaterial to jwt
                     }
             }
 
         inline operator fun <reified Claims, PUB> invoke(
-            signOps: BatchSignOp<PUB>,
+            batchSignOperation: BatchSignOperation<PUB>,
+            algorithm: JWSAlgorithm,
             noinline customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-        ): JwtBatchSigner<Claims, PUB> = invoke(serializer(), signOps, customizeHeader)
-
+        ): JwtBatchSigner<Claims, PUB> = invoke(serializer(), batchSignOperation, algorithm, customizeHeader)
     }
 }
 
 private class DefaultJwtSigner<in Claims, out PUB>(
     private val serializer: KSerializer<Claims>,
     private val signOperation: SignOperation<PUB>,
+    private val algorithm: JWSAlgorithm,
     private val customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
 ) : JwtSigner<Claims, PUB> {
 
@@ -92,7 +112,7 @@ private class DefaultJwtSigner<in Claims, out PUB>(
     fun <PUB> SignOperation<PUB>.header(
         customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
     ): JsonObject = buildJsonObject {
-        put("alg", this@header.algorithm.toJoseAlg().name)
+        put("alg", algorithm.name)
         customizeHeader(this@header.publicMaterial)
     }
 
