@@ -188,11 +188,11 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private fun SignOp<JwtBindingKey>.assertAlgorithmsAreSupported(proofTypesSupported: ProofTypesSupported) {
+    private fun SignOperation<JwtBindingKey>.assertAlgorithmsAreSupported(proofTypesSupported: ProofTypesSupported) {
         val spec = proofTypesSupported.values.filterIsInstance<ProofTypeMeta.Jwt>().firstOrNull()
         spec?.let {
             val proofTypeSigningAlgorithmsSupported = spec.algorithms
-            ensure(signingAlgorithm.toJoseAlg() in proofTypeSigningAlgorithmsSupported) {
+            ensure(algorithm.toJoseAlg() in proofTypeSigningAlgorithmsSupported) {
                 CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported()
             }
         }

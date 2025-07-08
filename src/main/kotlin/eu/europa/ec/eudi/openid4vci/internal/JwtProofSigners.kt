@@ -31,11 +31,11 @@ internal data class JwtProofClaims(
 )
 
 internal class JwtProofSigner(
-    private val signOp: SignOp<JwtBindingKey>,
+    private val signOperation: SignOperation<JwtBindingKey>,
 ) {
     suspend fun sign(claims: JwtProofClaims): String =
         JwtSigner<JwtProofClaims, JwtBindingKey>(
-            signOp = signOp,
+            signOp = signOperation,
             customizeHeader = { pubKey -> jwtProofHeader(pubKey) },
         ).sign(claims)
 }
@@ -43,7 +43,7 @@ internal class JwtProofSigner(
 internal class JwtProofsSigner(
     private val batchSignOp: BatchSignOp<JwtBindingKey>,
 ) {
-    suspend fun sign(claims: JwtProofClaims): List<String> =
+    suspend fun sign(claims: JwtProofClaims): List<Pair<JwtBindingKey, String>> =
         JwtBatchSigner<JwtProofClaims, JwtBindingKey>(
             signOps = batchSignOp,
             customizeHeader = { pubKey -> jwtProofHeader(pubKey) },

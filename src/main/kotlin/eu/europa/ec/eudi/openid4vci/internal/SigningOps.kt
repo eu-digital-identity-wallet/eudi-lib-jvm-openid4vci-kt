@@ -30,7 +30,7 @@ import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
 @OptIn(ExperimentalContracts::class)
-internal suspend fun <PUB, R> Signer<PUB>.use(block: suspend (SignOp<PUB>) -> R): R {
+internal suspend fun <PUB, R> Signer<PUB>.use(block: suspend (SignOperation<PUB>) -> R): R {
     contract {
         callsInPlace(block, InvocationKind.AT_MOST_ONCE)
     }
@@ -83,13 +83,13 @@ internal fun String.toJoseECAlg(): JWSAlgorithm? = when (this) {
     else -> null
 }
 
-internal fun SignOperation.Companion.forJavaEcPrivateKey(
+internal fun SignFunction.Companion.forJavaEcPrivateKey(
     javaSigningAlgorithm: String,
     privateKey: ECPrivateKey,
     secureRandom: SecureRandom?,
     provider: String?,
-): SignOperation =
-    SignOperation { input ->
+): SignFunction =
+    SignFunction { input ->
         withContext(Dispatchers.IO) {
             val signature =
                 provider
@@ -115,12 +115,12 @@ internal fun <PUB> Signer.Companion.fromEcPrivateKey(
     provider: String?,
 ): Signer<PUB> = object : Signer<PUB> {
 
-    override suspend fun authenticate(): SignOp<PUB> {
-        val sign = SignOperation.forJavaEcPrivateKey(signingAlgorithm, privateKey, secureRandom, provider)
-        return SignOp(signingAlgorithm, sign, publicMaterial)
+    override suspend fun authenticate(): SignOperation<PUB> {
+        val sign = SignFunction.forJavaEcPrivateKey(signingAlgorithm, privateKey, secureRandom, provider)
+        return SignOperation(signingAlgorithm, sign, publicMaterial)
     }
 
-    override suspend fun release(signOp: SignOp<PUB>?) {
+    override suspend fun release(signOperation: SignOperation<PUB>?) {
         // Nothing to do for releasing
     }
 }
@@ -132,16 +132,16 @@ internal fun <PUB> BatchSigner.Companion.fromEcPrivateKeys(
     provider: String?,
 ): BatchSigner<PUB> = object : BatchSigner<PUB> {
     override suspend fun authenticate(): BatchSignOp<PUB> {
-        val signOps = ecKeyPairs.map {
-            val sign = SignOperation.forJavaEcPrivateKey(
+        val signOperations = ecKeyPairs.map {
+            val sign = SignFunction.forJavaEcPrivateKey(
                 signingAlgorithm,
                 it.key,
                 secureRandom,
                 provider,
             )
-            SignOp(signingAlgorithm, sign, it.value)
+            SignOperation(signingAlgorithm, sign, it.value)
         }
-        return BatchSignOp(signOps)
+        return BatchSignOp(signOperations)
     }
 
     override suspend fun release(signOps: BatchSignOp<PUB>?) {

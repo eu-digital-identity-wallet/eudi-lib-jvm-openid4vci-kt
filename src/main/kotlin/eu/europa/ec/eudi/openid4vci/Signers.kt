@@ -15,118 +15,108 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
-import eu.europa.ec.eudi.openid4vci.internal.transcodeSignatureToConcat
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.*
-import kotlinx.serialization.serializer
-import java.util.*
-
-fun interface SignOperation {
+/**
+ * Functional interface to define a sign operation.
+ * This interface is typically implemented to enable signing of input data
+ * and returning the signed result.
+ */
+fun interface SignFunction {
 
     suspend fun sign(input: ByteArray): ByteArray
 
     companion object
 }
 
-data class SignOp<out PUB>(
-    val signingAlgorithm: String,
-    val operation: SignOperation,
+/**
+ * Represents a data class encapsulating a signing operation configuration.
+ *
+ * @param PUB The type of the public material used in the signing process.
+ * @property algorithm The algorithm used for signing.
+ * @property function The signing operation to be executed, represented by the [SignFunction] functional interface.
+ * @property publicMaterial The public material associated with the signing operation.
+ */
+data class SignOperation<out PUB>(
+    val algorithm: String,
+    val function: SignFunction,
     val publicMaterial: PUB,
 )
 
+/**
+ * Represents a batch of signing operations that can be executed together.
+ *
+ * @param PUB The type of the public material used in the signing operations.
+ * @property operations A list of [SignOperation] instances specifying the individual signing operations
+ * to be performed in the batch.
+ */
 data class BatchSignOp<out PUB>(
-    val operations: List<SignOp<PUB>>,
+    val operations: List<SignOperation<PUB>>,
 )
 
+/**
+ * Represents a generic Signer interface that manages signing operations.
+ *
+ * @param PUB The type of the public material used in the signing process.
+ */
 interface Signer<out PUB> {
 
-    suspend fun authenticate(): SignOp<PUB>
+    /**
+     * Performs the authentication operation and returns a signing operation configuration object.
+     *
+     * @return A [SignOperation] instance containing the configuration of the signing operation,
+     *         including the signing algorithm, the operation to be executed, and the public material.
+     */
+    suspend fun authenticate(): SignOperation<PUB>
 
-    suspend fun release(signOp: SignOp<@UnsafeVariance PUB>?)
+    /**
+     * Releases the resources associated with the provided signing operation.
+     * This method is used to clean up or finalize operations when a signing process
+     * is no longer needed.
+     *
+     * @param signOperation The signing operation to be released. It can be null, in which case
+     *               no action will be performed.
+     */
+    suspend fun release(signOperation: SignOperation<@UnsafeVariance PUB>?)
 
     companion object
 }
 
+/**
+ * Defines an interface for batch signing operations.
+ *
+ * This interface is intended for managing batches of signing operations, allowing
+ * for the authentication of a batch and the ability to release resources associated
+ * with a batch. Implementations should provide the logic for authenticating signing
+ * operations and releasing resources appropriately.
+ *
+ * @param PUB The type of the public material used in the signing operations.
+ */
 interface BatchSigner<out PUB> {
 
+    /**
+     * Authenticates a batch signing operation.
+     *
+     * The method initiates the process of authenticating signing operations that are
+     * structured as a batch. Authentication ensures that the signing operations
+     * meet the required security and validity conditions.
+     *
+     * @return A [BatchSignOp] instance containing the authenticated batch of
+     * signing operations. The returned batch encapsulates the verified operations
+     * that can be securely executed.
+     */
     suspend fun authenticate(): BatchSignOp<PUB>
 
+    /**
+     * Releases the resources associated with a batch of signing operations.
+     *
+     * This method is intended to clean up and release any allocated resources corresponding
+     * to the provided batch of signing operations. It takes an optional `BatchSignOp` parameter
+     * and ensures that any necessary cleanup for the batch is performed.
+     *
+     * @param signOps An optional [BatchSignOp] instance containing the batch of signing operations
+     *                to be released. If `null`, no operation is performed.
+     */
     suspend fun release(signOps: BatchSignOp<@UnsafeVariance PUB>?)
 
     companion object
 }
 
-// ///////////////
-// JWT Signers //
-// ///////////////
-
-fun interface JwtSigner<in Claims> {
-    suspend fun sign(claims: Claims): String
-
-    companion object {
-        inline operator fun <reified Claims, PUB> invoke(
-            signOp: SignOp<PUB>,
-            noinline customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-        ): JwtSigner<Claims> = DefaultJwtSigner(serializer(), signOp, customizeHeader)
-    }
-}
-
-fun interface JwtBatchSigner<in Claims> {
-    suspend fun sign(claims: Claims): List<String>
-
-    companion object {
-
-        inline operator fun <reified Claims, PUB> invoke(
-            signOps: BatchSignOp<PUB>,
-            noinline customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-        ): JwtBatchSigner<Claims> =
-            object : JwtBatchSigner<Claims> {
-
-                override suspend fun sign(claims: Claims): List<String> =
-                    signOps.operations.map { signOp ->
-                        DefaultJwtSigner(
-                            serializer = serializer<Claims>(),
-                            signOp = signOp,
-                            customizeHeader = customizeHeader,
-                        ).sign(claims)
-                    }
-            }
-    }
-}
-
-class DefaultJwtSigner<Claims, PUB>(
-    private val serializer: KSerializer<Claims>,
-    private val signOp: SignOp<PUB>,
-    private val customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-) : JwtSigner<Claims> {
-
-    override suspend fun sign(
-        claims: Claims,
-    ): String = run {
-        val header = signOp.header(customizeHeader)
-        val payload = Json.encodeToJsonElement(serializer, claims).jsonObject
-        signOp.signJwt(header, payload)
-    }
-
-    internal fun <PUB> SignOp<PUB>.header(
-        customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-    ): JsonObject = buildJsonObject {
-        put("alg", this@header.signingAlgorithm.toJoseAlg().name)
-        customizeHeader(this@header.publicMaterial)
-    }
-
-    private suspend fun <PUB> SignOp<PUB>.signJwt(header: JsonObject, claims: JsonObject): String {
-        // Base64Url encode header and claims
-        val base64UrlEncoder = Base64.getUrlEncoder().withoutPadding()
-        val headerB64 = base64UrlEncoder.encodeToString(header.toString().toByteArray(Charsets.UTF_8))
-        val claimsB64 = base64UrlEncoder.encodeToString(claims.toString().toByteArray(Charsets.UTF_8))
-
-        val signingInput: ByteArray = "$headerB64.$claimsB64".toByteArray(Charsets.US_ASCII)
-
-        val signatureBytes = operation.sign(signingInput)
-        val signatureB64 = base64UrlEncoder.encodeToString(signatureBytes.transcodeSignatureToConcat(signingAlgorithm))
-
-        return "$headerB64.$claimsB64.$signatureB64"
-    }
-}
