@@ -15,16 +15,16 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.header
-import eu.europa.ec.eudi.openid4vci.internal.signJwt
+import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
+import eu.europa.ec.eudi.openid4vci.internal.transcodeSignatureToConcat
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObjectBuilder
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 import kotlinx.serialization.serializer
+import java.util.*
 
 fun interface SignOperation {
-    suspend fun sign(input: ByteArray): Result<ByteArray>
+
+    suspend fun sign(input: ByteArray): ByteArray
 
     companion object
 }
@@ -107,5 +107,26 @@ class DefaultJwtSigner<Claims, PUB>(
         val header = signOp.header(customizeHeader)
         val payload = Json.encodeToJsonElement(serializer, claims).jsonObject
         signOp.signJwt(header, payload)
+    }
+
+    internal fun <PUB> SignOp<PUB>.header(
+        customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
+    ): JsonObject = buildJsonObject {
+        put("alg", this@header.signingAlgorithm.toJoseAlg().name)
+        customizeHeader(this@header.publicMaterial)
+    }
+
+    private suspend fun <PUB> SignOp<PUB>.signJwt(header: JsonObject, claims: JsonObject): String {
+        // Base64Url encode header and claims
+        val base64UrlEncoder = Base64.getUrlEncoder().withoutPadding()
+        val headerB64 = base64UrlEncoder.encodeToString(header.toString().toByteArray(Charsets.UTF_8))
+        val claimsB64 = base64UrlEncoder.encodeToString(claims.toString().toByteArray(Charsets.UTF_8))
+
+        val signingInput: ByteArray = "$headerB64.$claimsB64".toByteArray(Charsets.US_ASCII)
+
+        val signatureBytes = operation.sign(signingInput)
+        val signatureB64 = base64UrlEncoder.encodeToString(signatureBytes.transcodeSignatureToConcat(signingAlgorithm))
+
+        return "$headerB64.$claimsB64.$signatureB64"
     }
 }

@@ -22,14 +22,9 @@ import com.nimbusds.jose.jwk.ECKey
 import eu.europa.ec.eudi.openid4vci.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonObjectBuilder
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import java.security.SecureRandom
 import java.security.Signature
 import java.security.interfaces.ECPrivateKey
-import java.util.*
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
@@ -60,28 +55,6 @@ internal suspend fun <PUB, R> BatchSigner<PUB>.use(block: suspend (BatchSignOp<P
     } finally {
         release(signOps)
     }
-}
-
-internal fun <PUB> SignOp<PUB>.header(
-    customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-): JsonObject = buildJsonObject {
-    put("alg", this@header.signingAlgorithm.toJoseAlg().name)
-    customizeHeader(this@header.publicMaterial)
-}
-
-internal suspend fun <PUB> SignOp<PUB>.signJwt(header: JsonObject, claims: JsonObject): String {
-    // Base64Url encode header and claims
-    val base64UrlEncoder = Base64.getUrlEncoder().withoutPadding()
-    val headerB64 = base64UrlEncoder.encodeToString(header.toString().toByteArray(Charsets.UTF_8))
-    val claimsB64 = base64UrlEncoder.encodeToString(claims.toString().toByteArray(Charsets.UTF_8))
-
-    val signingInput: ByteArray = "$headerB64.$claimsB64".toByteArray(Charsets.US_ASCII)
-
-    val signatureB64 = operation.sign(signingInput).map {
-        base64UrlEncoder.encodeToString(it.transcodeSignatureToConcat(signingAlgorithm))
-    }.getOrThrow()
-
-    return "$headerB64.$claimsB64.$signatureB64"
 }
 
 internal fun ByteArray.transcodeSignatureToConcat(signingAlgorithm: String): ByteArray {
@@ -118,20 +91,18 @@ internal fun SignOperation.Companion.forJavaEcPrivateKey(
 ): SignOperation =
     SignOperation { input ->
         withContext(Dispatchers.IO) {
-            runCatching {
-                val signature =
-                    provider
-                        ?.let { Signature.getInstance(javaSigningAlgorithm, it) }
-                        ?: Signature.getInstance(javaSigningAlgorithm)
-                signature.run {
-                    secureRandom
-                        ?.let { initSign(privateKey, it) }
-                        ?: initSign(privateKey)
+            val signature =
+                provider
+                    ?.let { Signature.getInstance(javaSigningAlgorithm, it) }
+                    ?: Signature.getInstance(javaSigningAlgorithm)
+            signature.run {
+                secureRandom
+                    ?.let { initSign(privateKey, it) }
+                    ?: initSign(privateKey)
 
-                    update(input)
+                update(input)
 
-                    sign()
-                }
+                sign()
             }
         }
     }
