@@ -120,3 +120,22 @@ suspend fun authorizeRequestForCredentialOffer(
         }
     return authorizedRequest to issuer
 }
+
+suspend fun preAuthorizeRequestForCredentialOffer(
+    config: OpenId4VCIConfig? = OpenId4VCIConfiguration,
+    credentialOfferStr: String,
+    responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+    ktorHttpClientFactory: KtorHttpClientFactory,
+    txCode: String = "1234",
+): Pair<AuthorizedRequest, Issuer> {
+    val issuer = Issuer.make(
+        config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
+        credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
+        ktorHttpClientFactory = ktorHttpClientFactory,
+        responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+    ).getOrThrow()
+
+    val authorizedRequest = issuer.authorizeWithPreAuthorizationCode(txCode).getOrThrow()
+
+    return authorizedRequest to issuer
+}

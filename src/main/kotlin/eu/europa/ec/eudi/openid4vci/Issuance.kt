@@ -128,6 +128,26 @@ sealed interface IssuanceRequestPayload {
 
 typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
 
+sealed interface ProofsSpecification {
+
+    data object NoProofs : ProofsSpecification
+
+    sealed interface JwtProofs : ProofsSpecification {
+
+        data class NoKeyAttestation(
+            val proofsSigner: BatchSigner<JwtBindingKey>,
+        ) : JwtProofs
+
+        data class WithKeyAttestation(
+            val proofsSigner: Signer<String>,
+        ) : JwtProofs
+    }
+
+    data class AttestationProof(
+        val attestation: String,
+    ) : ProofsSpecification
+}
+
 /**
  * An interface for submitting a credential issuance request.
  */
@@ -141,9 +161,18 @@ interface RequestIssuance {
      * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh updated Resource-Server DPoP Nonce)
      * and the [SubmissionOutcome]
      */
+    @Deprecated(
+        "Use request method with JwtProofsSigner instead",
+        ReplaceWith("request(requestPayload, proofsSigner)"),
+    )
     suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
         popSigners: List<PopSigner> = emptyList(),
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
+
+    suspend fun AuthorizedRequest.request(
+        requestPayload: IssuanceRequestPayload,
+        proofsSpec: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 }
 

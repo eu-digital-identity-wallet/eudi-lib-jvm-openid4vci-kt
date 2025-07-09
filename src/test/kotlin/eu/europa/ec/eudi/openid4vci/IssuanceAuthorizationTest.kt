@@ -289,7 +289,6 @@ class IssuanceAuthorizationTest {
             val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
                 authServerWellKnownMocker(),
                 credentialIssuerMetadataWellKnownMocker(),
-                parPostMocker(),
                 RequestMocker(
                     requestMatcher = endsWith("/token", HttpMethod.Post),
                     responseBuilder = {

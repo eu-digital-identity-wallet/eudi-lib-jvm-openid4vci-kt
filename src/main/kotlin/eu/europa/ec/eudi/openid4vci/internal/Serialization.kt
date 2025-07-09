@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.ClaimPathElement.AllArrayElements
@@ -26,6 +27,8 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
+import java.security.cert.X509Certificate
+import java.time.Instant
 import java.util.*
 
 internal val JsonSupport: Json = Json {
@@ -165,3 +168,22 @@ internal object ClaimPathSerializer : KSerializer<ClaimPath> {
         return array.asClaimPath()
     }
 }
+
+object NumericInstantSerializer : KSerializer<Instant> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("NumericInstant", PrimitiveKind.LONG)
+
+    override fun serialize(encoder: Encoder, value: Instant) {
+        encoder.encodeLong(value.epochSecond)
+    }
+
+    override fun deserialize(decoder: Decoder): Instant {
+        return Instant.ofEpochSecond(decoder.decodeLong())
+    }
+}
+
+fun JWK.asJsonElement(): JsonElement = Json.parseToJsonElement(this.toPublicJWK().toJSONString())
+
+fun List<X509Certificate>.asJsonElement(): JsonArray = JsonArray(
+    this.map { Json.encodeToJsonElement(Base64.getEncoder().encodeToString(it.encoded)) },
+)
