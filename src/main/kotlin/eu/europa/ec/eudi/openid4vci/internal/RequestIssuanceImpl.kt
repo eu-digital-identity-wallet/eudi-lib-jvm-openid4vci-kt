@@ -177,7 +177,7 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize() {
+    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize() =
         when (val popSignersNo = operations.size) {
             0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
             1 -> Unit
@@ -193,7 +193,6 @@ internal class RequestIssuanceImpl(
                 }
             }
         }
-    }
 
     private fun String.toSupportedJoseAlgorithm(credentialConfigId: CredentialConfigurationIdentifier): JWSAlgorithm {
         val proofTypesSupported = credentialSupportedById(credentialConfigId).proofTypesSupported

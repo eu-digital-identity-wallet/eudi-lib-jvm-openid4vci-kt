@@ -57,6 +57,9 @@ data class BatchSignOperation<out PUB>(
  */
 interface Signer<out PUB> {
 
+    /**
+     * The algorithm that will be used for signing
+     */
     val javaAlgorithm: String
 
     /**
@@ -92,6 +95,9 @@ interface Signer<out PUB> {
  */
 interface BatchSigner<out PUB> {
 
+    /**
+     * The algorithm that will be used for signing
+     */
     val javaAlgorithm: String
 
     /**

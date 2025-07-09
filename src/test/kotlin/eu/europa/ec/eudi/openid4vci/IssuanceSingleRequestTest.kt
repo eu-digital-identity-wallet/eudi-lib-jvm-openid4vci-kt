@@ -32,6 +32,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
+import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
 import kotlin.test.*
 
 class IssuanceSingleRequestTest {
@@ -118,7 +119,7 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
-    fun `when the passed PoPSigners are more than the expected batch limit IssuerBatchSizeLimitExceeded is thrown`() = runTest {
+    fun `when BatchSigner sign operations are more than the expected batch limit IssuerBatchSizeLimitExceeded is thrown`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
@@ -189,11 +190,8 @@ class IssuanceSingleRequestTest {
                         "Proof expected to be sent but was not sent.",
                     )
                     assertIs<Proof.Jwt>(issuanceRequest.proof)
-                    val cNonce = issuanceRequest.proof.jwt.jwtClaimsSet.getStringClaim("nonce")
-                    assertNull(
-                        cNonce,
-                        "No c_nonce expected in proof but found one",
-                    )
+                    val cNonceExists = issuanceRequest.proof.jwt.jwtClaimsSet.claims.contains("nonce")
+                    assertFalse(cNonceExists, "No c_nonce expected in proof but found one")
                 },
             ),
         )
@@ -502,6 +500,44 @@ class IssuanceSingleRequestTest {
                 authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
             }
             assertIs<ResponseUnparsable>(ex.cause)
+        }
+    }
+
+    @Test
+    fun `when authorized with pre-authorization code grand and client is public, 'iss' attribute is not included in proof`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            tokenPostMocker { request ->
+                with(request) { tokenPostApplyPreAuthFlowAssertionsAndGetFormData() }
+            },
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(
+                requestValidator = {
+                    val textContent = it.body as TextContent
+                    val issuanceRequest = Json.decodeFromString<CredentialRequestTO>(textContent.text)
+                    assertNotNull(
+                        issuanceRequest.proof,
+                        "Proof expected to be sent but was not sent.",
+                    )
+                    assertIs<Proof.Jwt>(issuanceRequest.proof)
+
+                    val iss = issuanceRequest.proof.jwt.jwtClaimsSet.getStringClaim("iss")
+                    assertNull(iss, "No 'iss' claim expected in proof but found one")
+                },
+            ),
+        )
+
+        val (authorizedRequest, issuer) = preAuthorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMixedDocTypes_PRE_AUTH_GRANT,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            txCode = "1234",
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
         }
     }
 }

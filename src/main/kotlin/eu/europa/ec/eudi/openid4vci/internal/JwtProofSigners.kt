@@ -27,8 +27,8 @@ internal data class JwtProofClaims(
     @SerialName("aud") val audience: String,
     @Serializable(with = NumericInstantSerializer::class)
     @SerialName("iat") val issuedAt: Instant,
-    @SerialName("iss") val issuer: String?,
-    @SerialName("nonce") val nonce: String?,
+    @SerialName("iss") val issuer: String? = null,
+    @SerialName("nonce") val nonce: String? = null,
 )
 
 internal class JwtProofSigner(
