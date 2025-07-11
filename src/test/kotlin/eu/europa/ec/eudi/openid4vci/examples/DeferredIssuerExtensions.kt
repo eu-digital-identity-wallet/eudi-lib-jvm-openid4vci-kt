@@ -35,7 +35,7 @@ import kotlin.time.toKotlinDuration
 suspend fun DeferredIssuer.Companion.queryForDeferredCredential(
     clock: Clock = Clock.systemDefaultZone(),
     ctxTO: DeferredIssuanceStoredContextTO,
-    recreatePopSigner: ((String) -> PopSigner.Jwt)? = null,
+    recreatePopSigner: ((String) -> Signer<JWK>)? = null,
     recreateClientAttestationPodSigner: ((String) -> JWSSigner)? = null,
     ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
 ): Result<Pair<DeferredIssuanceStoredContextTO?, DeferredCredentialQueryOutcome>> = runCatching {
@@ -149,7 +149,7 @@ data class DeferredIssuanceStoredContextTO(
 
     fun toDeferredIssuanceStoredContext(
         clock: Clock,
-        recreatePopSigner: ((String) -> PopSigner.Jwt)?,
+        recreatePopSigner: ((String) -> Signer<JWK>)?,
         recreateClientAttestationPodSigner: ((String) -> JWSSigner)?,
     ): DeferredIssuanceContext {
         return DeferredIssuanceContext(

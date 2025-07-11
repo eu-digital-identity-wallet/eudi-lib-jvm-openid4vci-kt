@@ -19,6 +19,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
 import java.security.Signature
 import java.util.*
@@ -46,11 +47,15 @@ object CryptoGenerator {
         return keyPair to PopSigner.jwtPopSigner(keyPair, signingAlgorithm, bindingKey)
     }
 
-    fun ecProofSigner(curve: Curve = Curve.P_256, alg: JWSAlgorithm = JWSAlgorithm.ES256): PopSigner.Jwt {
+    fun ecSigner(curve: Curve = Curve.P_256, alg: JWSAlgorithm = JWSAlgorithm.ES256): Signer<JWK> {
         require(alg in JWSAlgorithm.Family.EC)
         val keyPair = randomECSigningKey(curve)
-        val bindingKey = JwtBindingKey.Jwk(keyPair.toPublicJWK())
-        return PopSigner.jwtPopSigner(keyPair, alg, bindingKey)
+        return Signer.fromNimbusEcKey(
+            keyPair,
+            keyPair.toPublicJWK(),
+            secureRandom = null,
+            provider = null,
+        )
     }
 
     fun ecKeyAndJwtProofSigner(

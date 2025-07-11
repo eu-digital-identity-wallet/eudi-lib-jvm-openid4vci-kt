@@ -39,7 +39,7 @@ internal object PidDevIssuer :
         credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
         authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         parUsage = ParUsage.IfSupported,
-        dPoPSigner = CryptoGenerator.ecProofSigner(),
+        dPoPSigner = CryptoGenerator.ecSigner(),
     )
 
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_vc_sd_jwt")
