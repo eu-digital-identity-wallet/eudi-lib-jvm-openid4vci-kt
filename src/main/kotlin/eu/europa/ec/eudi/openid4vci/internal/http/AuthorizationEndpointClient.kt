@@ -30,6 +30,7 @@ import eu.europa.ec.eudi.openid4vci.internal.clientAttestationHeaders
 import eu.europa.ec.eudi.openid4vci.internal.generateClientAttestationIfNeeded
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
+import io.ktor.client.request.header
 import io.ktor.http.*
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.SerialName
@@ -263,13 +264,15 @@ internal class AuthorizationEndpointClient(
                 existingDpopNonce: Nonce?,
                 retried: Boolean,
             ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> = coroutineScope {
+                val jwt =
+                    dPoPJwtFactory?.createDPoPJwt(Htm.POST, url, null, existingDpopNonce)
+                        ?.getOrThrow()?.serialize()
+
                 val response = client.submitForm(url.toString(), formParameters) {
                     config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL())?.let {
                         clientAttestationHeaders(it)
                     }
-                    dPoPJwtFactory?.let { factory ->
-                        dpop(factory, url, Htm.POST, accessToken = null, nonce = existingDpopNonce)
-                    }
+                    jwt?.let { header(DPoP, jwt) }
                 }
                 when {
                     response.status.isSuccess() -> {

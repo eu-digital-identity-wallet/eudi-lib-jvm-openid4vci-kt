@@ -62,8 +62,12 @@ internal class CredentialEndpointClient(
     ): Pair<SubmissionOutcomeInternal, Nonce?> =
         ktorHttpClientFactory().use { client ->
             val url = credentialEndpoint.value
+            val jwt = if (accessToken is AccessToken.DPoP && dPoPJwtFactory != null) {
+                dPoPJwtFactory.createDPoPJwt(Htm.POST, url, accessToken, resourceServerDpopNonce).getOrThrow().serialize()
+            } else null
+
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = resourceServerDpopNonce)
+                bearerOrDPoPAuth(accessToken, jwt)
                 contentType(ContentType.Application.Json)
                 setBody(CredentialRequestTO.from(request))
             }
@@ -123,8 +127,12 @@ internal class DeferredEndPointClient(
     ): Pair<DeferredCredentialQueryOutcome, Nonce?> =
         ktorHttpClientFactory().use { client ->
             val url = deferredCredentialEndpoint.value
+            val jwt = if (accessToken is AccessToken.DPoP && dPoPJwtFactory != null) {
+                dPoPJwtFactory.createDPoPJwt(Htm.POST, url, accessToken, resourceServerDpopNonce).getOrThrow().serialize()
+            } else null
+
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = resourceServerDpopNonce)
+                bearerOrDPoPAuth(accessToken, jwt)
                 contentType(ContentType.Application.Json)
                 setBody(DeferredRequestTO(transactionId.value))
             }

@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.DeferredIssuer.Companion.make
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessToken
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
@@ -41,7 +42,7 @@ data class DeferredIssuerConfig(
     val deferredEndpoint: URL,
     val authServerId: URL,
     val tokenEndpoint: URL,
-    val dPoPSigner: PopSigner.Jwt? = null,
+    val dPoPSigner: Signer<JWK>? = null,
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val responseEncryptionSpec: IssuanceResponseEncryptionSpec? = null,
     val clock: Clock = Clock.systemDefaultZone(),

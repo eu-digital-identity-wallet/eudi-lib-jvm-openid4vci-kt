@@ -44,8 +44,12 @@ internal class NotificationEndPointClient(
     ): Nonce? =
         ktorHttpClientFactory().use { client ->
             val url = notificationEndpoint.value
+            val jwt = if (accessToken is AccessToken.DPoP && dPoPJwtFactory != null) {
+                dPoPJwtFactory.createDPoPJwt(Htm.POST, url, accessToken, resourceServerDpopNonce).getOrThrow().serialize()
+            } else null
+
             val response = client.post(url) {
-                bearerOrDPoPAuth(dPoPJwtFactory, url, Htm.POST, accessToken, nonce = resourceServerDpopNonce)
+                bearerOrDPoPAuth(accessToken, jwt)
                 contentType(ContentType.Application.Json)
                 setBody(NotificationTO.from(event))
             }
