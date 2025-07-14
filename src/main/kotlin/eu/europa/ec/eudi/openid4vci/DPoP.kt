@@ -17,16 +17,17 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.dpop.DPoPUtils
 import com.nimbusds.oauth2.sdk.id.JWTID
+import eu.europa.ec.eudi.openid4vci.internal.JWTClaimsSetSerializer
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.JwtSigner
 import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
 import eu.europa.ec.eudi.openid4vci.internal.use
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.put
 import java.net.URL
@@ -73,7 +74,8 @@ class DPoPJwtFactory(
         )
 
         val signedJwt = signer.use { signOperation ->
-            JwtSigner<JWTClaimsSet, JWK>(
+            JwtSigner(
+                serializer = JWTClaimsSetSerializer,
                 signOperation = signOperation,
                 algorithm = signer.javaAlgorithm.toJoseAlg(),
                 customizeHeader = { key -> dpopJwtHeader(key) },

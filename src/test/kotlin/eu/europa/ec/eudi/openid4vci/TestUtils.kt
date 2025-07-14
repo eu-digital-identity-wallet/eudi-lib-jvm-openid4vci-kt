@@ -15,7 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.ecSigner
 import eu.europa.ec.eudi.openid4vci.Issuer.Companion.DefaultResponseEncryptionSpecFactory
 import java.net.URI
 import java.util.*
@@ -94,6 +96,17 @@ val OpenId4VCIConfiguration = OpenId4VCIConfig(
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
     credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+)
+
+val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
+    client = Client.Public("MyWallet_ClientId"),
+    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+    keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
+    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+    dPoPSigner = ecSigner(
+        curve = Curve.P_256,
+        alg = JWSAlgorithm.ES256,
+    ),
 )
 
 suspend fun authorizeRequestForCredentialOffer(

@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.util.JSONObjectUtils
+import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.ClaimPathElement.AllArrayElements
@@ -179,6 +181,23 @@ object NumericInstantSerializer : KSerializer<Instant> {
 
     override fun deserialize(decoder: Decoder): Instant {
         return Instant.ofEpochSecond(decoder.decodeLong())
+    }
+}
+
+object JWTClaimsSetSerializer : KSerializer<JWTClaimsSet> {
+
+    private val objectSerializer = serializer<JsonObject>()
+
+    override val descriptor: SerialDescriptor = objectSerializer.descriptor
+
+    override fun serialize(encoder: Encoder, value: JWTClaimsSet) {
+        val claimsJsonObject = JsonSupport.decodeFromString<JsonObject>(JSONObjectUtils.toJSONString(value.toJSONObject()))
+        objectSerializer.serialize(encoder, claimsJsonObject)
+    }
+
+    override fun deserialize(decoder: Decoder): JWTClaimsSet {
+        val deserialized = objectSerializer.deserialize(decoder)
+        return JWTClaimsSet.parse(JsonSupport.encodeToString(deserialized))
     }
 }
 
