@@ -18,8 +18,9 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 
-@JvmInline
-value class KeyAttestationJWT(val value: String) {
+data class KeyAttestationJWT(val value: String) {
+
+    val attestedKeys: List<JWK>
 
     init {
         val jwt = SignedJWT.parse(value)
@@ -35,7 +36,7 @@ value class KeyAttestationJWT(val value: String) {
             "Invalid Key Attestation JWT. `attested_keys` claim must not be empty"
         }
 
-        attestedKeysClaimEntries.forEachIndexed { index, keyObject ->
+        attestedKeys = attestedKeysClaimEntries.mapIndexed { index, keyObject ->
             require(keyObject is Map<*, *>) {
                 "Invalid Key Attestation JWT. Item at index $index in `attested_keys` is not a JSON object."
             }
