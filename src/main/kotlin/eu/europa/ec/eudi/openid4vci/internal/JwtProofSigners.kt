@@ -33,11 +33,11 @@ internal data class JwtProofClaims(
 
 internal class KeyAttestationJwtProofSigner(
     private val algorithm: JWSAlgorithm,
-    private val signOperation: SignOperation<String>,
+    private val signOperation: SignOperation<KeyAttestationJWT>,
     private val keyIndex: Int,
 ) {
     suspend fun sign(claims: JwtProofClaims): String =
-        JwtSigner<JwtProofClaims, String>(
+        JwtSigner<JwtProofClaims, KeyAttestationJWT>(
             signOperation = signOperation,
             algorithm = algorithm,
             customizeHeader = { key -> keyAttestationJwtProofHeader(key, keyIndex) },
@@ -71,8 +71,8 @@ internal fun JsonObjectBuilder.jwtProofHeader(key: JwtBindingKey) {
     }
 }
 
-internal fun JsonObjectBuilder.keyAttestationJwtProofHeader(keyAttestation: String, keyIndex: Int) {
+internal fun JsonObjectBuilder.keyAttestationJwtProofHeader(keyAttestation: KeyAttestationJWT, keyIndex: Int) {
     put("typ", "openid4vci-proof+jwt")
     put("kid", keyIndex.toString())
-    put("key_attestation", keyAttestation)
+    put("key_attestation", keyAttestation.value)
 }

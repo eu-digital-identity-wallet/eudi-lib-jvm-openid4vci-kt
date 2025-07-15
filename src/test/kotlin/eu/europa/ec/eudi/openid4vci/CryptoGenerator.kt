@@ -129,7 +129,7 @@ object CryptoGenerator {
             ecPrivateKey = ecKeys[0],
             keyInfo = keyAttestationJwt(
                 attestedKeys = ecKeys.map { it.toPublicJWK() },
-            ).serialize(),
+            ),
             secureRandom = null,
             provider = null,
         )
@@ -140,7 +140,7 @@ object CryptoGenerator {
         attestedKeys: List<JWK>,
     ) = run {
         val ecKey = randomECSigningKey(Curve.P_256)
-        SignedJWT(
+        val jwt = SignedJWT(
             JWSHeader.Builder(JWSAlgorithm.ES256)
                 .type(JOSEObjectType("keyattestation+jwt"))
                 .jwk(ecKey.toPublicJWK())
@@ -151,5 +151,6 @@ object CryptoGenerator {
                 expirationTime(Date.from(now().plusSeconds(3600)))
             }.build(),
         ).apply { sign(ECDSASigner(ecKey)) }
+        KeyAttestationJWT(jwt.serialize())
     }
 }

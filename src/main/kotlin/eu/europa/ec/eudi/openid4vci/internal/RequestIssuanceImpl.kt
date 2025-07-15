@@ -127,7 +127,7 @@ internal class RequestIssuanceImpl(
     }
 
     private suspend fun AuthorizedRequest.keyAttestationJwtProofFactoryFrom(
-        keyAttestationSigner: SignOperation<String>,
+        keyAttestationSigner: SignOperation<KeyAttestationJWT>,
         keyIndex: Int,
         javaSigningAlgorithm: String,
         credentialConfigId: CredentialConfigurationIdentifier,
@@ -252,6 +252,7 @@ internal class RequestIssuanceImpl(
                 grant = grant,
             ),
         )
+
         listOf(Proof.Jwt(SignedJWT.parse(signedJwt)))
     }
 
