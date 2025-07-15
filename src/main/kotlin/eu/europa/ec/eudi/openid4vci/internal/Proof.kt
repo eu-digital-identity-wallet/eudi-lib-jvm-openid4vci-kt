@@ -19,7 +19,6 @@ import com.nimbusds.jwt.JWT
 import eu.europa.ec.eudi.openid4vci.CredentialConfiguration
 import kotlinx.serialization.Serializable
 
-internal typealias ProofFactory = suspend (CredentialConfiguration) -> Proof
 internal typealias ProofsFactory = suspend (CredentialConfiguration) -> List<Proof>
 
 /**

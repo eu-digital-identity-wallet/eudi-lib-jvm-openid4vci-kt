@@ -139,7 +139,7 @@ sealed interface ProofsSpecification {
         ) : JwtProofs
 
         data class WithKeyAttestation(
-            val proofsSigner: Signer<String>,
+            val proofSigner: Signer<String>,
             val keyIndex: Int,
         ) : JwtProofs
     }

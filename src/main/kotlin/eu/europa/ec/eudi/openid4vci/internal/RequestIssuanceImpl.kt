@@ -69,9 +69,6 @@ internal class RequestIssuanceImpl(
                     buildRequest(requestPayload, null, credentialIdentifiers.orEmpty())
                 }
                 is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
-                    require(credentialConfigId.proofsRequirement() !is CredentialProofsRequirement.ProofNotRequired) {
-                        "Proofs are required for credential configuration $credentialConfigId, but proofs specification is set to NoProofs"
-                    }
                     ensure(
                         credentialConfigId.keyAttestationProofsRequirement() !is KeyAttestationRequirement.Required &&
                             credentialConfigId.keyAttestationProofsRequirement() !is KeyAttestationRequirement.RequiredNoConstraints,
@@ -86,8 +83,8 @@ internal class RequestIssuanceImpl(
                     }
                 }
                 is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
-                    proofsSpec.proofsSigner.use { signOp ->
-                        val javaAlgorithm = proofsSpec.proofsSigner.javaAlgorithm
+                    proofsSpec.proofSigner.use { signOp ->
+                        val javaAlgorithm = proofsSpec.proofSigner.javaAlgorithm
                         val keyIndex = proofsSpec.keyIndex
                         val proofsFactory = keyAttestationJwtProofFactoryFrom(signOp, keyIndex, javaAlgorithm, credentialConfigId)
                         buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
@@ -221,15 +218,27 @@ internal class RequestIssuanceImpl(
             }
         }
 
-    private fun iss(client: Client, grant: Grant): ClientId? {
-        val useIss = when (grant) {
-            Grant.AuthorizationCode -> true
-            Grant.PreAuthorizedCodeGrant -> when (client) {
-                is Client.Attested -> true
-                is Client.Public -> false
+    private fun jwtProofClaims(
+        cNonce: CNonce?,
+        grant: Grant,
+    ): JwtProofClaims {
+        fun iss(client: Client, grant: Grant): ClientId? {
+            val useIss = when (grant) {
+                Grant.AuthorizationCode -> true
+                Grant.PreAuthorizedCodeGrant -> when (client) {
+                    is Client.Attested -> true
+                    is Client.Public -> false
+                }
             }
+            return client.id.takeIf { useIss }
         }
-        return client.id.takeIf { useIss }
+
+        return JwtProofClaims(
+            audience = credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier.toString(),
+            issuedAt = Instant.now(),
+            issuer = iss(config.client, grant),
+            nonce = cNonce?.value,
+        )
     }
 
     private fun keyAttestationProofsFactory(
@@ -237,13 +246,10 @@ internal class RequestIssuanceImpl(
         cNonce: CNonce?,
         grant: Grant,
     ): ProofsFactory = { credentialSupported ->
-        val aud = credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier
         val signedJwt = proofsSigner.sign(
-            JwtProofClaims(
-                audience = aud.toString(),
-                issuedAt = Instant.now(),
-                issuer = iss(config.client, grant),
-                nonce = cNonce?.value,
+            jwtProofClaims(
+                cNonce = cNonce,
+                grant = grant,
             ),
         )
         listOf(Proof.Jwt(SignedJWT.parse(signedJwt)))
@@ -254,13 +260,10 @@ internal class RequestIssuanceImpl(
         cNonce: CNonce?,
         grant: Grant,
     ): ProofsFactory = { credentialSupported ->
-        val aud = credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier
         proofsSigner.sign(
-            JwtProofClaims(
-                audience = aud.toString(),
-                issuedAt = Instant.now(),
-                issuer = iss(config.client, grant),
-                nonce = cNonce?.value,
+            jwtProofClaims(
+                cNonce = cNonce,
+                grant = grant,
             ),
         ).map {
             Proof.Jwt(SignedJWT.parse(it.second))
