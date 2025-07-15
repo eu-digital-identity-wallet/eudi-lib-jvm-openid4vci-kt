@@ -15,7 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialResponseSuccessTO
 import io.ktor.client.engine.mock.*
@@ -101,9 +103,11 @@ class IssuanceBatchRequestTest {
                 httpClient = mockedKtorHttpClientFactory,
             )
 
-        val (request, popSigners) = reqs()
+        val request = IssuanceRequestPayload.ConfigurationBased(
+            CredentialConfigurationIdentifier(PID_MsoMdoc),
+        )
         val (_, outcome) = with(issuer) {
-            authorizedRequest.request(request, popSigners).getOrThrow()
+            authorizedRequest.request(request, proofsSpecForEcKeys(Curve.P_256, 3)).getOrThrow()
         }
         when (outcome) {
             is SubmissionOutcome.Failed -> {
@@ -118,8 +122,3 @@ class IssuanceBatchRequestTest {
         }
     }
 }
-
-fun reqs() =
-    IssuanceRequestPayload.ConfigurationBased(
-        CredentialConfigurationIdentifier(PID_MsoMdoc),
-    ) to (0..2).map { CryptoGenerator.rsaProofSigner() }

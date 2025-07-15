@@ -97,6 +97,8 @@ sealed interface KeyAttestationRequirement {
                 "Either key storage or user authentication constraints must be provided"
             }
         }
+
+        companion object
     }
 }
 

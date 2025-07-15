@@ -15,7 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
+import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import kotlinx.coroutines.runBlocking
 import java.net.URLEncoder
@@ -96,10 +98,9 @@ private suspend fun submit(
     credentialConfigurationId: CredentialConfigurationIdentifier,
 ): AuthorizedRequestAnd<List<IssuedCredential>> {
     with(issuer) {
-        val proofSigners = popSigners(credentialConfigurationId, proofsNo = 1)
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
         val (newAuthorized, outcome) =
-            authorized.request(requestPayload, proofSigners).getOrThrow()
+            authorized.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
         return when (outcome) {
             is SubmissionOutcome.Success -> newAuthorized to outcome.credentials
             is SubmissionOutcome.Deferred -> newAuthorized to handleDeferred(issuer, authorized, outcome.transactionId)

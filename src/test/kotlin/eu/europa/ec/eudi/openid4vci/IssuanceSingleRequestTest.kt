@@ -19,6 +19,7 @@ import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseUnparsable
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.keyAttestationJwtProofsSpec
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
 import eu.europa.ec.eudi.openid4vci.internal.Proof
@@ -112,7 +113,7 @@ class IssuanceSingleRequestTest {
         )
 
         val credentialConfigurationId = CredentialConfigurationIdentifier("UniversityDegree")
-        assertFailsWith<IllegalStateException> {
+        assertFailsWith<IllegalArgumentException> {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
             with(issuer) {
                 authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
@@ -332,7 +333,7 @@ class IssuanceSingleRequestTest {
         )
         assertThrows<IllegalStateException> {
             with(issuer) {
-                authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
             }
         }
     }
@@ -369,7 +370,7 @@ class IssuanceSingleRequestTest {
         )
         assertThrows<IllegalStateException> {
             with(issuer) {
-                authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
             }
         }
     }
@@ -630,6 +631,51 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
             authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
+        }
+    }
+
+    @Test
+    fun `when the issuer requires a key attestation jwt proof, it should be included in the JWT proof`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        assertFailsWith<CredentialIssuanceError.ProofTypeKeyAttestationRequired> {
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
+            }
+        }
+    }
+
+    @Test
+    fun `key attestation jwt proof issuance is successful when the issuer supports it`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            authorizedRequest.request(requestPayload, keyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
         }
     }
 }

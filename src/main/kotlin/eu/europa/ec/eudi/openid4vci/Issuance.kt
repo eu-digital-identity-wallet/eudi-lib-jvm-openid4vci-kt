@@ -140,6 +140,7 @@ sealed interface ProofsSpecification {
 
         data class WithKeyAttestation(
             val proofsSigner: Signer<String>,
+            val keyIndex: Int,
         ) : JwtProofs
     }
 
@@ -157,19 +158,10 @@ interface RequestIssuance {
      * Places a request to the credential issuance endpoint.
      *
      * @param requestPayload the payload of the request
-     * @param popSigners one or more signers for the proofs to be sent. Required when requested credential's configuration requires proof.
+     * @param proofsSpec the specification of proofs to be included in the request
      * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh updated Resource-Server DPoP Nonce)
      * and the [SubmissionOutcome]
      */
-    @Deprecated(
-        "Use request method with JwtProofsSigner instead",
-        ReplaceWith("request(requestPayload, proofsSigner)"),
-    )
-    suspend fun AuthorizedRequest.request(
-        requestPayload: IssuanceRequestPayload,
-        popSigners: List<PopSigner> = emptyList(),
-    ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
-
     suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
         proofsSpec: ProofsSpecification,
@@ -371,6 +363,11 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         class ProofTypeSigningAlgorithmNotSupported :
             ProofGenerationError("ProofTypeSigningAlgorithmNotSupported")
     }
+
+    /**
+     * Proof type requires key attestation, but it is not provided.
+     */
+    class ProofTypeKeyAttestationRequired : CredentialIssuanceError("ProofTypeKeyAttestationRequired")
 
     /**
      * Sealed hierarchy of errors related to validation of encryption parameters passed along with the issuance request.

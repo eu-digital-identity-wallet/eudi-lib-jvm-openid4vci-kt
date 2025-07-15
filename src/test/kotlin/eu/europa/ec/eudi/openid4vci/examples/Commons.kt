@@ -15,7 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
+import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import io.ktor.client.*
 import io.ktor.client.engine.apache.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -69,31 +71,6 @@ internal fun issuanceLog(message: String) {
 // Issuer extensions
 //
 
-fun Issuer.popSigner(
-    credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
-): PopSigner? = popSigners(credentialConfigurationIdentifier, 1).firstOrNull()
-
-fun Issuer.popSigners(
-    credentialConfigurationIdentifier: CredentialConfigurationIdentifier,
-    proofsNo: Int = 1,
-): List<PopSigner> {
-    val credentialConfigurationsSupported =
-        credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported
-    val credentialConfiguration =
-        checkNotNull(credentialConfigurationsSupported[credentialConfigurationIdentifier])
-
-    return if (credentialConfiguration.proofTypesSupported.values.isEmpty() || proofsNo == 0) emptyList()
-    else {
-        val popSigners =
-            (0..<proofsNo).mapNotNull {
-                CryptoGenerator.popSigner(
-                    credentialConfiguration = credentialConfiguration,
-                )
-            }
-        check(popSigners.isNotEmpty()) { "No signer can be generated for $credentialConfigurationIdentifier" }
-        popSigners
-    }
-}
 sealed interface BatchOption {
     data object DontUse : BatchOption
     data class Specific(val proofsNo: Int) : BatchOption
@@ -120,8 +97,7 @@ suspend fun Issuer.submitCredentialRequest(
             }
         }
 
-    val popSigners = popSigners(credentialConfigurationId, proofsNo)
-    return authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+    return authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, proofsNo)).getOrThrow()
 }
 
 suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(

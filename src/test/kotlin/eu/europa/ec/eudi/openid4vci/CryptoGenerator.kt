@@ -15,13 +15,19 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
 import java.security.Signature
+import java.time.Instant.now
 import java.util.*
 
 object CryptoGenerator {
@@ -105,7 +111,7 @@ object CryptoGenerator {
     fun proofsSpecForEcKeys(
         curve: Curve = Curve.P_256,
         num: Int = 1,
-    ): ProofsSpecification {
+    ): ProofsSpecification.JwtProofs.NoKeyAttestation {
         val ecKeys = List(num) { randomECSigningKey(curve) }
         val batchSigner = BatchSigner.fromNimbusEcKeys(
             ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
@@ -113,5 +119,37 @@ object CryptoGenerator {
             provider = null,
         )
         return ProofsSpecification.JwtProofs.NoKeyAttestation(batchSigner)
+    }
+
+    fun keyAttestationJwtProofsSpec(
+        curve: Curve = Curve.P_256,
+    ): ProofsSpecification {
+        val ecKeys = List(3) { randomECSigningKey(curve) }
+        val signer = Signer.fromNimbusEcKey(
+            ecPrivateKey = ecKeys[0],
+            keyInfo = keyAttestationJwt(
+                attestedKeys = ecKeys.map { it.toPublicJWK() },
+            ).serialize(),
+            secureRandom = null,
+            provider = null,
+        )
+        return ProofsSpecification.JwtProofs.WithKeyAttestation(signer, 1)
+    }
+
+    fun keyAttestationJwt(
+        attestedKeys: List<JWK>,
+    ) = run {
+        val ecKey = randomECSigningKey(Curve.P_256)
+        SignedJWT(
+            JWSHeader.Builder(JWSAlgorithm.ES256)
+                .type(JOSEObjectType("keyattestation+jwt"))
+                .jwk(ecKey.toPublicJWK())
+                .build(),
+            JWTClaimsSet.Builder().apply {
+                issueTime(Date.from(now()))
+                claim("attested_keys", attestedKeys.map { it.toJSONObject() })
+                expirationTime(Date.from(now().plusSeconds(3600)))
+            }.build(),
+        ).apply { sign(ECDSASigner(ecKey)) }
     }
 }

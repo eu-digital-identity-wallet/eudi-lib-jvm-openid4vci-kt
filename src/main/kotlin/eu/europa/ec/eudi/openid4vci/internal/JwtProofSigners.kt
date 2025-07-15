@@ -31,15 +31,16 @@ internal data class JwtProofClaims(
     @SerialName("nonce") val nonce: String? = null,
 )
 
-internal class JwtProofSigner(
+internal class KeyAttestationJwtProofSigner(
     private val algorithm: JWSAlgorithm,
-    private val signOperation: SignOperation<JwtBindingKey>,
+    private val signOperation: SignOperation<String>,
+    private val keyIndex: Int,
 ) {
     suspend fun sign(claims: JwtProofClaims): String =
-        JwtSigner<JwtProofClaims, JwtBindingKey>(
+        JwtSigner<JwtProofClaims, String>(
             signOperation = signOperation,
             algorithm = algorithm,
-            customizeHeader = { key -> jwtProofHeader(key) },
+            customizeHeader = { key -> keyAttestationJwtProofHeader(key, keyIndex) },
         ).sign(claims)
 }
 
@@ -68,4 +69,10 @@ internal fun JsonObjectBuilder.jwtProofHeader(key: JwtBindingKey) {
             put("x5c", key.chain.asJsonElement())
         }
     }
+}
+
+internal fun JsonObjectBuilder.keyAttestationJwtProofHeader(keyAttestation: String, keyIndex: Int) {
+    put("typ", "openid4vci-proof+jwt")
+    put("kid", keyIndex.toString())
+    put("key_attestation", keyAttestation)
 }
