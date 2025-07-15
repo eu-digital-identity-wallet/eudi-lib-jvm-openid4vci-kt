@@ -23,6 +23,7 @@ import eu.europa.ec.eudi.openid4vci.internal.TokenResponse
 import eu.europa.ec.eudi.openid4vci.internal.clientAttestationHeaders
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
+import io.ktor.client.request.header
 import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -206,10 +207,12 @@ internal class TokenEndpointClient(
                 val formParameters = Parameters.build {
                     params.entries.forEach { (k, v) -> append(k, v) }
                 }
+                val jwt =
+                    dPoPJwtFactory?.createDPoPJwt(Htm.POST, tokenEndpoint, null, existingDpopNonce)
+                        ?.getOrThrow()?.serialize()
+
                 httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
-                    dPoPJwtFactory?.let { factory ->
-                        dpop(factory, tokenEndpoint, Htm.POST, accessToken = null, nonce = existingDpopNonce)
-                    }
+                    jwt?.let { header(DPoP, jwt) }
                     generateClientAttestationIfNeeded()?.let(::clientAttestationHeaders)
                 }
             }

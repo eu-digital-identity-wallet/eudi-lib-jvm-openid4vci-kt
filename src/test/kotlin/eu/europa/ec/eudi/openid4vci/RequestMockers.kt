@@ -82,13 +82,24 @@ enum class IssuerMetadataVersion {
     CONTAINS_DEPRECATED_METHOD,
 }
 
-internal fun authServerWellKnownMocker(): RequestMocker = RequestMocker(
+enum class AuthServerMetadataVersion {
+    FULL,
+    NO_DPOP,
+}
+
+internal fun authServerWellKnownMocker(
+    metadataVersion: AuthServerMetadataVersion = AuthServerMetadataVersion.FULL,
+): RequestMocker = RequestMocker(
     requestMatcher = { request ->
         request.url.encodedPath.contains("/.well-known/oauth-authorization-server") && request.method == HttpMethod.Get
     },
     responseBuilder = {
+        val content = when (metadataVersion) {
+            AuthServerMetadataVersion.FULL -> getResourceAsText("well-known/openid-configuration.json")
+            AuthServerMetadataVersion.NO_DPOP -> getResourceAsText("well-known/openid-configuration_no_dpop.json")
+        }
         respond(
-            content = getResourceAsText("well-known/openid-configuration.json"),
+            content = content,
             status = HttpStatusCode.OK,
             headers = headersOf(
                 HttpHeaders.ContentType to listOf("application/json"),
@@ -117,7 +128,7 @@ internal fun parPostMocker(validator: (request: HttpRequestData) -> Unit = {}): 
         requestValidator = validator,
     )
 
-internal fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit = {}): RequestMocker =
+internal fun tokenPostMocker(dpopAccessToken: Boolean = false, validator: (request: HttpRequestData) -> Unit = {}): RequestMocker =
     RequestMocker(
         requestMatcher = endsWith("/token", HttpMethod.Post),
         responseBuilder = {
@@ -126,6 +137,7 @@ internal fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit = {})
                     TokenResponseTO.Success(
                         accessToken = UUID.randomUUID().toString(),
                         expiresIn = 3600,
+                        tokenType = if (dpopAccessToken) "DPoP" else null,
                     ),
                 ),
                 status = HttpStatusCode.OK,

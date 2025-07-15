@@ -15,7 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseUnparsable
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
@@ -532,6 +534,96 @@ class IssuanceSingleRequestTest {
             credentialOfferStr = CredentialOfferMixedDocTypes_PRE_AUTH_GRANT,
             ktorHttpClientFactory = mockedKtorHttpClientFactory,
             txCode = "1234",
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
+        }
+    }
+
+    @Test
+    fun `when dpop is supported from auth server, access token is of dpop type and dpop jwt is sent the issuance request `() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            nonceEndpointMocker(),
+            tokenPostMocker(dpopAccessToken = true),
+            singleIssuanceRequestMocker(
+                requestValidator = {
+                    val headers = it.headers
+
+                    val authorizationHeader = headers.get("Authorization")
+                    assertNotNull(authorizationHeader, "No Authorization header found.")
+                    assertTrue(authorizationHeader.contains("DPoP"), "Expected DPoP access token but was not.")
+
+                    val dpopHeader = headers.get("DPoP")
+                    assertNotNull(
+                        dpopHeader,
+                        "No DPoP found.",
+                    )
+                    val dpopJwt = SignedJWT.parse(dpopHeader)
+                    assertTrue(
+                        dpopJwt.state == JWSObject.State.SIGNED,
+                        "Expected a signed dpop jwt but was not",
+                    )
+                    assertTrue(
+                        dpopJwt.header.type.toString() == "dpop+jwt",
+                        "Wrong DPoP JWT. Type expected to be dpop+jwt but was not",
+                    )
+                    assertNotNull(
+                        dpopJwt.jwtClaimsSet.claims.get("htm"),
+                        "Expected htm claim but didn't find one.",
+                    )
+                    assertNotNull(
+                        dpopJwt.jwtClaimsSet.claims.get("htu"),
+                        "Expected htu claim but didn't find one.",
+                    )
+                },
+            ),
+        )
+
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            config = OpenId4VCIConfigurationWithDpopSigner,
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
+        }
+    }
+
+    @Test
+    fun `when dpop is not supported from auth server, access token is of Bearer type and no dpop jwt is sent`() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(AuthServerMetadataVersion.NO_DPOP),
+            parPostMocker(),
+            nonceEndpointMocker(),
+            tokenPostMocker(dpopAccessToken = true),
+            singleIssuanceRequestMocker(
+                requestValidator = {
+                    val headers = it.headers
+
+                    val authorizationHeader = headers.get("Authorization")
+                    assertNotNull(authorizationHeader, "No Authorization header found.")
+                    assertTrue(authorizationHeader.contains("Bearer"), "Expected Bearer access token but was not.")
+
+                    val dpopHeader = headers.get("DPoP")
+                    assertNull(dpopHeader, "No DPoP expected but one found.")
+                },
+            ),
+        )
+
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            config = OpenId4VCIConfigurationWithDpopSigner,
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
         )
 
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]

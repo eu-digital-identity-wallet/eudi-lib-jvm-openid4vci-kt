@@ -16,13 +16,20 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.dpop.DPoPUtils
 import com.nimbusds.oauth2.sdk.id.JWTID
+import eu.europa.ec.eudi.openid4vci.internal.JWTClaimsSetSerializer
+import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
+import eu.europa.ec.eudi.openid4vci.internal.JwtSigner
+import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
+import eu.europa.ec.eudi.openid4vci.internal.use
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.JsonObjectBuilder
+import kotlinx.serialization.json.put
 import java.net.URL
 import java.time.Clock
 import java.util.*
@@ -40,30 +47,21 @@ enum class Htm {
  * Factory class to generate DPoP JWTs to be added as a request header `DPoP` based on spec https://datatracker.ietf.org/doc/rfc9449/
  */
 class DPoPJwtFactory(
-    val signer: PopSigner.Jwt,
+    val signer: Signer<JWK>,
     private val jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
     private val clock: Clock,
 ) {
+
     init {
         require(jtiByteLength > 0) { "jtiByteLength must be greater than zero" }
     }
 
-    private val publicJwk: JWK by lazy {
-        val bk = signer.bindingKey
-        require(bk is JwtBindingKey.Jwk) { "Only JWK binding key is supported" }
-        bk.jwk
-    }
-
-    fun createDPoPJwt(
+    suspend fun createDPoPJwt(
         htm: Htm,
         htu: URL,
         accessToken: AccessToken.DPoP? = null,
         nonce: Nonce? = null,
     ): Result<SignedJWT> = runCatching {
-        val jwsHeader: JWSHeader = JWSHeader.Builder(signer.algorithm)
-            .type(NimbusDPoPProofFactory.TYPE)
-            .jwk(publicJwk)
-            .build()
         val jwtClaimsSet = DPoPUtils.createJWTClaimsSet(
             jti(),
             htm.name,
@@ -74,7 +72,21 @@ class DPoPJwtFactory(
             },
             nonce?.let { NimbusNonce(it.value) },
         )
-        SignedJWT(jwsHeader, jwtClaimsSet).apply { sign(signer.jwsSigner) }
+
+        val signedJwt = signer.use { signOperation ->
+            JwtSigner(
+                serializer = JWTClaimsSetSerializer,
+                signOperation = signOperation,
+                algorithm = signer.javaAlgorithm.toJoseAlg(),
+                customizeHeader = { key -> dpopJwtHeader(key) },
+            ).sign(jwtClaimsSet)
+        }
+        SignedJWT.parse(signedJwt)
+    }
+
+    private fun JsonObjectBuilder.dpopJwtHeader(jwk: JWK) {
+        put("typ", NimbusDPoPProofFactory.TYPE.type)
+        put("jwk", JsonSupport.parseToJsonElement(jwk.toJSONString()))
     }
 
     private fun now(): Date = Date.from(clock.instant())
@@ -96,7 +108,7 @@ class DPoPJwtFactory(
          *
          */
         fun createForServer(
-            signer: PopSigner.Jwt,
+            signer: Signer<JWK>,
             jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
             clock: Clock,
             oauthServerMetadata: CIAuthorizationServerMetadata,
@@ -117,12 +129,12 @@ class DPoPJwtFactory(
          *
          */
         fun create(
-            signer: PopSigner.Jwt,
+            signer: Signer<JWK>,
             jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
             clock: Clock,
             supportedDPopAlgorithms: List<JWSAlgorithm>,
         ): Result<DPoPJwtFactory?> = runCatching {
-            val signerAlg = signer.algorithm
+            val signerAlg = signer.javaAlgorithm.toJoseAlg()
             if (supportedDPopAlgorithms.isNotEmpty()) {
                 require(signerAlg in supportedDPopAlgorithms) {
                     "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportedDPopAlgorithms"
@@ -138,39 +150,22 @@ class DPoPJwtFactory(
  * Based on the passed [accessToken] DPoP header will be added if it is of type DPoP.
  */
 fun HttpRequestBuilder.bearerOrDPoPAuth(
-    factory: DPoPJwtFactory?,
-    htu: URL,
-    htm: Htm,
     accessToken: AccessToken,
-    nonce: Nonce?,
+    dpopJwt: String?,
 ) {
     when (accessToken) {
         is AccessToken.Bearer -> {
             bearerAuth(accessToken)
         }
         is AccessToken.DPoP -> {
-            if (factory != null) {
-                dpop(factory, htu, htm, accessToken, nonce = nonce)
+            if (dpopJwt != null) {
+                header(DPoP, dpopJwt)
                 dpopAuth(accessToken)
             } else {
                 bearerAuth(AccessToken.Bearer(accessToken.accessToken, accessToken.expiresIn))
             }
         }
     }
-}
-
-/**
- * Adds header `DPoP` on the request under construction,  utilizing the passed [DPoPJwtFactory]
- */
-fun HttpRequestBuilder.dpop(
-    factory: DPoPJwtFactory,
-    htu: URL,
-    htm: Htm,
-    accessToken: AccessToken.DPoP?,
-    nonce: Nonce?,
-) {
-    val jwt = factory.createDPoPJwt(htm, htu, accessToken, nonce).getOrThrow().serialize()
-    header(DPoP, jwt)
 }
 
 private fun HttpRequestBuilder.dpopAuth(accessToken: AccessToken.DPoP) {
