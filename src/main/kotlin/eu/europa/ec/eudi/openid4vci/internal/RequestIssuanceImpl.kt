@@ -27,16 +27,21 @@ import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.NonceEndpointClient
 import java.time.Instant
 
+sealed interface NonceRequirement {
+
+    data object Required : NonceRequirement
+
+    data object NotRequired : NonceRequirement
+}
+
 private sealed interface CredentialProofsRequirement {
 
     data object ProofNotRequired : CredentialProofsRequirement
 
-    sealed interface ProofRequired : CredentialProofsRequirement {
-
-        data object WithoutCNonce : ProofRequired
-
-        data object WithCNonce : ProofRequired
-    }
+    data class ProofRequired(
+        var nonceRequirement: NonceRequirement,
+        var keyAttestationRequirement: KeyAttestationRequirement,
+    ) : CredentialProofsRequirement
 }
 
 internal class RequestIssuanceImpl(
@@ -66,36 +71,53 @@ internal class RequestIssuanceImpl(
 
         // Place the request
         val (outcome, newResourceServerDpopNonce) = placeIssuanceRequest(accessToken, resourceServerDpopNonce) {
-            when (proofsSpec) {
-                is ProofsSpecification.NoProofs -> {
-                    require(credentialConfigId.proofsRequirement() is CredentialProofsRequirement.ProofNotRequired) {
-                        "Proofs are required for credential configuration $credentialConfigId, but proofs specification is set to NoProofs"
+            val proofsRequirement = credentialConfigId.proofsRequirement()
+
+            var proofsFactory: ProofsFactory?
+
+            when (proofsRequirement) {
+                is CredentialProofsRequirement.ProofNotRequired -> {
+                    require(proofsSpec is ProofsSpecification.NoProofs) {
+                        "Proofs are not required for credential configuration $credentialConfigId, " +
+                            "but proofs specification is set to ${proofsSpec::class.simpleName}"
                     }
                     buildRequest(requestPayload, null, credentialIdentifiers.orEmpty())
                 }
-                is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
-                    ensure(
-                        credentialConfigId.keyAttestationProofsRequirement() !is KeyAttestationRequirement.Required &&
-                            credentialConfigId.keyAttestationProofsRequirement() !is KeyAttestationRequirement.RequiredNoConstraints,
-                    ) {
-                        CredentialIssuanceError.ProofTypeKeyAttestationRequired()
-                    }
-
-                    proofsSpec.proofsSigner.use { signOps ->
-                        val javaAlgorithm = proofsSpec.proofsSigner.javaAlgorithm
-                        val proofsFactory = jwtProofsFactoryFrom(signOps, javaAlgorithm, credentialConfigId)
-                        buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
+                is CredentialProofsRequirement.ProofRequired -> {
+                    when (proofsRequirement.keyAttestationRequirement) {
+                        is KeyAttestationRequirement.NotRequired -> {
+                            require(proofsSpec is ProofsSpecification.JwtProofs.NoKeyAttestation) {
+                                "Proofs without key attestation are required for credential configuration $credentialConfigId, " +
+                                    "but proofs specification is set to ${proofsSpec::class.simpleName}"
+                            }
+                            proofsSpec.proofsSigner.use { signOps ->
+                                proofsFactory = jwtProofsFactoryFrom(
+                                    signOps,
+                                    proofsSpec.proofsSigner.javaAlgorithm,
+                                    credentialConfigId,
+                                )
+                                buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
+                            }
+                        }
+                        is KeyAttestationRequirement.RequiredNoConstraints,
+                        is KeyAttestationRequirement.Required,
+                        -> {
+                            require(proofsSpec is ProofsSpecification.JwtProofs.WithKeyAttestation) {
+                                "Proofs with key attestation are required for credential configuration $credentialConfigId, " +
+                                    "but proofs specification is set to ${proofsSpec::class.simpleName}"
+                            }
+                            proofsSpec.proofSigner.use { signOp ->
+                                val proofsFactory = keyAttestationJwtProofFactoryFrom(
+                                    signOp,
+                                    proofsSpec.keyIndex,
+                                    proofsSpec.proofSigner.javaAlgorithm,
+                                    credentialConfigId,
+                                )
+                                buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
+                            }
+                        }
                     }
                 }
-                is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
-                    proofsSpec.proofSigner.use { signOp ->
-                        val javaAlgorithm = proofsSpec.proofSigner.javaAlgorithm
-                        val keyIndex = proofsSpec.keyIndex
-                        val proofsFactory = keyAttestationJwtProofFactoryFrom(signOp, keyIndex, javaAlgorithm, credentialConfigId)
-                        buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
-                    }
-                }
-                is ProofsSpecification.AttestationProof -> error("Attestation proofs not yet supported")
             }
         }
 
@@ -109,8 +131,14 @@ internal class RequestIssuanceImpl(
         val credentialConfiguration = credentialSupportedById(this)
         return when {
             credentialConfiguration.proofTypesSupported.values.isEmpty() -> CredentialProofsRequirement.ProofNotRequired
-            credentialIssuerMetadata.nonceEndpoint == null -> CredentialProofsRequirement.ProofRequired.WithoutCNonce
-            else -> CredentialProofsRequirement.ProofRequired.WithCNonce
+            credentialIssuerMetadata.nonceEndpoint == null -> CredentialProofsRequirement.ProofRequired(
+                nonceRequirement = NonceRequirement.NotRequired,
+                this.keyAttestationProofsRequirement(),
+            )
+            else -> CredentialProofsRequirement.ProofRequired(
+                nonceRequirement = NonceRequirement.Required,
+                this.keyAttestationProofsRequirement(),
+            )
         }
     }
 
@@ -215,9 +243,9 @@ internal class RequestIssuanceImpl(
     }
 
     private suspend fun CredentialProofsRequirement.ProofRequired.cNonce(): CNonce? =
-        when (this) {
-            CredentialProofsRequirement.ProofRequired.WithoutCNonce -> null
-            CredentialProofsRequirement.ProofRequired.WithCNonce -> {
+        when (this.nonceRequirement) {
+            NonceRequirement.NotRequired -> null
+            NonceRequirement.Required -> {
                 checkNotNull(nonceEndpointClient) { "Issuer does not provide nonce endpoint." }
                 nonceEndpointClient.getNonce().getOrThrow()
             }

@@ -365,11 +365,6 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     }
 
     /**
-     * Proof type requires key attestation, but it is not provided.
-     */
-    class ProofTypeKeyAttestationRequired : CredentialIssuanceError("ProofTypeKeyAttestationRequired")
-
-    /**
      * Sealed hierarchy of errors related to validation of encryption parameters passed along with the issuance request.
      */
     sealed class ResponseEncryptionError(message: String) : CredentialIssuanceError(message) {

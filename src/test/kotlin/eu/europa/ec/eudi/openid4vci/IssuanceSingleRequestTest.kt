@@ -649,7 +649,7 @@ class IssuanceSingleRequestTest {
         )
 
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-        assertFailsWith<CredentialIssuanceError.ProofTypeKeyAttestationRequired> {
+        assertFailsWith<IllegalArgumentException> {
             with(issuer) {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
                 authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
