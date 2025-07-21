@@ -122,6 +122,5 @@ class SignersTest {
             assertEquals(JWSObject.State.SIGNED, signedJwt.state)
             assertTrue(signedJwt.header.getCustomParam("key_attestation") is String)
         }
-
     }
 }

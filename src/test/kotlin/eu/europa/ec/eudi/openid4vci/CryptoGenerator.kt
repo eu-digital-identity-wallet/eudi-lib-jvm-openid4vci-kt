@@ -150,7 +150,7 @@ object CryptoGenerator {
         )
         KeyAttestationJWT(jwt.serialize())
     }
-    
+
     fun keyAttestationJwtRsa(
         attestedKeys: List<JWK>,
     ) = run {
@@ -166,7 +166,7 @@ object CryptoGenerator {
     private fun randomKeyAttestationJwt(
         attestedKeys: List<JWK>,
         jwk: JWK,
-        signer: JWSSigner
+        signer: JWSSigner,
     ): SignedJWT = SignedJWT(
         JWSHeader.Builder(JWSAlgorithm.ES256)
             .type(JOSEObjectType(KEY_ATTESTATION_JWT_TYPE))
