@@ -19,9 +19,11 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.impl.ECDSA
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.RSAKey
 import eu.europa.ec.eudi.openid4vci.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.security.PrivateKey
 import java.security.SecureRandom
 import java.security.Signature
 import java.security.interfaces.ECPrivateKey
@@ -89,9 +91,9 @@ internal fun String.toJoseRSAAlg(): JWSAlgorithm? = when (this) {
     else -> null
 }
 
-internal fun SignFunction.Companion.forJavaEcPrivateKey(
+internal fun SignFunction.Companion.forJavaPrivateKey(
     javaSigningAlgorithm: String,
-    privateKey: ECPrivateKey,
+    privateKey: PrivateKey,
     secureRandom: SecureRandom?,
     provider: String?,
 ): SignFunction =
@@ -125,7 +127,7 @@ internal fun <PUB> Signer.Companion.fromEcPrivateKey(
         get() = signingAlgorithm
 
     override suspend fun authenticate(): SignOperation<PUB> {
-        val sign = SignFunction.forJavaEcPrivateKey(signingAlgorithm, privateKey, secureRandom, provider)
+        val sign = SignFunction.forJavaPrivateKey(signingAlgorithm, privateKey, secureRandom, provider)
         return SignOperation(sign, publicMaterial)
     }
 
@@ -134,9 +136,9 @@ internal fun <PUB> Signer.Companion.fromEcPrivateKey(
     }
 }
 
-internal fun <PUB> BatchSigner.Companion.fromEcPrivateKeys(
+internal fun <PUB> BatchSigner.Companion.fromPrivateKeys(
     signingAlgorithm: String,
-    ecKeyPairs: Map<ECPrivateKey, PUB>,
+    ecKeyPairs: Map<PrivateKey, PUB>,
     secureRandom: SecureRandom?,
     provider: String?,
 ): BatchSigner<PUB> = object : BatchSigner<PUB> {
@@ -146,7 +148,7 @@ internal fun <PUB> BatchSigner.Companion.fromEcPrivateKeys(
 
     override suspend fun authenticate(): BatchSignOperation<PUB> {
         val signOperations = ecKeyPairs.map {
-            val sign = SignFunction.forJavaEcPrivateKey(
+            val sign = SignFunction.forJavaPrivateKey(
                 signingAlgorithm,
                 it.key,
                 secureRandom,
@@ -189,10 +191,30 @@ internal fun <PUB> BatchSigner.Companion.fromNimbusEcKeys(
         require(it.key.isPrivate) { "All EC keys must be private keys" }
     }
     val signatureAlgorithm = ecKeyPairs.entries.first().key.curve.toJavaSigningAlg()
-    return fromEcPrivateKeys(
+    return fromPrivateKeys(
         signatureAlgorithm,
         ecKeyPairs.map {
             it.key.toECPrivateKey() to it.value
+        }.toMap(),
+        secureRandom,
+        provider,
+    )
+}
+
+internal fun <PUB> BatchSigner.Companion.fromNimbusRSAKeys(
+    rsaKeyPairs: Map<RSAKey, PUB>,
+    secureRandom: SecureRandom?,
+    provider: String?,
+): BatchSigner<PUB> {
+    require(rsaKeyPairs.isNotEmpty()) { "At least one EC key pair must be provided" }
+    rsaKeyPairs.forEach {
+        require(it.key.isPrivate) { "All EC keys must be private keys" }
+    }
+    val signatureAlgorithm = rsaKeyPairs.entries.first().key.toJavaSigningAlg()
+    return fromPrivateKeys(
+        signatureAlgorithm,
+        rsaKeyPairs.map {
+            it.key.toRSAPrivateKey() to it.value
         }.toMap(),
         secureRandom,
         provider,
@@ -206,5 +228,14 @@ internal fun Curve.toJavaSigningAlg(): String {
         Curve.P_521 -> "SHA512withECDSA"
         Curve.SECP256K1 -> "SHA256withECDSA"
         else -> error("Unsupported algorithm")
+    }
+}
+
+internal fun RSAKey.toJavaSigningAlg(): String {
+    return when (this.size()) {
+        2048 -> "SHA256withRSA"
+        3072 -> "SHA384withRSA"
+        4096 -> "SHA512withRSA"
+        else -> error("Unsupported RSA key size: ${this.size()}")
     }
 }
