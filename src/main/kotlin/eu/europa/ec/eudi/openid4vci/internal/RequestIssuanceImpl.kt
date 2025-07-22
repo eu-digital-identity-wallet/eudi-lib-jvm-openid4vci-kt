@@ -127,9 +127,12 @@ internal class RequestIssuanceImpl(
                         }
                     }
                     is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
-                        require(keyAttestationReq is KeyAttestationRequirement.Required ||
-                                keyAttestationReq is KeyAttestationRequirement.RequiredNoConstraints) {
-                            "JWT proof with key attestation is provided, but credential configuration $this does not support key attestation"
+                        require(
+                            keyAttestationReq is KeyAttestationRequirement.Required ||
+                                keyAttestationReq is KeyAttestationRequirement.RequiredNoConstraints,
+                        ) {
+                            "JWT proof with key attestation is provided, " +
+                                "but credential configuration $this does not support key attestation"
                         }
                     }
                 }
