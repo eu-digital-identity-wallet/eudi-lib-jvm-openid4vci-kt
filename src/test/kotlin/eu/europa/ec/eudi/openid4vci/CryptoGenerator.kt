@@ -30,7 +30,6 @@ import eu.europa.ec.eudi.openid4vci.KeyAttestationJWT.Companion.KEY_ATTESTATION_
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusRSAKeys
-import java.security.Signature
 import java.time.Instant.now
 import java.util.*
 
@@ -48,15 +47,6 @@ object CryptoGenerator {
         .issueTime(Date(System.currentTimeMillis()))
         .generate()
 
-    fun rsaProofSigner(signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256): PopSigner.Jwt =
-        rsaKeyAndJwtProofSigner(signingAlgorithm).second
-
-    fun rsaKeyAndJwtProofSigner(signingAlgorithm: JWSAlgorithm = JWSAlgorithm.RS256): Pair<JWK, PopSigner.Jwt> {
-        val keyPair = randomRSASigningKey(2048)
-        val bindingKey = JwtBindingKey.Jwk(keyPair.toPublicJWK())
-        return keyPair to PopSigner.jwtPopSigner(keyPair, signingAlgorithm, bindingKey)
-    }
-
     fun ecSigner(curve: Curve = Curve.P_256, alg: JWSAlgorithm = JWSAlgorithm.ES256): Signer<JWK> {
         require(alg in JWSAlgorithm.Family.EC)
         val keyPair = randomECSigningKey(curve)
@@ -67,50 +57,6 @@ object CryptoGenerator {
             provider = null,
         )
     }
-
-    fun ecKeyAndJwtProofSigner(
-        curve: Curve = Curve.P_256,
-        alg: JWSAlgorithm = JWSAlgorithm.ES256,
-    ): Pair<JWK, PopSigner.Jwt> {
-        require(alg in JWSAlgorithm.Family.EC)
-        val keyPair = randomECSigningKey(curve)
-        val bindingKey = JwtBindingKey.Jwk(keyPair.toPublicJWK())
-        return keyPair to PopSigner.jwtPopSigner(keyPair, alg, bindingKey)
-    }
-
-    private fun CoseAlgorithm.signature(): Signature =
-        when (this) {
-            CoseAlgorithm.ES256 -> "SHA256withECDSAinP1363Format"
-            CoseAlgorithm.ES384 -> "SHA384withECDSAinP1363Format"
-            CoseAlgorithm.ES512 -> "SHA512withECDSAinP1363Format"
-            else -> error("Unsupported $this")
-        }.let { Signature.getInstance(it) }
-
-    fun keyAndPopSigner(
-        proofTypeMeta: ProofTypeMeta,
-    ): Pair<JWK, PopSigner>? =
-        when (proofTypeMeta) {
-            is ProofTypeMeta.Jwt -> {
-                proofTypeMeta.algorithms.asSequence().mapNotNull { alg ->
-                    when (alg) {
-                        JWSAlgorithm.ES256 -> ecKeyAndJwtProofSigner(Curve.P_256, alg)
-                        JWSAlgorithm.ES384 -> ecKeyAndJwtProofSigner(Curve.P_384, alg)
-                        JWSAlgorithm.ES512 -> ecKeyAndJwtProofSigner(Curve.P_521, alg)
-                        in JWSAlgorithm.Family.RSA -> rsaKeyAndJwtProofSigner(alg)
-                        else -> null
-                    }
-                }.firstOrNull()
-            }
-
-            ProofTypeMeta.LdpVp -> null
-            is ProofTypeMeta.Unsupported -> null
-        }
-
-    fun popSigner(
-        credentialConfiguration: CredentialConfiguration,
-    ): PopSigner? =
-        credentialConfiguration.proofTypesSupported.values
-            .firstNotNullOfOrNull { keyAndPopSigner(it)?.second }
 
     fun proofsSpecForEcKeys(
         curve: Curve = Curve.P_256,
@@ -174,6 +120,16 @@ object CryptoGenerator {
             signer = RSASSASigner(rsaKey),
         )
         KeyAttestationJWT(jwt.serialize())
+    }
+
+    fun randomKeyAttestationJwt(): SignedJWT {
+        val ecKeys = List(3) { randomECSigningKey(Curve.P_256) }
+        val ecKey = randomECSigningKey(Curve.P_256)
+        return randomKeyAttestationJwt(
+            attestedKeys = ecKeys.map { it.toPublicJWK() },
+            jwk = ecKey.toPublicJWK(),
+            signer = ECDSASigner(ecKey.toECKey()),
+        )
     }
 
     private fun randomKeyAttestationJwt(

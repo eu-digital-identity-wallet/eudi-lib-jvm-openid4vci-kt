@@ -22,6 +22,7 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseUnparsable
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.keyAttestationJwtProofsSpec
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForRSAKeys
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.randomKeyAttestationJwt
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
@@ -695,7 +696,7 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
-    fun `key attestation jwt proof issuance is successful when the issuer supports it`() = runTest {
+    fun `issuance with key attestation jwt proof is successful when the issuer supports it`() = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
             credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED),
             authServerWellKnownMocker(),
@@ -713,6 +714,29 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
             authorizedRequest.request(requestPayload, keyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
+        }
+    }
+
+    @Test
+    fun `issuance with attestation proof is successful when the issuer supports it `() = runTest {
+        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            val keyAttestationJWT = KeyAttestationJWT(randomKeyAttestationJwt().serialize())
+            authorizedRequest.request(requestPayload, ProofsSpecification.AttestationProof(keyAttestationJWT)).getOrThrow()
         }
     }
 }

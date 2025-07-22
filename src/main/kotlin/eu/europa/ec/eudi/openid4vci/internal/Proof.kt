@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jwt.JWT
 import eu.europa.ec.eudi.openid4vci.CredentialConfiguration
+import eu.europa.ec.eudi.openid4vci.KeyAttestationJWT
 import kotlinx.serialization.Serializable
 
 internal typealias ProofsFactory = suspend (CredentialConfiguration) -> List<Proof>
@@ -44,4 +45,12 @@ internal sealed interface Proof {
      */
     @JvmInline
     value class LdpVp(val ldpVp: String) : Proof
+
+    /**
+     * Proof of possession is structured as a Key Attestation JWT
+     *
+     * @param keyAttestation The proof Key Attestation JWT
+     */
+    @JvmInline
+    value class Attestation(val keyAttestation: KeyAttestationJWT) : Proof
 }

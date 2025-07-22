@@ -145,7 +145,7 @@ sealed interface ProofsSpecification {
     }
 
     data class AttestationProof(
-        val attestation: String,
+        val attestation: KeyAttestationJWT,
     ) : ProofsSpecification
 }
 

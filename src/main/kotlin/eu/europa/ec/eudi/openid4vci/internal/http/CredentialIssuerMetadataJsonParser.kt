@@ -639,6 +639,13 @@ private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTy
         )
 
         "ldp_vp" -> ProofTypeMeta.LdpVp
+
+        "attestation" -> ProofTypeMeta.Attestation(
+            algorithms = meta.algorithms.map {
+                JWSAlgorithm.parse(it)
+            },
+            keyAttestationRequirement = meta.keyAttestationRequirement.toDomain(),
+        )
         else -> ProofTypeMeta.Unsupported(type)
     }
 

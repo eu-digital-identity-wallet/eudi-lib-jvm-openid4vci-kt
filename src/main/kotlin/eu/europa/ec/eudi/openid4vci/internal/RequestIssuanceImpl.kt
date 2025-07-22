@@ -86,6 +86,7 @@ internal class RequestIssuanceImpl(
                         proofsSpec.keyIndex,
                         proofsSpec.proofSigner.javaAlgorithm,
                         credentialConfigId,
+                        proofRequirements,
                     )
                     buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
                 }
@@ -100,7 +101,12 @@ internal class RequestIssuanceImpl(
                     buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
                 }
 
-                is ProofsSpecification.AttestationProof -> TODO()
+                is ProofsSpecification.AttestationProof -> {
+                    val proofsFactory: ProofsFactory = {
+                        listOf(Proof.Attestation(proofsSpec.attestation))
+                    }
+                    buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
+                }
             }
         }
 
@@ -134,16 +140,22 @@ internal class RequestIssuanceImpl(
                     is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
                         require(
                             keyAttestationReq is KeyAttestationRequirement.Required ||
-                                    keyAttestationReq is KeyAttestationRequirement.RequiredNoConstraints,
+                                keyAttestationReq is KeyAttestationRequirement.RequiredNoConstraints,
                         ) {
                             "JWT proof with key attestation is provided, " +
-                                    "but credential configuration $this does not support key attestation"
+                                "but credential configuration $this does not support key attestation"
                         }
                     }
                 }
             }
 
-            is ProofsSpecification.AttestationProof -> TODO()
+            is ProofsSpecification.AttestationProof -> {
+                require(proofRequirements is CredentialProofsRequirement.ProofRequired)
+                val requirements = proofRequirements.proofTypeRequirements[ProofType.ATTESTATION]
+                checkNotNull(requirements) {
+                    "Attestation proof is provided, but credential configuration $this does not support attestation proofs"
+                }
+            }
         }
     }
 
@@ -153,35 +165,32 @@ internal class RequestIssuanceImpl(
         return when {
             credentialConfiguration.proofTypesSupported.values.isEmpty() -> CredentialProofsRequirement.ProofNotRequired
             else -> CredentialProofsRequirement.ProofRequired(
-                credentialConfiguration.proofTypesSupported.values.mapNotNull { proofTypeMeta ->
+                credentialConfiguration.proofTypesSupported.values.associate { proofTypeMeta ->
                     val proofType = proofTypeMeta.type() ?: error("Unsupported proof type: $proofTypeMeta")
-                    val keyAttestationRequirement = keyAttestationProofsRequirement()
+                    val keyAttestationRequirement = keyAttestationProofsRequirement(proofTypeMeta)
                     val nonceRequirement = when (credentialIssuerMetadata.nonceEndpoint) {
                         null -> NonceRequirement.NotRequired
                         else -> NonceRequirement.Required
                     }
-                    if (keyAttestationRequirement !is KeyAttestationRequirement.NotRequired &&
-                        credentialIssuerMetadata.nonceEndpoint == null
-                    ) {
-                        // Don't add the pair if key attestation is required but nonce endpoint is missing
-                        null
-                    } else {
-                        proofType to ProofRequirements(
-                            nonceRequirement = nonceRequirement,
-                            keyAttestationRequirement = keyAttestationRequirement,
-                        )
-                    }
-                }.toMap(),
+                    proofType to ProofRequirements(
+                        nonceRequirement = nonceRequirement,
+                        keyAttestationRequirement = keyAttestationRequirement,
+                    )
+                },
             )
         }
     }
 
-    private fun CredentialConfigurationIdentifier.keyAttestationProofsRequirement(): KeyAttestationRequirement {
+    private fun CredentialConfigurationIdentifier.keyAttestationProofsRequirement(proofType: ProofTypeMeta): KeyAttestationRequirement {
         val credentialConfiguration = credentialSupportedById(this)
-        val spec = credentialConfiguration.proofTypesSupported.values.filterIsInstance<ProofTypeMeta.Jwt>().firstOrNull()
-        return when {
-            spec == null -> KeyAttestationRequirement.NotRequired
-            else -> spec.keyAttestationRequirement
+        val spec = credentialConfiguration.proofTypesSupported.values.filterIsInstance(proofType::class.java).firstOrNull()
+        return when (spec) {
+            null -> KeyAttestationRequirement.NotRequired
+            is ProofTypeMeta.Jwt -> spec.keyAttestationRequirement
+            is ProofTypeMeta.Attestation -> spec.keyAttestationRequirement
+            is ProofTypeMeta.LdpVp,
+            is ProofTypeMeta.Unsupported,
+            -> KeyAttestationRequirement.NotRequired
         }
     }
 
@@ -198,25 +207,18 @@ internal class RequestIssuanceImpl(
         keyIndex: Int,
         javaSigningAlgorithm: String,
         credentialConfigId: CredentialConfigurationIdentifier,
-    ): ProofsFactory? {
-        // Deduct from credential configuration and issuer metadata if issuer requires proofs to be sent for the specific credential
-        val proofsRequirement = credentialConfigId.proofsRequirement()
+        proofRequirements: CredentialProofsRequirement,
+    ): ProofsFactory {
+        require(proofRequirements is CredentialProofsRequirement.ProofRequired)
+        val jwtProofType = checkNotNull(proofRequirements.proofTypeRequirements[ProofType.JWT])
+        val joseAlg = javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
 
-        return when (proofsRequirement) {
-            is CredentialProofsRequirement.ProofNotRequired -> null
-
-            is CredentialProofsRequirement.ProofRequired -> {
-                // Check signing algorithm compatibility
-                val joseAlg = javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
-
-                val cNonce = proofsRequirement.proofTypeRequirements[ProofType.JWT]!!.cNonce()
-                keyAttestationProofsFactory(
-                    KeyAttestationJwtProofSigner(joseAlg, keyAttestationSigner, keyIndex),
-                    cNonce,
-                    grant,
-                )
-            }
-        }
+        val cNonce = jwtProofType.cNonce()
+        return keyAttestationProofsFactory(
+            KeyAttestationJwtProofSigner(joseAlg, keyAttestationSigner, keyIndex),
+            cNonce,
+            grant,
+        )
     }
 
     private suspend fun AuthorizedRequest.jwtProofsFactoryFrom(
@@ -224,8 +226,7 @@ internal class RequestIssuanceImpl(
         javaSigningAlgorithm: String,
         credentialConfigId: CredentialConfigurationIdentifier,
         proofRequirements: CredentialProofsRequirement,
-    ): ProofsFactory? {
-
+    ): ProofsFactory {
         require(proofRequirements is CredentialProofsRequirement.ProofRequired)
         proofsSigner.assertMatchesBatchIssuanceBatchSize()
         val jwtProofType = checkNotNull(proofRequirements.proofTypeRequirements[ProofType.JWT])
@@ -423,6 +424,7 @@ private fun CredentialConfiguration.assertProofSupported(proof: Proof) {
     val proofType = when (proof) {
         is Proof.Jwt -> ProofType.JWT
         is Proof.LdpVp -> ProofType.LDP_VP
+        is Proof.Attestation -> ProofType.ATTESTATION
     }
     checkNotNull(proofTypesSupported[proofType]) {
         "Provided proof type $proofType is not one of supported [$proofTypesSupported]."

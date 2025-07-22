@@ -59,6 +59,7 @@ sealed interface CryptographicBindingMethod : Serializable {
 enum class ProofType : Serializable {
     JWT,
     LDP_VP,
+    ATTESTATION,
 }
 
 sealed interface ProofTypeMeta : Serializable {
@@ -73,6 +74,15 @@ sealed interface ProofTypeMeta : Serializable {
 
     data object LdpVp : ProofTypeMeta {
         private fun readResolve(): Any = LdpVp
+    }
+
+    data class Attestation(
+        val algorithms: List<JWSAlgorithm>,
+        val keyAttestationRequirement: KeyAttestationRequirement,
+    ) : ProofTypeMeta {
+        init {
+            require(algorithms.isNotEmpty()) { "Supported algorithms in case of Attestation cannot be empty" }
+        }
     }
 
     data class Unsupported(val type: String) : ProofTypeMeta
@@ -105,6 +115,7 @@ sealed interface KeyAttestationRequirement {
 fun ProofTypeMeta.type(): ProofType? = when (this) {
     is ProofTypeMeta.Jwt -> ProofType.JWT
     is ProofTypeMeta.LdpVp -> ProofType.LDP_VP
+    is ProofTypeMeta.Attestation -> ProofType.ATTESTATION
     is ProofTypeMeta.Unsupported -> null
 }
 
