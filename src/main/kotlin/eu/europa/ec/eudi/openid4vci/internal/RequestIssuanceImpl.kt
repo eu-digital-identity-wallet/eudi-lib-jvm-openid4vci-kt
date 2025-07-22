@@ -69,41 +69,42 @@ internal class RequestIssuanceImpl(
 
     override suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
-        proofsSpec: ProofsSpecification,
+        proofsSpecification: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
         val credentialConfigId = requestPayload.credentialConfigurationIdentifier
-        val proofRequirements = credentialConfigId.proofsRequirement()
+        val proofsRequirement = credentialConfigId.proofsRequirement()
 
         // Place the request
         val (outcome, newResourceServerDpopNonce) = placeIssuanceRequest(accessToken, resourceServerDpopNonce) {
-            proofsSpec.ensureCompatibleProofs(proofRequirements)
 
-            when (proofsSpec) {
+            proofsSpecification.ensureCompatibleWith(proofsRequirement)
+
+            when (proofsSpecification) {
                 is ProofsSpecification.NoProofs -> buildRequest(requestPayload, null, credentialIdentifiers.orEmpty())
-                is ProofsSpecification.JwtProofs.WithKeyAttestation -> proofsSpec.proofSigner.use { signOp ->
+                is ProofsSpecification.JwtProofs.WithKeyAttestation -> proofsSpecification.proofSigner.use { signOp ->
                     val proofsFactory = keyAttestationJwtProofFactoryFrom(
                         signOp,
-                        proofsSpec.keyIndex,
-                        proofsSpec.proofSigner.javaAlgorithm,
+                        proofsSpecification.keyIndex,
+                        proofsSpecification.proofSigner.javaAlgorithm,
                         credentialConfigId,
-                        proofRequirements,
+                        proofsRequirement,
                     )
                     buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
                 }
 
-                is ProofsSpecification.JwtProofs.NoKeyAttestation -> proofsSpec.proofsSigner.use { signOps ->
+                is ProofsSpecification.JwtProofs.NoKeyAttestation -> proofsSpecification.proofsSigner.use { signOps ->
                     val proofsFactory = jwtProofsFactoryFrom(
                         signOps,
-                        proofsSpec.proofsSigner.javaAlgorithm,
+                        proofsSpecification.proofsSigner.javaAlgorithm,
                         credentialConfigId,
-                        proofRequirements,
+                        proofsRequirement,
                     )
                     buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
                 }
 
                 is ProofsSpecification.AttestationProof -> {
                     val proofsFactory: ProofsFactory = {
-                        listOf(Proof.Attestation(proofsSpec.attestation))
+                        listOf(Proof.Attestation(proofsSpecification.attestation))
                     }
                     buildRequest(requestPayload, proofsFactory, credentialIdentifiers.orEmpty())
                 }
@@ -115,20 +116,19 @@ internal class RequestIssuanceImpl(
         updatedAuthorizedRequest to outcome.toPub()
     }
 
-    private fun ProofsSpecification.ensureCompatibleProofs(proofRequirements: CredentialProofsRequirement) {
+    private fun ProofsSpecification.ensureCompatibleWith(proofsRequirement: CredentialProofsRequirement) =
         when (this) {
             is ProofsSpecification.NoProofs -> {
-                check(proofRequirements is CredentialProofsRequirement.ProofNotRequired) {
+                require(proofsRequirement is CredentialProofsRequirement.ProofNotRequired) {
                     "No proofs are provided, but credential configuration $this requires proofs"
                 }
             }
-
             is ProofsSpecification.JwtProofs -> {
-                require(proofRequirements is CredentialProofsRequirement.ProofRequired)
-                requireNotNull(proofRequirements.proofTypeRequirements[ProofType.JWT]) {
-                    "JWT proofs without key attestation are provided, but credential configuration $this does not support JWT proofs"
+                require(proofsRequirement is CredentialProofsRequirement.ProofRequired)
+                requireNotNull(proofsRequirement.proofTypeRequirements[ProofType.JWT]) {
+                    "JWT proofs are provided, but credential configuration $this does not support JWT proofs"
                 }
-                val (_, keyAttestationReq) = proofRequirements.proofTypeRequirements[ProofType.JWT]!!
+                val (_, keyAttestationReq) = proofsRequirement.proofTypeRequirements[ProofType.JWT]!!
 
                 when (this) {
                     is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
@@ -136,28 +136,26 @@ internal class RequestIssuanceImpl(
                             "JWT proof without key attestation is provided, but credential configuration $this requires key attestation"
                         }
                     }
-
                     is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
-                        require(
-                            keyAttestationReq is KeyAttestationRequirement.Required ||
-                                keyAttestationReq is KeyAttestationRequirement.RequiredNoConstraints,
-                        ) {
+                        require(keyAttestationReq !is KeyAttestationRequirement.NotRequired) {
                             "JWT proof with key attestation is provided, " +
                                 "but credential configuration $this does not support key attestation"
                         }
                     }
                 }
             }
-
             is ProofsSpecification.AttestationProof -> {
-                require(proofRequirements is CredentialProofsRequirement.ProofRequired)
-                val requirements = proofRequirements.proofTypeRequirements[ProofType.ATTESTATION]
-                checkNotNull(requirements) {
+                require(proofsRequirement is CredentialProofsRequirement.ProofRequired)
+                val requirements = proofsRequirement.proofTypeRequirements[ProofType.ATTESTATION]
+                requireNotNull(requirements) {
                     "Attestation proof is provided, but credential configuration $this does not support attestation proofs"
+                }
+                require(requirements.keyAttestationRequirement !is KeyAttestationRequirement.NotRequired) {
+                    "Problematic attestation proof key requirement. Issuer requires no key attestation for proof of type 'attestation'"
                 }
             }
         }
-    }
+
 
     private fun CredentialConfigurationIdentifier.proofsRequirement(): CredentialProofsRequirement {
         val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata

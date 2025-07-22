@@ -158,13 +158,13 @@ interface RequestIssuance {
      * Places a request to the credential issuance endpoint.
      *
      * @param requestPayload the payload of the request
-     * @param proofsSpec the specification of proofs to be included in the request
+     * @param proofsSpecification the specification of proofs to be included in the request
      * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh updated Resource-Server DPoP Nonce)
      * and the [SubmissionOutcome]
      */
     suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
-        proofsSpec: ProofsSpecification,
+        proofsSpecification: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 }
 
