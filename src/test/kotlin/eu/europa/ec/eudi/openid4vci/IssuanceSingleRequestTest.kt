@@ -48,7 +48,7 @@ class IssuanceSingleRequestTest {
         @JvmStatic
         fun noKeyAttestationProofSpecs(): Stream<ProofsSpecification.JwtProofs.NoKeyAttestation?> = Stream.of(
             proofsSpecForRSAKeys(),
-            proofsSpecForEcKeys(Curve.P_256)
+            proofsSpecForEcKeys(Curve.P_256),
         )
     }
 
@@ -191,7 +191,9 @@ class IssuanceSingleRequestTest {
 
     @ParameterizedTest
     @MethodSource("noKeyAttestationProofSpecs")
-    fun `when credential configuration config demands proofs and issuer has no nonce endpoint, expect proofs without nonce`(proofSpec: ProofsSpecification) = runTest {
+    fun `when credential configuration config demands proofs and issuer has no nonce endpoint, expect proofs without nonce`(
+        proofSpec: ProofsSpecification,
+    ) = runTest {
         val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(NO_NONCE_ENDPOINT),
             authServerWellKnownMocker(),
@@ -354,7 +356,9 @@ class IssuanceSingleRequestTest {
 
     @ParameterizedTest
     @MethodSource("noKeyAttestationProofSpecs")
-    fun `issuance request by credential id, is allowed only when token endpoint has returned credential identifiers`(proofSpec: ProofsSpecification) = runTest {
+    fun `issuance request by credential id, is allowed only when token endpoint has returned credential identifiers`(
+        proofSpec: ProofsSpecification,
+    ) = runTest {
         val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
@@ -424,7 +428,9 @@ class IssuanceSingleRequestTest {
 
     @ParameterizedTest
     @MethodSource("noKeyAttestationProofSpecs")
-    fun `when successful issuance response contains additional info, it is reflected in SubmissionOutcome_Success`(proofSpec: ProofsSpecification) = runTest {
+    fun `when successful issuance response contains additional info, it is reflected in SubmissionOutcome_Success`(
+        proofSpec: ProofsSpecification,
+    ) = runTest {
         val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
@@ -482,7 +488,9 @@ class IssuanceSingleRequestTest {
 
     @ParameterizedTest
     @MethodSource("noKeyAttestationProofSpecs")
-    fun `when successful issuance response does not contain 'credential' attribute fails with ResponseUnparsable exception`(proofSpec: ProofsSpecification) = runTest {
+    fun `when successful issuance response does not contain 'credential' attribute fails with ResponseUnparsable exception`(
+        proofSpec: ProofsSpecification,
+    ) = runTest {
         val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
@@ -525,7 +533,9 @@ class IssuanceSingleRequestTest {
 
     @ParameterizedTest
     @MethodSource("noKeyAttestationProofSpecs")
-    fun `when authorized with pre-authorization code grand and client is public, 'iss' attribute is not included in proof`(proofSpec: ProofsSpecification) = runTest {
+    fun `when authorized with pre-authorization code grand and client is public, 'iss' attribute is not included in proof`(
+        proofSpec: ProofsSpecification,
+    ) = runTest {
         val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
@@ -564,7 +574,9 @@ class IssuanceSingleRequestTest {
 
     @ParameterizedTest
     @MethodSource("noKeyAttestationProofSpecs")
-    fun `when dpop is supported from auth server, access token is of dpop type and dpop jwt is sent the issuance request `(proofSpec: ProofsSpecification) = runTest {
+    fun `when dpop is supported from auth server, access token is of dpop type and dpop jwt is sent the issuance request `(
+        proofSpec: ProofsSpecification,
+    ) = runTest {
         val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
@@ -620,7 +632,9 @@ class IssuanceSingleRequestTest {
 
     @ParameterizedTest
     @MethodSource("noKeyAttestationProofSpecs")
-    fun `when dpop is not supported from auth server, access token is of Bearer type and no dpop jwt is sent`(proofSpec: ProofsSpecification) = runTest {
+    fun `when dpop is not supported from auth server, access token is of Bearer type and no dpop jwt is sent`(
+        proofSpec: ProofsSpecification,
+    ) = runTest {
         val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(AuthServerMetadataVersion.NO_DPOP),
@@ -656,7 +670,9 @@ class IssuanceSingleRequestTest {
 
     @ParameterizedTest
     @MethodSource("noKeyAttestationProofSpecs")
-    fun `when the issuer requires a key attestation jwt proof, it should be included in the JWT proof`(proofSpec: ProofsSpecification) = runTest {
+    fun `when the issuer requires a key attestation jwt proof, it should be included in the JWT proof`(
+        proofSpec: ProofsSpecification,
+    ) = runTest {
         val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
             credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED),
             authServerWellKnownMocker(),
