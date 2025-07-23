@@ -22,6 +22,7 @@ import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
+import io.ktor.client.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -37,10 +38,10 @@ suspend fun DeferredIssuer.Companion.queryForDeferredCredential(
     ctxTO: DeferredIssuanceStoredContextTO,
     recreatePopSigner: ((String) -> Signer<JWK>)? = null,
     recreateClientAttestationPodSigner: ((String) -> JWSSigner)? = null,
-    ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+    httpClient: HttpClient,
 ): Result<Pair<DeferredIssuanceStoredContextTO?, DeferredCredentialQueryOutcome>> = runCatching {
     val ctx = ctxTO.toDeferredIssuanceStoredContext(clock, recreatePopSigner, recreateClientAttestationPodSigner)
-    val (newCtx, outcome) = queryForDeferredCredential(ctx, ktorHttpClientFactory).getOrThrow()
+    val (newCtx, outcome) = queryForDeferredCredential(ctx, httpClient).getOrThrow()
     val newCtxTO =
         newCtx?.let { DeferredIssuanceStoredContextTO.from(it, ctxTO.dPoPSignerKid, ctxTO.clientAttestationPopKeyId) }
     newCtxTO to outcome
@@ -164,7 +165,8 @@ data class DeferredIssuanceStoredContextTO(
                         }.getOrNull() ?: error("Invalid client attestation JWT")
                         val poPJWTSpec = ClientAttestationPoPJWTSpec(
                             signingAlgorithm = JWSAlgorithm.parse(checkNotNull(clientAttestationPopAlgorithm)),
-                            duration = Duration.ofSeconds(checkNotNull(clientAttestationPopDuration)).toKotlinDuration(),
+                            duration = Duration.ofSeconds(checkNotNull(clientAttestationPopDuration))
+                                .toKotlinDuration(),
                             typ = checkNotNull(clientAttestationPopType),
                             jwsSigner = checkNotNull(recreateClientAttestationPodSigner).invoke(
                                 checkNotNull(

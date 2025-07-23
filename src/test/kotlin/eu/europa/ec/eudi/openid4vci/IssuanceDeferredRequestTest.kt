@@ -28,7 +28,7 @@ class IssuanceDeferredRequestTest {
 
     @Test
     fun `when issuer responds with invalid_transaction_id, response should be of type Errored`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -44,7 +44,7 @@ class IssuanceDeferredRequestTest {
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
         with(issuer) {
@@ -68,7 +68,7 @@ class IssuanceDeferredRequestTest {
 
     @Test
     fun `when issuer responds with issuance_pending, response should be of type IssuancePending`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -85,7 +85,7 @@ class IssuanceDeferredRequestTest {
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
         with(issuer) {
@@ -109,7 +109,7 @@ class IssuanceDeferredRequestTest {
 
     @Test
     fun `when deferred request is valid, credential must be issued`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -145,7 +145,7 @@ class IssuanceDeferredRequestTest {
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
         with(issuer) {
@@ -165,7 +165,7 @@ class IssuanceDeferredRequestTest {
     private fun asDeferredIssuanceRequest(bodyStr: String): DeferredRequestTO? =
         try {
             Json.decodeFromString<DeferredRequestTO>(bodyStr)
-        } catch (ex: Exception) {
+        } catch (_: Exception) {
             null
         }
 }

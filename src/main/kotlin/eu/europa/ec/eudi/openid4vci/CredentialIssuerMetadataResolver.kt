@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
+import io.ktor.client.*
 import java.io.Serializable
 import java.net.URL
 
@@ -87,7 +88,8 @@ data class CredentialIssuerMetadata(
     }
 
     inline fun <reified T : CredentialConfiguration> findByFormat(predicate: (T) -> Boolean): Map<CredentialConfigurationIdentifier, T> {
-        return credentialConfigurationsSupported.mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }.toMap()
+        return credentialConfigurationsSupported.mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }
+            .toMap()
     }
 }
 
@@ -221,12 +223,10 @@ fun interface CredentialIssuerMetadataResolver {
          * Creates a new [CredentialIssuerMetadataResolver] instance.
          */
         operator fun invoke(
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            httpClient: HttpClient,
         ): CredentialIssuerMetadataResolver = CredentialIssuerMetadataResolver { issuerId, policy ->
-            ktorHttpClientFactory.invoke().use { httpClient ->
-                val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
-                resolver.resolve(issuerId, policy)
-            }
+            val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
+            resolver.resolve(issuerId, policy)
         }
     }
 }

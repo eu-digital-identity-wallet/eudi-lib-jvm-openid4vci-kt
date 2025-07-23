@@ -43,8 +43,8 @@ interface HasIssuerId {
 interface CanBeUsedWithVciLib {
     val cfg: OpenId4VCIConfig
 
-    suspend fun createIssuer(credentialOfferUri: String, enableHttpLogging: Boolean = false): Issuer {
-        return Issuer.make(cfg, credentialOfferUri, { createHttpClient(enableHttpLogging) }).getOrThrow()
+    suspend fun createIssuer(credentialOfferUri: String, httpClient: HttpClient): Issuer {
+        return Issuer.make(cfg, credentialOfferUri, httpClient).getOrThrow()
     }
 }
 
@@ -131,6 +131,7 @@ interface CanRequestForCredentialOffer<in USER> {
 data object NoUser
 interface HasTestUser<out USER> {
     val testUser: USER
+
     companion object {
         val HasNoTestUser: HasTestUser<NoUser> = object : HasTestUser<NoUser> {
             override val testUser: NoUser = NoUser
@@ -147,9 +148,9 @@ interface CanAuthorizeIssuance<in USER> {
     suspend fun loginUserAndGetAuthCode(
         authorizationRequestPrepared: AuthorizationRequestPrepared,
         user: USER,
-        enableHttpLogging: Boolean = false,
+        httpClient: HttpClient,
     ): Pair<String, String> = coroutineScope {
-        val response = createHttpClient(enableLogging = enableHttpLogging).use { httpClient ->
+        val response = run {
             val loginPageResponse = httpClient.visitAuthorizationPage(authorizationRequestPrepared)
             httpClient.authorizeIssuance(loginPageResponse, user)
         }
@@ -178,6 +179,7 @@ interface CanAuthorizeIssuance<in USER> {
             }
         }
     }
+
     suspend fun HttpClient.authorizeIssuance(loginResponse: HttpResponse, user: USER): HttpResponse
 }
 

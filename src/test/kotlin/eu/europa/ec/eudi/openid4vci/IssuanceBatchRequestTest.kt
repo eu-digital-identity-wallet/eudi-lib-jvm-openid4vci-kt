@@ -30,7 +30,7 @@ class IssuanceBatchRequestTest {
 
     @Test
     fun `successful batch issuance`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -98,7 +98,7 @@ class IssuanceBatchRequestTest {
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
         val (request, popSigners) = reqs()

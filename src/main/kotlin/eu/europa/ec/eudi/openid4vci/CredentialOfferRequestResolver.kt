@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialOfferRequestResolver
 import eu.europa.ec.eudi.openid4vci.internal.ensure
+import io.ktor.client.*
 import io.ktor.http.*
 import java.io.Serializable
 
@@ -294,13 +295,11 @@ fun interface CredentialOfferRequestResolver {
          * Creates a new [CredentialOfferRequestResolver].
          */
         operator fun invoke(
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            httpClient: HttpClient,
             issuerMetadataPolicy: IssuerMetadataPolicy,
         ): CredentialOfferRequestResolver = CredentialOfferRequestResolver { request ->
-            ktorHttpClientFactory().use { httpClient ->
-                val resolver = DefaultCredentialOfferRequestResolver(httpClient, issuerMetadataPolicy)
-                resolver.resolve(request)
-            }
+            val resolver = DefaultCredentialOfferRequestResolver(httpClient, issuerMetadataPolicy)
+            resolver.resolve(request)
         }
     }
 }

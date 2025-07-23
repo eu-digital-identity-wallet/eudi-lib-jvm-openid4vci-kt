@@ -19,6 +19,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.ecSigner
 import eu.europa.ec.eudi.openid4vci.Issuer.Companion.DefaultResponseEncryptionSpecFactory
+import io.ktor.client.HttpClient
 import java.net.URI
 import java.util.*
 
@@ -113,12 +114,12 @@ suspend fun authorizeRequestForCredentialOffer(
     config: OpenId4VCIConfig? = OpenId4VCIConfiguration,
     credentialOfferStr: String,
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
-    ktorHttpClientFactory: KtorHttpClientFactory,
+    httpClient: HttpClient,
 ): Pair<AuthorizedRequest, Issuer> {
     val issuer = Issuer.make(
         config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
         credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
-        ktorHttpClientFactory = ktorHttpClientFactory,
+        httpClient = httpClient,
         responseEncryptionSpecFactory = responseEncryptionSpecFactory,
     ).getOrThrow()
 
@@ -138,13 +139,13 @@ suspend fun preAuthorizeRequestForCredentialOffer(
     config: OpenId4VCIConfig? = OpenId4VCIConfiguration,
     credentialOfferStr: String,
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
-    ktorHttpClientFactory: KtorHttpClientFactory,
+    httpClient: HttpClient,
     txCode: String = "1234",
 ): Pair<AuthorizedRequest, Issuer> {
     val issuer = Issuer.make(
         config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
         credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
-        ktorHttpClientFactory = ktorHttpClientFactory,
+        httpClient = httpClient,
         responseEncryptionSpecFactory = responseEncryptionSpecFactory,
     ).getOrThrow()
 

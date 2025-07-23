@@ -289,5 +289,5 @@ private fun Map<CredentialConfigurationIdentifier, CredentialConfiguration>.jwtP
 
 private fun resolver(request: RequestMocker, expectSuccessOnly: Boolean = false) =
     CredentialIssuerMetadataResolver(
-        mockedKtorHttpClientFactory(request, expectSuccessOnly = expectSuccessOnly),
+        mockedHttpClient(request, expectSuccessOnly = expectSuccessOnly),
     )
