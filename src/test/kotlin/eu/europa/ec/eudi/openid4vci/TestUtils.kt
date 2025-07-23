@@ -50,13 +50,6 @@ val CredentialOfferWithSdJwtVc_NO_GRANTS = """
         }
 """.trimIndent()
 
-val CredentialOfferWithJwtVcJson_NO_GRANTS = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$DEGREE_JwtVcJson"]
-        }
-""".trimIndent()
-
 val CredentialOfferWithMDLMdoc_NO_GRANTS = """
         {
           "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",

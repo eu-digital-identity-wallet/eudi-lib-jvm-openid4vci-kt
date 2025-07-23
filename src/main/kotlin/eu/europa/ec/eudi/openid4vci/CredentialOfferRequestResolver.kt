@@ -241,7 +241,7 @@ sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestE
      * parameter or contained both of them.
      */
     data object OneOfCredentialOfferOrCredentialOfferUri : CredentialOfferRequestValidationError {
-
+        @Suppress("unused")
         private fun readResolve(): Any = OneOfCredentialOfferOrCredentialOfferUri
     }
 

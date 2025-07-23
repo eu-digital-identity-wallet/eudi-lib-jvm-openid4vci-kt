@@ -24,6 +24,7 @@ import java.net.URL
 
 sealed interface CredentialResponseEncryption : Serializable {
     data object NotSupported : CredentialResponseEncryption {
+        @Suppress("unused")
         private fun readResolve(): Any = NotSupported
     }
 
@@ -57,6 +58,7 @@ data class SupportedEncryptionAlgorithmsAndMethods(
 
 sealed interface BatchCredentialIssuance : Serializable {
     data object NotSupported : BatchCredentialIssuance {
+        @Suppress("unused")
         private fun readResolve(): Any = NotSupported
     }
 
@@ -93,7 +95,7 @@ data class CredentialIssuerMetadata(
     }
 }
 
-@Suppress("not used")
+@Suppress("unused")
 fun CredentialIssuerMetadata.findMsoMdoc(docType: String): MsoMdocCredential? =
     findByFormat<MsoMdocCredential> { it.docType == docType }.values.firstOrNull()
 

@@ -133,6 +133,7 @@ interface HasTestUser<out USER> {
     val testUser: USER
 
     companion object {
+        @Suppress("unused")
         val HasNoTestUser: HasTestUser<NoUser> = object : HasTestUser<NoUser> {
             override val testUser: NoUser = NoUser
         }

@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vci.examples
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import kotlinx.coroutines.runBlocking
-import sun.swing.SwingUtilities2.submit
 import java.net.URLEncoder
 
 fun main(): Unit = runBlocking {

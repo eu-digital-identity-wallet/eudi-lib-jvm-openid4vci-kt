@@ -19,7 +19,6 @@ import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import kotlinx.coroutines.runBlocking
-import sun.swing.SwingUtilities2.submit
 import java.net.URI
 
 fun main(): Unit = runBlocking {
