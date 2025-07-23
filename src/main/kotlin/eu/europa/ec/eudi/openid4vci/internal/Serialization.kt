@@ -56,7 +56,7 @@ internal object ProofSerializer : KSerializer<Proof> {
         @SerialName("proof_type") val proofType: String,
         @SerialName("jwt") val jwt: String? = null,
         @SerialName("ldp_vp") val ldpVp: String? = null,
-        @SerialName("key_attestation") val attestation: String? = null,
+        @SerialName("attestation") val attestation: String? = null,
     )
 
     private val internal = serializer<ProofJson>()

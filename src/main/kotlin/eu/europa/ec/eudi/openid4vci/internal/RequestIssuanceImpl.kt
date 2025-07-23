@@ -120,26 +120,26 @@ internal class RequestIssuanceImpl(
         when (this) {
             is ProofsSpecification.NoProofs -> {
                 require(proofsRequirement is CredentialProofsRequirement.ProofNotRequired) {
-                    "No proofs are provided, but credential configuration $this requires proofs"
+                    "No proofs are provided, but credential configuration requires proofs"
                 }
             }
             is ProofsSpecification.JwtProofs -> {
                 require(proofsRequirement is CredentialProofsRequirement.ProofRequired)
                 requireNotNull(proofsRequirement.proofTypeRequirements[ProofType.JWT]) {
-                    "JWT proofs are provided, but credential configuration $this does not support JWT proofs"
+                    "JWT proofs are provided, but credential configuration does not support JWT proofs"
                 }
                 val (_, keyAttestationReq) = proofsRequirement.proofTypeRequirements[ProofType.JWT]!!
 
                 when (this) {
                     is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
                         require(keyAttestationReq is KeyAttestationRequirement.NotRequired) {
-                            "JWT proof without key attestation is provided, but credential configuration $this requires key attestation"
+                            "JWT proof without key attestation is provided, but credential configuration requires key attestation"
                         }
                     }
                     is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
                         require(keyAttestationReq !is KeyAttestationRequirement.NotRequired) {
                             "JWT proof with key attestation is provided, " +
-                                "but credential configuration $this does not support key attestation"
+                                "but credential configuration does not support key attestation"
                         }
                     }
                 }
@@ -148,7 +148,7 @@ internal class RequestIssuanceImpl(
                 require(proofsRequirement is CredentialProofsRequirement.ProofRequired)
                 val requirements = proofsRequirement.proofTypeRequirements[ProofType.ATTESTATION]
                 requireNotNull(requirements) {
-                    "Attestation proof is provided, but credential configuration $this does not support attestation proofs"
+                    "Attestation proof is provided, but credential configuration does not support attestation proofs"
                 }
                 require(requirements.keyAttestationRequirement !is KeyAttestationRequirement.NotRequired) {
                     "Problematic attestation proof key requirement. Issuer requires no key attestation for proof of type 'attestation'"
