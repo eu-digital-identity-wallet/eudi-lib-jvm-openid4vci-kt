@@ -76,7 +76,6 @@ internal class RequestIssuanceImpl(
 
         // Place the request
         val (outcome, newResourceServerDpopNonce) = placeIssuanceRequest(accessToken, resourceServerDpopNonce) {
-
             proofsSpecification.ensureCompatibleWith(proofsRequirement)
 
             when (proofsSpecification) {
@@ -155,7 +154,6 @@ internal class RequestIssuanceImpl(
                 }
             }
         }
-
 
     private fun CredentialConfigurationIdentifier.proofsRequirement(): CredentialProofsRequirement {
         val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
