@@ -674,7 +674,7 @@ class IssuanceSingleRequestTest {
     fun `when the issuer requires a key attestation jwt proof, it should be included in the JWT proof`(
         proofSpec: ProofsSpecification,
     ) = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedHttpClient = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -683,7 +683,7 @@ class IssuanceSingleRequestTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedHttpClient,
         )
 
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
@@ -697,7 +697,7 @@ class IssuanceSingleRequestTest {
 
     @Test
     fun `issuance with key attestation jwt proof is successful when the issuer supports it`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedHttpClient = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -707,7 +707,7 @@ class IssuanceSingleRequestTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedHttpClient,
         )
 
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
@@ -719,7 +719,7 @@ class IssuanceSingleRequestTest {
 
     @Test
     fun `issuance with attestation proof is successful when the issuer supports it `() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedHttpClient = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -729,7 +729,7 @@ class IssuanceSingleRequestTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedHttpClient,
         )
 
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
