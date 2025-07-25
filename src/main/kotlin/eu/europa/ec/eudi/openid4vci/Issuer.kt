@@ -99,7 +99,7 @@ interface Issuer :
          *
          * @param config wallet's configuration options
          * @param credentialOffer the offer for which the issuer is being created
-         * @param ktorHttpClientFactory a factory for obtaining http clients, used while interacting with issuer
+         * @param httpClient an http client, used while interacting with issuer
          * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
          *
          * @return if wallet's [config] can satisfy the requirements of [credentialOffer] an [Issuer] will be
@@ -108,7 +108,7 @@ interface Issuer :
         fun make(
             config: OpenId4VCIConfig,
             credentialOffer: CredentialOffer,
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            httpClient: HttpClient,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Result<Issuer> = runCatching {
             config.client.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
@@ -130,7 +130,7 @@ interface Issuer :
                             credentialOffer.authorizationServerMetadata,
                             config,
                             dPoPJwtFactory,
-                            ktorHttpClientFactory,
+                            httpClient,
                         )
                     }
 
@@ -140,7 +140,7 @@ interface Issuer :
                     credentialOffer.authorizationServerMetadata,
                     config,
                     dPoPJwtFactory,
-                    ktorHttpClientFactory,
+                    httpClient,
                 )
 
             val authorizeIssuance =
@@ -159,12 +159,12 @@ interface Issuer :
                     CredentialEndpointClient(
                         credentialOffer.credentialIssuerMetadata.credentialEndpoint,
                         dPoPJwtFactory,
-                        ktorHttpClientFactory,
+                        httpClient,
                     )
                 val nonceEndpointClient = credentialOffer.credentialIssuerMetadata.nonceEndpoint?.let {
                     NonceEndpointClient(
                         credentialOffer.credentialIssuerMetadata.nonceEndpoint,
-                        ktorHttpClientFactory,
+                        httpClient,
                     )
                 }
                 RequestIssuanceImpl(
@@ -183,7 +183,7 @@ interface Issuer :
                     else -> {
                         val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
                         val deferredEndPointClient =
-                            DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, ktorHttpClientFactory)
+                            DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, httpClient)
                         QueryForDeferredCredential(refreshAccessToken, deferredEndPointClient, responseEncryptionSpec)
                     }
                 }
@@ -193,7 +193,7 @@ interface Issuer :
                     null -> NotifyIssuer.NoOp
                     else -> {
                         val notificationEndPointClient =
-                            NotificationEndPointClient(notificationEndpoint, dPoPJwtFactory, ktorHttpClientFactory)
+                            NotificationEndPointClient(notificationEndpoint, dPoPJwtFactory, httpClient)
                         NotifyIssuer(notificationEndPointClient)
                     }
                 }
@@ -251,7 +251,7 @@ interface Issuer :
          *
          * @param config wallet's configuration options
          * @param credentialOfferUri the credential offer uri to be resolved
-         * @param ktorHttpClientFactory a factory for obtaining http clients, used while interacting with issuer
+         * @param httpClient an http client, used while interacting with issuer
          * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
          *
          * @return if wallet's [config] can satisfy the requirements of the resolved credentialOffer an [Issuer] will be
@@ -260,12 +260,12 @@ interface Issuer :
         suspend fun make(
             config: OpenId4VCIConfig,
             credentialOfferUri: String,
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            httpClient: HttpClient,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Result<Issuer> = runCatching {
-            val credentialOfferRequestResolver = CredentialOfferRequestResolver(ktorHttpClientFactory, config.issuerMetadataPolicy)
+            val credentialOfferRequestResolver = CredentialOfferRequestResolver(httpClient, config.issuerMetadataPolicy)
             val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUri).getOrThrow()
-            make(config, credentialOffer, ktorHttpClientFactory, responseEncryptionSpecFactory).getOrThrow()
+            make(config, credentialOffer, httpClient, responseEncryptionSpecFactory).getOrThrow()
         }
 
         /**
@@ -279,7 +279,7 @@ interface Issuer :
          * @param config wallet's configuration options
          * @param credentialIssuerId the id of the credential issuer
          * @param credentialConfigurationIdentifiers a list of credential configuration identifiers
-         * @param ktorHttpClientFactory a factory for obtaining http clients, used while interacting with issuer
+         * @param httpClient an http client, used while interacting with issuer
          * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
          *
          * @return if wallet's [config] can satisfy the requirements of credential issuer, an [Issuer] will be
@@ -289,7 +289,7 @@ interface Issuer :
             config: OpenId4VCIConfig,
             credentialIssuerId: CredentialIssuerId,
             credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            httpClient: HttpClient,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
         ): Result<Issuer> = runCatching {
             require(credentialConfigurationIdentifiers.isNotEmpty()) {
@@ -297,7 +297,7 @@ interface Issuer :
             }
 
             val (credentialIssuerMetadata, authServersMetadata) =
-                ktorHttpClientFactory().use { httpClient -> metaData(httpClient, credentialIssuerId, config.issuerMetadataPolicy) }
+                metaData(httpClient, credentialIssuerId, config.issuerMetadataPolicy)
 
             val credentialOffer =
                 CredentialOffer(
@@ -308,7 +308,7 @@ interface Issuer :
                     Grants.AuthorizationCode(issuerState = null),
                 )
 
-            make(config, credentialOffer, ktorHttpClientFactory, responseEncryptionSpecFactory).getOrThrow()
+            make(config, credentialOffer, httpClient, responseEncryptionSpecFactory).getOrThrow()
         }
 
         val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =

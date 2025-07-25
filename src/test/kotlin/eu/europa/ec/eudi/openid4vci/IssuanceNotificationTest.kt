@@ -29,7 +29,7 @@ class IssuanceNotificationTest {
     @Test
     fun `when issuance response contains notification_id, it is present in and can be used for notifications`() = runTest {
         val credential = "issued_credential_content_sd_jwt_vc"
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -65,7 +65,7 @@ class IssuanceNotificationTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
         with(issuer) {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
@@ -91,7 +91,7 @@ class IssuanceNotificationTest {
 
     @Test
     fun `when notification request failed, a Result failure is returned`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -115,7 +115,7 @@ class IssuanceNotificationTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
         with(issuer) {
             val result = authorizedRequest.notify(

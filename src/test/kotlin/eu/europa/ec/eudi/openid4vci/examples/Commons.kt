@@ -126,7 +126,7 @@ suspend fun Issuer.submitCredentialRequest(
 
 suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(
     env: ENV,
-    enableHttpLogging: Boolean = false,
+    httpClient: HttpClient,
 ): AuthorizedRequest
     where
           ENV : HasTestUser<USER>,
@@ -138,7 +138,7 @@ suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(
             val (authorizationCode, serverState) = env.loginUserAndGetAuthCode(
                 authorizationRequestPrepared,
                 testUser,
-                enableHttpLogging,
+                httpClient,
             )
             authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState).getOrThrow()
         }
@@ -149,34 +149,39 @@ suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(
  */
 suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
     env: ENV,
-    enableHttpLogging: Boolean,
     credCfgId: CredentialConfigurationIdentifier = credentialOffer.credentialConfigurationIdentifiers.first(),
     batchOption: BatchOption,
+    httpClient: HttpClient,
 ) where
       ENV : HasTestUser<USER>,
       ENV : CanAuthorizeIssuance<USER> =
     coroutineScope {
-        val authorizedReq = authorizeUsingAuthorizationCodeFlow(env, enableHttpLogging)
+        val authorizedReq = authorizeUsingAuthorizationCodeFlow(env, httpClient)
         val (updatedAuthorizedReq, outcome) =
             submitCredentialRequest(authorizedReq, credCfgId, batchOption)
 
-        ensureIssued(updatedAuthorizedReq, outcome)
+        ensureIssued(updatedAuthorizedReq, outcome, httpClient)
     }
 
 suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
     txCode: String?,
     credCfgId: CredentialConfigurationIdentifier,
     batchOption: BatchOption,
+    httpClient: HttpClient,
 ) = coroutineScope {
     val (authorized, outcome) = run {
         val authorizedRequest = authorizeWithPreAuthorizationCode(txCode).getOrThrow()
         submitCredentialRequest(authorizedRequest, credCfgId, batchOption)
     }
 
-    ensureIssued(authorized, outcome)
+    ensureIssued(authorized, outcome, httpClient)
 }
 
-suspend fun Issuer.ensureIssued(authorized: AuthorizedRequest, outcome: SubmissionOutcome) {
+suspend fun Issuer.ensureIssued(
+    authorized: AuthorizedRequest,
+    outcome: SubmissionOutcome,
+    httpClient: HttpClient,
+) {
     when (outcome) {
         is SubmissionOutcome.Failed -> {
             fail("Issuer rejected request. Reason :${outcome.error.message}")
@@ -186,7 +191,7 @@ suspend fun Issuer.ensureIssued(authorized: AuthorizedRequest, outcome: Submissi
                 "Got a deferred issuance response from server with transaction_id ${outcome.transactionId.value}. Retrying issuance...",
             )
             val deferredCtx = authorized.deferredContext(outcome)
-            handleDeferred(deferredCtx).onEach(::println)
+            handleDeferred(deferredCtx, httpClient).onEach(::println)
         }
         is SubmissionOutcome.Success -> {
             outcome.credentials.forEach(::println)
@@ -196,11 +201,12 @@ suspend fun Issuer.ensureIssued(authorized: AuthorizedRequest, outcome: Submissi
 
 suspend fun handleDeferred(
     initialContext: DeferredIssuanceContext,
+    httpClient: HttpClient,
 ): List<IssuedCredential> {
     var ctx = initialContext
     var cred: List<IssuedCredential>
     do {
-        val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(ctx = ctx).getOrThrow()
+        val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(ctx = ctx, httpClient).getOrThrow()
         ctx = newCtx ?: ctx
         cred = when (outcome) {
             is DeferredCredentialQueryOutcome.Errored -> error(outcome.error)
@@ -226,8 +232,8 @@ suspend fun handleDeferred(
  */
 suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
     credCfgId: CredentialConfigurationIdentifier,
-    enableHttpLogging: Boolean = false,
     batchOption: BatchOption = BatchOption.DontUse,
+    httpClient: HttpClient,
 ) where
       ENV : HasTestUser<USER>,
       ENV : CanAuthorizeIssuance<USER>,
@@ -235,7 +241,7 @@ suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
       ENV : CanRequestForCredentialOffer<USER> {
     val credentialOfferUri = requestAuthorizationCodeGrantOffer(credCfgIds = setOf(credCfgId))
     val issuer = assertDoesNotThrow {
-        createIssuer(credentialOfferUri.toString(), enableHttpLogging)
+        createIssuer(credentialOfferUri.toString(), httpClient)
     }
 
     with(issuer) {
@@ -243,8 +249,8 @@ suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
         assertNotNull(credCfg)
         testIssuanceWithAuthorizationCodeFlow(
             env = this@testIssuanceWithAuthorizationCodeFlow,
-            enableHttpLogging = enableHttpLogging,
             batchOption = batchOption,
+            httpClient = httpClient,
         )
     }
 }
@@ -253,8 +259,8 @@ suspend fun <ENV, USER> ENV.testIssuanceWithPreAuthorizedCodeFlow(
     txCode: String?,
     credCfgId: CredentialConfigurationIdentifier,
     credentialOfferEndpoint: String? = null,
-    enableHttpLogging: Boolean = false,
     batchOption: BatchOption,
+    httpClient: HttpClient,
 ) where ENV : CanBeUsedWithVciLib, ENV : HasTestUser<USER>, ENV : CanRequestForCredentialOffer<USER> {
     val credentialOfferUri = requestPreAuthorizedCodeGrantOffer(
         setOf(credCfgId),
@@ -262,12 +268,12 @@ suspend fun <ENV, USER> ENV.testIssuanceWithPreAuthorizedCodeFlow(
         credentialOfferEndpoint = credentialOfferEndpoint,
     )
     val issuer = assertDoesNotThrow {
-        createIssuer(credentialOfferUri.toString(), enableHttpLogging)
+        createIssuer(credentialOfferUri.toString(), httpClient)
     }
     with(issuer) {
         val credCfg = credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credCfgId]
         assertNotNull(credCfg)
-        testIssuanceWithPreAuthorizedCodeFlow(txCode, credCfgId, batchOption)
+        testIssuanceWithPreAuthorizedCodeFlow(txCode, credCfgId, batchOption, httpClient)
     }
 }
 

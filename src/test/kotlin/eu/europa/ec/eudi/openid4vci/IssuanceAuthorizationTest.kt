@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.http.PushedAuthorizationRequestResponseTO
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenResponseTO
+import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
@@ -34,7 +35,7 @@ class IssuanceAuthorizationTest {
 
     @Test
     fun `successful authorization with authorization code flow (wallet initiated)`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedHttpClient = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker { request ->
@@ -52,11 +53,11 @@ class IssuanceAuthorizationTest {
             },
         )
 
-        val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_NO_GRANTS)
+        val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
         val issuer = Issuer.make(
             config = OpenId4VCIConfiguration,
             credentialOffer = offer,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedHttpClient,
         ).getOrThrow()
         with(issuer) {
             val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
@@ -71,7 +72,7 @@ class IssuanceAuthorizationTest {
     @Test
     fun `successful authorization with authorization code flow`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedHttpClient = mockedHttpClient(
                 credentialIssuerMetadataWellKnownMocker(),
                 authServerWellKnownMocker(),
                 parPostMocker { request ->
@@ -88,11 +89,11 @@ class IssuanceAuthorizationTest {
                 },
             )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedHttpClient,
             ).getOrThrow()
             with(issuer) {
                 val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
@@ -107,7 +108,7 @@ class IssuanceAuthorizationTest {
     @Test
     fun `successful authorization with pre-authorization code flow`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedHttpClient = mockedHttpClient(
                 authServerWellKnownMocker(),
                 credentialIssuerMetadataWellKnownMocker(),
                 parPostMocker {
@@ -117,11 +118,11 @@ class IssuanceAuthorizationTest {
                     with(request) { tokenPostApplyPreAuthFlowAssertionsAndGetFormData() }
                 },
             )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
+            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedHttpClient,
             ).getOrThrow()
             with(issuer) {
                 authorizeWithPreAuthorizationCode("1234").getOrThrow()
@@ -131,16 +132,16 @@ class IssuanceAuthorizationTest {
     @Test
     fun `(pre-auth flow) when pre-authorized grant's tx_code is of wrong length exception is raised`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedHttpClient = mockedHttpClient(
                 authServerWellKnownMocker(),
                 credentialIssuerMetadataWellKnownMocker(),
             )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
+            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedHttpClient,
             ).getOrThrow()
 
             with(issuer) {
@@ -161,16 +162,16 @@ class IssuanceAuthorizationTest {
     @Test
     fun `(pre-auth flow) when pre-authorized grant's tx_code is of wrong input mode exception is raised`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedHttpClient = mockedHttpClient(
                 authServerWellKnownMocker(),
                 credentialIssuerMetadataWellKnownMocker(),
             )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
+            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedHttpClient,
             ).getOrThrow()
 
             with(issuer) {
@@ -191,7 +192,7 @@ class IssuanceAuthorizationTest {
     @Test
     fun `when par endpoint responds with failure, exception PushedAuthorizationRequestFailed is thrown`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedHttpClient = mockedHttpClient(
                 authServerWellKnownMocker(),
                 credentialIssuerMetadataWellKnownMocker(),
                 RequestMocker(
@@ -212,11 +213,11 @@ class IssuanceAuthorizationTest {
                     },
                 ),
             )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_AUTH_GRANT)
+            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedHttpClient,
             ).getOrThrow()
             with(issuer) {
                 prepareAuthorizationRequest()
@@ -236,7 +237,7 @@ class IssuanceAuthorizationTest {
     @Test
     fun `(auth code flow) when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedHttpClient = mockedHttpClient(
                 authServerWellKnownMocker(),
                 credentialIssuerMetadataWellKnownMocker(),
                 parPostMocker(),
@@ -257,11 +258,11 @@ class IssuanceAuthorizationTest {
                     },
                 ),
             )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_AUTH_GRANT)
+            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedHttpClient,
             ).getOrThrow()
 
             with(issuer) {
@@ -286,7 +287,7 @@ class IssuanceAuthorizationTest {
     @Test
     fun `(pre-auth code flow) when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedHttpClient = mockedHttpClient(
                 authServerWellKnownMocker(),
                 credentialIssuerMetadataWellKnownMocker(),
                 RequestMocker(
@@ -306,11 +307,11 @@ class IssuanceAuthorizationTest {
                     },
                 ),
             )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
+            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedHttpClient,
             ).getOrThrow()
 
             with(issuer) {
@@ -329,10 +330,10 @@ class IssuanceAuthorizationTest {
         }
 
     private suspend fun credentialOffer(
-        ktorHttpClientFactory: KtorHttpClientFactory,
+        httpClient: HttpClient,
         credentialOfferStr: String,
     ): CredentialOffer {
-        return CredentialOfferRequestResolver(ktorHttpClientFactory, IssuerMetadataPolicy.IgnoreSigned)
+        return CredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.IgnoreSigned)
             .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
             .getOrThrow()
     }

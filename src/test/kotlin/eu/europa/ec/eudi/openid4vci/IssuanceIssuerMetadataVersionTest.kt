@@ -44,7 +44,7 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when encryption algorithm is not supported by issuer then throw ResponseEncryptionAlgorithmNotSupportedByIssuer`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
@@ -61,7 +61,7 @@ class IssuanceIssuerMetadataVersionTest {
                     authorizeRequestForCredentialOffer(
                         credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                         responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
-                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                        httpClient = mockedKtorHttpClientFactory,
                     )
                 },
             )
@@ -70,7 +70,7 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuance request encryption method is not supported by issuer then throw ResponseEncryptionMethodNotSupportedByIssuer`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
@@ -87,7 +87,7 @@ class IssuanceIssuerMetadataVersionTest {
                     authorizeRequestForCredentialOffer(
                         credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                         responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
-                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                        httpClient = mockedKtorHttpClientFactory,
                     )
                 },
             )
@@ -96,7 +96,7 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `response encryption unsupported by issuer, required by wallet, then ResponseEncryptionRequiredByWalletButNotSupportedByIssuer`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
@@ -116,7 +116,7 @@ class IssuanceIssuerMetadataVersionTest {
                         ),
                         credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                         responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
-                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                        httpClient = mockedKtorHttpClientFactory,
                     )
                 },
             )
@@ -125,7 +125,7 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `no crypto material generated when required, then WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
@@ -140,7 +140,7 @@ class IssuanceIssuerMetadataVersionTest {
                         ),
                         credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                         responseEncryptionSpecFactory = { _, _ -> null },
-                        ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                        httpClient = mockedKtorHttpClientFactory,
                     )
                 },
             )
@@ -149,7 +149,7 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuer does not support encrypted responses encryption spec is ignored in submitted request`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
@@ -173,7 +173,7 @@ class IssuanceIssuerMetadataVersionTest {
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
@@ -186,7 +186,7 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuer supports but not mandates encrypted responses, client can request encrypted responses`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
@@ -224,7 +224,7 @@ class IssuanceIssuerMetadataVersionTest {
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
@@ -237,7 +237,7 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuer supports but not mandates encrypted responses, client can request NON encrypted responses`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
@@ -256,7 +256,7 @@ class IssuanceIssuerMetadataVersionTest {
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> null },
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
@@ -269,7 +269,7 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuer mandates encrypted responses, request must include response encryption material`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
@@ -328,7 +328,7 @@ class IssuanceIssuerMetadataVersionTest {
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
@@ -342,7 +342,7 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuer mandates encrypted responses, batch request must not include encryption spec in its individual single requests`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
@@ -389,7 +389,7 @@ class IssuanceIssuerMetadataVersionTest {
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
@@ -401,7 +401,7 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuer mandates encrypted responses, batch response is encrypted and parsable`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
@@ -434,7 +434,7 @@ class IssuanceIssuerMetadataVersionTest {
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
             val (_, outcome) = with(issuer) {
@@ -449,7 +449,7 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuance request mandates encrypted responses and deferred response is not encrypted, throw InvalidResponseContentType`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
                 authServerWellKnownMocker(),
                 parPostMocker(),
@@ -476,7 +476,7 @@ class IssuanceIssuerMetadataVersionTest {
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
                 responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
             with(issuer) {
@@ -502,7 +502,7 @@ class IssuanceIssuerMetadataVersionTest {
             algorithm = JWEAlgorithm.RSA_OAEP_256,
             encryptionMethod = EncryptionMethod.A128CBC_HS256,
         )
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -541,7 +541,7 @@ class IssuanceIssuerMetadataVersionTest {
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
             responseEncryptionSpecFactory = { _, _ -> responseEncryption },
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
         with(issuer) {
@@ -561,17 +561,17 @@ class IssuanceIssuerMetadataVersionTest {
 
     @Test
     fun `when metadata response contains four valid and one unknown format, skip it and deserialize everything else`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),
             nonceEndpointMocker(),
             credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.CONTAINS_DEPRECATED_METHOD),
         )
-        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+        val (_, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
             responseEncryptionSpecFactory = { _, _ -> null },
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
         assertTrue("Deserialization did not discard unknown format credential_configurations_supported values") {
             issuer.credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported.count() == 4

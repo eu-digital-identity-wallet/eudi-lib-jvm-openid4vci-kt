@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointForm
+import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
@@ -33,7 +34,7 @@ class RichAuthorizationRequestTest {
 
     @Test
     fun `when AuthorizationDetailsInTokenRequest is Include in pre-authorization flow expect authorization_details`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             authServerWellKnownMocker(),
             credentialIssuerMetadataWellKnownMocker(),
             parPostMocker {
@@ -62,7 +63,7 @@ class RichAuthorizationRequestTest {
         val issuer = Issuer.make(
             config = OpenId4VCIConfiguration,
             credentialOffer = offer,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         ).getOrThrow()
         with(issuer) {
             authorizeWithPreAuthorizationCode(
@@ -75,7 +76,7 @@ class RichAuthorizationRequestTest {
     @Test
     fun `when config is FAVOR_SCOPES, auth details option is Include and all credentials have scopes no authorization_details expected`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 credentialIssuerMetadataWellKnownMocker(),
                 authServerWellKnownMocker(),
                 parPostMocker { request ->
@@ -101,7 +102,7 @@ class RichAuthorizationRequestTest {
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             ).getOrThrow()
             with(issuer) {
                 val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
@@ -120,7 +121,7 @@ class RichAuthorizationRequestTest {
     @Test
     fun `when config is FAVOR_SCOPES, auth details option is Include and some credentials have no scopes, expect authorization_details`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 // Credential Issuer Metadata Well Known Mocker
                 RequestMocker(
                     requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
@@ -159,7 +160,7 @@ class RichAuthorizationRequestTest {
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             ).getOrThrow()
             with(issuer) {
                 val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
@@ -178,7 +179,7 @@ class RichAuthorizationRequestTest {
     @Test
     fun `when FAVOR_SCOPES, auth details option is DoNotInclude and credentials have no scope attribute, no authorization_details`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 // Credential Issuer Metadata Well Known Mocker
                 RequestMocker(
                     requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
@@ -208,7 +209,7 @@ class RichAuthorizationRequestTest {
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             ).getOrThrow()
 
             with(issuer) {
@@ -228,7 +229,7 @@ class RichAuthorizationRequestTest {
     @Test
     fun `when one of the offer credentials has no scope, then expect 'authorization_details' and 'scope' parameter in request`() =
         runTest {
-            val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+            val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker { request ->
                     val form = with(request) { parPostApplyAssertionsAndGetFormData(true) }
@@ -265,7 +266,7 @@ class RichAuthorizationRequestTest {
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             ).getOrThrow()
 
             val authRequestPrepared = issuer.prepareAuthorizationRequest().getOrThrow()
@@ -276,10 +277,10 @@ class RichAuthorizationRequestTest {
         }
 
     private suspend fun credentialOffer(
-        ktorHttpClientFactory: KtorHttpClientFactory,
+        httpClient: HttpClient,
         credentialOfferStr: String,
     ): CredentialOffer {
-        return CredentialOfferRequestResolver(ktorHttpClientFactory, IssuerMetadataPolicy.IgnoreSigned)
+        return CredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.IgnoreSigned)
             .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
             .getOrThrow()
     }

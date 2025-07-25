@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.examples
 
 import eu.europa.ec.eudi.openid4vci.*
+import io.ktor.client.*
 import kotlinx.coroutines.runBlocking
 
 fun main(): Unit = runBlocking {
@@ -27,29 +28,32 @@ fun runUseCase(
     credentialIssuerId: CredentialIssuerId,
     credentialConfigurationIds: List<CredentialConfigurationIdentifier>,
 ): Unit = runBlocking {
-    println("[[Scenario: Issuance based on credential configuration ids: $credentialConfigurationIds]] ")
+    createHttpClient(enableLogging = false).use { httpClient ->
+        println("[[Scenario: Issuance based on credential configuration ids: $credentialConfigurationIds]] ")
 
-    val issuer = Issuer.makeWalletInitiated(
-        config,
-        credentialIssuerId,
-        credentialConfigurationIds,
-        { createHttpClient(enableLogging = false) },
-    ).getOrThrow()
+        val issuer = Issuer.makeWalletInitiated(
+            config,
+            credentialIssuerId,
+            credentialConfigurationIds,
+            httpClient,
+        ).getOrThrow()
 
-    with(issuer) {
-        authorizationLog("Using authorized code flow to authorize")
-        var authorizedRequest = authorizeRequestWithAuthCodeUseCase(PidDevIssuer.testUser).also {
-            authorizationLog("Authorization retrieved: $it")
-        }
+        with(issuer) {
+            authorizationLog("Using authorized code flow to authorize")
+            var authorizedRequest = authorizeRequestWithAuthCodeUseCase(PidDevIssuer.testUser).also {
+                authorizationLog("Authorization retrieved: $it")
+            }
 
-        credentialOffer.credentialConfigurationIdentifiers.forEach { credentialIdentifier ->
+            credentialOffer.credentialConfigurationIdentifiers.forEach { credentialIdentifier ->
 
-            submitCredentialRequest(
-                authorizedRequest,
-                credentialIdentifier,
-            ).also { (newAuthorizedRequest, credential) ->
-                println("--> Issued credential: $credential \n")
-                authorizedRequest = newAuthorizedRequest
+                submitCredentialRequest(
+                    authorizedRequest,
+                    credentialIdentifier,
+                    httpClient,
+                ).also { (newAuthorizedRequest, credential) ->
+                    println("--> Issued credential: $credential \n")
+                    authorizedRequest = newAuthorizedRequest
+                }
             }
         }
     }
@@ -63,10 +67,14 @@ private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: Keycl
     }
 
     return with(prepareAuthorizationCodeRequest) {
-        val (authorizationCode, serverState) = PidDevIssuer.loginUserAndGetAuthCode(
-            prepareAuthorizationCodeRequest,
-            actingUser,
-        )
+        val (authorizationCode, serverState) =
+            createHttpClient(false).use { httpClient ->
+                PidDevIssuer.loginUserAndGetAuthCode(
+                    prepareAuthorizationCodeRequest,
+                    actingUser,
+                    httpClient,
+                )
+            }
 
         authorizationLog("Authorization code retrieved: $authorizationCode")
 
@@ -79,6 +87,7 @@ private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: Keycl
 private suspend fun Issuer.submitCredentialRequest(
     authorizedRequest: AuthorizedRequest,
     credentialConfigurationId: CredentialConfigurationIdentifier,
+    httpClient: HttpClient,
 ): AuthorizedRequestAnd<List<IssuedCredential>> {
     issuanceLog("Requesting issuance of '$credentialConfigurationId'")
     val proofSigners = popSigners(credentialConfigurationId, proofsNo = 1)
@@ -92,11 +101,12 @@ private suspend fun Issuer.submitCredentialRequest(
             println("Hm we got a deferred issuance case with ${outcome.transactionId.value}")
             val vcs = run {
                 val ctx = newAuthorized.deferredContext(outcome)
-                queryDeferredEndpoint(ctx)
+                queryDeferredEndpoint(ctx, httpClient)
             }
 
             newAuthorized to vcs
         }
+
         is SubmissionOutcome.Failed ->
             throw if (outcome.error is CredentialIssuanceError.InvalidProof) {
                 IllegalStateException("Although providing a proof with c_nonce the proof is still invalid")
@@ -106,11 +116,12 @@ private suspend fun Issuer.submitCredentialRequest(
 
 private suspend fun queryDeferredEndpoint(
     deferredContext: DeferredIssuanceContext,
+    httpClient: HttpClient,
 ): List<IssuedCredential> {
     var ctx = deferredContext
     var cred: List<IssuedCredential>
     do {
-        val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(ctx = ctx).getOrThrow()
+        val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(ctx = ctx, httpClient).getOrThrow()
         ctx = newCtx ?: ctx
         cred = when (outcome) {
             is DeferredCredentialQueryOutcome.Errored -> error(outcome.error)

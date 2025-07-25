@@ -20,6 +20,7 @@ import eu.europa.ec.eudi.openid4vci.DeferredIssuer.Companion.make
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessToken
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
+import io.ktor.client.*
 import java.net.URI
 import java.net.URL
 import java.time.Clock
@@ -92,7 +93,7 @@ interface DeferredIssuer : QueryForDeferredCredential {
          * Creates a [DeferredIssuer] using the [ctx] and then queries the endpoint
          *
          * @param ctx the context containing the data needed to instantiate the issuer and query the endpoint
-         * @param ktorHttpClientFactory a factory for getting http clients, used while interacting with issuer
+         * @param httpClient an http client, used while interacting with issuer
          *
          * @return The method returns a pair comprised of:
          * - On the right side, there is the [outcome][DeferredCredentialQueryOutcome] of querying the endpoint
@@ -101,9 +102,9 @@ interface DeferredIssuer : QueryForDeferredCredential {
          */
         suspend fun queryForDeferredCredential(
             ctx: DeferredIssuanceContext,
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            httpClient: HttpClient,
         ): Result<Pair<DeferredIssuanceContext?, DeferredCredentialQueryOutcome>> = runCatching {
-            val deferredIssuer = make(ctx.config, ktorHttpClientFactory).getOrThrow()
+            val deferredIssuer = make(ctx.config, httpClient).getOrThrow()
             val (newAuthorized, outcome) = with(deferredIssuer) {
                 with(ctx.authorizedTransaction.authorizedRequest) {
                     val transactionId = ctx.authorizedTransaction.transactionId
@@ -129,13 +130,13 @@ interface DeferredIssuer : QueryForDeferredCredential {
          * Factory method for getting an instance of [DeferredIssuer]
          *
          * @param config the minimal configuration needed.
-         * @param ktorHttpClientFactory a factory for getting http clients, used while interacting with issuer
+         * @param httpClient an http client, used while interacting with issuer
          *
          * @return the deferred issuer instance
          */
         fun make(
             config: DeferredIssuerConfig,
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            httpClient: HttpClient,
         ): Result<DeferredIssuer> = runCatching {
             val dPoPJwtFactory = config.dPoPSigner?.let { signer ->
                 DPoPJwtFactory(signer = signer, clock = config.clock)
@@ -150,14 +151,14 @@ interface DeferredIssuer : QueryForDeferredCredential {
                 config.tokenEndpoint,
                 dPoPJwtFactory,
                 config.clientAttestationPoPBuilder,
-                ktorHttpClientFactory,
+                httpClient,
             )
 
             val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
             val deferredEndPointClient = DeferredEndPointClient(
                 CredentialIssuerEndpoint.invoke(config.deferredEndpoint.toString()).getOrThrow(),
                 dPoPJwtFactory,
-                ktorHttpClientFactory,
+                httpClient,
             )
             val queryForDeferredCredential =
                 QueryForDeferredCredential(
