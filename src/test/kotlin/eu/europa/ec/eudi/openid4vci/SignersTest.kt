@@ -18,7 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.keyAttestationJwtEC
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.keyAttestationJwt
 import eu.europa.ec.eudi.openid4vci.internal.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Nested
@@ -98,7 +98,7 @@ class SignersTest {
 
             val signer = Signer.fromNimbusEcKey(
                 ecKey,
-                keyAttestationJwtEC(
+                keyAttestationJwt(
                     attestedKeys = listOf(ecKey.toPublicJWK()),
                 ),
                 secureRandom = null,

@@ -20,7 +20,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.ECDSASigner
-import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
@@ -85,11 +84,12 @@ object CryptoGenerator {
 
     fun keyAttestationJwtProofsSpec(
         curve: Curve = Curve.P_256,
+        attestedKeysCount: Int = 3,
     ): ProofsSpecification {
-        val ecKeys = List(3) { randomECSigningKey(curve) }
+        val ecKeys = List(attestedKeysCount) { randomECSigningKey(curve) }
         val signer = Signer.fromNimbusEcKey(
             ecPrivateKey = ecKeys[0],
-            keyInfo = keyAttestationJwtEC(
+            keyInfo = keyAttestationJwt(
                 attestedKeys = ecKeys.map { it.toPublicJWK() },
             ),
             secureRandom = null,
@@ -98,37 +98,25 @@ object CryptoGenerator {
         return ProofsSpecification.JwtProofs.WithKeyAttestation(signer, 1)
     }
 
-    fun keyAttestationJwtEC(
+    fun keyAttestationJwt(
         attestedKeys: List<JWK>,
     ) = run {
-        val ecKey = randomECSigningKey(Curve.P_256)
+        val signingKey = randomECSigningKey(Curve.P_256)
         val jwt = randomKeyAttestationJwt(
             attestedKeys = attestedKeys,
-            jwk = ecKey.toPublicJWK(),
-            signer = ECDSASigner(ecKey.toECKey()),
-        )
-        KeyAttestationJWT(jwt.serialize())
-    }
-
-    fun keyAttestationJwtRsa(
-        attestedKeys: List<JWK>,
-    ) = run {
-        val rsaKey = randomRSASigningKey(256)
-        val jwt = randomKeyAttestationJwt(
-            attestedKeys = attestedKeys,
-            jwk = rsaKey.toPublicJWK(),
-            signer = RSASSASigner(rsaKey),
+            jwk = signingKey.toPublicJWK(),
+            signer = ECDSASigner(signingKey),
         )
         KeyAttestationJWT(jwt.serialize())
     }
 
     fun randomKeyAttestationJwt(): SignedJWT {
-        val ecKeys = List(3) { randomECSigningKey(Curve.P_256) }
-        val ecKey = randomECSigningKey(Curve.P_256)
+        val attestedKeys = List(3) { randomECSigningKey(Curve.P_256) }
+        val signingKey = randomECSigningKey(Curve.P_256)
         return randomKeyAttestationJwt(
-            attestedKeys = ecKeys.map { it.toPublicJWK() },
-            jwk = ecKey.toPublicJWK(),
-            signer = ECDSASigner(ecKey.toECKey()),
+            attestedKeys = attestedKeys.map { it.toPublicJWK() },
+            jwk = signingKey.toPublicJWK(),
+            signer = ECDSASigner(signingKey),
         )
     }
 
@@ -142,8 +130,10 @@ object CryptoGenerator {
             .jwk(jwk)
             .build(),
         JWTClaimsSet.Builder().apply {
-            issueTime(Date.from(now()))
             claim("attested_keys", attestedKeys.map { it.toJSONObject() })
+            claim("key_storage", listOf("iso_18045_moderate"))
+            claim("user_authentication", listOf("iso_18045_moderate"))
+            issueTime(Date.from(now()))
             expirationTime(Date.from(now().plusSeconds(3600)))
         }.build(),
     ).apply { sign(signer) }

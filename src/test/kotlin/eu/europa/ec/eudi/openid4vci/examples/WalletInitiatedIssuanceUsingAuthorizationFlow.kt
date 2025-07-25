@@ -17,8 +17,8 @@ package eu.europa.ec.eudi.openid4vci.examples
 
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
-import io.ktor.client.*
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
+import io.ktor.client.*
 import kotlinx.coroutines.runBlocking
 
 fun main(): Unit = runBlocking {
