@@ -88,6 +88,36 @@ private class KeyAttestationJWTTest {
     }
 
     @Test
+    fun `KeyAttestationJWT should have valid attested keys claim`() {
+        val signedJwt = SignedJWT(
+            JWSHeader.Builder(JWSAlgorithm.ES256)
+                .type(JOSEObjectType(KEY_ATTESTATION_JWT_TYPE))
+                .build(),
+            JWTClaimsSet.Builder()
+                .issueTime(Date())
+                .claim("attested_keys", listOf("jwk1", "jwk2"))
+                .build(),
+        ).apply { sign(signer) }
+        val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(signedJwt.serialize()) }
+        assertEquals("Invalid Key Attestation JWT. Item at index 0 in `attested_keys` is not a JSON object.", exception.message)
+    }
+
+    @Test
+    fun `KeyAttestationJWT should not have private keys in the attested keys claim`() {
+        val signedJwt = SignedJWT(
+            JWSHeader.Builder(JWSAlgorithm.ES256)
+                .type(JOSEObjectType(KEY_ATTESTATION_JWT_TYPE))
+                .build(),
+            JWTClaimsSet.Builder()
+                .issueTime(Date())
+                .claim("attested_keys", listOf(ecKeyJwk.toJSONObject()))
+                .build(),
+        ).apply { sign(signer) }
+        val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(signedJwt.serialize()) }
+        assertEquals("Invalid Key Attestation JWT. Item at index 0 in `attested_keys` must be a public key.", exception.message)
+    }
+
+    @Test
     fun `KeyAttestationJWT should be created when valid`() {
         val signedJwt = SignedJWT(
             JWSHeader.Builder(JWSAlgorithm.ES256)
