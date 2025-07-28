@@ -17,46 +17,58 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 
-data class KeyAttestationJWT(val value: String) {
+@Serializable
+@JvmInline
+value class KeyAttestationJWT(val value: String) {
 
     val attestedKeys: List<JWK>
+        get() = validateJwt(value).getOrThrow()
 
     init {
-        val jwt = SignedJWT.parse(value)
-        jwt.ensureSignedNotMAC()
-        require(jwt.header.type != null && jwt.header.type.type.equals(KEY_ATTESTATION_JWT_TYPE)) {
-            "Invalid Key Attestation JWT. Type must be set to `$KEY_ATTESTATION_JWT_TYPE`"
-        }
-        requireNotNull(jwt.jwtClaimsSet.issueTime) { "Invalid Key Attestation JWT. Misses `iat` claim" }
-
-        val attestedKeysClaimEntries = jwt.jwtClaimsSet.getListClaim("attested_keys")
-        requireNotNull(attestedKeysClaimEntries) { "Invalid Key Attestation JWT. Misses `attested_keys` claim" }
-        require(attestedKeysClaimEntries.isNotEmpty()) {
-            "Invalid Key Attestation JWT. `attested_keys` claim must not be empty"
-        }
-
-        attestedKeys = attestedKeysClaimEntries.mapIndexed { index, keyObject ->
-            require(keyObject is Map<*, *>) {
-                "Invalid Key Attestation JWT. Item at index $index in `attested_keys` is not a JSON object."
-            }
-            try {
-                @Suppress("UNCHECKED_CAST")
-                val jwk = JWK.parse(keyObject as Map<String, Any>)
-                require(!jwk.isPrivate) {
-                    "Invalid Key Attestation JWT. Item at index $index in `attested_keys` must be a public key."
-                }
-                jwk
-            } catch (e: java.text.ParseException) {
-                throw IllegalArgumentException(
-                    "Invalid Key Attestation JWT. Item at index $index in `attested_keys` is not a valid JWK: ${e.message}",
-                    e,
-                )
-            }
-        }
+        validateJwt(value).getOrThrow()
     }
 
     companion object {
-        const val KEY_ATTESTATION_JWT_TYPE = "keyattestation+jwt"
+
+        fun validateJwt(value: String): Result<List<JWK>> = runCatching {
+            val jwt = SignedJWT.parse(value)
+            jwt.ensureSignedNotMAC()
+
+            require(jwt.header?.type?.type == OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE) {
+                "Invalid Key Attestation JWT. Type must be set to `$OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE`"
+            }
+
+            val claims = Json.parseToJsonElement(jwt.jwtClaimsSet.toString()).jsonObject
+            require(claims["iat"] != null) { "Invalid Key Attestation JWT. Misses `iat` claim" }
+
+            val attestedKeysClaimEntries = claims[OpenId4VPSpec.KEY_ATTESTATION_ATTESTED_KEYS]?.jsonArray
+            requireNotNull(attestedKeysClaimEntries) { "Invalid Key Attestation JWT. Misses `attested_keys` claim" }
+            require(attestedKeysClaimEntries.isNotEmpty()) {
+                "Invalid Key Attestation JWT. `attested_keys` claim must not be empty"
+            }
+            attestedKeysClaimEntries.mapIndexed { index, keyElement ->
+                require(keyElement is JsonObject) {
+                    "Invalid Key Attestation JWT. Item at index $index in `attested_keys` is not a JSON object."
+                }
+                runCatching {
+                    JWK.parse(keyElement.toString())
+                }.getOrElse { e ->
+                    throw IllegalArgumentException(
+                        "Invalid Key Attestation JWT. Item at index $index in `attested_keys` is not a valid JWK: ${e.message}",
+                        e,
+                    )
+                }.also {
+                    require(!it.isPrivate) {
+                        "Invalid Key Attestation JWT. Item at index $index in `attested_keys` must be a public key."
+                    }
+                }
+            }
+        }
     }
 }

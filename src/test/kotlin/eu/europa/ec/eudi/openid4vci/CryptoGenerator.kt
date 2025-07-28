@@ -22,23 +22,14 @@ import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
-import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.KeyAttestationJWT.Companion.KEY_ATTESTATION_JWT_TYPE
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
-import eu.europa.ec.eudi.openid4vci.internal.fromNimbusRSAKeys
 import java.time.Instant.now
 import java.util.*
 
 object CryptoGenerator {
-
-    fun randomRSASigningKey(size: Int): RSAKey = RSAKeyGenerator(size)
-        .keyUse(KeyUse.SIGNATURE)
-        .keyID(UUID.randomUUID().toString())
-        .issueTime(Date(System.currentTimeMillis()))
-        .generate()
 
     fun randomECSigningKey(curve: Curve): ECKey = ECKeyGenerator(curve)
         .keyUse(KeyUse.SIGNATURE)
@@ -64,18 +55,6 @@ object CryptoGenerator {
         val ecKeys = List(num) { randomECSigningKey(curve) }
         val batchSigner = BatchSigner.fromNimbusEcKeys(
             ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
-            secureRandom = null,
-            provider = null,
-        )
-        return ProofsSpecification.JwtProofs.NoKeyAttestation(batchSigner)
-    }
-
-    fun proofsSpecForRSAKeys(
-        num: Int = 1,
-    ): ProofsSpecification.JwtProofs.NoKeyAttestation {
-        val ecKeys = List(num) { randomRSASigningKey(2048) }
-        val batchSigner = BatchSigner.fromNimbusRSAKeys(
-            rsaKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
             secureRandom = null,
             provider = null,
         )
@@ -126,7 +105,7 @@ object CryptoGenerator {
         signer: JWSSigner,
     ): SignedJWT = SignedJWT(
         JWSHeader.Builder(JWSAlgorithm.ES256)
-            .type(JOSEObjectType(KEY_ATTESTATION_JWT_TYPE))
+            .type(JOSEObjectType(OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE))
             .jwk(jwk)
             .build(),
         JWTClaimsSet.Builder().apply {

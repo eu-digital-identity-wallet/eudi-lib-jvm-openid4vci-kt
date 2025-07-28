@@ -19,7 +19,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.impl.ECDSA
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.RSAKey
 import eu.europa.ec.eudi.openid4vci.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -74,20 +73,12 @@ internal fun ByteArray.transcodeSignatureToConcat(alg: JWSAlgorithm): ByteArray 
 
 internal fun String.toJoseAlg(): JWSAlgorithm =
     this.toJoseECAlg()
-        ?: this.toJoseRSAAlg()
         ?: error("Unsupported algorithm for JWS signature: $this")
 
 internal fun String.toJoseECAlg(): JWSAlgorithm? = when (this) {
     "SHA256withECDSA" -> JWSAlgorithm.ES256
     "SHA384withECDSA" -> JWSAlgorithm.ES384
     "SHA512withECDSA" -> JWSAlgorithm.ES512
-    else -> null
-}
-
-internal fun String.toJoseRSAAlg(): JWSAlgorithm? = when (this) {
-    "SHA256withRSA" -> JWSAlgorithm.RS256
-    "SHA384withRSA" -> JWSAlgorithm.RS384
-    "SHA512withRSA" -> JWSAlgorithm.RS512
     else -> null
 }
 
@@ -201,26 +192,6 @@ internal fun <PUB> BatchSigner.Companion.fromNimbusEcKeys(
     )
 }
 
-internal fun <PUB> BatchSigner.Companion.fromNimbusRSAKeys(
-    rsaKeyPairs: Map<RSAKey, PUB>,
-    secureRandom: SecureRandom?,
-    provider: String?,
-): BatchSigner<PUB> {
-    require(rsaKeyPairs.isNotEmpty()) { "At least one EC key pair must be provided" }
-    rsaKeyPairs.forEach {
-        require(it.key.isPrivate) { "All EC keys must be private keys" }
-    }
-    val signatureAlgorithm = rsaKeyPairs.entries.first().key.toJavaSigningAlg()
-    return fromPrivateKeys(
-        signatureAlgorithm,
-        rsaKeyPairs.map {
-            it.key.toRSAPrivateKey() to it.value
-        }.toMap(),
-        secureRandom,
-        provider,
-    )
-}
-
 internal fun Curve.toJavaSigningAlg(): String {
     return when (this) {
         Curve.P_256 -> "SHA256withECDSA"
@@ -228,14 +199,5 @@ internal fun Curve.toJavaSigningAlg(): String {
         Curve.P_521 -> "SHA512withECDSA"
         Curve.SECP256K1 -> "SHA256withECDSA"
         else -> error("Unsupported algorithm")
-    }
-}
-
-internal fun RSAKey.toJavaSigningAlg(): String {
-    return when (this.size()) {
-        2048 -> "SHA256withRSA"
-        3072 -> "SHA384withRSA"
-        4096 -> "SHA512withRSA"
-        else -> error("Unsupported RSA key size: ${this.size()}")
     }
 }
