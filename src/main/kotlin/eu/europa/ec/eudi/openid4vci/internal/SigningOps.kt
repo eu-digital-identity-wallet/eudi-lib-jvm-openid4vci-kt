@@ -74,7 +74,6 @@ internal fun ByteArray.transcodeSignatureToConcat(alg: JWSAlgorithm): ByteArray 
 internal fun String.toJoseAlg(): JWSAlgorithm =
     this.toJoseECAlg()
         ?: error("Unsupported algorithm for JWS signature: $this")
-
 internal fun String.toJoseECAlg(): JWSAlgorithm? = when (this) {
     "SHA256withECDSA" -> JWSAlgorithm.ES256
     "SHA384withECDSA" -> JWSAlgorithm.ES384
@@ -127,9 +126,9 @@ internal fun <PUB> Signer.Companion.fromEcPrivateKey(
     }
 }
 
-internal fun <PUB> BatchSigner.Companion.fromPrivateKeys(
+internal fun <PUB> BatchSigner.Companion.fromECPrivateKeys(
     signingAlgorithm: String,
-    ecKeyPairs: Map<PrivateKey, PUB>,
+    ecKeyPairs: Map<ECPrivateKey, PUB>,
     secureRandom: SecureRandom?,
     provider: String?,
 ): BatchSigner<PUB> = object : BatchSigner<PUB> {
@@ -182,7 +181,7 @@ internal fun <PUB> BatchSigner.Companion.fromNimbusEcKeys(
         require(it.key.isPrivate) { "All EC keys must be private keys" }
     }
     val signatureAlgorithm = ecKeyPairs.entries.first().key.curve.toJavaSigningAlg()
-    return fromPrivateKeys(
+    return fromECPrivateKeys(
         signatureAlgorithm,
         ecKeyPairs.map {
             it.key.toECPrivateKey() to it.value
@@ -192,12 +191,12 @@ internal fun <PUB> BatchSigner.Companion.fromNimbusEcKeys(
     )
 }
 
+
 internal fun Curve.toJavaSigningAlg(): String {
     return when (this) {
         Curve.P_256 -> "SHA256withECDSA"
         Curve.P_384 -> "SHA384withECDSA"
         Curve.P_521 -> "SHA512withECDSA"
-        Curve.SECP256K1 -> "SHA256withECDSA"
         else -> error("Unsupported algorithm")
     }
 }
