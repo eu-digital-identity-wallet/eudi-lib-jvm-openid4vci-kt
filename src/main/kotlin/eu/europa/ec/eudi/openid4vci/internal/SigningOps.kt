@@ -191,7 +191,6 @@ internal fun <PUB> BatchSigner.Companion.fromNimbusEcKeys(
     )
 }
 
-
 internal fun Curve.toJavaSigningAlg(): String {
     return when (this) {
         Curve.P_256 -> "SHA256withECDSA"
