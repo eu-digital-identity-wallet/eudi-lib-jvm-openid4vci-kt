@@ -16,11 +16,8 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jwt.JWT
-import eu.europa.ec.eudi.openid4vci.CredentialConfiguration
 import eu.europa.ec.eudi.openid4vci.KeyAttestationJWT
 import kotlinx.serialization.Serializable
-
-internal typealias ProofsFactory = suspend (CredentialConfiguration) -> List<Proof>
 
 /**
  * Sealed hierarchy of the proofs of possession that can be included in a credential issuance request. Proofs are used
