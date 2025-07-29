@@ -29,4 +29,6 @@ object OpenId4VPSpec {
 
     const val KEY_ATTESTATION_JWT_TYPE = "keyattestation+jwt"
     const val KEY_ATTESTATION_ATTESTED_KEYS = "attested_keys"
+    const val KEY_ATTESTATION_KEY_STORAGE = "key_storage"
+    const val KEY_ATTESTATION_USER_AUTHENTICATION = "user_authentication"
 }

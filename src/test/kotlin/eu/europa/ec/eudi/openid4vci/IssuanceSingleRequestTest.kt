@@ -19,9 +19,9 @@ import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseUnparsable
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.attestationProofSpec
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.keyAttestationJwtProofsSpec
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.randomKeyAttestationJwt
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
@@ -698,8 +698,7 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            val keyAttestationJWT = KeyAttestationJWT(randomKeyAttestationJwt().serialize())
-            authorizedRequest.request(requestPayload, ProofsSpecification.AttestationProof(keyAttestationJWT)).getOrThrow()
+            authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
         }
     }
 }
