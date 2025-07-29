@@ -27,24 +27,12 @@ import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.NonceEndpointClient
 import java.time.Instant
 
-private sealed interface NonceRequirement {
-
-    data object Required : NonceRequirement
-
-    data object NotRequired : NonceRequirement
-}
-
-private data class ProofRequirements(
-    val nonceRequirement: NonceRequirement,
-    val keyAttestationRequirement: KeyAttestationRequirement,
-)
-
 private sealed interface CredentialProofsRequirement {
 
     data object ProofNotRequired : CredentialProofsRequirement
 
     data class ProofRequired(
-        val proofTypeRequirements: Map<ProofType, ProofRequirements>,
+        val keyAttestationRequirements: Map<ProofType, KeyAttestationRequirement>,
     ) : CredentialProofsRequirement
 }
 
@@ -76,37 +64,29 @@ internal class RequestIssuanceImpl(
 
         // Place the request
         val (outcome, newResourceServerDpopNonce) = placeIssuanceRequest(accessToken, resourceServerDpopNonce) {
-            when (proofsSpecification) {
-                is ProofsSpecification.NoProofs -> {
-                    val proofs = emptyList<Proof>()
-                    buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
-                }
-
-                is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
-                    val cNonce = cNonce()
-                    val proofs = listOf(jwtProofWithKeyAttestation(proofsSpecification, credentialConfigId, cNonce))
-                    buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
-                }
-
-                is ProofsSpecification.JwtProofs.NoKeyAttestation -> proofsSpecification.proofsSigner.use { signOps ->
-                    val proofs = jwtProofsWithoutKeyAttestation(
-                        signOps,
-                        proofsSpecification.proofsSigner.javaAlgorithm,
-                        credentialConfigId,
-                    )
-                    buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
-                }
-
-                is ProofsSpecification.AttestationProof -> {
-                    val proofs = listOf(Proof.Attestation(proofsSpecification.attestation))
-                    buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
-                }
-            }
+            val proofs = buildProofs(proofsSpecification, credentialConfigId)
+            buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
         }
 
         // Update state (maybe) with new Dpop Nonce from resource server
         val updatedAuthorizedRequest = this.withResourceServerDpopNonce(newResourceServerDpopNonce)
         updatedAuthorizedRequest to outcome.toPub()
+    }
+
+    private suspend fun AuthorizedRequest.buildProofs(
+        proofsSpecification: ProofsSpecification,
+        credentialConfigId: CredentialConfigurationIdentifier,
+    ): List<Proof> = when (proofsSpecification) {
+        is ProofsSpecification.NoProofs -> emptyList()
+        is ProofsSpecification.JwtProofs.WithKeyAttestation -> listOf(
+            jwtProofWithKeyAttestation(proofsSpecification, credentialConfigId, cNonce()),
+        )
+        is ProofsSpecification.JwtProofs.NoKeyAttestation -> jwtProofsWithoutKeyAttestation(
+            proofsSpecification,
+            credentialConfigId,
+            cNonce(),
+        )
+        is ProofsSpecification.AttestationProof -> listOf(attestationProof(proofsSpecification, cNonce()))
     }
 
     private fun ProofsSpecification.ensureCompatibleWith(credentialConfigId: CredentialConfigurationIdentifier) {
@@ -120,10 +100,11 @@ internal class RequestIssuanceImpl(
 
             is ProofsSpecification.JwtProofs -> {
                 require(proofsRequirement is CredentialProofsRequirement.ProofRequired)
-                requireNotNull(proofsRequirement.proofTypeRequirements[ProofType.JWT]) {
+
+                val keyAttestationReq = proofsRequirement.keyAttestationRequirements[ProofType.JWT]
+                requireNotNull(keyAttestationReq) {
                     "JWT proofs are provided, but credential configuration does not support JWT proofs"
                 }
-                val (_, keyAttestationReq) = proofsRequirement.proofTypeRequirements[ProofType.JWT]!!
 
                 when (this) {
                     is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
@@ -143,11 +124,11 @@ internal class RequestIssuanceImpl(
 
             is ProofsSpecification.AttestationProof -> {
                 require(proofsRequirement is CredentialProofsRequirement.ProofRequired)
-                val requirements = proofsRequirement.proofTypeRequirements[ProofType.ATTESTATION]
-                requireNotNull(requirements) {
+                val keyAttestationReq = proofsRequirement.keyAttestationRequirements[ProofType.ATTESTATION]
+                requireNotNull(keyAttestationReq) {
                     "Attestation proof is provided, but credential configuration does not support attestation proofs"
                 }
-                require(requirements.keyAttestationRequirement !is KeyAttestationRequirement.NotRequired) {
+                require(keyAttestationReq !is KeyAttestationRequirement.NotRequired) {
                     "Problematic attestation proof key requirement. Issuer requires no key attestation for proof of type 'attestation'"
                 }
             }
@@ -155,7 +136,6 @@ internal class RequestIssuanceImpl(
     }
 
     private fun CredentialConfigurationIdentifier.proofsRequirement(): CredentialProofsRequirement {
-        val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
         val credentialConfiguration = credentialSupportedById(this)
         return when {
             credentialConfiguration.proofTypesSupported.values.isEmpty() -> CredentialProofsRequirement.ProofNotRequired
@@ -163,14 +143,7 @@ internal class RequestIssuanceImpl(
                 credentialConfiguration.proofTypesSupported.values.associate { proofTypeMeta ->
                     val proofType = proofTypeMeta.type() ?: error("Unsupported proof type: $proofTypeMeta")
                     val keyAttestationRequirement = keyAttestationProofsRequirement(proofTypeMeta)
-                    val nonceRequirement = when (credentialIssuerMetadata.nonceEndpoint) {
-                        null -> NonceRequirement.NotRequired
-                        else -> NonceRequirement.Required
-                    }
-                    proofType to ProofRequirements(
-                        nonceRequirement = nonceRequirement,
-                        keyAttestationRequirement = keyAttestationRequirement,
-                    )
+                    proofType to keyAttestationRequirement
                 },
             )
         }
@@ -181,9 +154,9 @@ internal class RequestIssuanceImpl(
         val spec =
             credentialConfiguration.proofTypesSupported.values.filterIsInstance(proofType::class.java).firstOrNull()
         return when (spec) {
-            null -> KeyAttestationRequirement.NotRequired
             is ProofTypeMeta.Jwt -> spec.keyAttestationRequirement
             is ProofTypeMeta.Attestation -> spec.keyAttestationRequirement
+            null,
             is ProofTypeMeta.LdpVp,
             is ProofTypeMeta.Unsupported,
             -> KeyAttestationRequirement.NotRequired
@@ -203,7 +176,8 @@ internal class RequestIssuanceImpl(
         credentialConfigId: CredentialConfigurationIdentifier,
         cNonce: CNonce?,
     ): Proof.Jwt {
-        val (proofSigner, keyIndex) = proofsSpecification
+        val (proofSignerProvider, keyIndex) = proofsSpecification
+        val proofSigner = proofSignerProvider(cNonce)
         val joseAlg = run {
             val javaSigningAlgorithm = proofSigner.javaAlgorithm
             javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
@@ -219,16 +193,30 @@ internal class RequestIssuanceImpl(
     }
 
     private suspend fun AuthorizedRequest.jwtProofsWithoutKeyAttestation(
-        proofsSigner: BatchSignOperation<JwtBindingKey>,
-        javaSigningAlgorithm: String,
+        proofsSpecification: ProofsSpecification.JwtProofs.NoKeyAttestation,
         credentialConfigId: CredentialConfigurationIdentifier,
-    ): List<Proof> {
-        proofsSigner.assertMatchesBatchIssuanceBatchSize()
-        val joseAlg = javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
+        cNonce: CNonce?,
+    ): List<Proof.Jwt> {
+        val joseAlg = run {
+            val javaSigningAlgorithm = proofsSpecification.proofsSigner.javaAlgorithm
+            javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
+        }
+        return proofsSpecification.proofsSigner.use { operation ->
+            operation.assertMatchesBatchIssuanceBatchSize()
+            val proofsSigner = JwtProofsSigner(joseAlg, operation)
+            val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
+            proofsSigner.sign(claims).map {
+                Proof.Jwt(SignedJWT.parse(it.second))
+            }
+        }
+    }
 
-        val cNonce = cNonce()
-        val proofsSigner = JwtProofsSigner(joseAlg, proofsSigner)
-        return proofsFactory(proofsSigner, cNonce, grant)
+    private suspend fun attestationProof(
+        proofsSpecification: ProofsSpecification.AttestationProof,
+        cNonce: CNonce?,
+    ): Proof.Attestation {
+        val keyAttestationJwt = proofsSpecification.attestationProvider(cNonce)
+        return Proof.Attestation(keyAttestationJwt)
     }
 
     private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize() =
@@ -311,51 +299,26 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private suspend fun proofsFactory(
-        proofsSigner: JwtProofsSigner,
-        cNonce: CNonce?,
-        grant: Grant,
-    ): List<Proof> {
-        return proofsSigner.sign(
-            jwtProofClaims(
-                cNonce = cNonce,
-                grant = grant,
-            ),
-        ).map {
-            Proof.Jwt(SignedJWT.parse(it.second))
-        }
-    }
-
-    private suspend fun buildRequest(
+    private fun buildRequest(
         requestPayload: IssuanceRequestPayload,
         proofs: List<Proof>,
         authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
-    ): CredentialIssuanceRequest {
-        val credentialCfg = run {
-            val creCfgId = requestPayload.credentialConfigurationIdentifier
-            check(creCfgId in credentialOffer.credentialConfigurationIdentifiers) {
-                "The provided credential configuration ${creCfgId.value} is not part of the credential offer"
-            }
-            credentialSupportedById(creCfgId)
+    ): CredentialIssuanceRequest = when (requestPayload) {
+        is IssuanceRequestPayload.ConfigurationBased -> {
+            CredentialIssuanceRequest.byCredentialConfigurationId(
+                requestPayload.credentialConfigurationIdentifier,
+                proofs,
+                responseEncryptionSpec,
+            )
         }
 
-        return when (requestPayload) {
-            is IssuanceRequestPayload.ConfigurationBased -> {
-                CredentialIssuanceRequest.byCredentialConfigurationId(
-                    requestPayload.credentialConfigurationIdentifier,
-                    proofs,
-                    responseEncryptionSpec,
-                )
-            }
-
-            is IssuanceRequestPayload.IdentifierBased -> {
-                requestPayload.ensureAuthorized(authorizationDetails)
-                CredentialIssuanceRequest.byCredentialId(
-                    requestPayload.credentialIdentifier,
-                    proofs,
-                    responseEncryptionSpec,
-                )
-            }
+        is IssuanceRequestPayload.IdentifierBased -> {
+            requestPayload.ensureAuthorized(authorizationDetails)
+            CredentialIssuanceRequest.byCredentialId(
+                requestPayload.credentialIdentifier,
+                proofs,
+                responseEncryptionSpec,
+            )
         }
     }
 
@@ -379,17 +342,6 @@ private fun IssuanceRequestPayload.IdentifierBased.ensureAuthorized(
     }
     check(credentialId in authorizedCredIds) {
         "The credential identifier ${credentialId.value} is not authorized"
-    }
-}
-
-private fun CredentialConfiguration.assertProofSupported(proof: Proof) {
-    val proofType = when (proof) {
-        is Proof.Jwt -> ProofType.JWT
-        is Proof.LdpVp -> ProofType.LDP_VP
-        is Proof.Attestation -> ProofType.ATTESTATION
-    }
-    checkNotNull(proofTypesSupported[proofType]) {
-        "Provided proof type $proofType is not one of supported [$proofTypesSupported]."
     }
 }
 

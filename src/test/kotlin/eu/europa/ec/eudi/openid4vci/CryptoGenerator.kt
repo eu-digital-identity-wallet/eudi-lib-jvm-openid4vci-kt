@@ -71,25 +71,30 @@ object CryptoGenerator {
         attestedKeysCount: Int = 3,
     ): ProofsSpecification {
         val ecKeys = List(attestedKeysCount) { randomECSigningKey(curve) }
-        val signer = Signer.fromNimbusEcKey(
-            ecPrivateKey = ecKeys[0],
-            keyInfo = keyAttestationJwt(
-                attestedKeys = ecKeys.map { it.toPublicJWK() },
-            ),
-            secureRandom = null,
-            provider = null,
-        )
-        return ProofsSpecification.JwtProofs.WithKeyAttestation(signer, 1)
+        val signerProvider: suspend (CNonce?) -> Signer<KeyAttestationJWT> = { cNonce ->
+            Signer.fromNimbusEcKey(
+                ecPrivateKey = ecKeys[0],
+                keyInfo =
+                    keyAttestationJwt(
+                        attestedKeys = ecKeys.map { it.toPublicJWK() },
+                        cNonce,
+                    ),
+                secureRandom = null,
+                provider = null,
+            )
+        }
+        return ProofsSpecification.JwtProofs.WithKeyAttestation(signerProvider, 1)
     }
 
     fun attestationProofSpec(keysNo: Int = 3) =
-        ProofsSpecification.AttestationProof(
+        ProofsSpecification.AttestationProof { nonce ->
             keyAttestationJwt(
                 List(keysNo) {
                     randomECSigningKey(Curve.P_256)
                 },
-            ),
-        )
+                nonce,
+            )
+        }
 
     // Helper to load an EC private key from PEM file
     private fun loadECPrivateKeyFromFile(resourcePath: String): ECPrivateKey {
@@ -117,6 +122,7 @@ object CryptoGenerator {
 
     fun keyAttestationJwt(
         attestedKeys: List<JWK>? = null,
+        nonce: CNonce? = null,
     ) = run {
         val privateKey = loadECPrivateKeyFromFile("eu/europa/ec/eudi/openid4vci/internal/key_attestation_jwt.key")
         val certificate = loadCertificateFromFile("eu/europa/ec/eudi/openid4vci/internal/key_attestation_jwt.cert")
@@ -124,6 +130,7 @@ object CryptoGenerator {
             attestedKeys = attestedKeys ?: List(3) { randomECSigningKey(Curve.P_256) },
             certificate = certificate,
             signer = ECDSASigner(privateKey),
+            nonce,
         )
         KeyAttestationJWT(jwt.serialize())
     }
@@ -132,6 +139,7 @@ object CryptoGenerator {
         attestedKeys: List<JWK>,
         certificate: X509Certificate,
         signer: JWSSigner,
+        nonce: CNonce? = null,
     ): SignedJWT = SignedJWT(
         JWSHeader.Builder(JWSAlgorithm.ES256)
             .type(JOSEObjectType(OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE))
@@ -141,6 +149,7 @@ object CryptoGenerator {
             claim(OpenId4VPSpec.KEY_ATTESTATION_ATTESTED_KEYS, attestedKeys.map { it.toPublicJWK().toJSONObject() })
             claim(OpenId4VPSpec.KEY_ATTESTATION_KEY_STORAGE, listOf("iso_18045_moderate"))
             claim(OpenId4VPSpec.KEY_ATTESTATION_USER_AUTHENTICATION, listOf("iso_18045_moderate"))
+            nonce?.let { claim("nonce", nonce.value) }
             issueTime(Date.from(now()))
             expirationTime(Date.from(now().plusSeconds(3600)))
         }.build(),
