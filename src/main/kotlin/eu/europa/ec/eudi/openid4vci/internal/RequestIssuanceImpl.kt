@@ -59,12 +59,9 @@ internal class RequestIssuanceImpl(
         requestPayload: IssuanceRequestPayload,
         proofsSpecification: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
-        val credentialConfigId = requestPayload.credentialConfigurationIdentifier
-        proofsSpecification.ensureCompatibleWith(credentialConfigId)
-
         // Place the request
         val (outcome, newResourceServerDpopNonce) = placeIssuanceRequest(accessToken, resourceServerDpopNonce) {
-            val proofs = buildProofs(proofsSpecification, credentialConfigId)
+            val proofs = buildProofs(proofsSpecification, requestPayload.credentialConfigurationIdentifier)
             buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
         }
 
@@ -76,17 +73,23 @@ internal class RequestIssuanceImpl(
     private suspend fun AuthorizedRequest.buildProofs(
         proofsSpecification: ProofsSpecification,
         credentialConfigId: CredentialConfigurationIdentifier,
-    ): List<Proof> = when (proofsSpecification) {
-        is ProofsSpecification.NoProofs -> emptyList()
-        is ProofsSpecification.JwtProofs.WithKeyAttestation -> listOf(
-            jwtProofWithKeyAttestation(proofsSpecification, credentialConfigId, cNonce()),
-        )
-        is ProofsSpecification.JwtProofs.NoKeyAttestation -> jwtProofsWithoutKeyAttestation(
-            proofsSpecification,
-            credentialConfigId,
-            cNonce(),
-        )
-        is ProofsSpecification.AttestationProof -> listOf(attestationProof(proofsSpecification, cNonce()))
+    ): List<Proof> {
+        proofsSpecification.ensureCompatibleWith(credentialConfigId)
+
+        return when (proofsSpecification) {
+            is ProofsSpecification.NoProofs -> emptyList()
+            is ProofsSpecification.JwtProofs.WithKeyAttestation -> listOf(
+                jwtProofWithKeyAttestation(proofsSpecification, credentialConfigId, cNonce()),
+            )
+
+            is ProofsSpecification.JwtProofs.NoKeyAttestation -> jwtProofsWithoutKeyAttestation(
+                proofsSpecification,
+                credentialConfigId,
+                cNonce(),
+            )
+
+            is ProofsSpecification.AttestationProof -> listOf(attestationProof(proofsSpecification, cNonce()))
+        }
     }
 
     private fun ProofsSpecification.ensureCompatibleWith(credentialConfigId: CredentialConfigurationIdentifier) {
