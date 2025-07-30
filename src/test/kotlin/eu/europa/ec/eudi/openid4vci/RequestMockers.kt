@@ -62,6 +62,8 @@ internal fun credentialIssuerMetadataWellKnownMocker(
             NO_NONCE_ENDPOINT -> getResourceAsText("well-known/openid-credential-issuer_no_nonce_endpoint.json")
             NO_SCOPES -> getResourceAsText("well-known/openid-credential-issuer_no_scopes.json")
             CONTAINS_DEPRECATED_METHOD -> getResourceAsText("well-known/openid-credential-issuer_contains_invalid_configuration.json")
+            KEY_ATTESTATION_REQUIRED -> getResourceAsText("well-known/openid-credential-issuer_key_attestation_required.json")
+            ATTESTATION_PROOF_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_attestation_proof_supported.json")
         }
         respond(
             content = content,
@@ -80,6 +82,8 @@ enum class IssuerMetadataVersion {
     NO_NONCE_ENDPOINT,
     NO_SCOPES,
     CONTAINS_DEPRECATED_METHOD,
+    KEY_ATTESTATION_REQUIRED,
+    ATTESTATION_PROOF_SUPPORTED,
 }
 
 enum class AuthServerMetadataVersion {

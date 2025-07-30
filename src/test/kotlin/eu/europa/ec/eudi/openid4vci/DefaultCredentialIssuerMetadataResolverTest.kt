@@ -115,7 +115,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                 "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json",
             ),
         )
-        val metaData = assertDoesNotThrow { resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow() }
+        val metaData =
+            assertDoesNotThrow { resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow() }
         assertEquals(credentialIssuerMetadata(), metaData)
     }
 
@@ -140,7 +141,10 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         assertTrue("Expected ") {
             val proofs = credentialConfigs.jwtProofTypeSupported("MobileDrivingLicense_msoMdoc")
-            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.RequiredNoConstraints }
+            proofs != null && proofs.all {
+                val proof = it.keyAttestationRequirement
+                proof == KeyAttestationRequirement.RequiredNoConstraints
+            }
         }
 
         assertTrue("Expected ") {
@@ -211,7 +215,10 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                 ECKeyGenerator(Curve.P_256).generate().toPublicJWK(),
             )
 
-            listOf(IssuerMetadataPolicy.RequireSigned(issuerTrust), IssuerMetadataPolicy.PreferSigned(issuerTrust)).forEach { policy ->
+            listOf(
+                IssuerMetadataPolicy.RequireSigned(issuerTrust),
+                IssuerMetadataPolicy.PreferSigned(issuerTrust),
+            ).forEach { policy ->
                 assertFailsWith<CredentialIssuerMetadataError.InvalidSignedMetadata> {
                     resolver.resolve(credentialIssuerId, policy).getOrThrow()
                 }
@@ -231,7 +238,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             )
 
             val issuerTrust = IssuerTrust.ByPublicKey(
-                ECKey.parse(getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/signed_metadata_jwk.json")).toPublicJWK(),
+                ECKey.parse(getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/signed_metadata_jwk.json"))
+                    .toPublicJWK(),
             )
             val policy = IssuerMetadataPolicy.PreferSigned(issuerTrust)
 
@@ -252,7 +260,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             )
 
             val issuerTrust = IssuerTrust.ByPublicKey(
-                ECKey.parse(getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/signed_metadata_jwk.json")).toPublicJWK(),
+                ECKey.parse(getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/signed_metadata_jwk.json"))
+                    .toPublicJWK(),
             )
             val policy = IssuerMetadataPolicy.RequireSigned(issuerTrust)
 
@@ -273,7 +282,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         )
 
         val issuerTrust = IssuerTrust.ByPublicKey(
-            ECKey.parse(getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/signed_metadata_jwk.json")).toPublicJWK(),
+            ECKey.parse(getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/signed_metadata_jwk.json"))
+                .toPublicJWK(),
         )
         val policy = IssuerMetadataPolicy.RequireSigned(issuerTrust)
 

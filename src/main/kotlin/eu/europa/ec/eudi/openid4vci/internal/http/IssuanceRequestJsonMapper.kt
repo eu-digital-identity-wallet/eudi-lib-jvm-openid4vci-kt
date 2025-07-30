@@ -52,10 +52,11 @@ internal data class CredentialResponseEncryptionSpecTO(
 data class ProofsTO(
     @SerialName("jwt") val jwtProofs: List<String>? = null,
     @SerialName("ldp_vp") val ldpVpProofs: List<String>? = null,
+    @SerialName("attestation") val attestationProofs: List<String>? = null,
 ) {
 
     init {
-        require(!(jwtProofs.isNullOrEmpty() && ldpVpProofs.isNullOrEmpty()))
+        require(!(jwtProofs.isNullOrEmpty() && ldpVpProofs.isNullOrEmpty() && attestationProofs.isNullOrEmpty()))
     }
 }
 
@@ -120,6 +121,7 @@ internal data class CredentialRequestTO(
             else null to ProofsTO(
                 jwtProofs = filterIsInstance<Proof.Jwt>().map { it.jwt.serialize() }.takeIf { it.isNotEmpty() },
                 ldpVpProofs = filterIsInstance<Proof.LdpVp>().map { it.ldpVp }.takeIf { it.isNotEmpty() },
+                attestationProofs = filterIsInstance<Proof.Attestation>().map { it.keyAttestation.value }.takeIf { it.isNotEmpty() },
             )
     }
 }

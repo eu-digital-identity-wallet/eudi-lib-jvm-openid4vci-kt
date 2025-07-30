@@ -31,15 +31,16 @@ internal data class JwtProofClaims(
     @SerialName("nonce") val nonce: String? = null,
 )
 
-internal class JwtProofSigner(
+internal class KeyAttestationJwtProofSigner(
     private val algorithm: JWSAlgorithm,
-    private val signOperation: SignOperation<JwtBindingKey>,
+    private val signOperation: SignOperation<KeyAttestationJWT>,
+    private val keyIndex: Int,
 ) {
     suspend fun sign(claims: JwtProofClaims): String =
-        JwtSigner<JwtProofClaims, JwtBindingKey>(
+        JwtSigner<JwtProofClaims, KeyAttestationJWT>(
             signOperation = signOperation,
             algorithm = algorithm,
-            customizeHeader = { key -> jwtProofHeader(key) },
+            customizeHeader = { key -> keyAttestationJwtProofHeader(key, keyIndex) },
         ).sign(claims)
 }
 
@@ -56,16 +57,26 @@ internal class JwtProofsSigner(
 }
 
 internal fun JsonObjectBuilder.jwtProofHeader(key: JwtBindingKey) {
-    put("typ", "openid4vci-proof+jwt")
+    put("typ", OpenId4VPSpec.JWT_PROOF_TYPE)
     when (key) {
         is JwtBindingKey.Did -> {
-            put("kid", key.identity)
+            put(OpenId4VPSpec.JOSE_HEADER_KEY_ID, key.identity)
         }
         is JwtBindingKey.Jwk -> {
-            put("jwk", key.jwk.asJsonElement())
+            put(OpenId4VPSpec.JOSE_HEADER_JWK, key.jwk.asJsonElement())
         }
         is JwtBindingKey.X509 -> {
-            put("x5c", key.chain.asJsonElement())
+            put(OpenId4VPSpec.JOSE_HEADER_X5C, key.chain.asJsonElement())
         }
     }
+}
+
+internal fun JsonObjectBuilder.keyAttestationJwtProofHeader(keyAttestation: KeyAttestationJWT, keyIndex: Int) {
+    check(keyIndex in keyAttestation.attestedKeys.indices) {
+        "Key index $keyIndex is out of bounds for attested keys: $keyAttestation.attestedKeys.size"
+    }
+
+    put("typ", OpenId4VPSpec.JWT_PROOF_TYPE)
+    put(OpenId4VPSpec.JOSE_HEADER_KEY_ID, keyIndex.toString())
+    put(OpenId4VPSpec.JOSE_HEADER_KEY_ATTESTATION, keyAttestation.value)
 }
