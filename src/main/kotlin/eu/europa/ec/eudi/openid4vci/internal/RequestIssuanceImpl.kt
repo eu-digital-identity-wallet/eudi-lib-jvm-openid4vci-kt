@@ -50,7 +50,7 @@ internal class RequestIssuanceImpl(
         requestPayload: IssuanceRequestPayload,
         proofsSpecification: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
-        val proofs = buildProofs(proofsSpecification, requestPayload.credentialConfigurationIdentifier)
+        val proofs = buildProofs(proofsSpecification, requestPayload.credentialConfigurationIdentifier, grant)
         val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
 
         // Place the request
@@ -67,21 +67,28 @@ internal class RequestIssuanceImpl(
         updatedAuthorizedRequest to outcome.toPub()
     }
 
-    private suspend fun AuthorizedRequest.buildProofs(
+    private suspend fun buildProofs(
         proofsSpecification: ProofsSpecification,
         credentialConfigId: CredentialConfigurationIdentifier,
+        grant: Grant,
     ): List<Proof> {
         proofsSpecification.ensureCompatibleWith(credentialConfigId)
 
         return when (proofsSpecification) {
             is ProofsSpecification.NoProofs -> emptyList()
             is ProofsSpecification.JwtProofs.WithKeyAttestation -> listOf(
-                jwtProofWithKeyAttestation(proofsSpecification, credentialConfigId, cNonce()),
+                jwtProofWithKeyAttestation(
+                    proofsSpecification,
+                    credentialConfigId,
+                    grant,
+                    cNonce(),
+                ),
             )
 
             is ProofsSpecification.JwtProofs.NoKeyAttestation -> jwtProofsWithoutKeyAttestation(
                 proofsSpecification,
                 credentialConfigId,
+                grant,
                 cNonce(),
             )
 
@@ -138,9 +145,10 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private suspend fun AuthorizedRequest.jwtProofWithKeyAttestation(
+    private suspend fun jwtProofWithKeyAttestation(
         proofsSpecification: ProofsSpecification.JwtProofs.WithKeyAttestation,
         credentialConfigId: CredentialConfigurationIdentifier,
+        grant: Grant,
         cNonce: CNonce?,
     ): Proof.Jwt {
         val (proofSignerProvider, keyIndex) = proofsSpecification
@@ -159,9 +167,10 @@ internal class RequestIssuanceImpl(
         return Proof.Jwt(jwtProof)
     }
 
-    private suspend fun AuthorizedRequest.jwtProofsWithoutKeyAttestation(
+    private suspend fun jwtProofsWithoutKeyAttestation(
         proofsSpecification: ProofsSpecification.JwtProofs.NoKeyAttestation,
         credentialConfigId: CredentialConfigurationIdentifier,
+        grant: Grant,
         cNonce: CNonce?,
     ): List<Proof.Jwt> {
         val joseAlg = run {

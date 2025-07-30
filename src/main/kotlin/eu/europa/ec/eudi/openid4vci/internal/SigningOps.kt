@@ -36,7 +36,7 @@ internal suspend fun <PUB, R> Signer<PUB>.use(block: suspend (SignOperation<PUB>
         callsInPlace(block, InvocationKind.AT_MOST_ONCE)
     }
 
-    val signOp = authenticate()
+    val signOp = acquire()
     try {
         return block(signOp)
     } finally {
@@ -116,7 +116,7 @@ internal fun <PUB> Signer.Companion.fromEcPrivateKey(
     override val javaAlgorithm: String
         get() = signingAlgorithm
 
-    override suspend fun authenticate(): SignOperation<PUB> {
+    override suspend fun acquire(): SignOperation<PUB> {
         val sign = SignFunction.forJavaPrivateKey(signingAlgorithm, privateKey, secureRandom, provider)
         return SignOperation(sign, publicMaterial)
     }

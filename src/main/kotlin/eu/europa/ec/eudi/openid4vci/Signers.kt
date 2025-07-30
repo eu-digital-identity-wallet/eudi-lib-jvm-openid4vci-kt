@@ -63,12 +63,12 @@ interface Signer<out PUB> {
     val javaAlgorithm: String
 
     /**
-     * Performs the authentication operation and returns a signing operation configuration object.
+     * Performs the acquisition operation and returns a signing operation configuration object.
      *
      * @return A [SignOperation] instance containing the configuration of the signing operation,
      *         including the signing algorithm, the operation to be executed, and the public material.
      */
-    suspend fun authenticate(): SignOperation<PUB>
+    suspend fun acquire(): SignOperation<PUB>
 
     /**
      * Releases the resources associated with the provided signing operation.
