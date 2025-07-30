@@ -45,7 +45,7 @@ value class KeyAttestationJWT(val value: String) {
             }
 
             val claims = Json.parseToJsonElement(jwt.jwtClaimsSet.toString()).jsonObject
-            require(claims["iat"] != null) { "Invalid Key Attestation JWT. Misses `iat` claim" }
+            requireNotNull(claims["iat"]) { "Invalid Key Attestation JWT. Misses `iat` claim" }
 
             val attestedKeysClaimEntries = claims[OpenId4VPSpec.KEY_ATTESTATION_ATTESTED_KEYS]?.jsonArray
             requireNotNull(attestedKeysClaimEntries) { "Invalid Key Attestation JWT. Misses `attested_keys` claim" }

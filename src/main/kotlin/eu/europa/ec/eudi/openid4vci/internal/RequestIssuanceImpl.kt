@@ -54,7 +54,6 @@ internal class RequestIssuanceImpl(
         val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
 
         // Place the request
-
         // TODO Please note on the draft 16, the `resourceServerDpopNonce` can be change from the proofs step
         val (outcome, newResourceServerDpopNonce) =
             credentialEndpointClient.placeIssuanceRequest(
@@ -91,31 +90,9 @@ internal class RequestIssuanceImpl(
     }
 
     private fun ProofsSpecification.ensureCompatibleWith(credentialConfigId: CredentialConfigurationIdentifier) {
-        data class ProofRequired(
-            val keyAttestationRequirements: Map<ProofType, KeyAttestationRequirement>,
-        )
-
-        fun CredentialConfigurationIdentifier.proofsRequirement(): ProofRequired? {
-            val credentialConfiguration = credentialSupportedById(this)
-            val proofTypesSupported = credentialConfiguration.proofTypesSupported
-            return when {
-                proofTypesSupported.values.isEmpty() -> null
-                else -> ProofRequired(
-                    proofTypesSupported.values.associate { proofTypeMeta ->
-                        val proofType = proofTypeMeta.type() ?: error("Unsupported proof type: $proofTypeMeta")
-                        val keyAttestationRequirement = keyAttestationProofsRequirement(proofTypeMeta)
-                        proofType to keyAttestationRequirement
-                    },
-                )
-            }
-        }
-
         val credentialConfiguration = credentialSupportedById(credentialConfigId)
         val proofTypesSupported = credentialConfiguration.proofTypesSupported
-        val proofTypesWithKeyAttestationRequirements =
-            proofTypesSupported.values.filter { it is HasKeyAttestationRequirement }
 
-        // val proofsRequirement = credentialConfigId.proofsRequirement()
         when (this) {
             is ProofsSpecification.NoProofs -> {
                 require(proofTypesSupported == ProofTypesSupported.Empty) {
@@ -126,21 +103,20 @@ internal class RequestIssuanceImpl(
             is ProofsSpecification.JwtProofs -> {
                 val proofRequirement = proofTypesSupported[ProofType.JWT]
                 requireNotNull(proofRequirement) {
-                    "Credential configuration doesn't support JWT proofs"
+                    "Credential configuration doesn't support JWT proofs."
                 }
                 check(proofRequirement is ProofTypeMeta.Jwt)
                 val keyAttestationRequirement = proofRequirement.keyAttestationRequirement
                 when (this) {
                     is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
                         require(keyAttestationRequirement is KeyAttestationRequirement.NotRequired) {
-                            "Credential configuration requires key attestation"
+                            "Credential configuration requires key attestation."
                         }
                     }
 
                     is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
                         require(keyAttestationRequirement !is KeyAttestationRequirement.NotRequired) {
-                            "JWT proof with key attestation is provided, " +
-                                "but credential configuration does not support key attestation"
+                            "Credential configuration does not support key attestation."
                         }
                     }
                 }
@@ -148,23 +124,9 @@ internal class RequestIssuanceImpl(
 
             is ProofsSpecification.AttestationProof -> {
                 requireNotNull(proofTypesSupported[ProofType.ATTESTATION]) {
-                    "Credential configuration doesn't support ${ProofType.ATTESTATION} proofs"
+                    "Credential configuration doesn't support attestation proofs."
                 }
             }
-        }
-    }
-
-    private fun CredentialConfigurationIdentifier.keyAttestationProofsRequirement(proofType: ProofTypeMeta): KeyAttestationRequirement {
-        val credentialConfiguration = credentialSupportedById(this)
-        val spec =
-            credentialConfiguration.proofTypesSupported.values.filterIsInstance(proofType::class.java).firstOrNull()
-        return when (spec) {
-            is ProofTypeMeta.Jwt -> spec.keyAttestationRequirement
-            is ProofTypeMeta.Attestation -> spec.keyAttestationRequirement
-            null,
-            is ProofTypeMeta.LdpVp,
-            is ProofTypeMeta.Unsupported,
-            -> KeyAttestationRequirement.NotRequired
         }
     }
 
