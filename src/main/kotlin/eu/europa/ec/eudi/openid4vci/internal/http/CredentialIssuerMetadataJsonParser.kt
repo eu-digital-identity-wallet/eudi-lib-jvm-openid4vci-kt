@@ -644,15 +644,18 @@ private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTy
             algorithms = meta.algorithms.map {
                 JWSAlgorithm.parse(it)
             },
-            keyAttestationRequirement = meta.keyAttestationRequirement.toDomain(),
+            keyAttestationRequirement = run {
+                val req = meta.keyAttestationRequirement.toDomain()
+                require(req is KeyAttestationRequirement.Required)
+                req
+            },
         )
         else -> ProofTypeMeta.Unsupported(type)
     }
 
 private fun KeyAttestationRequirementTO?.toDomain(): KeyAttestationRequirement = when {
     this == null -> KeyAttestationRequirement.NotRequired
-    this.keyStorage.isNullOrEmpty() && this.userAuthentication.isNullOrEmpty() -> KeyAttestationRequirement.RequiredNoConstraints
-    else -> KeyAttestationRequirement.Required(this.keyStorage.orEmpty(), this.userAuthentication.orEmpty())
+    else -> KeyAttestationRequirement.Required(keyStorage, userAuthentication)
 }
 
 /**

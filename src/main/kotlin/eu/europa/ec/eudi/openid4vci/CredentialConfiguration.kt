@@ -65,8 +65,8 @@ enum class ProofType : Serializable {
 sealed interface ProofTypeMeta : Serializable {
     data class Jwt(
         val algorithms: List<JWSAlgorithm>,
-        val keyAttestationRequirement: KeyAttestationRequirement,
-    ) : ProofTypeMeta {
+        override val keyAttestationRequirement: KeyAttestationRequirement,
+    ) : ProofTypeMeta, HasKeyAttestationRequirement {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of JWT cannot be empty" }
         }
@@ -78,8 +78,8 @@ sealed interface ProofTypeMeta : Serializable {
 
     data class Attestation(
         val algorithms: List<JWSAlgorithm>,
-        val keyAttestationRequirement: KeyAttestationRequirement,
-    ) : ProofTypeMeta {
+        override val keyAttestationRequirement: KeyAttestationRequirement.Required,
+    ) : ProofTypeMeta, HasKeyAttestationRequirement {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of Attestation cannot be empty" }
         }
@@ -88,27 +88,41 @@ sealed interface ProofTypeMeta : Serializable {
     data class Unsupported(val type: String) : ProofTypeMeta
 }
 
+interface HasKeyAttestationRequirement {
+    val keyAttestationRequirement: KeyAttestationRequirement
+}
+
 sealed interface KeyAttestationRequirement {
 
     data object NotRequired : KeyAttestationRequirement {
         private fun readResolve(): Any = NotRequired
     }
 
-    data object RequiredNoConstraints : KeyAttestationRequirement {
-        private fun readResolve(): Any = RequiredNoConstraints
-    }
-
     data class Required(
-        val keyStorageConstraints: List<String>,
-        val userAuthenticationConstraints: List<String>,
+        val keyStorageConstraints: List<String>?,
+        val userAuthenticationConstraints: List<String>?,
     ) : KeyAttestationRequirement {
         init {
-            require(keyStorageConstraints.isNotEmpty() || userAuthenticationConstraints.isNotEmpty()) {
-                "Either key storage or user authentication constraints must be provided"
+
+            if (keyStorageConstraints != null) {
+                require(keyStorageConstraints.isNotEmpty()) {
+                    "Key storage constraints, if provided, should be non-empty"
+                }
+            }
+            if (userAuthenticationConstraints != null) {
+                require(userAuthenticationConstraints.isNotEmpty()) {
+                    "User authentication constraints, if provided, should be non-empty"
+                }
             }
         }
 
+        val hasConstrains: Boolean
+            get() = keyStorageConstraints != null || userAuthenticationConstraints != null
+
         companion object
+    }
+    companion object {
+        val RequiredNoConstraints: Required = Required(null, null)
     }
 }
 
