@@ -15,6 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.util.JSONObjectUtils
+import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.ClaimPathElement.AllArrayElements
@@ -26,6 +29,8 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
+import java.security.cert.X509Certificate
+import java.time.Instant
 import java.util.*
 
 internal val JsonSupport: Json = Json {
@@ -51,6 +56,7 @@ internal object ProofSerializer : KSerializer<Proof> {
         @SerialName("proof_type") val proofType: String,
         @SerialName("jwt") val jwt: String? = null,
         @SerialName("ldp_vp") val ldpVp: String? = null,
+        @SerialName("attestation") val attestation: String? = null,
     )
 
     private val internal = serializer<ProofJson>()
@@ -84,6 +90,14 @@ internal object ProofSerializer : KSerializer<Proof> {
                 ProofJson(
                     proofType = ProofType.LDP_VP.toString().lowercase(),
                     jwt = value.ldpVp,
+                ),
+            )
+
+            is Proof.Attestation -> internal.serialize(
+                encoder,
+                ProofJson(
+                    proofType = ProofType.ATTESTATION.toString().lowercase(),
+                    attestation = value.keyAttestation.value,
                 ),
             )
         }
@@ -165,3 +179,39 @@ internal object ClaimPathSerializer : KSerializer<ClaimPath> {
         return array.asClaimPath()
     }
 }
+
+object NumericInstantSerializer : KSerializer<Instant> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("NumericInstant", PrimitiveKind.LONG)
+
+    override fun serialize(encoder: Encoder, value: Instant) {
+        encoder.encodeLong(value.epochSecond)
+    }
+
+    override fun deserialize(decoder: Decoder): Instant {
+        return Instant.ofEpochSecond(decoder.decodeLong())
+    }
+}
+
+object JWTClaimsSetSerializer : KSerializer<JWTClaimsSet> {
+
+    private val objectSerializer = serializer<JsonObject>()
+
+    override val descriptor: SerialDescriptor = objectSerializer.descriptor
+
+    override fun serialize(encoder: Encoder, value: JWTClaimsSet) {
+        val claimsJsonObject = JsonSupport.decodeFromString<JsonObject>(JSONObjectUtils.toJSONString(value.toJSONObject()))
+        objectSerializer.serialize(encoder, claimsJsonObject)
+    }
+
+    override fun deserialize(decoder: Decoder): JWTClaimsSet {
+        val deserialized = objectSerializer.deserialize(decoder)
+        return JWTClaimsSet.parse(JsonSupport.encodeToString(deserialized))
+    }
+}
+
+fun JWK.asJsonElement(): JsonElement = Json.parseToJsonElement(this.toPublicJWK().toJSONString())
+
+fun List<X509Certificate>.asJsonElement(): JsonArray = JsonArray(
+    this.map { Json.encodeToJsonElement(Base64.getEncoder().encodeToString(it.encoded)) },
+)

@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.internal.http.NotificationEventTO
 import eu.europa.ec.eudi.openid4vci.internal.http.NotificationTO
 import io.ktor.client.engine.mock.*
@@ -29,7 +31,7 @@ class IssuanceNotificationTest {
     @Test
     fun `when issuance response contains notification_id, it is present in and can be used for notifications`() = runTest {
         val credential = "issued_credential_content_sd_jwt_vc"
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -65,14 +67,13 @@ class IssuanceNotificationTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
         with(issuer) {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            val popSigner = CryptoGenerator.rsaProofSigner()
             val (newAuthorizedRequest, outcome) =
-                authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
             assertIs<SubmissionOutcome.Success>(outcome)
 
             val issuedCredential = outcome.credentials.firstOrNull()
@@ -91,7 +92,7 @@ class IssuanceNotificationTest {
 
     @Test
     fun `when notification request failed, a Result failure is returned`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -115,7 +116,7 @@ class IssuanceNotificationTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
         with(issuer) {
             val result = authorizedRequest.notify(

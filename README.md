@@ -44,8 +44,8 @@ In particular, the library focuses on the wallet's role in and provides the foll
 | [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                               | ✅                                                                                                                  |
 | Wallet authentication                                                                           | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth2-attestation-based-client-authentication) |
 | Use issuer's nonce endpoint to get c_nonce for proofs                                           | ✅                                                                                                                  |
-| `attestation` proof type                                                                        | ❌                                                                                                                  |
-| `key_attestation` to the JWT Proof (JOSE header)                                                | ❌                                                                                                                  |
+| `attestation` proof type                                                                        | ✅                                                                                                                  |
+| `key_attestation` to the JWT Proof (JOSE header)                                                | ✅                                                                                                                  |
 | Wallet attestation                                                                              | ❌                                                                                                                  |
 
 
@@ -337,7 +337,14 @@ In case of an unexpected error, a runtime exception will be raised.
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
-val popSigner: PopSigner? = // optional JWT or CWT signer. Required only if proof are required by issuer
+// Specifies the type of proof(s) to be included in the credential issuance request.
+// This can be one of the following, depending on the credential issuer's requirements and the wallet's capabilities:
+// - ProofsSpecification.NoProofs: No proof is included in the request.
+// - ProofsSpecification.JwtProofs.NoKeyAttestation: JWT-based proof(s) without key attestation, requires a BatchSigner for JWT binding keys.
+// - ProofsSpecification.JwtProofs.WithKeyAttestation: JWT-based proof with key attestation, requires a Signer for KeyAttestationJWT and a key index.
+// - ProofsSpecification.AttestationProof: Uses a pre-generated KeyAttestationJWT as proof.
+val proofSpecification: ProofsSpecification = ...
+
 val claimSetToRequest : ClaimSet? = null // null indicates that all claims will be requested    
 
 // Step 1
@@ -349,7 +356,7 @@ val request =
 val (updatedAuthorizedRequest, outcome) =
     with(issuer) {
         with(authorizedRequest) {
-            request(request, listOf(popSigner))
+            request(request, proofSpecification)
         }
     }
 

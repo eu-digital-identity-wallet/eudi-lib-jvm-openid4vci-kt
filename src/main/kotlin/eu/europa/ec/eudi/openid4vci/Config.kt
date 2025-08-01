@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.JWK
 import java.net.URI
 import java.time.Clock
 
@@ -73,7 +74,7 @@ data class OpenId4VCIConfig(
     val keyGenerationConfig: KeyGenerationConfig,
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-    val dPoPSigner: PopSigner.Jwt? = null,
+    val dPoPSigner: Signer<JWK>? = null,
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
@@ -86,7 +87,7 @@ data class OpenId4VCIConfig(
         keyGenerationConfig: KeyGenerationConfig,
         credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-        dPoPSigner: PopSigner.Jwt? = null,
+        dPoPSigner: Signer<JWK>? = null,
         clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
@@ -103,18 +104,6 @@ data class OpenId4VCIConfig(
         clock,
         issuerMetadataPolicy,
     )
-
-    init {
-        if (null != dPoPSigner) {
-            val key = dPoPSigner.bindingKey
-            require(key is JwtBindingKey.Jwk) {
-                "Only JWK can be used with DPoP Proof signer"
-            }
-            require(!key.jwk.isPrivate) {
-                "JWK in binding key must be public"
-            }
-        }
-    }
 
     @Deprecated(
         message = "Deprecated in favor of openId4VCIConfig client.id",

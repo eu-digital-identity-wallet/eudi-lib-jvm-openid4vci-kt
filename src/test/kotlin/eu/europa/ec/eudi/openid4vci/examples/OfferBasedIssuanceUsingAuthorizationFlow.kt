@@ -15,7 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
+import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import kotlinx.coroutines.runBlocking
 import java.net.URLEncoder
@@ -31,34 +33,35 @@ fun main(): Unit = runBlocking {
         "authorization_server%22:%22https://dev.authenticate.eudiw.dev/realms/pid-issuer-realm%22%7D%7D%7D"
 
     println("[[Scenario: Issuance based on credential offer url: $credentialOfferUrl]] ")
+    createHttpClient().use { httpClient ->
+        val issuer = Issuer.make(
+            config = PidDevIssuer.cfg,
+            credentialOfferUri = credentialOfferUrl,
+            httpClient = httpClient,
+        ).getOrThrow()
 
-    val issuer = Issuer.make(
-        config = PidDevIssuer.cfg,
-        credentialOfferUri = credentialOfferUrl,
-        ktorHttpClientFactory = ::createHttpClient,
-    ).getOrThrow()
+        val credentialOffer = issuer.credentialOffer
+        ensure(credentialOffer.grants is Grants.AuthorizationCode || credentialOffer.grants is Grants.Both) {
+            IllegalStateException("Offer does not have expected grants (AuthorizationCode | Both)")
+        }
 
-    val credentialOffer = issuer.credentialOffer
-    ensure(credentialOffer.grants is Grants.AuthorizationCode || credentialOffer.grants is Grants.Both) {
-        IllegalStateException("Offer does not have expected grants (AuthorizationCode | Both)")
-    }
+        authorizationLog("Using authorized code flow to authorize")
+        var authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, PidDevIssuer.testUser)
+        authorizationLog("Authorization retrieved: $authorizedRequest")
 
-    authorizationLog("Using authorized code flow to authorize")
-    var authorizedRequest = authorizeRequestWithAuthCodeUseCase(issuer, PidDevIssuer.testUser)
-    authorizationLog("Authorization retrieved: $authorizedRequest")
+        val offerCredentialConfIds = credentialOffer.credentialConfigurationIdentifiers
 
-    val offerCredentialConfIds = credentialOffer.credentialConfigurationIdentifiers
+        val credentials = offerCredentialConfIds.associate { credentialId ->
+            issuanceLog("Requesting issuance of '$credentialId'")
+            val (newAuthorizedRequest, credentials) = submit(issuer, authorizedRequest, credentialId)
+            authorizedRequest = newAuthorizedRequest
+            credentialId.value to credentials
+        }
 
-    val credentials = offerCredentialConfIds.associate { credentialId ->
-        issuanceLog("Requesting issuance of '$credentialId'")
-        val (newAuthorizedRequest, credentials) = submit(issuer, authorizedRequest, credentialId)
-        authorizedRequest = newAuthorizedRequest
-        credentialId.value to credentials
-    }
-
-    println("--> Issued credentials :")
-    credentials.onEach { (credentialId, credentials) ->
-        println("\t [$credentialId] : $credentials")
+        println("--> Issued credentials :")
+        credentials.onEach { (credentialId, credentials) ->
+            println("\t [$credentialId] : $credentials")
+        }
     }
 }
 
@@ -73,8 +76,9 @@ private suspend fun authorizeRequestWithAuthCodeUseCase(
 
         authorizationLog("Get authorization code URL is: ${prepareAuthorizationCodeRequest.authorizationCodeURL.value}")
 
-        val (authorizationCode, serverState) =
-            PidDevIssuer.loginUserAndGetAuthCode(prepareAuthorizationCodeRequest, actingUser)
+        val (authorizationCode, serverState) = createHttpClient().use { httpClient ->
+            PidDevIssuer.loginUserAndGetAuthCode(prepareAuthorizationCodeRequest, actingUser, httpClient)
+        }
 
         authorizationLog("Authorization code retrieved: $authorizationCode")
 
@@ -94,10 +98,9 @@ private suspend fun submit(
     credentialConfigurationId: CredentialConfigurationIdentifier,
 ): AuthorizedRequestAnd<List<IssuedCredential>> {
     with(issuer) {
-        val proofSigners = popSigners(credentialConfigurationId, proofsNo = 1)
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
         val (newAuthorized, outcome) =
-            authorized.request(requestPayload, proofSigners).getOrThrow()
+            authorized.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
         return when (outcome) {
             is SubmissionOutcome.Success -> newAuthorized to outcome.credentials
             is SubmissionOutcome.Deferred -> newAuthorized to handleDeferred(issuer, authorized, outcome.transactionId)

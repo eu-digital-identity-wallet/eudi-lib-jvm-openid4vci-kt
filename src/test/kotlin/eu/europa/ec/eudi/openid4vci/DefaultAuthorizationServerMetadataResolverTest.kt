@@ -68,7 +68,7 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
     @Test
     internal fun `fails when url does not return the metadata`() = runTest {
         val issuer = HttpsUrl("https://keycloak.netcompany.com/realms/pid-issuer-realm").getOrThrow()
-        val resolver = AuthorizationServerMetadataResolver(mockedKtorHttpClientFactory(expectSuccessOnly = true))
+        val resolver = AuthorizationServerMetadataResolver(mockedHttpClient(expectSuccessOnly = true))
         val error = assertFailsWith<AuthorizationServerMetadataResolutionException> {
             resolver.resolve(issuer).getOrThrow()
         }
@@ -84,4 +84,4 @@ internal class DefaultAuthorizationServerMetadataResolverTest {
 }
 
 private fun mockResolver(mocker: RequestMocker) =
-    AuthorizationServerMetadataResolver(mockedKtorHttpClientFactory(mocker))
+    AuthorizationServerMetadataResolver(mockedHttpClient(mocker))

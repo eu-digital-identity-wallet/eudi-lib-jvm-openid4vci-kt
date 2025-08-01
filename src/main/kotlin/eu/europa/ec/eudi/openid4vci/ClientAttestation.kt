@@ -121,7 +121,7 @@ fun interface ClientAttestationPoPBuilder {
     }
 }
 
-private fun SignedJWT.ensureSignedNotMAC() {
+internal fun SignedJWT.ensureSignedNotMAC() {
     check(state == JWSObject.State.SIGNED || state == JWSObject.State.VERIFIED) {
         "Provided JWT is not signed"
     }
@@ -132,4 +132,4 @@ private fun SignedJWT.ensureSignedNotMAC() {
 internal fun requireIsNotMAC(alg: JWSAlgorithm) =
     require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
 
-private fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
+internal fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS

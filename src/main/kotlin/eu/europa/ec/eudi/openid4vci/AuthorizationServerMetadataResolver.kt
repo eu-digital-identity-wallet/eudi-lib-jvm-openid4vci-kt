@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.DefaultAuthorizationServerMetadataResolver
+import io.ktor.client.*
 
 /**
  * Indicates an error during the resolution of an Authorization Server's metadata.
@@ -38,11 +39,7 @@ fun interface AuthorizationServerMetadataResolver {
          * Creates a new [AuthorizationServerMetadataResolver] instance.
          */
         operator fun invoke(
-            ktorHttpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
-        ): AuthorizationServerMetadataResolver = AuthorizationServerMetadataResolver { authServerUrl ->
-            ktorHttpClientFactory().use { httpClient ->
-                DefaultAuthorizationServerMetadataResolver(httpClient).resolve(authServerUrl)
-            }
-        }
+            httpClient: HttpClient,
+        ): AuthorizationServerMetadataResolver = DefaultAuthorizationServerMetadataResolver(httpClient)
     }
 }
