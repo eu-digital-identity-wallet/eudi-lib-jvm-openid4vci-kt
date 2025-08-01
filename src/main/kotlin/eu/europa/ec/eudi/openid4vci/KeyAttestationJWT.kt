@@ -40,14 +40,14 @@ value class KeyAttestationJWT(val value: String) {
             val jwt = SignedJWT.parse(value)
             jwt.ensureSignedNotMAC()
 
-            require(jwt.header?.type?.type == OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE) {
-                "Invalid Key Attestation JWT. Type must be set to `$OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE`"
+            require(jwt.header?.type?.type == OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE) {
+                "Invalid Key Attestation JWT. Type must be set to `$OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE`"
             }
 
             val claims = Json.parseToJsonElement(jwt.jwtClaimsSet.toString()).jsonObject
             requireNotNull(claims["iat"]) { "Invalid Key Attestation JWT. Misses `iat` claim" }
 
-            val attestedKeysClaimEntries = claims[OpenId4VPSpec.KEY_ATTESTATION_ATTESTED_KEYS]?.jsonArray
+            val attestedKeysClaimEntries = claims[OpenId4VCISpec.KEY_ATTESTATION_ATTESTED_KEYS]?.jsonArray
             requireNotNull(attestedKeysClaimEntries) { "Invalid Key Attestation JWT. Misses `attested_keys` claim" }
             require(attestedKeysClaimEntries.isNotEmpty()) {
                 "Invalid Key Attestation JWT. `attested_keys` claim must not be empty"

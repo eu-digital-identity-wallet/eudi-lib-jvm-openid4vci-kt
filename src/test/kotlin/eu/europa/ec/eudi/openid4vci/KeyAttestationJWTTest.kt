@@ -56,14 +56,14 @@ private class KeyAttestationJWTTest {
                 .build(),
         ).apply { sign(signer) }
         val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(signedJwt.serialize()) }
-        assertEquals("Invalid Key Attestation JWT. Type must be set to `$OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE`", exception.message)
+        assertEquals("Invalid Key Attestation JWT. Type must be set to `$OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE`", exception.message)
     }
 
     @Test
     fun `KeyAttestationJWT should have iat claim`() {
         val signedJwt = SignedJWT(
             JWSHeader.Builder(JWSAlgorithm.ES256)
-                .type(JOSEObjectType(OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE))
+                .type(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
                 .build(),
             JWTClaimsSet.Builder()
                 .build(),
@@ -76,7 +76,7 @@ private class KeyAttestationJWTTest {
     fun `KeyAttestationJWT should have attested keys claim`() {
         val signedJwt = SignedJWT(
             JWSHeader.Builder(JWSAlgorithm.ES256)
-                .type(JOSEObjectType(OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE))
+                .type(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
                 .build(),
             JWTClaimsSet.Builder()
                 .issueTime(Date())
@@ -90,7 +90,7 @@ private class KeyAttestationJWTTest {
     fun `KeyAttestationJWT should have valid attested keys claim`() {
         val signedJwt = SignedJWT(
             JWSHeader.Builder(JWSAlgorithm.ES256)
-                .type(JOSEObjectType(OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE))
+                .type(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
                 .build(),
             JWTClaimsSet.Builder()
                 .issueTime(Date())
@@ -105,7 +105,7 @@ private class KeyAttestationJWTTest {
     fun `KeyAttestationJWT should not have private keys in the attested keys claim`() {
         val signedJwt = SignedJWT(
             JWSHeader.Builder(JWSAlgorithm.ES256)
-                .type(JOSEObjectType(OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE))
+                .type(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
                 .build(),
             JWTClaimsSet.Builder()
                 .issueTime(Date())
@@ -120,7 +120,7 @@ private class KeyAttestationJWTTest {
     fun `KeyAttestationJWT should be created when valid`() {
         val signedJwt = SignedJWT(
             JWSHeader.Builder(JWSAlgorithm.ES256)
-                .type(JOSEObjectType(OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE))
+                .type(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
                 .build(),
             JWTClaimsSet.Builder()
                 .issueTime(Date())

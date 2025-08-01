@@ -142,13 +142,13 @@ object CryptoGenerator {
         nonce: CNonce? = null,
     ): SignedJWT = SignedJWT(
         JWSHeader.Builder(JWSAlgorithm.ES256)
-            .type(JOSEObjectType(OpenId4VPSpec.KEY_ATTESTATION_JWT_TYPE))
+            .type(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
             .x509CertChain(listOf(com.nimbusds.jose.util.Base64.encode(certificate.encoded)))
             .build(),
         JWTClaimsSet.Builder().apply {
-            claim(OpenId4VPSpec.KEY_ATTESTATION_ATTESTED_KEYS, attestedKeys.map { it.toPublicJWK().toJSONObject() })
-            claim(OpenId4VPSpec.KEY_ATTESTATION_KEY_STORAGE, listOf("iso_18045_moderate"))
-            claim(OpenId4VPSpec.KEY_ATTESTATION_USER_AUTHENTICATION, listOf("iso_18045_moderate"))
+            claim(OpenId4VCISpec.KEY_ATTESTATION_ATTESTED_KEYS, attestedKeys.map { it.toPublicJWK().toJSONObject() })
+            claim(OpenId4VCISpec.KEY_ATTESTATION_KEY_STORAGE, listOf("iso_18045_moderate"))
+            claim(OpenId4VCISpec.KEY_ATTESTATION_USER_AUTHENTICATION, listOf("iso_18045_moderate"))
             nonce?.let { claim("nonce", nonce.value) }
             issueTime(Date.from(now()))
             expirationTime(Date.from(now().plusSeconds(3600)))

@@ -18,7 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 /**
  * [OpenID for Verifiable Credential Issuance](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-15.html)
  */
-object OpenId4VPSpec {
+object OpenId4VCISpec {
 
     const val JWT_PROOF_TYPE = "openid4vci-proof+jwt"
 
