@@ -239,6 +239,6 @@ private var oauthMetaDataHandler =
 
 private fun resolver(vararg request: RequestMocker): CredentialOfferRequestResolver =
     CredentialOfferRequestResolver(
-        mockedKtorHttpClientFactory(requestMockers = request),
+        mockedHttpClient(requestMockers = request),
         IssuerMetadataPolicy.IgnoreSigned,
     )

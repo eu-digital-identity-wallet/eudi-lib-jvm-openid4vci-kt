@@ -15,7 +15,13 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSObject
+import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseUnparsable
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.attestationProofSpec
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.keyAttestationJwtProofsSpec
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
 import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
@@ -30,13 +36,14 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
+import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
 import kotlin.test.*
 
 class IssuanceSingleRequestTest {
 
     @Test
     fun `when issuer responds with invalid_proof it is reflected in the submission outcomes`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -78,15 +85,14 @@ class IssuanceSingleRequestTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
         with(issuer) {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val (_, outcome) = assertDoesNotThrow {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 3)).getOrThrow()
             }
             assertIs<SubmissionOutcome.Failed>(outcome)
             assertIs<CredentialIssuanceError.InvalidProof>(outcome.error)
@@ -95,7 +101,7 @@ class IssuanceSingleRequestTest {
 
     @Test
     fun `when the requested credential is not included in the offer an IllegalArgumentException is thrown`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -104,21 +110,21 @@ class IssuanceSingleRequestTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
         val credentialConfigurationId = CredentialConfigurationIdentifier("UniversityDegree")
         assertFailsWith<IllegalArgumentException> {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
             with(issuer) {
-                authorizedRequest.request(requestPayload, emptyList()).getOrThrow()
+                authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
             }
         }
     }
 
     @Test
-    fun `when the passed PoPSigners are more than the expected batch limit IssuerBatchSizeLimitExceeded is thrown`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+    fun `when BatchSigner sign operations are more than the expected batch limit IssuerBatchSizeLimitExceeded is thrown`() = runTest {
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -127,27 +133,21 @@ class IssuanceSingleRequestTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         assertFailsWith<CredentialIssuanceError.IssuerBatchSizeLimitExceeded> {
             with(issuer) {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val popSigners = listOf(
-                    CryptoGenerator.rsaProofSigner(),
-                    CryptoGenerator.rsaProofSigner(),
-                    CryptoGenerator.rsaProofSigner(),
-                    CryptoGenerator.rsaProofSigner(),
-                )
-                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 4)).getOrThrow()
             }
         }
     }
 
     @Test
     fun `when credential configuration config does not demand proofs, no proof is included in the request`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -168,19 +168,19 @@ class IssuanceSingleRequestTest {
         // In issuer metadata the 'MobileDrivingLicense_msoMdoc' credential is configured to demand no proofs
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferWithMDLMdoc_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, emptyList()).getOrThrow()
+            authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
         }
     }
 
     @Test
     fun `when credential configuration config demands proofs and issuer has no nonce endpoint, expect proofs without nonce`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(NO_NONCE_ENDPOINT),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -194,25 +194,21 @@ class IssuanceSingleRequestTest {
                         "Proof expected to be sent but was not sent.",
                     )
                     assertIs<Proof.Jwt>(issuanceRequest.proof)
-                    val cNonce = issuanceRequest.proof.jwt.jwtClaimsSet.getStringClaim("nonce")
-                    assertNull(
-                        cNonce,
-                        "No c_nonce expected in proof but found one",
-                    )
+                    val cNonceExists = issuanceRequest.proof.jwt.jwtClaimsSet.claims.contains("nonce")
+                    assertFalse(cNonceExists, "No c_nonce expected in proof but found one")
                 },
             ),
         )
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-            authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+            authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
         }
     }
 
@@ -220,7 +216,7 @@ class IssuanceSingleRequestTest {
     fun `successful issuance of credential requested by credential configuration id`() = runTest {
         val credential = "issued_credential_content_mso_mdoc"
         val nonceValue = "c_nonce_from_endpoint"
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -256,21 +252,20 @@ class IssuanceSingleRequestTest {
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-        val popSigner = CryptoGenerator.rsaProofSigner()
         val (_, outcome) = with(issuer) {
-            authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
+            authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
         }
         assertIs<SubmissionOutcome.Success>(outcome)
     }
 
     @Test
     fun `when token endpoint returns credential identifiers, issuance request must be IdentifierBasedIssuanceRequestTO`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -292,10 +287,9 @@ class IssuanceSingleRequestTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
-        val popSigners = listOf(CryptoGenerator.rsaProofSigner())
         val requestPayload = authorizedRequest.credentialIdentifiers?.let {
             IssuanceRequestPayload.IdentifierBased(
                 it.entries.first().key,
@@ -303,13 +297,13 @@ class IssuanceSingleRequestTest {
             )
         } ?: error("No credential identifier")
         with(issuer) {
-            authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+            authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
         }
     }
 
     @Test
     fun `when request is by credential id, this id must be in the list of identifiers returned from token endpoint`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -331,7 +325,7 @@ class IssuanceSingleRequestTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
         val requestPayload = IssuanceRequestPayload.IdentifierBased(
@@ -340,14 +334,14 @@ class IssuanceSingleRequestTest {
         )
         assertThrows<IllegalStateException> {
             with(issuer) {
-                authorizedRequest.request(requestPayload).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256, 1)).getOrThrow()
             }
         }
     }
 
     @Test
     fun `issuance request by credential id, is allowed only when token endpoint has returned credential identifiers`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -368,7 +362,7 @@ class IssuanceSingleRequestTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
         val requestPayload = IssuanceRequestPayload.IdentifierBased(
@@ -377,14 +371,14 @@ class IssuanceSingleRequestTest {
         )
         assertThrows<IllegalStateException> {
             with(issuer) {
-                authorizedRequest.request(requestPayload).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
             }
         }
     }
 
     @Test
     fun `when token endpoint returns authorization_details they are parsed properly`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -406,7 +400,7 @@ class IssuanceSingleRequestTest {
         )
         val (authorizedRequest, _) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
         assertTrue("Identifiers expected to be parsed") {
@@ -416,7 +410,7 @@ class IssuanceSingleRequestTest {
 
     @Test
     fun `when successful issuance response contains additional info, it is reflected in SubmissionOutcome_Success`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -449,15 +443,14 @@ class IssuanceSingleRequestTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
         with(issuer) {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val (_, outcome) = assertDoesNotThrow {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
             }
             assertIs<SubmissionOutcome.Success>(outcome)
             assertTrue { outcome.credentials.size == 1 }
@@ -474,7 +467,7 @@ class IssuanceSingleRequestTest {
 
     @Test
     fun `when successful issuance response does not contain 'credential' attribute fails with ResponseUnparsable exception`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -501,17 +494,211 @@ class IssuanceSingleRequestTest {
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            ktorHttpClientFactory = mockedKtorHttpClientFactory,
+            httpClient = mockedKtorHttpClientFactory,
         )
 
         with(issuer) {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val ex = assertFailsWith<JsonConvertException> {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val popSigners = listOf(CryptoGenerator.rsaProofSigner())
-                authorizedRequest.request(requestPayload, popSigners).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
             }
             assertIs<ResponseUnparsable>(ex.cause)
+        }
+    }
+
+    @Test
+    fun `when authorized with pre-authorization code grand and client is public, 'iss' attribute is not included in proof`() = runTest {
+        val mockedKtorHttpClientFactory = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            tokenPostMocker { request ->
+                with(request) { tokenPostApplyPreAuthFlowAssertionsAndGetFormData() }
+            },
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(
+                requestValidator = {
+                    val textContent = it.body as TextContent
+                    val issuanceRequest = Json.decodeFromString<CredentialRequestTO>(textContent.text)
+                    assertNotNull(
+                        issuanceRequest.proof,
+                        "Proof expected to be sent but was not sent.",
+                    )
+                    assertIs<Proof.Jwt>(issuanceRequest.proof)
+
+                    val iss = issuanceRequest.proof.jwt.jwtClaimsSet.getStringClaim("iss")
+                    assertNull(iss, "No 'iss' claim expected in proof but found one")
+                },
+            ),
+        )
+
+        val (authorizedRequest, issuer) = preAuthorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMixedDocTypes_PRE_AUTH_GRANT,
+            httpClient = mockedKtorHttpClientFactory,
+            txCode = "1234",
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
+        }
+    }
+
+    @Test
+    fun `when dpop is supported from auth server, access token is of dpop type and dpop jwt is sent the issuance request `() = runTest {
+        val mockedKtorHttpClientFactory = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            nonceEndpointMocker(),
+            tokenPostMocker(dpopAccessToken = true),
+            singleIssuanceRequestMocker(
+                requestValidator = {
+                    val headers = it.headers
+
+                    val authorizationHeader = headers.get("Authorization")
+                    assertNotNull(authorizationHeader, "No Authorization header found.")
+                    assertTrue(authorizationHeader.contains("DPoP"), "Expected DPoP access token but was not.")
+
+                    val dpopHeader = headers.get("DPoP")
+                    assertNotNull(
+                        dpopHeader,
+                        "No DPoP found.",
+                    )
+                    val dpopJwt = SignedJWT.parse(dpopHeader)
+                    assertTrue(
+                        dpopJwt.state == JWSObject.State.SIGNED,
+                        "Expected a signed dpop jwt but was not",
+                    )
+                    assertTrue(
+                        dpopJwt.header.type.toString() == "dpop+jwt",
+                        "Wrong DPoP JWT. Type expected to be dpop+jwt but was not",
+                    )
+                    assertNotNull(
+                        dpopJwt.jwtClaimsSet.claims.get("htm"),
+                        "Expected htm claim but didn't find one.",
+                    )
+                    assertNotNull(
+                        dpopJwt.jwtClaimsSet.claims.get("htu"),
+                        "Expected htu claim but didn't find one.",
+                    )
+                },
+            ),
+        )
+
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            config = OpenId4VCIConfigurationWithDpopSigner,
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            httpClient = mockedKtorHttpClientFactory,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
+        }
+    }
+
+    @Test
+    fun `when dpop is not supported from auth server, access token is of Bearer type and no dpop jwt is sent`() = runTest {
+        val mockedKtorHttpClientFactory = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(AuthServerMetadataVersion.NO_DPOP),
+            parPostMocker(),
+            nonceEndpointMocker(),
+            tokenPostMocker(dpopAccessToken = true),
+            singleIssuanceRequestMocker(
+                requestValidator = {
+                    val headers = it.headers
+
+                    val authorizationHeader = headers.get("Authorization")
+                    assertNotNull(authorizationHeader, "No Authorization header found.")
+                    assertTrue(authorizationHeader.contains("Bearer"), "Expected Bearer access token but was not.")
+
+                    val dpopHeader = headers.get("DPoP")
+                    assertNull(dpopHeader, "No DPoP expected but one found.")
+                },
+            ),
+        )
+
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            config = OpenId4VCIConfigurationWithDpopSigner,
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            httpClient = mockedKtorHttpClientFactory,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
+        }
+    }
+
+    @Test
+    fun `when the issuer requires a key attestation jwt proof, it should be included in the JWT proof`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            httpClient = mockedHttpClient,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        assertFailsWith<IllegalArgumentException> {
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
+            }
+        }
+    }
+
+    @Test
+    fun `issuance with key attestation jwt proof is successful when the issuer supports it`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            httpClient = mockedHttpClient,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            authorizedRequest.request(requestPayload, keyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
+        }
+    }
+
+    @Test
+    fun `issuance with attestation proof is successful when the issuer supports it `() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            httpClient = mockedHttpClient,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
         }
     }
 }

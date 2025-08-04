@@ -62,6 +62,8 @@ internal fun credentialIssuerMetadataWellKnownMocker(
             NO_NONCE_ENDPOINT -> getResourceAsText("well-known/openid-credential-issuer_no_nonce_endpoint.json")
             NO_SCOPES -> getResourceAsText("well-known/openid-credential-issuer_no_scopes.json")
             CONTAINS_DEPRECATED_METHOD -> getResourceAsText("well-known/openid-credential-issuer_contains_invalid_configuration.json")
+            KEY_ATTESTATION_REQUIRED -> getResourceAsText("well-known/openid-credential-issuer_key_attestation_required.json")
+            ATTESTATION_PROOF_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_attestation_proof_supported.json")
         }
         respond(
             content = content,
@@ -80,15 +82,28 @@ enum class IssuerMetadataVersion {
     NO_NONCE_ENDPOINT,
     NO_SCOPES,
     CONTAINS_DEPRECATED_METHOD,
+    KEY_ATTESTATION_REQUIRED,
+    ATTESTATION_PROOF_SUPPORTED,
 }
 
-internal fun authServerWellKnownMocker(): RequestMocker = RequestMocker(
+enum class AuthServerMetadataVersion {
+    FULL,
+    NO_DPOP,
+}
+
+internal fun authServerWellKnownMocker(
+    metadataVersion: AuthServerMetadataVersion = AuthServerMetadataVersion.FULL,
+): RequestMocker = RequestMocker(
     requestMatcher = { request ->
         request.url.encodedPath.contains("/.well-known/oauth-authorization-server") && request.method == HttpMethod.Get
     },
     responseBuilder = {
+        val content = when (metadataVersion) {
+            AuthServerMetadataVersion.FULL -> getResourceAsText("well-known/openid-configuration.json")
+            AuthServerMetadataVersion.NO_DPOP -> getResourceAsText("well-known/openid-configuration_no_dpop.json")
+        }
         respond(
-            content = getResourceAsText("well-known/openid-configuration.json"),
+            content = content,
             status = HttpStatusCode.OK,
             headers = headersOf(
                 HttpHeaders.ContentType to listOf("application/json"),
@@ -117,7 +132,7 @@ internal fun parPostMocker(validator: (request: HttpRequestData) -> Unit = {}): 
         requestValidator = validator,
     )
 
-internal fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit = {}): RequestMocker =
+internal fun tokenPostMocker(dpopAccessToken: Boolean = false, validator: (request: HttpRequestData) -> Unit = {}): RequestMocker =
     RequestMocker(
         requestMatcher = endsWith("/token", HttpMethod.Post),
         responseBuilder = {
@@ -126,6 +141,7 @@ internal fun tokenPostMocker(validator: (request: HttpRequestData) -> Unit = {})
                     TokenResponseTO.Success(
                         accessToken = UUID.randomUUID().toString(),
                         expiresIn = 3600,
+                        tokenType = if (dpopAccessToken) "DPoP" else null,
                     ),
                 ),
                 status = HttpStatusCode.OK,

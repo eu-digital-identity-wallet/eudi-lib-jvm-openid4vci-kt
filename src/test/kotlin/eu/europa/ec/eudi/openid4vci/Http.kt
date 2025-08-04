@@ -62,10 +62,10 @@ internal data class RequestMocker(
 /**
  * Factory method to create mocked http clients. Http clients behavior is based on the passed [requestMockers].
  */
-internal fun mockedKtorHttpClientFactory(
+internal fun mockedHttpClient(
     vararg requestMockers: RequestMocker,
     expectSuccessOnly: Boolean = false,
-): KtorHttpClientFactory = {
+): HttpClient =
     HttpClient(MockEngine) {
         engine {
             this.addHandler { request ->
@@ -85,4 +85,3 @@ internal fun mockedKtorHttpClientFactory(
         }
         expectSuccess = expectSuccessOnly
     }
-}

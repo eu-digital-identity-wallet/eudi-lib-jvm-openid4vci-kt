@@ -28,7 +28,9 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFa
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
 import eu.europa.ec.eudi.openid4vci.internal.clientAttestationHeaders
 import eu.europa.ec.eudi.openid4vci.internal.generateClientAttestationIfNeeded
+import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import kotlinx.coroutines.coroutineScope
@@ -75,7 +77,7 @@ internal class AuthorizationEndpointClient(
     private val pushedAuthorizationRequestEndpoint: URL?,
     private val config: OpenId4VCIConfig,
     private val dPoPJwtFactory: DPoPJwtFactory?,
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
+    private val httpClient: HttpClient,
 ) {
 
     constructor(
@@ -83,7 +85,7 @@ internal class AuthorizationEndpointClient(
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
         dPoPJwtFactory: DPoPJwtFactory?,
-        ktorHttpClientFactory: KtorHttpClientFactory,
+        httpClient: HttpClient,
     ) : this(
         credentialIssuerId,
         authorizationServerMetadata.issuer.value,
@@ -91,7 +93,7 @@ internal class AuthorizationEndpointClient(
         authorizationServerMetadata.pushedAuthorizationRequestEndpointURI?.toURL(),
         config,
         dPoPJwtFactory,
-        ktorHttpClientFactory,
+        httpClient,
     )
 
     private val isCredentialIssuerAuthorizationServer: Boolean
@@ -131,7 +133,7 @@ internal class AuthorizationEndpointClient(
      * @param scopes    The scopes of the authorization request.
      * @param state     The oauth2 specific 'state' request parameter.
      * @param issuerState   The state passed from credential issuer during the negotiation phase of the issuance.
-     * @return The result of the request as a pair of the PKCE verifier used during request and the authorization code
+     * @return The result of the request as a pair of the PKCE verifier used during the request and the authorization code
      *      url that caller will need to follow to retrieve the authorization code.
      *
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
@@ -257,45 +259,44 @@ internal class AuthorizationEndpointClient(
             }
         }
 
-        ktorHttpClientFactory().use { client ->
+        suspend fun requestInternal(
+            existingDpopNonce: Nonce?,
+            retried: Boolean,
+        ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> = coroutineScope {
+            val jwt =
+                dPoPJwtFactory?.createDPoPJwt(Htm.POST, url, null, existingDpopNonce)
+                    ?.getOrThrow()?.serialize()
 
-            suspend fun requestInternal(
-                existingDpopNonce: Nonce?,
-                retried: Boolean,
-            ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> = coroutineScope {
-                val response = client.submitForm(url.toString(), formParameters) {
-                    config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL())?.let {
-                        clientAttestationHeaders(it)
-                    }
-                    dPoPJwtFactory?.let { factory ->
-                        dpop(factory, url, Htm.POST, accessToken = null, nonce = existingDpopNonce)
-                    }
+            val response = httpClient.submitForm(url.toString(), formParameters) {
+                config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL())?.let {
+                    clientAttestationHeaders(it)
                 }
-                when {
-                    response.status.isSuccess() -> {
-                        val responseTO = response.body<PushedAuthorizationRequestResponseTO.Success>()
-                        val newDopNonce = response.dpopNonce()
-                        responseTO to (newDopNonce ?: existingDpopNonce)
-                    }
-
-                    response.status == HttpStatusCode.BadRequest -> {
-                        val errorTO = response.body<PushedAuthorizationRequestResponseTO.Failure>()
-                        val newDopNonce = response.dpopNonce()
-                        when {
-                            errorTO.error == "use_dpop_nonce" && newDopNonce != null && !retried -> {
-                                requestInternal(newDopNonce, true)
-                            }
-
-                            else -> errorTO to (newDopNonce ?: existingDpopNonce)
-                        }
-                    }
-
-                    else -> throw AccessTokenRequestFailed("Token request failed with ${response.status}", "N/A")
-                }
+                jwt?.let { header(DPoP, jwt) }
             }
+            when {
+                response.status.isSuccess() -> {
+                    val responseTO = response.body<PushedAuthorizationRequestResponseTO.Success>()
+                    val newDopNonce = response.dpopNonce()
+                    responseTO to (newDopNonce ?: existingDpopNonce)
+                }
 
-            requestInternal(null, false)
+                response.status == HttpStatusCode.BadRequest -> {
+                    val errorTO = response.body<PushedAuthorizationRequestResponseTO.Failure>()
+                    val newDopNonce = response.dpopNonce()
+                    when {
+                        errorTO.error == "use_dpop_nonce" && newDopNonce != null && !retried -> {
+                            requestInternal(newDopNonce, true)
+                        }
+
+                        else -> errorTO to (newDopNonce ?: existingDpopNonce)
+                    }
+                }
+
+                else -> throw AccessTokenRequestFailed("Token request failed with ${response.status}", "N/A")
+            }
         }
+
+        requestInternal(null, false)
     }
 
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =

@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredRequestTO
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -26,7 +28,7 @@ class IssuanceDeferredRequestTest {
 
     @Test
     fun `when issuer responds with invalid_transaction_id, response should be of type Errored`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -42,16 +44,15 @@ class IssuanceDeferredRequestTest {
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
             )
-            val popSigner = CryptoGenerator.rsaProofSigner()
             val (newAuthorizedRequest, outcome) =
-                authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
             assertIs<SubmissionOutcome.Deferred>(outcome)
 
             val (_, requestDeferredIssuance) =
@@ -67,7 +68,7 @@ class IssuanceDeferredRequestTest {
 
     @Test
     fun `when issuer responds with issuance_pending, response should be of type IssuancePending`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -84,16 +85,15 @@ class IssuanceDeferredRequestTest {
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
             )
-            val popSigner = CryptoGenerator.rsaProofSigner()
             val (newAuthorizedRequest, outcome) =
-                authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
             assertIs<SubmissionOutcome.Deferred>(outcome)
 
             val (_, requestDeferredIssuance) =
@@ -109,7 +109,7 @@ class IssuanceDeferredRequestTest {
 
     @Test
     fun `when deferred request is valid, credential must be issued`() = runTest {
-        val mockedKtorHttpClientFactory = mockedKtorHttpClientFactory(
+        val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
@@ -145,16 +145,15 @@ class IssuanceDeferredRequestTest {
         val (authorizedRequest, issuer) =
             authorizeRequestForCredentialOffer(
                 credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-                ktorHttpClientFactory = mockedKtorHttpClientFactory,
+                httpClient = mockedKtorHttpClientFactory,
             )
 
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
             )
-            val popSigner = CryptoGenerator.rsaProofSigner()
             val (newAuthorized, outcome) =
-                authorizedRequest.request(requestPayload, listOf(popSigner)).getOrThrow()
+                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
 
             assertIs<SubmissionOutcome.Deferred>(outcome)
 
@@ -166,7 +165,7 @@ class IssuanceDeferredRequestTest {
     private fun asDeferredIssuanceRequest(bodyStr: String): DeferredRequestTO? =
         try {
             Json.decodeFromString<DeferredRequestTO>(bodyStr)
-        } catch (ex: Exception) {
+        } catch (_: Exception) {
             null
         }
 }

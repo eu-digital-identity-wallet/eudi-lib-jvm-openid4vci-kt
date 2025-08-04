@@ -21,7 +21,9 @@ import eu.europa.ec.eudi.openid4vci.Grants.PreAuthorizedCode
 import eu.europa.ec.eudi.openid4vci.internal.GrantedAuthorizationDetailsSerializer
 import eu.europa.ec.eudi.openid4vci.internal.TokenResponse
 import eu.europa.ec.eudi.openid4vci.internal.clientAttestationHeaders
+import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import kotlinx.serialization.SerialName
@@ -93,7 +95,7 @@ internal class TokenEndpointClient(
     private val tokenEndpoint: URL,
     private val dPoPJwtFactory: DPoPJwtFactory?,
     private val clientAttestationPoPBuilder: ClientAttestationPoPBuilder,
-    private val ktorHttpClientFactory: KtorHttpClientFactory,
+    private val httpClient: HttpClient,
 ) {
 
     private val isCredentialIssuerAuthorizationServer: Boolean
@@ -104,7 +106,7 @@ internal class TokenEndpointClient(
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
         dPoPJwtFactory: DPoPJwtFactory?,
-        ktorHttpClientFactory: KtorHttpClientFactory,
+        httpClient: HttpClient,
     ) : this(
         credentialIssuerId,
         config.clock,
@@ -114,7 +116,7 @@ internal class TokenEndpointClient(
         authorizationServerMetadata.tokenEndpointURI.toURL(),
         dPoPJwtFactory,
         config.clientAttestationPoPBuilder,
-        ktorHttpClientFactory,
+        httpClient,
     )
 
     /**
@@ -202,14 +204,16 @@ internal class TokenEndpointClient(
             existingDpopNonce: Nonce?,
             retried: Boolean,
         ): Pair<TokenResponseTO, Nonce?> {
-            val response = ktorHttpClientFactory().use { httpClient ->
+            val response = run {
                 val formParameters = Parameters.build {
                     params.entries.forEach { (k, v) -> append(k, v) }
                 }
+                val jwt =
+                    dPoPJwtFactory?.createDPoPJwt(Htm.POST, tokenEndpoint, null, existingDpopNonce)
+                        ?.getOrThrow()?.serialize()
+
                 httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
-                    dPoPJwtFactory?.let { factory ->
-                        dpop(factory, tokenEndpoint, Htm.POST, accessToken = null, nonce = existingDpopNonce)
-                    }
+                    jwt?.let { header(DPoP, jwt) }
                     generateClientAttestationIfNeeded()?.let(::clientAttestationHeaders)
                 }
             }
@@ -228,6 +232,7 @@ internal class TokenEndpointClient(
                         errorTO.error == "use_dpop_nonce" && newDopNonce != null && !retried -> {
                             requestInternal(newDopNonce, true)
                         }
+
                         else -> errorTO to (newDopNonce ?: existingDpopNonce)
                     }
                 }

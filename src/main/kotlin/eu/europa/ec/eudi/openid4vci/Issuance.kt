@@ -15,10 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSSigner
-import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
-import com.nimbusds.jose.jwk.JWK
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -128,6 +124,27 @@ sealed interface IssuanceRequestPayload {
 
 typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
 
+sealed interface ProofsSpecification {
+
+    data object NoProofs : ProofsSpecification
+
+    sealed interface JwtProofs : ProofsSpecification {
+
+        data class NoKeyAttestation(
+            val proofsSigner: BatchSigner<JwtBindingKey>,
+        ) : JwtProofs
+
+        data class WithKeyAttestation(
+            val proofSignerProvider: suspend (CNonce?) -> Signer<KeyAttestationJWT>,
+            val keyIndex: Int,
+        ) : JwtProofs
+    }
+
+    data class AttestationProof(
+        val attestationProvider: suspend (CNonce?) -> KeyAttestationJWT,
+    ) : ProofsSpecification
+}
+
 /**
  * An interface for submitting a credential issuance request.
  */
@@ -137,62 +154,14 @@ interface RequestIssuance {
      * Places a request to the credential issuance endpoint.
      *
      * @param requestPayload the payload of the request
-     * @param popSigners one or more signers for the proofs to be sent. Required when requested credential's configuration requires proof.
+     * @param proofsSpecification the specification of proofs to be included in the request
      * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh updated Resource-Server DPoP Nonce)
      * and the [SubmissionOutcome]
      */
     suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
-        popSigners: List<PopSigner> = emptyList(),
+        proofsSpecification: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
-}
-
-sealed interface PopSigner {
-    /**
-     * A signer for proof of possession JWTs
-     * @param algorithm The algorithm used by the singing key
-     * @param bindingKey The public key to be included to the proof. It should correspond to the key
-     * used to sign the proof.
-     * @param jwsSigner A function to sign the JWT
-     */
-    data class Jwt(
-        val algorithm: JWSAlgorithm,
-        val bindingKey: JwtBindingKey,
-        val jwsSigner: JWSSigner,
-    ) : PopSigner
-
-    companion object {
-
-        /**
-         * Factory method for creating a [PopSigner.Jwt]
-         *
-         * Comes handy when caller has access to [privateKey]
-         *
-         * @param privateKey the key that will be used to sign the JWT
-         * @param publicKey the pub key to be included in the JWT. It should form a pair with [privateKey].
-         * In case of [JwtBindingKey.Did] this condition is not being checked.
-         * @param algorithm The algorithm for signing the JWT
-         *
-         * @return the JWT signer
-         */
-        fun jwtPopSigner(
-            privateKey: JWK,
-            algorithm: JWSAlgorithm,
-            publicKey: JwtBindingKey,
-        ): Jwt {
-            require(privateKey.isPrivate) { "A private key is required" }
-            require(
-                when (publicKey) {
-                    is JwtBindingKey.Did -> true // Would require DID resolution which is out of scope
-                    is JwtBindingKey.Jwk -> privateKey.toPublicJWK() == publicKey.jwk
-                    is JwtBindingKey.X509 -> privateKey.toPublicJWK() == JWK.parse(publicKey.chain.first())
-                },
-            ) { "Public/private key don't match" }
-
-            val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
-            return Jwt(algorithm, publicKey, signer)
-        }
-    }
 }
 
 /**
@@ -291,7 +260,7 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
 
     /**
      * Issuance server provides supports batch_size which is
-     * smaller than the number of [PopSigner] the caller provided.
+     * smaller than the number of proofs the caller provided.
      */
     class IssuerBatchSizeLimitExceeded(val batchSize: Int) :
         CredentialIssuanceError("IssuerBatchSizeLimitExceeded $batchSize")
