@@ -58,7 +58,7 @@ sealed interface CryptographicBindingMethod : Serializable {
  */
 enum class ProofType : Serializable {
     JWT,
-    LDP_VP,
+    DI_VP,
     ATTESTATION,
 }
 
@@ -72,8 +72,8 @@ sealed interface ProofTypeMeta : Serializable {
         }
     }
 
-    data object LdpVp : ProofTypeMeta {
-        private fun readResolve(): Any = LdpVp
+    data object DiVp : ProofTypeMeta {
+        private fun readResolve(): Any = DiVp
     }
 
     data class Attestation(
@@ -128,7 +128,7 @@ sealed interface KeyAttestationRequirement {
 
 fun ProofTypeMeta.type(): ProofType? = when (this) {
     is ProofTypeMeta.Jwt -> ProofType.JWT
-    is ProofTypeMeta.LdpVp -> ProofType.LDP_VP
+    is ProofTypeMeta.DiVp -> ProofType.DI_VP
     is ProofTypeMeta.Attestation -> ProofType.ATTESTATION
     is ProofTypeMeta.Unsupported -> null
 }

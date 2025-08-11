@@ -15,12 +15,33 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.jose.JOSEObjectType
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.AsymmetricJWK
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
+import com.nimbusds.jose.proc.JWSKeySelector
+import com.nimbusds.jose.proc.SecurityContext
+import com.nimbusds.jose.proc.SingleKeyJWSKeySelector
+import com.nimbusds.jose.util.JSONObjectUtils
+import com.nimbusds.jose.util.X509CertChainUtils
+import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
+import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialIssuerMetadataJsonParser
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
+
+private const val CREDENTIAL_ISSUER_WELL_KNOWN_PATH = "/.well-known/openid-credential-issuer"
+private const val SIGNED_METADATA_JWT_TYPE = "openidvci-issuer-metadata+jwt"
+
+private const val CONTENT_TYPE_APPLICATION_JWT = "application/jwt"
+private const val CONTENT_TYPE_APPLICATION_JSON = "application/json"
 
 internal class DefaultCredentialIssuerMetadataResolver(
     private val httpClient: HttpClient,
@@ -31,18 +52,138 @@ internal class DefaultCredentialIssuerMetadataResolver(
         policy: IssuerMetadataPolicy,
     ): Result<CredentialIssuerMetadata> = runCatching {
         val wellKnownUrl = issuer.wellKnown()
-        val json = try {
-            httpClient.get(wellKnownUrl).body<String>()
+        val json = when (policy) {
+            IssuerMetadataPolicy.IgnoreSigned -> wellKnownUrl.requestUnsigned()
+            is IssuerMetadataPolicy.RequireSigned -> wellKnownUrl.requestSigned(policy.issuerTrust, issuer)
+            is IssuerMetadataPolicy.PreferSigned -> wellKnownUrl.requestPreferingSigned(policy.issuerTrust, issuer)
+        }
+        CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer)
+    }
+
+    private suspend fun Url.requestUnsigned(): String {
+        val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JSON)
+        require(response.headers.contains("Content-Type", CONTENT_TYPE_APPLICATION_JSON)) {
+            "Credential issuer responded with invalid content type: " +
+                "expected $CONTENT_TYPE_APPLICATION_JSON but was ${response.headers["Content-Type"]}"
+        }
+        return response.body<String>()
+    }
+
+    private suspend fun Url.requestSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): String {
+        val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT)
+        ensure(response.headers.contains("Content-Type", CONTENT_TYPE_APPLICATION_JWT)) {
+            CredentialIssuerMetadataError.MissingSignedMetadata()
+        }
+        return parseAndVerifySignedMetadata(response.body<String>(), issuerTrust, issuer)
+            .getOrElse {
+                throw CredentialIssuerMetadataError.InvalidSignedMetadata(it)
+            }
+    }
+
+    private suspend fun Url.requestPreferingSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): String {
+        val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT, CONTENT_TYPE_APPLICATION_JSON)
+        val contentType = response.headers["Content-Type"]
+
+        requireNotNull(contentType) { "Credential issuer did not respond with a content type header" }
+
+        return when (contentType) {
+            CONTENT_TYPE_APPLICATION_JWT -> parseAndVerifySignedMetadata(
+                jwt = response.body<String>(),
+                issuerTrust = issuerTrust,
+                issuer = issuer,
+            ).getOrElse {
+                throw CredentialIssuerMetadataError.InvalidSignedMetadata(it)
+            }
+
+            CONTENT_TYPE_APPLICATION_JSON -> response.body<String>()
+
+            else -> "Unexpected content type $contentType when retrieving issuer metadata."
+        }
+    }
+
+    /**
+     * Parses and verifies the signature of a Signed JWT that contains Credential Issuer Metadata.
+     *
+     * @param jwt the Signed JWT to parse and verify
+     * @param issuerTrust trust anchor for the issuer of the signed metadata
+     * @param issuer the id of the Credential Issuer whose signed metadata to parse
+     */
+    private suspend fun parseAndVerifySignedMetadata(
+        jwt: String,
+        issuerTrust: IssuerTrust,
+        issuer: CredentialIssuerId,
+    ): Result<String> = runCatching {
+        val processor = DefaultJWTProcessor<SecurityContext>()
+            .apply {
+                jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType(SIGNED_METADATA_JWT_TYPE))
+                jwsKeySelector = issuerTrust.keySelector(jwt)
+                jwtClaimsSetVerifier =
+                    DefaultJWTClaimsVerifier(
+                        null,
+                        JWTClaimsSet.Builder()
+                            .subject(issuer.value.value.toExternalForm())
+                            .build(),
+                        setOf("iat", "sub"),
+                    )
+            }
+
+        val claimsSet = processor.process(jwt, null)
+        JSONObjectUtils.toJSONString(claimsSet.toJSONObject())
+    }
+
+    private suspend fun IssuerTrust.keySelector(jwt: String): JWSKeySelector<SecurityContext> {
+        val signedJwt = SignedJWT.parse(jwt)
+        val jwk = when (this) {
+            is IssuerTrust.ByPublicKey -> jwk.toPublicJWK()
+
+            is IssuerTrust.ByCertificateChain -> {
+                val certChain = requireNotNull(signedJwt.header.x509CertChain) {
+                    "missing 'x5c' header claim"
+                }.let { X509CertChainUtils.parse(it) }
+
+                require(certificateChainTrust.isTrusted(certChain)) {
+                    "certificate chain in 'x5c' header claim is not trusted"
+                }
+                JWK.parse(certChain.first())
+            }
+        }
+        require(jwk is AsymmetricJWK) {
+            "Metadata signing key should be asymmetric."
+        }
+
+        val algorithm: JWSAlgorithm? = signedJwt.header.algorithm
+        requireNotNull(algorithm) {
+            "No algorithm specified in JWT header."
+        }
+
+        return SingleKeyJWSKeySelector(algorithm, jwk.toPublicKey())
+    }
+
+    private suspend fun Url.getAcceptingContentTypes(vararg contentTypes: String): HttpResponse =
+        try {
+            val response = httpClient.get(this) {
+                contentTypes.forEach {
+                    accept(ContentType.parse(it))
+                }
+            }
+            require(response.status.isSuccess()) {
+                "Credential issuer responded with status code: ${response.status}"
+            }
+            response
         } catch (t: Throwable) {
             throw CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata(t)
         }
-
-        CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer, policy)
-    }
 }
 
-private fun CredentialIssuerId.wellKnown() = URLBuilder(Url(value.value.toURI()))
-    .appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false)
-    .build()
-    .toURI()
-    .toURL()
+internal fun CredentialIssuerId.wellKnown(): Url {
+    val issuer = Url(this.value.toString())
+    val pathSegment = buildString {
+        append(CREDENTIAL_ISSUER_WELL_KNOWN_PATH)
+        val joinedSegments = issuer.segments.joinToString(separator = "/")
+        if (joinedSegments.isNotBlank()) {
+            append("/")
+        }
+        append(joinedSegments)
+    }
+    return URLBuilder(issuer).apply { path(pathSegment) }.build()
+}
