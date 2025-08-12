@@ -15,12 +15,29 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import io.ktor.client.*
 import java.io.Serializable
 import java.net.URL
+
+sealed interface CredentialRequestEncryption : Serializable {
+    data object NotSupported : CredentialRequestEncryption {
+        @Suppress("unused")
+        private fun readResolve(): Any = NotSupported
+    }
+
+    data class SupportedNotRequired(
+        val encryptionParameters: SupportedRequestEncryptionParameters,
+    ) : CredentialRequestEncryption
+
+    data class Required(
+        val encryptionParameters: SupportedRequestEncryptionParameters,
+    ) : CredentialRequestEncryption
+}
 
 sealed interface CredentialResponseEncryption : Serializable {
     data object NotSupported : CredentialResponseEncryption {
@@ -29,17 +46,18 @@ sealed interface CredentialResponseEncryption : Serializable {
     }
 
     data class SupportedNotRequired(
-        val encryptionAlgorithmsAndMethods: SupportedEncryptionAlgorithmsAndMethods,
+        val encryptionParameters: SupportedResponseEncryptionParameters,
     ) : CredentialResponseEncryption
 
     data class Required(
-        val encryptionAlgorithmsAndMethods: SupportedEncryptionAlgorithmsAndMethods,
+        val encryptionParameters: SupportedResponseEncryptionParameters,
     ) : CredentialResponseEncryption
 }
 
-data class SupportedEncryptionAlgorithmsAndMethods(
+data class SupportedResponseEncryptionParameters(
     val algorithms: List<JWEAlgorithm>,
     val encryptionMethods: List<EncryptionMethod>,
+    val compressionAlgorithms: List<CompressionAlgorithm>? = emptyList(),
 ) {
     init {
         require(encryptionMethods.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
@@ -52,6 +70,27 @@ data class SupportedEncryptionAlgorithmsAndMethods(
         }
         if (!allAreAsymmetricAlgorithms) {
             throw CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired()
+        }
+    }
+}
+
+data class SupportedRequestEncryptionParameters(
+    val encryptionKeys: JWKSet,
+    val encryptionMethods: List<EncryptionMethod>,
+    val compressionAlgorithms: List<CompressionAlgorithm>? = emptyList(),
+) {
+    init {
+        require(encryptionMethods.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
+        if (encryptionKeys.isEmpty()) {
+            throw CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysRequired()
+        }
+        val allKeysHaveKeyId = encryptionKeys.keys.all { it.keyID != null }
+        if (!allKeysHaveKeyId) {
+            throw CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysMustHaveKeyId()
+        }
+        val allKeysArePublic = encryptionKeys.keys.all { !it.isPrivate }
+        if (!allKeysArePublic) {
+            throw CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysMustBePublic()
         }
     }
 }
@@ -79,6 +118,7 @@ data class CredentialIssuerMetadata(
     val nonceEndpoint: CredentialIssuerEndpoint? = null,
     val deferredCredentialEndpoint: CredentialIssuerEndpoint? = null,
     val notificationEndpoint: CredentialIssuerEndpoint? = null,
+    val credentialRequestEncryption: CredentialRequestEncryption = CredentialRequestEncryption.NotSupported,
     val credentialResponseEncryption: CredentialResponseEncryption = CredentialResponseEncryption.NotSupported,
     val batchCredentialIssuance: BatchCredentialIssuance = BatchCredentialIssuance.NotSupported,
     val credentialConfigurationsSupported: Map<CredentialConfigurationIdentifier, CredentialConfiguration>,
@@ -193,6 +233,24 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
      */
     class CredentialResponseAsymmetricEncryptionAlgorithmsRequired :
         CredentialIssuerMetadataValidationError(IllegalArgumentException("Asymmetric ResponseEncryption Algorithms Required"))
+
+    /**
+     * Credential Request Encryption keys are required.
+     */
+    class CredentialRequestEncryptionKeysRequired :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("Credential Request Encryption Keys are required"))
+
+    /**
+     * Credential Request Encryption Keys must have a key id.
+     */
+    class CredentialRequestEncryptionKeysMustHaveKeyId :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("Credential Request Encryption Keys must have a key id"))
+
+    /**
+     * Credential Request Encryption Keys must be public.
+     */
+    class CredentialRequestEncryptionKeysMustBePublic :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("Credential Request Encryption Keys must be public."))
 
     /**
      * The supported Credentials not valid.

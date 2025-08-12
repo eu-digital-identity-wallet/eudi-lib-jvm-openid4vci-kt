@@ -15,9 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.oauth2.sdk.GrantType
 import com.nimbusds.oauth2.sdk.ResponseMode
 import com.nimbusds.oauth2.sdk.ResponseType
@@ -238,19 +240,12 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
  */
 internal fun mobileDrivingLicense() = MsoMdocCredential(
     "MobileDrivingLicense_msoMdoc",
-    listOf(CryptographicBindingMethod.COSE),
+    emptyList(),
     listOf("ES256", "ES384", "ES512"),
     emptyList(),
     emptyList(),
     null,
-    ProofTypesSupported(
-        setOf(
-            ProofTypeMeta.Jwt(
-                listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
-                KeyAttestationRequirement.RequiredNoConstraints,
-            ),
-        ),
-    ),
+    ProofTypesSupported.Empty,
     listOf(
         Display(
             "Mobile Driving License",
@@ -298,8 +293,29 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
     CredentialIssuerEndpoint("https://credential-issuer.example.com/nonce").getOrThrow(),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/credentials/deferred").getOrThrow(),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/notification").getOrThrow(),
+    CredentialRequestEncryption.Required(
+        SupportedRequestEncryptionParameters(
+            encryptionKeys = JWKSet.parse(
+                """
+                    {
+                    "keys": [
+                        {
+                            "kty": "EC",
+                            "kid": "key-0",
+                            "crv": "P-256",
+                            "x": "ilzt0a_ukEX-nl0S05S2RAlbQFL2DSOpTjT3xf52JBY",
+                            "y": "q-fNv_d0nlZf_S_3S-KmrktIsylB0cybRiL6rZMLZHI"
+                        }
+                    ]
+                }
+                """,
+            ),
+            encryptionMethods = listOf(EncryptionMethod.XC20P),
+            compressionAlgorithms = listOf(CompressionAlgorithm.DEF),
+        ),
+    ),
     CredentialResponseEncryption.Required(
-        SupportedEncryptionAlgorithmsAndMethods(
+        SupportedResponseEncryptionParameters(
             listOf(
                 JWEAlgorithm.ECDH_ES,
                 JWEAlgorithm.ECDH_ES_A128KW,
@@ -310,6 +326,7 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
                 JWEAlgorithm.RSA_OAEP_512,
             ),
             listOf(EncryptionMethod.XC20P),
+            listOf(CompressionAlgorithm.DEF),
         ),
     ),
     BatchCredentialIssuance.Supported(batchSize = 2),
@@ -338,8 +355,9 @@ internal fun credentialIssuerSignedMetadata() = CredentialIssuerMetadata(
     CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/nonce").getOrThrow(),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/credentials/deferred").getOrThrow(),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/notification").getOrThrow(),
+    CredentialRequestEncryption.NotSupported,
     CredentialResponseEncryption.Required(
-        SupportedEncryptionAlgorithmsAndMethods(
+        SupportedResponseEncryptionParameters(
             listOf(JWEAlgorithm.RSA_OAEP_256),
             listOf(EncryptionMethod.XC20P),
         ),

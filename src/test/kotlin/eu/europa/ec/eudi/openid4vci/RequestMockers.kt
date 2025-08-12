@@ -40,9 +40,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.util.*
 
-internal fun credentialIssuerMetaDataHandler(id: CredentialIssuerId, resource: String): RequestMocker = RequestMocker(
+internal fun credentialIssuerMetaDataHandler(
+    id: CredentialIssuerId,
+    resource: String,
+    acceptContentTypes: List<String> = listOf("application/json"),
+): RequestMocker = RequestMocker(
     match(id.metaDataUrl().value.toURI()),
-    jsonResponse(resource),
+    jsonResponse(resource, acceptContentTypes),
 )
 
 internal fun oauthMetaDataHandler(oauth2ServerUrl: HttpsUrl, oauth2MetaDataResource: String): RequestMocker = RequestMocker(
