@@ -320,6 +320,7 @@ internal sealed interface SubmissionOutcomeInternal {
 
     data class Deferred(
         val transactionId: TransactionId,
+        val interval: Long,
     ) : SubmissionOutcomeInternal
 
     data class Failed(
@@ -329,7 +330,7 @@ internal sealed interface SubmissionOutcomeInternal {
     fun toPub(): SubmissionOutcome =
         when (this) {
             is Success -> SubmissionOutcome.Success(credentials, notificationId)
-            is Deferred -> SubmissionOutcome.Deferred(transactionId)
+            is Deferred -> SubmissionOutcome.Deferred(transactionId, interval)
             is Failed -> SubmissionOutcome.Failed(error)
         }
 }

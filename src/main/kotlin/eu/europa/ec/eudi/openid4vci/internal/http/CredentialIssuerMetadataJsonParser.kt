@@ -438,7 +438,7 @@ private fun CredentialResponseEncryptionTO?.toDomain(): CredentialResponseEncryp
         val encryptionAlgorithms = algorithmsSupported.map { JWEAlgorithm.parse(it) }
         val compressionAlgorithms = zipValuesSupported?.map { CompressionAlgorithm(it) }
         val encryptionMethods = methodsSupported.map { EncryptionMethod.parse(it) }
-        return SupportedResponseEncryptionParameters(encryptionAlgorithms, encryptionMethods, compressionAlgorithms)
+        return SupportedResponseEncryptionParameters(encryptionAlgorithms, encryptionMethods, PayloadCompression(compressionAlgorithms))
     }
 
     return if (null == this) {
@@ -460,7 +460,7 @@ private fun CredentialRequestEncryptionTO?.toDomain(): CredentialRequestEncrypti
         val encryptionKeys = JWKSet.parse(JsonSupport.encodeToString(jwks))
         val compressionAlgorithms = zipValuesSupported?.map { CompressionAlgorithm(it) }
         val encryptionMethods = methodsSupported.map { EncryptionMethod.parse(it) }
-        return SupportedRequestEncryptionParameters(encryptionKeys, encryptionMethods, compressionAlgorithms)
+        return SupportedRequestEncryptionParameters(encryptionKeys, encryptionMethods, PayloadCompression(compressionAlgorithms))
     }
 
     return if (null == this) {

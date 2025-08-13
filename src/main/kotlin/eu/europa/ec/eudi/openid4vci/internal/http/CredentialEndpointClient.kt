@@ -144,12 +144,17 @@ internal class DeferredEndPointClient(
         val response = httpClient.post(url) {
             bearerOrDPoPAuth(accessToken, jwt)
             contentType(ContentType.Application.Json)
-            setBody(DeferredRequestTO(transactionId.value))
+            setBody(
+                DeferredRequestTO(
+                    transactionId = transactionId.value,
+                    credentialResponseEncryption = responseEncryptionSpec?.let { CredentialResponseEncryptionSpecTO.from(it) },
+                ),
+            )
         }
 
         return if (response.status.isSuccess()) {
             val outcome =
-                responsePossiblyEncrypted<DeferredIssuanceSuccessResponseTO, DeferredCredentialQueryOutcome.Issued>(
+                responsePossiblyEncrypted<DeferredIssuanceSuccessResponseTO, DeferredCredentialQueryOutcome>(
                     response,
                     responseEncryptionSpec,
                     fromTransferObject = { it.toDomain() },
@@ -169,10 +174,8 @@ internal class DeferredEndPointClient(
                 )
             } else {
                 val responsePayload = response.body<GenericErrorResponseTO>()
-                responsePayload.toDeferredCredentialQueryOutcome() to (
-                    newResourceServerDpopNonce
-                        ?: resourceServerDpopNonce
-                    )
+                val errored = DeferredCredentialQueryOutcome.Errored(responsePayload.error, responsePayload.errorDescription)
+                errored to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
             }
         }
     }
@@ -197,7 +200,7 @@ private suspend inline fun <reified ResponseTO, Response> responsePossiblyEncryp
             val jwt = response.body<String>()
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
                 jweKeySelector = JWEDecryptionKeySelector(
-                    encryptionSpec.algorithm,
+                    encryptionSpec.encryptionKeyAlgorithm,
                     encryptionSpec.encryptionMethod,
                     ImmutableJWKSet(JWKSet(encryptionSpec.jwk)),
                 )
