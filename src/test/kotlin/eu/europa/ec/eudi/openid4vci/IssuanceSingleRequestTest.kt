@@ -23,7 +23,6 @@ import eu.europa.ec.eudi.openid4vci.CryptoGenerator.attestationProofSpec
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.keyAttestationJwtProofsSpec
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
-import eu.europa.ec.eudi.openid4vci.internal.Proof
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -158,7 +157,7 @@ class IssuanceSingleRequestTest {
                     val textContent = it.body as TextContent
                     val issuanceRequest = Json.decodeFromString<CredentialRequestTO>(textContent.text)
                     assertNull(
-                        issuanceRequest.proof,
+                        issuanceRequest.proofs,
                         "No proof expected to be sent with request but was sent.",
                     )
                 },
@@ -190,12 +189,16 @@ class IssuanceSingleRequestTest {
                     val textContent = it.body as TextContent
                     val issuanceRequest = Json.decodeFromString<CredentialRequestTO>(textContent.text)
                     assertNotNull(
-                        issuanceRequest.proof,
+                        issuanceRequest.proofs,
                         "Proof expected to be sent but was not sent.",
                     )
-                    assertIs<Proof.Jwt>(issuanceRequest.proof)
-                    val cNonceExists = issuanceRequest.proof.jwt.jwtClaimsSet.claims.contains("nonce")
-                    assertFalse(cNonceExists, "No c_nonce expected in proof but found one")
+                    val jwtProofs = assertNotNull(issuanceRequest.proofs.jwtProofs)
+                    val distinctNonces = jwtProofs
+                        .map { SignedJWT.parse(it) }
+                        .mapNotNull { it.jwtClaimsSet.getStringClaim("nonce") }
+                        .distinct()
+
+                    assertTrue(distinctNonces.isEmpty(), "No c_nonce expected in proof but found one")
                 },
             ),
         )
@@ -232,11 +235,18 @@ class IssuanceSingleRequestTest {
                         "Expected request by configuration id but was not.",
                     )
                     assertNotNull(
-                        issuanceRequest.proof,
+                        issuanceRequest.proofs,
                         "Proof expected to be sent but was not sent.",
                     )
-                    assertIs<Proof.Jwt>(issuanceRequest.proof)
-                    val cNonce = issuanceRequest.proof.jwt.jwtClaimsSet.getStringClaim("nonce")
+                    val jwtProofs = assertNotNull(issuanceRequest.proofs.jwtProofs)
+                    assertEquals(
+                        1,
+                        jwtProofs.size,
+                        "Expected exactly one proof but was not",
+                    )
+                    val cNonce = SignedJWT.parse(jwtProofs[0])
+                        .jwtClaimsSet.getStringClaim("nonce")
+
                     assertNotNull(
                         cNonce,
                         "c_nonce expected to be found in proof but was not",
@@ -521,12 +531,14 @@ class IssuanceSingleRequestTest {
                     val textContent = it.body as TextContent
                     val issuanceRequest = Json.decodeFromString<CredentialRequestTO>(textContent.text)
                     assertNotNull(
-                        issuanceRequest.proof,
+                        issuanceRequest.proofs,
                         "Proof expected to be sent but was not sent.",
                     )
-                    assertIs<Proof.Jwt>(issuanceRequest.proof)
+                    assertNotNull(issuanceRequest.proofs.jwtProofs)
+                    val jwtProofStr = issuanceRequest.proofs.jwtProofs[0]
+                    val jwtProof = SignedJWT.parse(jwtProofStr)
 
-                    val iss = issuanceRequest.proof.jwt.jwtClaimsSet.getStringClaim("iss")
+                    val iss = jwtProof.jwtClaimsSet.getStringClaim("iss")
                     assertNull(iss, "No 'iss' claim expected in proof but found one")
                 },
             ),
