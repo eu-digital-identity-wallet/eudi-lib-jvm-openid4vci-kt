@@ -20,6 +20,7 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
@@ -622,6 +623,16 @@ class IssuanceIssuerMetadataVersionTest {
         assertTrue("Deserialization did not discard unknown format credential_configurations_supported values") {
             issuer.credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported.count() == 4
         }
+    }
+
+    @Test
+    fun randomECEncryptionKey() {
+        ECKeyGenerator(Curve.P_256)
+            .keyUse(KeyUse.ENCRYPTION)
+            .keyID(UUID.randomUUID().toString())
+            .algorithm(JWEAlgorithm.ECDH_ES)
+            .issueTime(Date(System.currentTimeMillis()))
+            .generate().also { println(it.toPublicJWK()) }
     }
 }
 

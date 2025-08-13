@@ -298,16 +298,19 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
             encryptionKeys = JWKSet.parse(
                 """
                     {
-                    "keys": [
+                      "keys": [
                         {
-                            "kty": "EC",
-                            "kid": "key-0",
-                            "crv": "P-256",
-                            "x": "ilzt0a_ukEX-nl0S05S2RAlbQFL2DSOpTjT3xf52JBY",
-                            "y": "q-fNv_d0nlZf_S_3S-KmrktIsylB0cybRiL6rZMLZHI"
+                          "kty": "EC",
+                          "use": "enc",
+                          "crv": "P-256",
+                          "alg": "ECDH-ES",
+                          "kid": "key-0",
+                          "x": "gtgP8ul2T8JgF9EDyESOB8MX2-mxH8UePaJ-XVOLieU",
+                          "y": "zAR2-fq0uRPysKJD38VlbK3w6UP77B1U7NcALO8hICM",
+                          "iat": 1755093009
                         }
-                    ]
-                }
+                      ]
+                    }
                 """,
             ),
             encryptionMethods = listOf(EncryptionMethod.XC20P),
@@ -355,7 +358,30 @@ internal fun credentialIssuerSignedMetadata() = CredentialIssuerMetadata(
     CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/nonce").getOrThrow(),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/credentials/deferred").getOrThrow(),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/notification").getOrThrow(),
-    CredentialRequestEncryption.NotSupported,
+    CredentialRequestEncryption.Required(
+        SupportedRequestEncryptionParameters(
+            encryptionKeys = JWKSet.parse(
+                """
+                    {
+                      "keys": [
+                        {
+                          "kty": "EC",
+                          "use": "enc",
+                          "crv": "P-256",
+                          "alg": "ECDH-ES",
+                          "kid": "key-0",
+                          "x": "gtgP8ul2T8JgF9EDyESOB8MX2-mxH8UePaJ-XVOLieU",
+                          "y": "zAR2-fq0uRPysKJD38VlbK3w6UP77B1U7NcALO8hICM",
+                          "iat": 1755093009
+                        }
+                      ]
+                    }
+                """,
+            ),
+            encryptionMethods = listOf(EncryptionMethod.XC20P),
+            payloadCompression = PayloadCompression(listOf(CompressionAlgorithm.DEF)),
+        ),
+    ),
     CredentialResponseEncryption.Required(
         SupportedResponseEncryptionParameters(
             listOf(JWEAlgorithm.RSA_OAEP_256),
