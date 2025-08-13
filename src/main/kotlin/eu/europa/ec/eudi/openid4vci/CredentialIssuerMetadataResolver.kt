@@ -326,6 +326,16 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
     class CredentialsSupportedRequired :
         CredentialIssuerMetadataValidationError(IllegalArgumentException("Credentials Supported Required"))
 
+    /**
+     * Supported Credentials are required.
+     */
+    class CredentialRequestEncryptionMustExistIfCredentialResponseEncryptionExists :
+        CredentialIssuerMetadataValidationError(
+            IllegalArgumentException(
+                "Issuer must specify Credential Request Encryption if Credential Response Encryption is specified",
+            ),
+        )
+
     class InvalidBatchSize :
         CredentialIssuerMetadataValidationError(IllegalArgumentException("batch_size should be greater than zero"))
 }
