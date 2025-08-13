@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.CompressionAlgorithm
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -82,8 +83,9 @@ sealed interface SubmissionOutcome : java.io.Serializable {
      * to request the credential from issuer's Deferred Credential Endpoint.
      *
      * @param transactionId  A string identifying a Deferred Issuance transaction.
+     * @param interval Represents the minimum amount of time in seconds before sending a new deferred issuance request.
      */
-    data class Deferred(val transactionId: TransactionId) : SubmissionOutcome
+    data class Deferred(val transactionId: TransactionId, val interval: Long) : SubmissionOutcome
 
     /**
      * State that denotes that the credential issuance request has failed
@@ -169,7 +171,7 @@ interface RequestIssuance {
  * that the wallet expects in the response of its issuance request.
  */
 typealias ResponseEncryptionSpecFactory =
-    (SupportedResponseEncryptionParameters, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec?
+    (SupportedResponseEncryptionParameters, KeyGenerationConfig, List<CompressionAlgorithm>?) -> IssuanceResponseEncryptionSpec?
 
 /**
  * Errors that can happen in the process of issuance process
@@ -222,13 +224,6 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
         CredentialIssuanceError("Irrecoverable invalid proof ")
 
     /**
-     * Issuer has not issued yet deferred credential. Retry interval (in seconds) is provided to caller
-     */
-    data class DeferredCredentialIssuancePending(
-        val retryInterval: Long = 5,
-    ) : CredentialIssuanceError("DeferredCredentialIssuancePending")
-
-    /**
      * Invalid access token passed to issuance server
      */
     class InvalidToken : CredentialIssuanceError("InvalidToken")
@@ -239,14 +234,14 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     class InvalidTransactionId : CredentialIssuanceError("InvalidTransactionId")
 
     /**
-     * Invalid credential type requested to issuance server
+     *  Requested Credential Configuration is unknown to issuance server
      */
-    class UnsupportedCredentialType : CredentialIssuanceError("UnsupportedCredentialType")
+    class UnknownCredentialConfiguration : CredentialIssuanceError("UnknownCredentialConfiguration")
 
     /**
-     * Unsupported credential type requested to issuance server
+     * Requested Credential identifier is unknown to issuance server
      */
-    class UnsupportedCredentialFormat : CredentialIssuanceError("UnsupportedCredentialFormat")
+    class UnknownCredentialIdentifier : CredentialIssuanceError("UnknownCredentialIdentifier")
 
     /**
      * Invalid encryption parameters passed to issuance server
@@ -324,6 +319,12 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
             ResponseEncryptionError("ResponseEncryptionRequiredByWalletButNotSupportedByIssuer")
 
         /**
+         * Response encryption key does not specify 'alg' attribute
+         */
+        class ResponseEncryptionKeyDoesNotSpecifyAlgorithm :
+            ResponseEncryptionError("ResponseEncryptionKeyDoesNotSpecifyAlgorithm")
+
+        /**
          * Response encryption algorithm specified in request is not supported from issuance server
          */
         class ResponseEncryptionAlgorithmNotSupportedByIssuer :
@@ -346,6 +347,18 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
          */
         class WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated :
             ResponseEncryptionError("WalletRequiresCredentialResponseEncryptionButNoCryptoMaterialCanBeGenerated")
+
+        /**
+         * Issuer does not support ecrypted payload compression
+         */
+        class IssuerDoesNotSupportEncryptedPayloadCompression :
+            ResponseEncryptionError("IssuerDoesNotSupportEncryptedPayloadCompression")
+
+        /**
+         * Issuer does not support ecrypted payload compression
+         */
+        class IssuerDoesNotSupportEncryptedPayloadCompressionAlgorithm :
+            ResponseEncryptionError("IssuerDoesNotSupportEncryptedPayloadCompressionAlgorithm")
     }
 
     /**

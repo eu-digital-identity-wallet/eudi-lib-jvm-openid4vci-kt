@@ -235,7 +235,6 @@ interface Issuer :
                             tokenEndpoint = tokenEndpoint,
                             dPoPSigner = dPoPJwtFactory?.signer,
                             clientAttestationPoPBuilder = config.clientAttestationPoPBuilder,
-                            responseEncryptionSpec = responseEncryptionSpec,
                             clock = config.clock,
                         ),
                         AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
@@ -312,11 +311,17 @@ interface Issuer :
         }
 
         val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =
-            { supportedAlgorithmsAndMethods, keyGenerationConfig ->
-                val method = supportedAlgorithmsAndMethods.encryptionMethods[0]
-                supportedAlgorithmsAndMethods.algorithms.firstNotNullOfOrNull { alg ->
+            { supportedResponseEncryptionParameters, keyGenerationConfig, walletCompressionAlgorithms ->
+                val supportedPayloadCompression = supportedResponseEncryptionParameters.payloadCompression
+                val compressionAlg = when (supportedPayloadCompression) {
+                    PayloadCompression.NotSupported -> null
+                    is PayloadCompression.Supported ->
+                        walletCompressionAlgorithms?.intersect(supportedPayloadCompression.algorithms)?.firstOrNull()
+                }
+                val method = supportedResponseEncryptionParameters.encryptionMethods[0]
+                supportedResponseEncryptionParameters.algorithms.firstNotNullOfOrNull { alg ->
                     KeyGenerator.genKeyIfSupported(keyGenerationConfig, alg)?.let { jwk ->
-                        IssuanceResponseEncryptionSpec(jwk, alg, method)
+                        IssuanceResponseEncryptionSpec(jwk, method, compressionAlg)
                     }
                 }
             }

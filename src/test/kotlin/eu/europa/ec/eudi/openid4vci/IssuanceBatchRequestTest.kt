@@ -25,7 +25,9 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.*
 
 class IssuanceBatchRequestTest {
@@ -76,10 +78,6 @@ class IssuanceBatchRequestTest {
                 requestValidator = {
                     val textContent = it.body as TextContent
                     val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
-                    assertNull(
-                        issuanceRequestTO.proof,
-                        "Multiple proofs expected but received one proof",
-                    )
                     assertNotNull(
                         issuanceRequestTO.proofs,
                         "Multiple proofs expected but received one proof",

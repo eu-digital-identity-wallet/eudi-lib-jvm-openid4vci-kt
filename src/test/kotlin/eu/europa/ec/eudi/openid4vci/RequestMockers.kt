@@ -27,10 +27,7 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.*
-import eu.europa.ec.eudi.openid4vci.internal.http.CNonceResponse
-import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
-import eu.europa.ec.eudi.openid4vci.internal.http.PushedAuthorizationRequestResponseTO
-import eu.europa.ec.eudi.openid4vci.internal.http.TokenResponseTO
+import eu.europa.ec.eudi.openid4vci.internal.http.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -235,7 +232,7 @@ internal fun deferredIssuanceRequestMocker(
 private fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(request: HttpRequestData?, credential: String): HttpResponseData {
     val textContent = request?.body as TextContent
     val issuanceRequest = Json.decodeFromString<JsonObject>(textContent.text)
-    return if (issuanceRequest["proof"] != null) {
+    return if (issuanceRequest["proofs"] != null) {
         respond(
             content = """
                     {                                  
@@ -266,11 +263,12 @@ private fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(request: H
 fun MockRequestHandleScope.respondToIssuanceRequestWithDeferredResponseDataBuilder(request: HttpRequestData?): HttpResponseData {
     val textContent = request?.body as TextContent
     val issuanceRequest = Json.decodeFromString<CredentialRequestTO>(textContent.text)
-    return if (issuanceRequest.proof != null) {
+    return if (issuanceRequest.proofs != null) {
         respond(
             content = """
                     {                      
-                      "transaction_id": "1234565768122"                     
+                      "transaction_id": "1234565768122",
+                      "interval": 12345
                     }
             """.trimIndent(),
             status = HttpStatusCode.OK,
@@ -297,31 +295,37 @@ fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(
     credentialIsReady: Boolean,
     transactionIdIsValid: Boolean = true,
 ): HttpResponseData =
-    if (credentialIsReady && transactionIdIsValid) {
-        respond(
-            content = """
-                    {                     
-                      "credentials": [ { "credential": "credential_content"} ]
-                    }
-            """.trimIndent(),
-            status = HttpStatusCode.OK,
-            headers = headersOf(
-                HttpHeaders.ContentType to listOf("application/json"),
-            ),
-        )
+    if (transactionIdIsValid) {
+        if (credentialIsReady) {
+            respond(
+                content = """
+                        {                     
+                          "credentials": [ { "credential": "credential_content"} ]
+                        }
+                """.trimIndent(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("application/json"),
+                ),
+            )
+        } else {
+            respond(
+                content = """
+                        {                     
+                          "interval": 12345
+                        }
+                """.trimIndent(),
+                status = HttpStatusCode.Accepted,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("application/json"),
+                ),
+            )
+        }
     } else {
-        val error =
-            if (!transactionIdIsValid) {
-                "invalid_transaction_id "
-            } else {
-                "issuance_pending"
-            }
-
         respond(
             content = """
                     {
-                      "error": "$error",
-                      "interval": 5
+                      "error": "invalid_transaction_id"
                     }
             """.trimIndent(),
             status = HttpStatusCode.BadRequest,
@@ -349,20 +353,20 @@ fun MockRequestHandleScope.encryptedResponseDataBuilder(
 private fun extractEncryptionSpec(request: HttpRequestData?): Triple<JWK, JWEAlgorithm, EncryptionMethod> {
     val textContent = request?.body as TextContent
     val text = textContent.text
-    val credentialResponseEncryption = if (text.contains("proofs")) {
+    val credentialResponseEncryption = try {
         Json.decodeFromString<CredentialRequestTO>(text).credentialResponseEncryption
-    } else {
-        Json.decodeFromString<CredentialRequestTO>(text).credentialResponseEncryption
+    } catch (e: Exception) {
+        Json.decodeFromString<DeferredRequestTO>(text).credentialResponseEncryption
     }
     val jwk = JWK.parse(credentialResponseEncryption?.jwk.toString())
-    val alg = JWEAlgorithm.parse(credentialResponseEncryption?.encryptionAlgorithm)
+    val alg = JWEAlgorithm.parse(jwk.algorithm.name)
     val enc = EncryptionMethod.parse(credentialResponseEncryption?.encryptionMethod)
     return Triple(jwk, alg, enc)
 }
 
 fun encypt(claimSet: JWTClaimsSet, jwk: JWK, alg: JWEAlgorithm, enc: EncryptionMethod): Result<String> =
     runCatching {
-        randomRSAEncryptionKey(2048)
+        randomRSAEncryptionKey(2048, alg)
         val header =
             JWEHeader.Builder(alg, enc)
                 .jwk(jwk.toPublicJWK())

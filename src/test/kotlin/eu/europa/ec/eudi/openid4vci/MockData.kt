@@ -311,7 +311,7 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
                 """,
             ),
             encryptionMethods = listOf(EncryptionMethod.XC20P),
-            compressionAlgorithms = listOf(CompressionAlgorithm.DEF),
+            payloadCompression = PayloadCompression(listOf(CompressionAlgorithm.DEF)),
         ),
     ),
     CredentialResponseEncryption.Required(
@@ -326,7 +326,7 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
                 JWEAlgorithm.RSA_OAEP_512,
             ),
             listOf(EncryptionMethod.XC20P),
-            listOf(CompressionAlgorithm.DEF),
+            PayloadCompression(listOf(CompressionAlgorithm.DEF)),
         ),
     ),
     BatchCredentialIssuance.Supported(batchSize = 2),
