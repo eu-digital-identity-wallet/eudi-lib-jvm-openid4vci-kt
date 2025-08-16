@@ -40,12 +40,16 @@ internal fun endsWith(endsWith: String, method: HttpMethod = HttpMethod.Get): Ht
  * Gets a [HttpResponseDataBuilder] that returns the provided [resource]
  * as an 'application/json' [HttpResponseData] using the provided [status].
  */
-internal fun jsonResponse(resource: String, status: HttpStatusCode = HttpStatusCode.OK): HttpResponseDataBuilder = {
+internal fun jsonResponse(
+    resource: String,
+    acceptContentTypes: List<String> = listOf("application/json"),
+    status: HttpStatusCode = HttpStatusCode.OK,
+): HttpResponseDataBuilder = {
     respond(
         content = getResourceAsText(resource),
         status = status,
         headers = headersOf(
-            HttpHeaders.ContentType to listOf("application/json"),
+            *acceptContentTypes.map { HttpHeaders.ContentType to listOf(it) }.toTypedArray(),
         ),
     )
 }

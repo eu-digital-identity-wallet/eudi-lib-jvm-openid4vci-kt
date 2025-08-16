@@ -27,7 +27,7 @@ object OpenId4VCISpec {
     const val JOSE_HEADER_X5C = "x5c"
     const val JOSE_HEADER_KEY_ATTESTATION = "key_attestation"
 
-    const val KEY_ATTESTATION_JWT_TYPE = "keyattestation+jwt"
+    const val KEY_ATTESTATION_JWT_TYPE = "key-attestation+jwt"
     const val KEY_ATTESTATION_ATTESTED_KEYS = "attested_keys"
     const val KEY_ATTESTATION_KEY_STORAGE = "key_storage"
     const val KEY_ATTESTATION_USER_AUTHENTICATION = "user_authentication"

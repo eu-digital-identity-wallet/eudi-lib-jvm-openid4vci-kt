@@ -20,19 +20,22 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialResponseSuccessTO
+import eu.europa.ec.eudi.openid4vci.internal.http.DeferredRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.*
-import org.junit.jupiter.api.assertDoesNotThrow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -50,9 +53,8 @@ class IssuanceIssuerMetadataVersionTest {
                 tokenPostMocker(),
                 credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             )
-            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
-                jwk = randomRSAEncryptionKey(2048),
-                algorithm = JWEAlgorithm.RSA_OAEP_384,
+            val issuanceResponseEncryptionSpec = EncryptionSpec(
+                jwk = randomRSAEncryptionKey(2048, JWEAlgorithm.RSA_OAEP_384),
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
@@ -76,9 +78,8 @@ class IssuanceIssuerMetadataVersionTest {
                 tokenPostMocker(),
                 credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             )
-            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
+            val issuanceResponseEncryptionSpec = EncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
-                algorithm = JWEAlgorithm.RSA_OAEP_256,
                 encryptionMethod = EncryptionMethod.A256GCM,
             )
 
@@ -102,9 +103,8 @@ class IssuanceIssuerMetadataVersionTest {
                 tokenPostMocker(),
                 credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_NOT_SUPPORTED),
             )
-            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
+            val issuanceResponseEncryptionSpec = EncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
-                algorithm = JWEAlgorithm.RSA_OAEP_256,
                 encryptionMethod = EncryptionMethod.A256GCM,
             )
 
@@ -112,7 +112,9 @@ class IssuanceIssuerMetadataVersionTest {
                 block = {
                     authorizeRequestForCredentialOffer(
                         config = OpenId4VCIConfiguration.copy(
-                            credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.REQUIRED,
+                            encryptionSupportConfig = OpenId4VCIConfiguration.encryptionSupportConfig.copy(
+                                credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.REQUIRED,
+                            ),
                         ),
                         credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                         responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
@@ -136,7 +138,9 @@ class IssuanceIssuerMetadataVersionTest {
                 block = {
                     authorizeRequestForCredentialOffer(
                         config = OpenId4VCIConfiguration.copy(
-                            credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.REQUIRED,
+                            encryptionSupportConfig = OpenId4VCIConfiguration.encryptionSupportConfig.copy(
+                                credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.REQUIRED,
+                            ),
                         ),
                         credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
                         responseEncryptionSpecFactory = { _, _ -> null },
@@ -165,9 +169,8 @@ class IssuanceIssuerMetadataVersionTest {
                     },
                 ),
             )
-            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
+            val issuanceResponseEncryptionSpec = EncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
-                algorithm = JWEAlgorithm.RSA_OAEP_256,
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
@@ -186,15 +189,16 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuer supports but not mandates encrypted responses, client can request encrypted responses`() =
         runTest {
+            val issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED
             val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
                 nonceEndpointMocker(),
-                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
-                        encryptedResponseDataBuilder(it) {
+                        encryptionAwareResponseDataBuilder(it, issuerMetadataVersion) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
                                     credentials = listOf(
@@ -208,17 +212,16 @@ class IssuanceIssuerMetadataVersionTest {
                         }
                     },
                     requestValidator = {
-                        val textContent = it.body as TextContent
-                        val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
-                        assertTrue("Encryption parameters were expected to be sent but was not.") {
-                            issuanceRequestTO.credentialResponseEncryption != null
+                        encryptionAwareRequestValidator<CredentialRequestTO>(it, issuerMetadataVersion) {
+                            assertTrue("Encryption parameters were expected to be sent but was not.") {
+                                it.credentialResponseEncryption != null
+                            }
                         }
                     },
                 ),
             )
-            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
+            val issuanceResponseEncryptionSpec = EncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
-                algorithm = JWEAlgorithm.RSA_OAEP_256,
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
@@ -237,18 +240,33 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuer supports but not mandates encrypted responses, client can request NON encrypted responses`() =
         runTest {
+            val issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED
             val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
                 nonceEndpointMocker(),
-                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion),
                 singleIssuanceRequestMocker(
-                    requestValidator = {
-                        val textContent = it.body as TextContent
-                        val issuanceRequestTO = Json.decodeFromString<CredentialRequestTO>(textContent.text)
-                        assertTrue("Encryption parameters were expected to be sent but was not.") {
-                            issuanceRequestTO.credentialResponseEncryption == null
+                    responseBuilder = { request ->
+                        encryptionAwareResponseDataBuilder(request, issuerMetadataVersion) {
+                            Json.encodeToString(
+                                CredentialResponseSuccessTO(
+                                    credentials = listOf(
+                                        buildJsonObject {
+                                            put("credential", "issued_credential")
+                                        },
+                                    ),
+                                    notificationId = "fgh126lbHjtspVbn",
+                                ),
+                            )
+                        }
+                    },
+                    requestValidator = { request ->
+                        encryptionAwareRequestValidator<CredentialRequestTO>(request, issuerMetadataVersion) {
+                            assertTrue("Encryption parameters were expected to be sent but was not.") {
+                                it.credentialResponseEncryption == null
+                            }
                         }
                     },
                 ),
@@ -269,16 +287,17 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuer mandates encrypted responses, request must include response encryption material`() =
         runTest {
+            val issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED
             val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
                 nonceEndpointMocker(),
                 nonceEndpointMocker(),
-                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
-                        encryptedResponseDataBuilder(it) {
+                        encryptionAwareResponseDataBuilder(it, issuerMetadataVersion) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
                                     credentials = listOf(
@@ -291,37 +310,27 @@ class IssuanceIssuerMetadataVersionTest {
                             )
                         }
                     },
-                    requestValidator = {
+                    requestValidator = { request ->
                         assertTrue("No Authorization header passed.") {
-                            it.headers.contains("Authorization")
+                            request.headers.contains("Authorization")
                         }
                         assertTrue("Authorization header malformed.") {
-                            it.headers["Authorization"]?.contains("Bearer") ?: false
+                            request.headers["Authorization"]?.contains("Bearer") ?: false
                         }
-                        assertTrue("Content Type must be application/json") {
-                            it.body.contentType == ContentType.parse("application/json")
-                        }
-
-                        val textContent = it.body as TextContent
-                        val issuanceRequestTO = assertDoesNotThrow("Wrong credential request type") {
-                            Json.decodeFromString<CredentialRequestTO>(textContent.text)
-                        }
-                        assertTrue("Missing response encryption JWK") {
-                            issuanceRequestTO.credentialResponseEncryption?.jwk != null
-                        }
-                        assertTrue("Missing response encryption algorithm") {
-                            issuanceRequestTO.credentialResponseEncryption?.encryptionAlgorithm != null
-                        }
-                        assertTrue("Missing response encryption method") {
-                            issuanceRequestTO.credentialResponseEncryption?.encryptionMethod != null
+                        encryptionAwareRequestValidator<CredentialRequestTO>(request, issuerMetadataVersion) {
+                            assertTrue("Missing response encryption JWK") {
+                                it.credentialResponseEncryption?.jwk != null
+                            }
+                            assertTrue("Missing response encryption method") {
+                                it.credentialResponseEncryption?.encryptionMethod != null
+                            }
                         }
                     },
                 ),
             )
 
-            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
+            val issuanceResponseEncryptionSpec = EncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
-                algorithm = JWEAlgorithm.RSA_OAEP_256,
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
@@ -342,15 +351,16 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuer mandates encrypted responses, batch request must not include encryption spec in its individual single requests`() =
         runTest {
+            val issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_REQUIRED
             val mockedKtorHttpClientFactory = mockedHttpClient(
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
                 nonceEndpointMocker(),
-                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
-                        encryptedResponseDataBuilder(it) {
+                        encryptionAwareResponseDataBuilder(it, issuerMetadataVersion) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
                                     credentials = listOf(
@@ -362,27 +372,21 @@ class IssuanceIssuerMetadataVersionTest {
                             )
                         }
                     },
-                    requestValidator = {
-                        val textContent = it.body as TextContent
-                        val batchRequestTO = assertDoesNotThrow("Wrong credential request type") {
-                            Json.decodeFromString<CredentialRequestTO>(textContent.text)
-                        }
-                        assertTrue("Missing response encryption JWK") {
-                            batchRequestTO.credentialResponseEncryption?.jwk != null
-                        }
-                        assertTrue("Missing response encryption algorithm") {
-                            batchRequestTO.credentialResponseEncryption?.encryptionAlgorithm != null
-                        }
-                        assertTrue("Missing response encryption method") {
-                            batchRequestTO.credentialResponseEncryption?.encryptionMethod != null
+                    requestValidator = { request ->
+                        encryptionAwareRequestValidator<CredentialRequestTO>(request, issuerMetadataVersion) {
+                            assertTrue("Missing response encryption JWK") {
+                                it.credentialResponseEncryption?.jwk != null
+                            }
+                            assertTrue("Missing response encryption method") {
+                                it.credentialResponseEncryption?.encryptionMethod != null
+                            }
                         }
                     },
                 ),
             )
 
-            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
+            val issuanceResponseEncryptionSpec = EncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
-                algorithm = JWEAlgorithm.RSA_OAEP_256,
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
@@ -409,7 +413,7 @@ class IssuanceIssuerMetadataVersionTest {
                 credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
-                        encryptedResponseDataBuilder(it) {
+                        encryptionAwareResponseDataBuilder(it, IssuerMetadataVersion.ENCRYPTION_REQUIRED) {
                             Json.encodeToString(
                                 CredentialResponseSuccessTO(
                                     credentials = listOf(
@@ -425,9 +429,8 @@ class IssuanceIssuerMetadataVersionTest {
                 ),
             )
 
-            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
+            val issuanceResponseEncryptionSpec = EncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
-                algorithm = JWEAlgorithm.RSA_OAEP_256,
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
@@ -449,16 +452,17 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuance request mandates encrypted responses and deferred response is not encrypted, throw InvalidResponseContentType`() =
         runTest {
+            val issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_REQUIRED
             val mockedKtorHttpClientFactory = mockedHttpClient(
-                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
+                credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion),
                 authServerWellKnownMocker(),
                 parPostMocker(),
                 tokenPostMocker(),
                 nonceEndpointMocker(),
                 singleIssuanceRequestMocker(
                     responseBuilder = {
-                        encryptedResponseDataBuilder(it) {
-                            """ { "transaction_id": "1234565768122" } """.trimIndent()
+                        encryptionAwareResponseDataBuilder(it, issuerMetadataVersion) {
+                            """ { "transaction_id": "1234565768122", "interval": 12345 } """.trimIndent()
                         }
                     },
                 ),
@@ -467,9 +471,8 @@ class IssuanceIssuerMetadataVersionTest {
                 ),
             )
 
-            val issuanceResponseEncryptionSpec = IssuanceResponseEncryptionSpec(
+            val issuanceResponseEncryptionSpec = EncryptionSpec(
                 jwk = randomRSAEncryptionKey(2048),
-                algorithm = JWEAlgorithm.RSA_OAEP_256,
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
@@ -496,10 +499,69 @@ class IssuanceIssuerMetadataVersionTest {
         }
 
     @Test
+    fun `when issuance request mandates encrypted responses deferred request must include credential_response_encryption parameters`() =
+        runTest {
+            val issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_REQUIRED
+            val mockedKtorHttpClientFactory = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                nonceEndpointMocker(),
+                singleIssuanceRequestMocker(
+                    responseBuilder = {
+                        encryptionAwareResponseDataBuilder(it, issuerMetadataVersion) {
+                            """ { "transaction_id": "1234565768122", "interval": 12345 } """.trimIndent()
+                        }
+                    },
+                ),
+                deferredIssuanceRequestMocker(
+                    responseBuilder = {
+                        encryptionAwareResponseDataBuilder(it, issuerMetadataVersion) {
+                            """ { "credentials": [{ "credential": "credential_content" }] }""".trimIndent()
+                        }
+                    },
+                    requestValidator = { request ->
+                        encryptionAwareRequestValidator<DeferredRequestTO>(request, issuerMetadataVersion) {
+                            assertTrue("Encryption parameters expected to be sent but was not") {
+                                it.credentialResponseEncryption != null
+                            }
+                            assertTrue("Wrong encryption method") {
+                                it.credentialResponseEncryption?.encryptionMethod == EncryptionMethod.A128CBC_HS256.name
+                            }
+                        }
+                    },
+                ),
+            )
+
+            val issuanceResponseEncryptionSpec = EncryptionSpec(
+                jwk = randomRSAEncryptionKey(2048),
+                encryptionMethod = EncryptionMethod.A128CBC_HS256,
+            )
+
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                responseEncryptionSpecFactory = { _, _ -> issuanceResponseEncryptionSpec },
+                httpClient = mockedKtorHttpClientFactory,
+            )
+
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                    CredentialConfigurationIdentifier(PID_SdJwtVC),
+                )
+                val (newAuthorizedRequest, outcome) =
+                    authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
+                assertIs<SubmissionOutcome.Deferred>(outcome)
+
+                val (_, deferredOutcome) = newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId).getOrThrow()
+                assertIs<DeferredCredentialQueryOutcome.Issued>(deferredOutcome)
+            }
+        }
+
+    @Test
     fun `when initial issuance request mandates encrypted responses, deferred responses must be encrypted`() = runTest {
-        val responseEncryption = IssuanceResponseEncryptionSpec(
+        val responseEncryption = EncryptionSpec(
             jwk = randomRSAEncryptionKey(2048),
-            algorithm = JWEAlgorithm.RSA_OAEP_256,
             encryptionMethod = EncryptionMethod.A128CBC_HS256,
         )
         val mockedKtorHttpClientFactory = mockedHttpClient(
@@ -510,8 +572,8 @@ class IssuanceIssuerMetadataVersionTest {
             nonceEndpointMocker(),
             singleIssuanceRequestMocker(
                 responseBuilder = {
-                    encryptedResponseDataBuilder(it) {
-                        """ { "transaction_id": "1234565768122" } """.trimIndent()
+                    encryptionAwareResponseDataBuilder(it, IssuerMetadataVersion.ENCRYPTION_REQUIRED) {
+                        """ { "transaction_id": "1234565768122", "interval": 12345 } """.trimIndent()
                     }
                 },
             ),
@@ -526,7 +588,7 @@ class IssuanceIssuerMetadataVersionTest {
                         content = encypt(
                             JWTClaimsSet.parse(responseJson),
                             responseEncryption.jwk,
-                            responseEncryption.algorithm,
+                            responseEncryption.encryptionKeyAlgorithm,
                             responseEncryption.encryptionMethod,
                         ).getOrThrow(),
                         status = HttpStatusCode.OK,
@@ -577,10 +639,21 @@ class IssuanceIssuerMetadataVersionTest {
             issuer.credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported.count() == 4
         }
     }
+
+    @Test
+    fun randomECEncryptionKey() {
+        ECKeyGenerator(Curve.P_256)
+            .keyUse(KeyUse.ENCRYPTION)
+            .keyID(UUID.randomUUID().toString())
+            .algorithm(JWEAlgorithm.ECDH_ES)
+            .issueTime(Date(System.currentTimeMillis()))
+            .generate().also { println(it.toPublicJWK()) }
+    }
 }
 
-fun randomRSAEncryptionKey(size: Int): RSAKey = RSAKeyGenerator(size)
+fun randomRSAEncryptionKey(size: Int, algorithm: JWEAlgorithm = JWEAlgorithm.RSA_OAEP_256): RSAKey = RSAKeyGenerator(size)
     .keyUse(KeyUse.ENCRYPTION)
     .keyID(UUID.randomUUID().toString())
+    .algorithm(algorithm)
     .issueTime(Date(System.currentTimeMillis()))
     .generate()
