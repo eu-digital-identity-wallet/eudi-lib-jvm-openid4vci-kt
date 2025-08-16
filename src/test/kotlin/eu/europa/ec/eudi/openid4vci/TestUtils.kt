@@ -19,7 +19,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.ecSigner
 import eu.europa.ec.eudi.openid4vci.Issuer.Companion.DefaultResponseEncryptionSpecFactory
-import io.ktor.client.HttpClient
+import io.ktor.client.*
 import java.net.URI
 import java.util.*
 
@@ -88,15 +88,13 @@ val CredentialOfferMixedDocTypes_AUTH_GRANT = """
 val OpenId4VCIConfiguration = OpenId4VCIConfig(
     client = Client.Public("MyWallet_ClientId"),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-    keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+    encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
 )
 
 val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
     client = Client.Public("MyWallet_ClientId"),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-    keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+    encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
     dPoPSigner = ecSigner(
         curve = Curve.P_256,
         alg = JWSAlgorithm.ES256,
