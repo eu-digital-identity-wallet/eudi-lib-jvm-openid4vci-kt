@@ -99,7 +99,7 @@ class IssuanceDeferredRequestTest {
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
             )
             val (newAuthorizedRequest, outcome) =
-                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
             assertIs<SubmissionOutcome.Deferred>(outcome)
 
             val (_, requestDeferredIssuance) =

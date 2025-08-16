@@ -313,10 +313,10 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
                           "use": "enc",
                           "crv": "P-256",
                           "alg": "ECDH-ES",
-                          "kid": "key-0",
-                          "x": "gtgP8ul2T8JgF9EDyESOB8MX2-mxH8UePaJ-XVOLieU",
-                          "y": "zAR2-fq0uRPysKJD38VlbK3w6UP77B1U7NcALO8hICM",
-                          "iat": 1755093009
+                          "kid": "encKey-0",
+                          "x": "TmcsNF6JpWjP85wKfBXKybHaJNowtp6jCuToppDosdw",
+                          "y": "egzDuJuSxyypCE0qUoo1oKOnslpaw1Om-flQ4knafas",
+                          "iat": 1755352588
                         }
                       ]
                     }
@@ -378,10 +378,10 @@ internal fun credentialIssuerSignedMetadata() = CredentialIssuerMetadata(
                           "use": "enc",
                           "crv": "P-256",
                           "alg": "ECDH-ES",
-                          "kid": "key-0",
-                          "x": "gtgP8ul2T8JgF9EDyESOB8MX2-mxH8UePaJ-XVOLieU",
-                          "y": "zAR2-fq0uRPysKJD38VlbK3w6UP77B1U7NcALO8hICM",
-                          "iat": 1755093009
+                          "kid": "encKey-0",
+                          "x": "TmcsNF6JpWjP85wKfBXKybHaJNowtp6jCuToppDosdw",
+                          "y": "egzDuJuSxyypCE0qUoo1oKOnslpaw1Om-flQ4knafas",
+                          "iat": 1755352588
                         }
                       ]
                     }

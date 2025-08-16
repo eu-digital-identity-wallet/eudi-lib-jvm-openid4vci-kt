@@ -21,3 +21,8 @@ import java.io.File
  * Gets the content of a classpath resource as a string.
  */
 internal fun getResourceAsText(resource: String): String = File(ClassLoader.getSystemResource(resource).path).readText()
+
+/**
+ * Gets the classpath resource as File.
+ */
+internal fun getResourceAsFile(resource: String): File = File(ClassLoader.getSystemResource(resource).path)
