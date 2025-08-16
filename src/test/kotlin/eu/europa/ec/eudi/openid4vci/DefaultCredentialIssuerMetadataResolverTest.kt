@@ -290,15 +290,33 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                 ),
             )
 
-            val issuerTrust = IssuerTrust.ByPublicKey(
-                ECKey.parse(getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/signed_metadata_jwk.json"))
-                    .toPublicJWK(),
-            )
             val policy = IssuerMetadataPolicy.IgnoreSigned
 
             assertFailsWith<CredentialRequestEncryptionMustExistIfCredentialResponseEncryptionExists> {
                 resolver.resolve(credentialIssuerId, policy).getOrThrow()
             }
+        }
+
+    @Test
+    internal fun `resolution succeeds when no response encryption params included but request encryption params included`() =
+        runTest {
+            val credentialIssuerId = SampleIssuer.Id
+
+            val resolver = resolver(
+                credentialIssuerMetaDataHandler(
+                    credentialIssuerId,
+                    "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_no_response_encryption.json",
+                ),
+            )
+
+            val policy = IssuerMetadataPolicy.IgnoreSigned
+
+            val issuerMetadata = credentialIssuerMetadata().copy(
+                credentialResponseEncryption = CredentialResponseEncryption.NotSupported,
+            )
+
+            val metadata = assertDoesNotThrow { resolver.resolve(credentialIssuerId, policy).getOrThrow() }
+            assertEquals(issuerMetadata, metadata)
         }
 
     @Test

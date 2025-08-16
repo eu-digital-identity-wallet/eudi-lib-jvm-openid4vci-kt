@@ -22,6 +22,8 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.MissingRequiredRequestEncryptionSpecification
+import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
 import kotlinx.serialization.Serializable
 import java.net.URI
 import java.net.URL
@@ -239,21 +241,34 @@ sealed interface JwtBindingKey {
     }
 }
 
-data class IssuanceResponseEncryptionSpec(
+/**
+ * Represents the specifications and parameters required for encryption. Used for encrypting issuance requests or for communicating
+ * to issuers the encryption parameters by which expected issuance responses should be encrypted by.
+ *
+ * This class is designed to encapsulate encryption-related configurations,
+ * including the key, encryption method, and an optional compression algorithm.
+ * It validates the provided key and algorithm for compatibility with the
+ * encryption operation and ensures that they adhere to the expected asymmetric
+ * encryption standards.
+ *
+ * @property jwk The JSON Web Key (JWK) used for encryption, representing the cryptographic key.
+ * @property encryptionMethod The encryption method specifying the algorithm for payload encryption.
+ * @property compressionAlgorithm An optional compression algorithm to apply before encryption.
+ * @property encryptionKeyAlgorithm The derived encryption key algorithm from the JWK's algorithm property, expected to be of type JWEAlgorithm.
+ *
+ * @throws IllegalArgumentException If the key use is not intended for encryption, if the key does not contain an algorithm,
+ * or the algorithm is incompatible with the key or encryption process.
+ */
+data class EncryptionSpec(
     val jwk: JWK,
     val encryptionMethod: EncryptionMethod,
     val compressionAlgorithm: CompressionAlgorithm? = null,
 ) : java.io.Serializable {
 
-    val encryptionKeyAlgorithm: JWEAlgorithm get() = jwk.algorithm as JWEAlgorithm
+    val encryptionKeyAlgorithm: JWEAlgorithm
+        get() = JWEAlgorithm.parse(jwk.algorithm.name)
 
     init {
-        val keyUse: KeyUse? = jwk.keyUse
-        if (keyUse != null) {
-            require(keyUse == KeyUse.ENCRYPTION) {
-                "Provided key use is not encryption"
-            }
-        }
         val keyAlgorithm = jwk.algorithm
         requireNotNull(keyAlgorithm) {
             "Provided key does not contain an algorithm"
@@ -269,6 +284,39 @@ data class IssuanceResponseEncryptionSpec(
         // Validate key is for encryption operation
         require(jwk.keyUse == KeyUse.ENCRYPTION) {
             "Provided key use is not encryption"
+        }
+    }
+}
+
+/**
+ * Represents the encryption specifications for an issuance process, encompassing request and response encryption.
+ *
+ * This class is used to define the encryption configuration for:
+ * - The issuance request, specifying the parameters required to encrypt the request sent to the issuer.
+ * - The issuance response, specifying the expected parameters of encrypted responses received from the issuer.
+ *
+ * If according to wallet configuration and issuer capabilities, response encryption is feasible, it will be used to
+ * request encrypted responses from issuer. In this case the request must be also encrypted, so it is mandatory to have
+ * a request encryption specification.
+ *
+ * Each encryption specification leverages the `EncryptionSpec` class to ensure compatibility and secure encryption using standards
+ * such as JWKs and JWE algorithms.
+ *
+ * @property requestEncryptionSpec The encryption specification for securing issuance requests sent to the issuer.
+ * @property responseEncryptionSpec The encryption specification for securing issuance responses returned by the issuer.
+ *
+ * @throws MissingRequiredRequestEncryptionSpecification Thrown when a response encryption specification is provided
+ * but request encryption specification is missing.
+ */
+data class IssuanceEncryptionSpecs(
+    val requestEncryptionSpec: EncryptionSpec?,
+    val responseEncryptionSpec: EncryptionSpec?,
+) {
+    init {
+        if (responseEncryptionSpec != null) {
+            ensureNotNull(requestEncryptionSpec) {
+                MissingRequiredRequestEncryptionSpecification()
+            }
         }
     }
 }
