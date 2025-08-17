@@ -35,8 +35,7 @@ internal object PidDevIssuer :
     override val cfg = OpenId4VCIConfig(
         client = Client.Public(WALLET_CLIENT_ID),
         authFlowRedirectionURI = Keycloak.DebugRedirectUri,
-        keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-        credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+        encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
         authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         parUsage = ParUsage.IfSupported,
         dPoPSigner = CryptoGenerator.ecSigner(),

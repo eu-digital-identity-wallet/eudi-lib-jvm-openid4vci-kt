@@ -20,8 +20,8 @@ import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
+import eu.europa.ec.eudi.openid4vci.internal.wellKnown
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
@@ -200,6 +200,34 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
     }
 
     @Test
+    internal fun `resolution fails when signed metadata are signed by expected issuer but 'typ' is missing`() =
+        runTest {
+            val credentialIssuerId = SampleIssuer.Id
+
+            val resolver = resolver(
+                credentialIssuerMetaDataHandler(
+                    credentialIssuerId,
+                    "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_signed_invalid.txt",
+                    listOf("application/jwt"),
+                ),
+            )
+
+            val issuerTrust = IssuerTrust.ByPublicKey(
+                ECKey.parse(getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/signed_metadata_jwk.json"))
+                    .toPublicJWK(),
+            )
+
+            listOf(
+                IssuerMetadataPolicy.RequireSigned(issuerTrust),
+                IssuerMetadataPolicy.PreferSigned(issuerTrust),
+            ).forEach { policy ->
+                assertFailsWith<CredentialIssuerMetadataError.InvalidSignedMetadata> {
+                    resolver.resolve(credentialIssuerId, policy).getOrThrow()
+                }
+            }
+        }
+
+    @Test
     internal fun `resolution fails when signed metadata is required or optional and present but not signed by a trusted issuer`() =
         runTest {
             val credentialIssuerId = SampleIssuer.Id
@@ -207,7 +235,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             val resolver = resolver(
                 credentialIssuerMetaDataHandler(
                     credentialIssuerId,
-                    "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_signed_partial.json",
+                    "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_signed_partial.txt",
+                    listOf("application/jwt"),
                 ),
             )
 
@@ -226,28 +255,6 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         }
 
     @Test
-    internal fun `resolution succeeds and precedence is given to signed metadata values over plain json elements`() =
-        runTest {
-            val credentialIssuerId = SampleIssuer.Id
-
-            val resolver = resolver(
-                credentialIssuerMetaDataHandler(
-                    credentialIssuerId,
-                    "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_signed_partial.json",
-                ),
-            )
-
-            val issuerTrust = IssuerTrust.ByPublicKey(
-                ECKey.parse(getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/signed_metadata_jwk.json"))
-                    .toPublicJWK(),
-            )
-            val policy = IssuerMetadataPolicy.PreferSigned(issuerTrust)
-
-            val metadata = assertDoesNotThrow { resolver.resolve(credentialIssuerId, policy).getOrThrow() }
-            assertEquals(credentialIssuerSignedMetadata(), metadata)
-        }
-
-    @Test
     internal fun `resolution fails when signed metadata is required and present but does not contain all required values`() =
         runTest {
             val credentialIssuerId = SampleIssuer.Id
@@ -255,7 +262,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             val resolver = resolver(
                 credentialIssuerMetaDataHandler(
                     credentialIssuerId,
-                    "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_signed_partial.json",
+                    "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_signed_partial.txt",
+                    listOf("application/jwt"),
                 ),
             )
 
@@ -271,13 +279,55 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         }
 
     @Test
+    internal fun `resolution fails when response encryption params included but no request encryption params included`() =
+        runTest {
+            val credentialIssuerId = SampleIssuer.Id
+
+            val resolver = resolver(
+                credentialIssuerMetaDataHandler(
+                    credentialIssuerId,
+                    "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_no_request_encryption.json",
+                ),
+            )
+
+            val policy = IssuerMetadataPolicy.IgnoreSigned
+
+            assertFailsWith<CredentialRequestEncryptionMustExistIfCredentialResponseEncryptionExists> {
+                resolver.resolve(credentialIssuerId, policy).getOrThrow()
+            }
+        }
+
+    @Test
+    internal fun `resolution succeeds when no response encryption params included but request encryption params included`() =
+        runTest {
+            val credentialIssuerId = SampleIssuer.Id
+
+            val resolver = resolver(
+                credentialIssuerMetaDataHandler(
+                    credentialIssuerId,
+                    "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_no_response_encryption.json",
+                ),
+            )
+
+            val policy = IssuerMetadataPolicy.IgnoreSigned
+
+            val issuerMetadata = credentialIssuerMetadata().copy(
+                credentialResponseEncryption = CredentialResponseEncryption.NotSupported,
+            )
+
+            val metadata = assertDoesNotThrow { resolver.resolve(credentialIssuerId, policy).getOrThrow() }
+            assertEquals(issuerMetadata, metadata)
+        }
+
+    @Test
     internal fun `resolution succeeds when signed metadata is required present and contains all values`() = runTest {
         val credentialIssuerId = SampleIssuer.Id
 
         val resolver = resolver(
             credentialIssuerMetaDataHandler(
                 credentialIssuerId,
-                "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_signed_full.json",
+                "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_signed_full.txt",
+                listOf("application/jwt"),
             ),
         )
 
@@ -289,6 +339,15 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         val metadata = assertDoesNotThrow { resolver.resolve(credentialIssuerId, policy).getOrThrow() }
         assertEquals(credentialIssuerSignedMetadata(), metadata)
+    }
+
+    @Test
+    internal fun `well-known path segment is appended always between the host component and the path component, if any`() = runTest {
+        var id = CredentialIssuerId("https://issuer.example.com").getOrThrow()
+        assertEquals("https://issuer.example.com/.well-known/openid-credential-issuer", id.wellKnown().toString())
+
+        id = CredentialIssuerId("https://issuer.example.com/tenant").getOrThrow()
+        assertEquals("https://issuer.example.com/.well-known/openid-credential-issuer/tenant", id.wellKnown().toString())
     }
 }
 

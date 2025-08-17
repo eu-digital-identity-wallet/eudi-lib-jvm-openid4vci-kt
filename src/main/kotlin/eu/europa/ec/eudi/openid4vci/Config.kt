@@ -15,9 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
+import eu.europa.ec.eudi.openid4vci.ParUsage.*
 import java.net.URI
 import java.time.Clock
 
@@ -57,8 +59,7 @@ sealed interface Client : java.io.Serializable {
  *
  * @param client the OAUTH2 client kind of the wallet
  * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
- * @param keyGenerationConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
- * @param credentialResponseEncryptionPolicy Wallet's policy for Credential Response encryption
+ * @param encryptionSupportConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
  * @param authorizeIssuanceConfig Instruction on how to assemble the authorization request. If scopes are supported
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
@@ -71,8 +72,7 @@ sealed interface Client : java.io.Serializable {
 data class OpenId4VCIConfig(
     val client: Client,
     val authFlowRedirectionURI: URI,
-    val keyGenerationConfig: KeyGenerationConfig,
-    val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+    val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPSigner: Signer<JWK>? = null,
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
@@ -84,8 +84,7 @@ data class OpenId4VCIConfig(
     constructor(
         clientId: ClientId,
         authFlowRedirectionURI: URI,
-        keyGenerationConfig: KeyGenerationConfig,
-        credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+        encryptionSupportConfig: EncryptionSupportConfig,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         dPoPSigner: Signer<JWK>? = null,
         clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
@@ -95,8 +94,7 @@ data class OpenId4VCIConfig(
     ) : this(
         Client.Public(clientId),
         authFlowRedirectionURI,
-        keyGenerationConfig,
-        credentialResponseEncryptionPolicy,
+        encryptionSupportConfig,
         authorizeIssuanceConfig,
         dPoPSigner,
         clientAttestationPoPBuilder,
@@ -144,20 +142,28 @@ enum class CredentialResponseEncryptionPolicy {
     SUPPORTED,
 }
 
-data class KeyGenerationConfig(
+data class EncryptionSupportConfig(
+    val compressionAlgorithms: List<CompressionAlgorithm>? = listOf(CompressionAlgorithm.DEF),
+    val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val ecConfig: EcConfig?,
     val rsaConfig: RsaConfig?,
 ) {
+
+    val supportedEncryptionAlgorithms: List<JWEAlgorithm> get() = buildList {
+        ecConfig?.supportedJWEAlgorithms?.let { addAll(it) }
+        rsaConfig?.supportedJWEAlgorithms?.let { addAll(it) }
+    }
+
     companion object {
         operator fun invoke(
             ecKeyCurve: Curve,
             rcaKeySize: Int,
-        ): KeyGenerationConfig = KeyGenerationConfig(EcConfig(ecKeyCurve), RsaConfig(rcaKeySize))
-
-        fun ecOnly(
-            ecKeyCurve: Curve,
-            supportedJWEAlgorithms: List<JWEAlgorithm> = JWEAlgorithm.Family.ECDH_ES.toList(),
-        ): KeyGenerationConfig = KeyGenerationConfig(EcConfig(ecKeyCurve, supportedJWEAlgorithms), null)
+            credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+        ): EncryptionSupportConfig = EncryptionSupportConfig(
+            ecConfig = EcConfig(ecKeyCurve),
+            rsaConfig = RsaConfig(rcaKeySize),
+            credentialResponseEncryptionPolicy = credentialResponseEncryptionPolicy,
+        )
     }
 }
 

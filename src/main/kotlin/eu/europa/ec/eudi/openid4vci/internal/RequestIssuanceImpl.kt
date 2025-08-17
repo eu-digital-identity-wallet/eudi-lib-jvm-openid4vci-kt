@@ -33,7 +33,7 @@ internal class RequestIssuanceImpl(
     private val credentialEndpointClient: CredentialEndpointClient,
     private val nonceEndpointClient: NonceEndpointClient?,
     private val batchCredentialIssuance: BatchCredentialIssuance,
-    private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+    private val issuanceEncryptionSpecs: IssuanceEncryptionSpecs,
 ) : RequestIssuance {
 
     init {
@@ -284,7 +284,7 @@ internal class RequestIssuanceImpl(
             CredentialIssuanceRequest.byCredentialConfigurationId(
                 requestPayload.credentialConfigurationIdentifier,
                 proofs,
-                responseEncryptionSpec,
+                issuanceEncryptionSpecs,
             )
         }
 
@@ -293,7 +293,7 @@ internal class RequestIssuanceImpl(
             CredentialIssuanceRequest.byCredentialId(
                 requestPayload.credentialIdentifier,
                 proofs,
-                responseEncryptionSpec,
+                issuanceEncryptionSpecs,
             )
         }
     }
@@ -320,6 +320,7 @@ internal sealed interface SubmissionOutcomeInternal {
 
     data class Deferred(
         val transactionId: TransactionId,
+        val interval: Long,
     ) : SubmissionOutcomeInternal
 
     data class Failed(
@@ -329,7 +330,7 @@ internal sealed interface SubmissionOutcomeInternal {
     fun toPub(): SubmissionOutcome =
         when (this) {
             is Success -> SubmissionOutcome.Success(credentials, notificationId)
-            is Deferred -> SubmissionOutcome.Deferred(transactionId)
+            is Deferred -> SubmissionOutcome.Deferred(transactionId, interval)
             is Failed -> SubmissionOutcome.Failed(error)
         }
 }

@@ -15,10 +15,18 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
+import com.nimbusds.jose.JOSEObjectType
+import com.nimbusds.jose.JWEHeader
+import com.nimbusds.jose.crypto.ECDHEncrypter
+import com.nimbusds.jose.crypto.RSAEncrypter
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet
 import com.nimbusds.jose.proc.JWEDecryptionKeySelector
 import com.nimbusds.jose.proc.SecurityContext
+import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
@@ -37,7 +45,6 @@ internal class CredentialEndpointClient(
     private val dPoPJwtFactory: DPoPJwtFactory?,
     private val httpClient: HttpClient,
 ) {
-
     /**
      * Method that submits a request to credential issuer for the issuance of a single credential.
      *
@@ -69,13 +76,17 @@ internal class CredentialEndpointClient(
 
         val response = httpClient.post(url) {
             bearerOrDPoPAuth(accessToken, jwt)
-            contentType(ContentType.Application.Json)
-            setBody(CredentialRequestTO.from(request))
+            encryptRequest(
+                requestTO = CredentialRequestTO.from(request),
+                requestEncryptionSpec = request.encryptionSpecs.requestEncryptionSpec,
+                transferObjectToJwtClaims = { CredentialRequestTO.toJwtClaimsSet(it) },
+            )
         }
+
         return if (response.status.isSuccess()) {
             val submissionOutcome = responsePossiblyEncrypted(
                 response,
-                request.encryption,
+                request.encryptionSpecs.responseEncryptionSpec,
                 fromTransferObject = { it.toDomain() },
                 transferObjectFromJwtClaims = { CredentialResponseSuccessTO.from(it) },
             )
@@ -107,23 +118,21 @@ internal class DeferredEndPointClient(
      * @param accessToken Access token authorizing the request
      * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
      * @param transactionId The identifier of the Deferred Issuance transaction
-     * @param responseEncryptionSpec The response encryption information as specified when placing the issuance request. If initial request
-     *      had specified response encryption then the issuer response is expected to be encrypted by the encryption details of the initial
-     *      issuance request.
+     * @param issuanceEncryptionSpecs Encryption specifications for deferred request and response encryption
      * @return response from issuer. Can be either positive if a credential is issued or error in case issuance is still pending
      */
     suspend fun placeDeferredCredentialRequest(
         accessToken: AccessToken,
         resourceServerDpopNonce: Nonce?,
         transactionId: TransactionId,
-        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+        issuanceEncryptionSpecs: IssuanceEncryptionSpecs,
     ): Result<Pair<DeferredCredentialQueryOutcome, Nonce?>> =
         runCatching {
             placeDeferredCredentialRequestInternal(
                 accessToken,
                 resourceServerDpopNonce,
                 transactionId,
-                responseEncryptionSpec,
+                issuanceEncryptionSpecs,
                 false,
             )
         }
@@ -132,7 +141,7 @@ internal class DeferredEndPointClient(
         accessToken: AccessToken,
         resourceServerDpopNonce: Nonce?,
         transactionId: TransactionId,
-        responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+        issuanceEncryptionSpecs: IssuanceEncryptionSpecs,
         retried: Boolean,
     ): Pair<DeferredCredentialQueryOutcome, Nonce?> {
         val url = deferredCredentialEndpoint.value
@@ -141,17 +150,27 @@ internal class DeferredEndPointClient(
                 .serialize()
         } else null
 
+        val deferredRequestTO = DeferredRequestTO(
+            transactionId = transactionId.value,
+            credentialResponseEncryption = issuanceEncryptionSpecs.responseEncryptionSpec?.let {
+                CredentialResponseEncryptionSpecTO.from(it)
+            },
+        )
+
         val response = httpClient.post(url) {
             bearerOrDPoPAuth(accessToken, jwt)
-            contentType(ContentType.Application.Json)
-            setBody(DeferredRequestTO(transactionId.value))
+            encryptRequest(
+                requestTO = deferredRequestTO,
+                requestEncryptionSpec = issuanceEncryptionSpecs.requestEncryptionSpec,
+                transferObjectToJwtClaims = { DeferredRequestTO.toJwtClaimsSet(it) },
+            )
         }
 
         return if (response.status.isSuccess()) {
             val outcome =
-                responsePossiblyEncrypted<DeferredIssuanceSuccessResponseTO, DeferredCredentialQueryOutcome.Issued>(
+                responsePossiblyEncrypted<DeferredIssuanceSuccessResponseTO, DeferredCredentialQueryOutcome>(
                     response,
-                    responseEncryptionSpec,
+                    issuanceEncryptionSpecs.responseEncryptionSpec,
                     fromTransferObject = { it.toDomain() },
                     transferObjectFromJwtClaims = { DeferredIssuanceSuccessResponseTO.from(it) },
                 )
@@ -164,23 +183,65 @@ internal class DeferredEndPointClient(
                     accessToken,
                     newResourceServerDpopNonce,
                     transactionId,
-                    responseEncryptionSpec,
+                    issuanceEncryptionSpecs,
                     true,
                 )
             } else {
                 val responsePayload = response.body<GenericErrorResponseTO>()
-                responsePayload.toDeferredCredentialQueryOutcome() to (
-                    newResourceServerDpopNonce
-                        ?: resourceServerDpopNonce
-                    )
+                val errored = DeferredCredentialQueryOutcome.Errored(responsePayload.error, responsePayload.errorDescription)
+                errored to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
             }
         }
     }
 }
 
+private inline fun <reified RequestTO> HttpRequestBuilder.encryptRequest(
+    requestTO: RequestTO,
+    requestEncryptionSpec: EncryptionSpec?,
+    transferObjectToJwtClaims: (RequestTO) -> JWTClaimsSet,
+) =
+    when (requestEncryptionSpec) {
+        null -> {
+            contentType(ContentType.Application.Json)
+            setBody(requestTO)
+        }
+        else -> {
+            contentType(ContentType("application", "jwt"))
+
+            val claimsSet = transferObjectToJwtClaims(requestTO)
+            val encryptedRequestTO = requestEncryptionSpec.encrypt(claimsSet, requestEncryptionSpec.jwk)
+
+            setBody(encryptedRequestTO)
+        }
+    }
+
+private fun EncryptionSpec.encrypt(jwtClaimSet: JWTClaimsSet, jwk: JWK): String {
+    fun EncryptionSpec.jweHeader() =
+        JWEHeader.Builder(encryptionKeyAlgorithm, encryptionMethod).apply {
+            jwk(jwk)
+            type(JOSEObjectType.JWT)
+            jwk.keyID?.let { keyID(it) }
+            compressionAlgorithm?.let { compressionAlgorithm(it) }
+        }.build()
+
+    return EncryptedJWT(jweHeader(), jwtClaimSet)
+        .apply { encrypt(jwk) }
+        .serialize()
+}
+
+private fun EncryptedJWT.encrypt(jwk: JWK) {
+    val enc = when (jwk) {
+        is RSAKey -> RSAEncrypter(jwk)
+        is ECKey -> ECDHEncrypter(jwk)
+        else -> null
+    }
+    enc?.let { encrypt(it) }
+        ?: error("unsupported 'kty': '${jwk.keyType.value}'")
+}
+
 private suspend inline fun <reified ResponseTO, Response> responsePossiblyEncrypted(
     response: HttpResponse,
-    encryptionSpec: IssuanceResponseEncryptionSpec?,
+    encryptionSpec: EncryptionSpec?,
     fromTransferObject: (ResponseTO) -> Response,
     transferObjectFromJwtClaims: (JWTClaimsSet) -> ResponseTO,
 ): Response {
@@ -197,7 +258,7 @@ private suspend inline fun <reified ResponseTO, Response> responsePossiblyEncryp
             val jwt = response.body<String>()
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
                 jweKeySelector = JWEDecryptionKeySelector(
-                    encryptionSpec.algorithm,
+                    encryptionSpec.encryptionKeyAlgorithm,
                     encryptionSpec.encryptionMethod,
                     ImmutableJWKSet(JWKSet(encryptionSpec.jwk)),
                 )

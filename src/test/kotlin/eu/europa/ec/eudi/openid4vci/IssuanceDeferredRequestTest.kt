@@ -22,7 +22,9 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class IssuanceDeferredRequestTest {
 
@@ -61,13 +63,13 @@ class IssuanceDeferredRequestTest {
 
             assertIs<DeferredCredentialQueryOutcome.Errored>(requestDeferredIssuance)
             assertTrue("Expected error response invalid_transaction_id but was not") {
-                requestDeferredIssuance.error != "invalid_transaction_id"
+                requestDeferredIssuance.error == "invalid_transaction_id"
             }
         }
     }
 
     @Test
-    fun `when issuer responds with issuance_pending, response should be of type IssuancePending`() = runTest {
+    fun `when issuer needs more time to prepare credential, responds with 'interval' and issuance outcome is IssuancePending`() = runTest {
         val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
