@@ -19,7 +19,7 @@ import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.attestationProofSpec
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.keyAttestationJwtProofsSpec
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.noKeyAttestationJwtProofsSpec
 import io.ktor.client.*
 import io.ktor.client.engine.apache.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -115,9 +115,9 @@ suspend fun Issuer.submitCredentialRequest(
         }
 
     val proofSpec: ProofsSpecification = when (proofsType) {
-        is ProofsType.JwtProofsNoKeyAttestation -> proofsSpecForEcKeys(Curve.P_256, proofsNo)
+        is ProofsType.JwtProofsNoKeyAttestation -> noKeyAttestationJwtProofsSpec(Curve.P_256, proofsNo)
         is ProofsType.JwtProofWithKeyAttestation -> keyAttestationJwtProofsSpec(Curve.P_256, proofsNo)
-        is ProofsType.AttestationProof -> attestationProofSpec(proofsNo)
+        is ProofsType.AttestationProof -> attestationProofSpec(keysNo = proofsNo)
     }
     return authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
 }

@@ -17,7 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.noKeyAttestationJwtProofsSpec
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialResponseSuccessTO
 import io.ktor.client.engine.mock.*
@@ -25,7 +25,9 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.*
 
 class IssuanceBatchRequestTest {
@@ -107,7 +109,7 @@ class IssuanceBatchRequestTest {
             CredentialConfigurationIdentifier(PID_MsoMdoc),
         )
         val (_, outcome) = with(issuer) {
-            authorizedRequest.request(request, proofsSpecForEcKeys(Curve.P_256, 3)).getOrThrow()
+            authorizedRequest.request(request, noKeyAttestationJwtProofsSpec(Curve.P_256, 3)).getOrThrow()
         }
         when (outcome) {
             is SubmissionOutcome.Failed -> {
