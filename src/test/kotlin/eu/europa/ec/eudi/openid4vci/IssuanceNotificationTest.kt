@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.noKeyAttestationJwtProofsSpec
 import eu.europa.ec.eudi.openid4vci.internal.http.NotificationEventTO
 import eu.europa.ec.eudi.openid4vci.internal.http.NotificationTO
 import io.ktor.client.engine.mock.*
@@ -73,7 +73,7 @@ class IssuanceNotificationTest {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
             val (newAuthorizedRequest, outcome) =
-                authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
             assertIs<SubmissionOutcome.Success>(outcome)
 
             val issuedCredential = outcome.credentials.firstOrNull()

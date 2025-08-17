@@ -179,6 +179,7 @@ internal fun tokenPostMockerWithAuthDetails(
 
 internal fun nonceEndpointMocker(
     nonceValue: String? = null,
+    dPopNonceValue: String? = null,
     validator: (request: HttpRequestData) -> Unit = {},
 ): RequestMocker =
     RequestMocker(
@@ -190,6 +191,7 @@ internal fun nonceEndpointMocker(
                 ),
                 status = HttpStatusCode.OK,
                 headers = headersOf(
+                    "DPoP-Nonce" to listOf(dPopNonceValue ?: UUID.randomUUID().toString()),
                     HttpHeaders.ContentType to listOf("application/json"),
                 ),
             )
