@@ -57,7 +57,7 @@ kotlin {
         vendor = JvmVendorSpec.ADOPTIUM
     }
     compilerOptions {
-        apiVersion = KotlinVersion.KOTLIN_2_0
+        apiVersion = KotlinVersion.KOTLIN_2_1
     }
 }
 
