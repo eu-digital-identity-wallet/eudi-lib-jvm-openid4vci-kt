@@ -64,7 +64,13 @@ private sealed interface CredentialSupportedTO {
 private data class CredentialMetadataTO(
     @SerialName("display") val display: List<CredentialSupportedDisplayTO>? = null,
     @SerialName("claims") val claims: List<ClaimTO>? = null,
-)
+) {
+    fun toDomain(): CredentialMetadata {
+        val display = display?.map { it.toDomain() }.orEmpty()
+        val claims = claims?.map { it.toDomain() }.orEmpty()
+        return CredentialMetadata(display, claims)
+    }
+}
 
 @Serializable
 private data class ProofTypeSupportedMetaTO(
@@ -113,8 +119,6 @@ private data class MsdMdocCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
 
-        val display = credentialMetadata?.display?.map { it.toDomain() }.orEmpty()
-        val claims = credentialMetadata?.claims?.map { it.toDomain() }.orEmpty()
         val proofTypesSupported = proofTypesSupported.toProofTypes()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported
             .orEmpty().mapNotNull { it.toCoseAlgorithm()?.name() }
@@ -128,6 +132,10 @@ private data class MsdMdocCredentialTO(
             require(proofTypesSupported.values.isNotEmpty()) {
                 "Proof types must be specified if cryptographic binding methods are specified"
             }
+        } else {
+            require(proofTypesSupported.values.isEmpty()) {
+                "Proof types cannot be specified if cryptographic binding methods are not specified"
+            }
         }
 
         return MsoMdocCredential(
@@ -138,9 +146,8 @@ private data class MsdMdocCredentialTO(
             coseCurves,
             policy,
             proofTypesSupported,
-            display,
+            credentialMetadata?.toDomain(),
             docType,
-            claims,
         )
     }
 }
@@ -168,14 +175,16 @@ private data class SdJwtVcCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
 
-        val display = credentialMetadata?.display?.map { it.toDomain() }.orEmpty()
-        val claims = credentialMetadata?.claims?.map { it.toDomain() }.orEmpty()
         val proofTypesSupported = proofTypesSupported.toProofTypes()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
 
         if (bindingMethods.isNotEmpty()) {
             require(proofTypesSupported.values.isNotEmpty()) {
                 "Proof types must be specified if cryptographic binding methods are specified"
+            }
+        } else {
+            require(proofTypesSupported.values.isEmpty()) {
+                "Proof types cannot be specified if cryptographic binding methods are not specified"
             }
         }
 
@@ -184,9 +193,8 @@ private data class SdJwtVcCredentialTO(
             bindingMethods,
             cryptographicSuitesSupported,
             proofTypesSupported,
-            display,
+            credentialMetadata?.toDomain(),
             type,
-            claims,
         )
     }
 }
@@ -228,14 +236,16 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
     override fun toDomain(): W3CJsonLdDataIntegrityCredential {
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
-        val display = credentialMetadata?.display?.map { it.toDomain() }.orEmpty()
-        val claims = credentialMetadata?.claims?.map { it.toDomain() }.orEmpty()
         val proofTypesSupported = proofTypesSupported.toProofTypes()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
 
         if (bindingMethods.isNotEmpty()) {
             require(proofTypesSupported.values.isNotEmpty()) {
                 "Proof types must be specified if cryptographic binding methods are specified"
+            }
+        } else {
+            require(proofTypesSupported.values.isEmpty()) {
+                "Proof types cannot be specified if cryptographic binding methods are not specified"
             }
         }
 
@@ -244,9 +254,8 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
             cryptographicBindingMethodsSupported = bindingMethods,
             credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
             proofTypesSupported = proofTypesSupported,
-            display = display,
+            credentialMetadata = credentialMetadata?.toDomain(),
             credentialDefinition = credentialDefinition.toDomain(),
-            claims = claims,
         )
     }
 }
@@ -277,14 +286,16 @@ private data class W3CJsonLdSignedJwtCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
 
-        val display = credentialMetadata?.display?.map { it.toDomain() }.orEmpty()
-        val claims = credentialMetadata?.claims?.map { it.toDomain() }.orEmpty()
         val proofTypesSupported = proofTypesSupported.toProofTypes()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
 
         if (bindingMethods.isNotEmpty()) {
             require(proofTypesSupported.values.isNotEmpty()) {
                 "Proof types must be specified if cryptographic binding methods are specified"
+            }
+        } else {
+            require(proofTypesSupported.values.isEmpty()) {
+                "Proof types cannot be specified if cryptographic binding methods are not specified"
             }
         }
 
@@ -293,9 +304,8 @@ private data class W3CJsonLdSignedJwtCredentialTO(
             cryptographicBindingMethodsSupported = bindingMethods,
             credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
             proofTypesSupported = proofTypesSupported,
-            display = display,
+            credentialMetadata = credentialMetadata?.toDomain(),
             credentialDefinition = credentialDefinition.toDomain(),
-            claims = claims,
         )
     }
 }
@@ -337,14 +347,16 @@ private data class W3CSignedJwtCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
 
-        val display = credentialMetadata?.display?.map { it.toDomain() }.orEmpty()
-        val claims = credentialMetadata?.claims?.map { it.toDomain() }.orEmpty()
         val proofTypesSupported = proofTypesSupported.toProofTypes()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
 
         if (bindingMethods.isNotEmpty()) {
             require(proofTypesSupported.values.isNotEmpty()) {
                 "Proof types must be specified if cryptographic binding methods are specified"
+            }
+        } else {
+            require(proofTypesSupported.values.isEmpty()) {
+                "Proof types cannot be specified if cryptographic binding methods are not specified"
             }
         }
 
@@ -353,9 +365,8 @@ private data class W3CSignedJwtCredentialTO(
             cryptographicBindingMethodsSupported = bindingMethods,
             credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
             proofTypesSupported = proofTypesSupported,
-            display = display,
+            credentialMetadata = credentialMetadata?.toDomain(),
             credentialDefinition = credentialDefinition.toDomain(),
-            claims = claims,
         )
     }
 }

@@ -19,7 +19,10 @@ import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.KeyType
+import com.nimbusds.jose.jwk.KeyUse
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
+import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.client.*
 import java.io.Serializable
 import java.net.URL
@@ -84,13 +87,25 @@ data class SupportedRequestEncryptionParameters(
         if (encryptionKeys.isEmpty()) {
             throw CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysRequired()
         }
-        val allKeysHaveKeyId = encryptionKeys.keys.all { it.keyID != null }
-        if (!allKeysHaveKeyId) {
-            throw CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysMustHaveKeyId()
-        }
-        val allKeysArePublic = encryptionKeys.keys.all { !it.isPrivate }
-        if (!allKeysArePublic) {
-            throw CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysMustBePublic()
+        encryptionKeys.keys.forEach {
+            ensure(it.keyID != null) {
+                CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysMustHaveKeyId()
+            }
+            ensure(it.algorithm != null) {
+                CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysMustHaveAlgorithm()
+            }
+            ensure(JWEAlgorithm.Family.ASYMMETRIC.contains(it.algorithm)) {
+                CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysMustHaveAsymmetricAlgorithm()
+            }
+            ensure(!it.isPrivate) {
+                CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysMustBePublic()
+            }
+            ensure(it.keyType == KeyType.forAlgorithm(it.algorithm)) {
+                CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeyWrongKeyType()
+            }
+            ensure(it.keyUse == KeyUse.ENCRYPTION) {
+                CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysMustHaveEncryptionUsage()
+            }
         }
     }
 }
@@ -245,6 +260,32 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
      */
     class CredentialRequestEncryptionKeysMustHaveKeyId :
         CredentialIssuerMetadataValidationError(IllegalArgumentException("Credential Request Encryption Keys must have a key id"))
+
+    /**
+     * Credential Request Encryption Keys must have algorithm.
+     */
+    class CredentialRequestEncryptionKeysMustHaveAlgorithm :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("Credential Request Encryption Keys must have algorithm"))
+
+    /**
+     * Credential Request Encryption Keys must have an asymmetric algorithm.
+     */
+    class CredentialRequestEncryptionKeysMustHaveAsymmetricAlgorithm :
+        CredentialIssuerMetadataValidationError(
+            IllegalArgumentException("Provided encryption algorithm is not an asymmetric encryption algorithm"),
+        )
+
+    /**
+     * A Credential Request Encryption Key type don't match with algorithm.
+     */
+    class CredentialRequestEncryptionKeyWrongKeyType :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("Encryption key type and encryption algorithm do not match"))
+
+    /**
+     * Credential Request Encryption Keys must all be for encryption use.
+     */
+    class CredentialRequestEncryptionKeysMustHaveEncryptionUsage :
+        CredentialIssuerMetadataValidationError(IllegalArgumentException("All encryption keys must have use 'enc'"))
 
     /**
      * Credential Request Encryption Keys must be public.

@@ -74,43 +74,45 @@ internal fun universityDegreeJwt() = W3CSignedJwtCredential(
             ),
         ),
     ),
-    listOf(
-        Display(
-            "University Credential",
-            Locale.forLanguageTag("en-US"),
-            Display.Logo(
-                URI.create("https://exampleuniversity.com/public/logo.png"),
-                "a square logo of a university",
+    CredentialMetadata(
+        listOf(
+            Display(
+                "University Credential",
+                Locale.forLanguageTag("en-US"),
+                Display.Logo(
+                    URI.create("https://exampleuniversity.com/public/logo.png"),
+                    "a square logo of a university",
+                ),
+                null,
+                "#12107c",
+                URI.create("https://examplestate.com/public/background.png"),
+                "#FFFFFF",
             ),
-            null,
-            "#12107c",
-            URI.create("https://examplestate.com/public/background.png"),
-            "#FFFFFF",
+        ),
+        listOf(
+            Claim(
+                path = ClaimPath.claim("given_name"),
+                display = listOf(
+                    Claim.Display("Given Name", Locale.forLanguageTag("en-US")),
+                ),
+            ),
+            Claim(
+                path = ClaimPath.claim("family_name"),
+                display = listOf(
+                    Claim.Display("Surname", Locale.forLanguageTag("en-US")),
+                ),
+            ),
+            Claim(path = ClaimPath.claim("degree")),
+            Claim(
+                path = ClaimPath.claim("gpa"),
+                display = listOf(
+                    Claim.Display("name", Locale.forLanguageTag("GPA")),
+                ),
+            ),
         ),
     ),
     W3CSignedJwtCredential.CredentialDefinition(
         listOf("VerifiableCredential", "UniversityDegreeCredential"),
-    ),
-    listOf(
-        Claim(
-            path = ClaimPath.claim("given_name"),
-            display = listOf(
-                Claim.Display("Given Name", Locale.forLanguageTag("en-US")),
-            ),
-        ),
-        Claim(
-            path = ClaimPath.claim("family_name"),
-            display = listOf(
-                Claim.Display("Surname", Locale.forLanguageTag("en-US")),
-            ),
-        ),
-        Claim(path = ClaimPath.claim("degree")),
-        Claim(
-            path = ClaimPath.claim("gpa"),
-            display = listOf(
-                Claim.Display("name", Locale.forLanguageTag("GPA")),
-            ),
-        ),
     ),
 )
 
@@ -132,18 +134,41 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
             ),
         ),
     ),
-    listOf(
-        Display(
-            "University Credential",
-            Locale.forLanguageTag("en-US"),
-            Display.Logo(
-                URI.create("https://exampleuniversity.com/public/logo.png"),
-                "a square logo of a university",
+    CredentialMetadata(
+        listOf(
+            Display(
+                "University Credential",
+                Locale.forLanguageTag("en-US"),
+                Display.Logo(
+                    URI.create("https://exampleuniversity.com/public/logo.png"),
+                    "a square logo of a university",
+                ),
+                null,
+                "#12107c",
+                null,
+                "#FFFFFF",
             ),
-            null,
-            "#12107c",
-            null,
-            "#FFFFFF",
+        ),
+        listOf(
+            Claim(
+                path = ClaimPath.claim("given_name"),
+                display = listOf(
+                    Claim.Display("Given Name", Locale.forLanguageTag("en-US")),
+                ),
+            ),
+            Claim(
+                path = ClaimPath.claim("family_name"),
+                display = listOf(
+                    Claim.Display("Surname", Locale.forLanguageTag("en-US")),
+                ),
+            ),
+            Claim(path = ClaimPath.claim("degree")),
+            Claim(
+                path = ClaimPath.claim("gpa"),
+                display = listOf(
+                    Claim.Display("name", Locale.forLanguageTag("GPA")),
+                ),
+            ),
         ),
     ),
     W3CJsonLdCredentialDefinition(
@@ -152,27 +177,6 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
             URI("https://www.w3.org/2018/credentials/examples/v1").toURL(),
         ),
         listOf("VerifiableCredential_LDP_VC", "UniversityDegreeCredential_LDP_VC"),
-    ),
-    listOf(
-        Claim(
-            path = ClaimPath.claim("given_name"),
-            display = listOf(
-                Claim.Display("Given Name", Locale.forLanguageTag("en-US")),
-            ),
-        ),
-        Claim(
-            path = ClaimPath.claim("family_name"),
-            display = listOf(
-                Claim.Display("Surname", Locale.forLanguageTag("en-US")),
-            ),
-        ),
-        Claim(path = ClaimPath.claim("degree")),
-        Claim(
-            path = ClaimPath.claim("gpa"),
-            display = listOf(
-                Claim.Display("name", Locale.forLanguageTag("GPA")),
-            ),
-        ),
     ),
 )
 
@@ -191,18 +195,41 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
             ),
         ),
     ),
-    listOf(
-        Display(
-            "University Credential",
-            Locale.forLanguageTag("en-US"),
-            Display.Logo(
-                URI.create("https://exampleuniversity.com/public/logo.png"),
-                "a square logo of a university",
+    CredentialMetadata(
+        listOf(
+            Display(
+                "University Credential",
+                Locale.forLanguageTag("en-US"),
+                Display.Logo(
+                    URI.create("https://exampleuniversity.com/public/logo.png"),
+                    "a square logo of a university",
+                ),
+                null,
+                "#12107c",
+                null,
+                "#FFFFFF",
             ),
-            null,
-            "#12107c",
-            null,
-            "#FFFFFF",
+        ),
+        listOf(
+            Claim(
+                path = ClaimPath.claim("given_name"),
+                display = listOf(
+                    Claim.Display("Given Name", Locale.forLanguageTag("en-US")),
+                ),
+            ),
+            Claim(
+                path = ClaimPath.claim("family_name"),
+                display = listOf(
+                    Claim.Display("Surname", Locale.forLanguageTag("en-US")),
+                ),
+            ),
+            Claim(path = ClaimPath.claim("degree")),
+            Claim(
+                path = ClaimPath.claim("gpa"),
+                display = listOf(
+                    Claim.Display("name", Locale.forLanguageTag("GPA")),
+                ),
+            ),
         ),
     ),
     W3CJsonLdCredentialDefinition(
@@ -211,27 +238,6 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
             URI("https://www.w3.org/2018/credentials/examples/v1").toURL(),
         ),
         listOf("VerifiableCredential_JWT_VC_JSON-LD", "UniversityDegreeCredential_JWT_VC_JSON-LD"),
-    ),
-    listOf(
-        Claim(
-            path = ClaimPath.claim("given_name"),
-            display = listOf(
-                Claim.Display("Given Name", Locale.forLanguageTag("en-US")),
-            ),
-        ),
-        Claim(
-            path = ClaimPath.claim("family_name"),
-            display = listOf(
-                Claim.Display("Surname", Locale.forLanguageTag("en-US")),
-            ),
-        ),
-        Claim(path = ClaimPath.claim("degree")),
-        Claim(
-            path = ClaimPath.claim("gpa"),
-            display = listOf(
-                Claim.Display("name", Locale.forLanguageTag("GPA")),
-            ),
-        ),
     ),
 )
 
@@ -246,41 +252,44 @@ internal fun mobileDrivingLicense() = MsoMdocCredential(
     emptyList(),
     null,
     ProofTypesSupported.Empty,
-    listOf(
-        Display(
-            "Mobile Driving License",
-            Locale.forLanguageTag("en-US"),
-            Display.Logo(
-                URI.create("https://examplestate.com/public/mdl.png"),
-                "a square figure of a mobile driving license",
+    CredentialMetadata(
+        listOf(
+            Display(
+                "Mobile Driving License",
+                Locale.forLanguageTag("en-US"),
+                Display.Logo(
+                    URI.create("https://examplestate.com/public/mdl.png"),
+                    "a square figure of a mobile driving license",
+                ),
+                null,
+                "#12107c",
+                URI.create("https://examplestate.com/public/background.png"),
+                "#FFFFFF",
             ),
-            null,
-            "#12107c",
-            URI.create("https://examplestate.com/public/background.png"),
-            "#FFFFFF",
+        ),
+
+        listOf(
+            Claim(
+                path = ClaimPath.claim("org.iso.18013.5.1").claim("given_name"),
+                display = listOf(
+                    Claim.Display("Given Name", Locale.forLanguageTag("en-US")),
+                ),
+            ),
+            Claim(
+                path = ClaimPath.claim("org.iso.18013.5.1").claim("family_name"),
+                display = listOf(
+                    Claim.Display("Surname", Locale.forLanguageTag("en-US")),
+                ),
+            ),
+            Claim(
+                path = ClaimPath.claim("org.iso.18013.5.1").claim("birth_date"),
+            ),
+            Claim(
+                path = ClaimPath.claim("org.iso.18013.5.1.aamva").claim("organ_donor"),
+            ),
         ),
     ),
     "org.iso.18013.5.1.mDL",
-    listOf(
-        Claim(
-            path = ClaimPath.claim("org.iso.18013.5.1").claim("given_name"),
-            display = listOf(
-                Claim.Display("Given Name", Locale.forLanguageTag("en-US")),
-            ),
-        ),
-        Claim(
-            path = ClaimPath.claim("org.iso.18013.5.1").claim("family_name"),
-            display = listOf(
-                Claim.Display("Surname", Locale.forLanguageTag("en-US")),
-            ),
-        ),
-        Claim(
-            path = ClaimPath.claim("org.iso.18013.5.1").claim("birth_date"),
-        ),
-        Claim(
-            path = ClaimPath.claim("org.iso.18013.5.1.aamva").claim("organ_donor"),
-        ),
-    ),
 )
 
 /**
@@ -301,10 +310,13 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
                     "keys": [
                         {
                             "kty": "EC",
-                            "kid": "key-0",
+                          "use": "enc",
                             "crv": "P-256",
-                            "x": "ilzt0a_ukEX-nl0S05S2RAlbQFL2DSOpTjT3xf52JBY",
-                            "y": "q-fNv_d0nlZf_S_3S-KmrktIsylB0cybRiL6rZMLZHI"
+                          "alg": "ECDH-ES",
+                          "kid": "encKey-0",
+                          "x": "TmcsNF6JpWjP85wKfBXKybHaJNowtp6jCuToppDosdw",
+                          "y": "egzDuJuSxyypCE0qUoo1oKOnslpaw1Om-flQ4knafas",
+                          "iat": 1755352588
                         }
                     ]
                 }
