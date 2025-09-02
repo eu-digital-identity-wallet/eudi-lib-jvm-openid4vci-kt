@@ -15,22 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
+import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSVerifier
-import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.crypto.Ed25519Verifier
-import com.nimbusds.jose.crypto.MACVerifier
-import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.*
-import com.nimbusds.jose.proc.SecurityContext
-import com.nimbusds.jose.util.JSONObjectUtils
-import com.nimbusds.jose.util.X509CertChainUtils
-import com.nimbusds.jwt.JWTClaimsSet
-import com.nimbusds.jwt.SignedJWT
-import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
-import com.nimbusds.jwt.proc.JWTClaimsSetVerifier
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
@@ -40,123 +29,19 @@ import eu.europa.ec.eudi.openid4vci.internal.ensureSuccess
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import java.net.URI
-import java.security.cert.X509Certificate
 import java.util.*
 
 internal object CredentialIssuerMetadataJsonParser {
 
-    suspend fun parseMetaData(
-        json: String,
-        issuer: CredentialIssuerId,
-        policy: IssuerMetadataPolicy,
-    ): CredentialIssuerMetadata {
+    fun parseMetaData(json: String, issuer: CredentialIssuerId): CredentialIssuerMetadata {
         val metadata = try {
             JsonSupport.decodeFromString<CredentialIssuerMetadataTO>(json)
         } catch (t: Throwable) {
             throw CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(t)
         }
-
-        suspend fun signedMetadata(issuerTrust: IssuerTrust): CredentialIssuerMetadataTO? =
-            metadata.signedMetadata?.let { signedMetadataJwt ->
-                parseAndVerifySignedMetadata(
-                    signedMetadataJwt,
-                    issuerTrust,
-                    issuer,
-                ).getOrElse { throw CredentialIssuerMetadataError.InvalidSignedMetadata(it) }
-            }
-
-        return when (policy) {
-            is IssuerMetadataPolicy.RequireSigned -> {
-                val signedMetadata =
-                    signedMetadata(policy.issuerTrust) ?: throw CredentialIssuerMetadataError.MissingSignedMetadata()
-                signedMetadata.toDomain(issuer)
-            }
-
-            is IssuerMetadataPolicy.PreferSigned -> {
-                val signedMetadata = signedMetadata(policy.issuerTrust)
-                signedMetadata?.mergeWith(metadata)?.toDomain(issuer) ?: metadata.toDomain(issuer)
-            }
-
-            IssuerMetadataPolicy.IgnoreSigned -> metadata.toDomain(issuer)
-        }
+        return metadata.toDomain(issuer)
     }
 }
-
-/**
- * Parses and verifies the signature of a Signed JWT that contains Credential Issuer Metadata.
- *
- * @param jwt the Signed JWT to parse and verify
- * @param issuerTrust trust anchor for the issuer of the signed metadata
- * @param issuer the id of the Credential Issuer whose signed metadata to parse
- */
-private suspend fun parseAndVerifySignedMetadata(
-    jwt: String,
-    issuerTrust: IssuerTrust,
-    issuer: CredentialIssuerId,
-): Result<CredentialIssuerMetadataTO> = runCatching {
-    val signedJwt = SignedJWT.parse(jwt)
-
-    require(issuerTrust.verify(signedJwt)) { "signature verification of signed metadata failed" }
-
-    val claimSet = signedJwt.jwtClaimsSet
-    val claimSetVerifier = signedMetadataClaimSetVerifier(issuer)
-    claimSetVerifier.verify(claimSet, null)
-
-    val json = JSONObjectUtils.toJSONString(claimSet.toJSONObject())
-    JsonSupport.decodeFromString<CredentialIssuerMetadataTO>(json)
-}
-
-/**
- * Verifies [jwt] is signed by a trusted issuer.
- */
-private suspend fun IssuerTrust.verify(jwt: SignedJWT): Boolean {
-    fun JWK.jwsVerifier(): JWSVerifier =
-        when (this) {
-            is RSAKey -> RSASSAVerifier(this)
-            is ECKey -> ECDSAVerifier(this)
-            is OctetKeyPair -> Ed25519Verifier(this)
-            is OctetSequenceKey -> MACVerifier(this)
-            else -> throw IllegalArgumentException("Unsupported JWK type '${this.javaClass}'")
-        }
-
-    fun X509Certificate.jwsVerifier(): JWSVerifier = JWK.parse(this).jwsVerifier()
-
-    val jwsVerifier = when (this) {
-        is IssuerTrust.ByPublicKey -> jwk.jwsVerifier()
-
-        is IssuerTrust.ByCertificateChain -> {
-            val certChain = requireNotNull(jwt.header.x509CertChain) {
-                "missing 'x5c' header claim"
-            }.let { X509CertChainUtils.parse(it) }
-            require(certificateChainTrust.isTrusted(certChain)) {
-                "certificate chain in 'x5c' header claim is not trusted"
-            }
-            certChain.first().jwsVerifier()
-        }
-    }
-
-    return jwt.verify(jwsVerifier)
-}
-
-/**
- * Gets a [JWTClaimsSetVerifier] for the claims of a Signed JWT that contains the signed metadata of a Credential Issuer.
- *
- * The verifier:
- * 1. Accepts all audiences
- * 2. Requires 'sub' claim to be [subject]
- * 3. Requires 'iat', 'iss', 'sub' claims to be present
- * 4. Ensures 'signed_metadata' claim is not present
- * 5. Ensures the claim set can be used according to 'exp' and 'nbf' if present
- */
-private fun signedMetadataClaimSetVerifier(subject: CredentialIssuerId): JWTClaimsSetVerifier<SecurityContext> =
-    DefaultJWTClaimsVerifier(
-        null,
-        JWTClaimsSet.Builder()
-            .subject(subject.value.value.toExternalForm())
-            .build(),
-        setOf("iat", "iss", "sub"),
-        setOf("signed_metadata"),
-    )
 
 /**
  * The metadata of a Credentials that can be issued by a Credential Issuer.
@@ -170,9 +55,21 @@ private sealed interface CredentialSupportedTO {
     val scope: String?
     val cryptographicBindingMethodsSupported: List<String>?
     val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>?
-    val display: List<CredentialSupportedDisplayTO>?
+    val credentialMetadata: CredentialMetadataTO?
 
     fun toDomain(): CredentialConfiguration
+}
+
+@Serializable
+private data class CredentialMetadataTO(
+    @SerialName("display") val display: List<CredentialSupportedDisplayTO>? = null,
+    @SerialName("claims") val claims: List<ClaimTO>? = null,
+) {
+    fun toDomain(): CredentialMetadata {
+        val display = display?.map { it.toDomain() }.orEmpty()
+        val claims = claims?.map { it.toDomain() }.orEmpty()
+        return CredentialMetadata(display, claims)
+    }
 }
 
 @Serializable
@@ -211,9 +108,8 @@ private data class MsdMdocCredentialTO(
     @SerialName("policy") val isoPolicy: PolicyTO? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>? = null,
-    @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
     @SerialName("doctype") @Required val docType: String,
-    @SerialName("claims") val claims: List<ClaimTO>? = null,
+    @SerialName("credential_metadata") override val credentialMetadata: CredentialMetadataTO? = null,
 ) : CredentialSupportedTO {
     init {
         require(format == FORMAT_MSO_MDOC) { "invalid format '$format'" }
@@ -223,7 +119,6 @@ private data class MsdMdocCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
 
-        val display = display.orEmpty().map { it.toDomain() }
         val proofTypesSupported = proofTypesSupported.toProofTypes()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported
             .orEmpty().mapNotNull { it.toCoseAlgorithm()?.name() }
@@ -233,6 +128,16 @@ private data class MsdMdocCredentialTO(
         val coseCurves = isoCredentialCurvesSupported.orEmpty().map { CoseCurve(it) }
         val policy = isoPolicy?.let { policy -> MsoMdocPolicy(policy.oneTimeUse, policy.batchSize) }
 
+        if (bindingMethods.isNotEmpty()) {
+            require(proofTypesSupported.values.isNotEmpty()) {
+                "Proof types must be specified if cryptographic binding methods are specified"
+            }
+        } else {
+            require(proofTypesSupported.values.isEmpty()) {
+                "Proof types cannot be specified if cryptographic binding methods are not specified"
+            }
+        }
+
         return MsoMdocCredential(
             scope,
             bindingMethods,
@@ -241,9 +146,8 @@ private data class MsdMdocCredentialTO(
             coseCurves,
             policy,
             proofTypesSupported,
-            display,
+            credentialMetadata?.toDomain(),
             docType,
-            claims?.map { it.toDomain() }.orEmpty(),
         )
     }
 }
@@ -260,9 +164,8 @@ private data class SdJwtVcCredentialTO(
     val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>? = null,
-    @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
     @SerialName("vct") val type: String,
-    @SerialName("claims") val claims: List<ClaimTO>? = null,
+    @SerialName("credential_metadata") override val credentialMetadata: CredentialMetadataTO? = null,
 ) : CredentialSupportedTO {
     init {
         require(format == FORMAT_SD_JWT_VC) { "invalid format '$format'" }
@@ -272,18 +175,26 @@ private data class SdJwtVcCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
 
-        val display = display.orEmpty().map { it.toDomain() }
         val proofTypesSupported = proofTypesSupported.toProofTypes()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
+
+        if (bindingMethods.isNotEmpty()) {
+            require(proofTypesSupported.values.isNotEmpty()) {
+                "Proof types must be specified if cryptographic binding methods are specified"
+            }
+        } else {
+            require(proofTypesSupported.values.isEmpty()) {
+                "Proof types cannot be specified if cryptographic binding methods are not specified"
+            }
+        }
 
         return SdJwtVcCredential(
             scope,
             bindingMethods,
             cryptographicSuitesSupported,
             proofTypesSupported,
-            display,
+            credentialMetadata?.toDomain(),
             type,
-            claims?.map { it.toDomain() }.orEmpty(),
         )
     }
 }
@@ -315,9 +226,8 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
     val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>? = null,
-    @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
     @SerialName("credential_definition") @Required val credentialDefinition: W3CJsonLdCredentialDefinitionTO,
-    @SerialName("claims") val claims: List<ClaimTO>? = null,
+    @SerialName("credential_metadata") override val credentialMetadata: CredentialMetadataTO? = null,
 ) : CredentialSupportedTO {
     init {
         require(format == FORMAT_W3C_JSONLD_DATA_INTEGRITY) { "invalid format '$format'" }
@@ -326,18 +236,26 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
     override fun toDomain(): W3CJsonLdDataIntegrityCredential {
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
-        val display = display.orEmpty().map { it.toDomain() }
         val proofTypesSupported = proofTypesSupported.toProofTypes()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
+
+        if (bindingMethods.isNotEmpty()) {
+            require(proofTypesSupported.values.isNotEmpty()) {
+                "Proof types must be specified if cryptographic binding methods are specified"
+            }
+        } else {
+            require(proofTypesSupported.values.isEmpty()) {
+                "Proof types cannot be specified if cryptographic binding methods are not specified"
+            }
+        }
 
         return W3CJsonLdDataIntegrityCredential(
             scope = scope,
             cryptographicBindingMethodsSupported = bindingMethods,
             credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
             proofTypesSupported = proofTypesSupported,
-            display = display,
+            credentialMetadata = credentialMetadata?.toDomain(),
             credentialDefinition = credentialDefinition.toDomain(),
-            claims = claims?.map { it.toDomain() }.orEmpty(),
         )
     }
 }
@@ -357,9 +275,8 @@ private data class W3CJsonLdSignedJwtCredentialTO(
     val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>? = null,
-    @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
     @SerialName("credential_definition") @Required val credentialDefinition: W3CJsonLdCredentialDefinitionTO,
-    @SerialName("claims") val claims: List<ClaimTO>? = null,
+    @SerialName("credential_metadata") override val credentialMetadata: CredentialMetadataTO? = null,
 ) : CredentialSupportedTO {
     init {
         require(format == FORMAT_W3C_JSONLD_SIGNED_JWT) { "invalid format '$format'" }
@@ -369,18 +286,26 @@ private data class W3CJsonLdSignedJwtCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
 
-        val display = display.orEmpty().map { it.toDomain() }
         val proofTypesSupported = proofTypesSupported.toProofTypes()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
+
+        if (bindingMethods.isNotEmpty()) {
+            require(proofTypesSupported.values.isNotEmpty()) {
+                "Proof types must be specified if cryptographic binding methods are specified"
+            }
+        } else {
+            require(proofTypesSupported.values.isEmpty()) {
+                "Proof types cannot be specified if cryptographic binding methods are not specified"
+            }
+        }
 
         return W3CJsonLdSignedJwtCredential(
             scope = scope,
             cryptographicBindingMethodsSupported = bindingMethods,
             credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
             proofTypesSupported = proofTypesSupported,
-            display = display,
+            credentialMetadata = credentialMetadata?.toDomain(),
             credentialDefinition = credentialDefinition.toDomain(),
-            claims = claims?.map { it.toDomain() }.orEmpty(),
         )
     }
 }
@@ -400,9 +325,8 @@ private data class W3CSignedJwtCredentialTO(
     val credentialSigningAlgorithmsSupported: List<String>? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>? = null,
-    @SerialName("display") override val display: List<CredentialSupportedDisplayTO>? = null,
     @SerialName("credential_definition") @Required val credentialDefinition: CredentialDefinitionTO,
-    @SerialName("claims") val claims: List<ClaimTO>? = null,
+    @SerialName("credential_metadata") override val credentialMetadata: CredentialMetadataTO? = null,
 ) : CredentialSupportedTO {
     init {
         require(format == FORMAT_W3C_SIGNED_JWT) { "invalid format '$format'" }
@@ -423,18 +347,26 @@ private data class W3CSignedJwtCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
 
-        val display = display.orEmpty().map { it.toDomain() }
         val proofTypesSupported = proofTypesSupported.toProofTypes()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
+
+        if (bindingMethods.isNotEmpty()) {
+            require(proofTypesSupported.values.isNotEmpty()) {
+                "Proof types must be specified if cryptographic binding methods are specified"
+            }
+        } else {
+            require(proofTypesSupported.values.isEmpty()) {
+                "Proof types cannot be specified if cryptographic binding methods are not specified"
+            }
+        }
 
         return W3CSignedJwtCredential(
             scope = scope,
             cryptographicBindingMethodsSupported = bindingMethods,
             credentialSigningAlgorithmsSupported = cryptographicSuitesSupported,
             proofTypesSupported = proofTypesSupported,
-            display = display,
+            credentialMetadata = credentialMetadata?.toDomain(),
             credentialDefinition = credentialDefinition.toDomain(),
-            claims = claims?.map { it.toDomain() }.orEmpty(),
         )
     }
 }
@@ -455,9 +387,9 @@ private data class CredentialIssuerMetadataTO(
     @SerialName("nonce_endpoint") val nonceEndpoint: String? = null,
     @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
     @SerialName("notification_endpoint") val notificationEndpoint: String? = null,
+    @SerialName("credential_request_encryption") val credentialRequestEncryption: CredentialRequestEncryptionTO? = null,
     @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionTO? = null,
     @SerialName("batch_credential_issuance") val batchCredentialIssuance: BatchCredentialIssuanceTO? = null,
-    @SerialName("signed_metadata") val signedMetadata: String? = null,
     @Serializable(with = KeepKnownConfigurations::class)
     @SerialName("credential_configurations_supported") val credentialConfigurationsSupported: Map<String, CredentialSupportedTO>? = null,
     @SerialName("display") val display: List<DisplayTO>? = null,
@@ -502,27 +434,59 @@ private object KeepKnownConfigurations : JsonTransformingSerializer<Map<String, 
  * Converts this [CredentialResponseEncryptionTO] to a [CredentialResponseEncryption].
  */
 private fun CredentialResponseEncryptionTO?.toDomain(): CredentialResponseEncryption {
-    fun CredentialResponseEncryptionTO.algorithmsAndMethods(): SupportedEncryptionAlgorithmsAndMethods {
+    fun CredentialResponseEncryptionTO.responseEncryptionParams(): SupportedResponseEncryptionParameters {
         val encryptionAlgorithms = algorithmsSupported.map { JWEAlgorithm.parse(it) }
+        val compressionAlgorithms = zipValuesSupported?.map { CompressionAlgorithm(it) }
         val encryptionMethods = methodsSupported.map { EncryptionMethod.parse(it) }
-        return SupportedEncryptionAlgorithmsAndMethods(encryptionAlgorithms, encryptionMethods)
+        return SupportedResponseEncryptionParameters(encryptionAlgorithms, encryptionMethods, compressionAlgorithms)
     }
 
     return if (null == this) {
         CredentialResponseEncryption.NotSupported
     } else {
         if (encryptionRequired) {
-            CredentialResponseEncryption.Required(algorithmsAndMethods())
+            CredentialResponseEncryption.Required(responseEncryptionParams())
         } else {
-            CredentialResponseEncryption.SupportedNotRequired(algorithmsAndMethods())
+            CredentialResponseEncryption.SupportedNotRequired(responseEncryptionParams())
+        }
+    }
+}
+
+/**
+ * Converts this [CredentialRequestEncryptionTO] to a [CredentialRequestEncryption].
+ */
+private fun CredentialRequestEncryptionTO?.toDomain(): CredentialRequestEncryption {
+    fun CredentialRequestEncryptionTO.requestEncryptionParams(): SupportedRequestEncryptionParameters {
+        val encryptionKeys = JWKSet.parse(JsonSupport.encodeToString(jwks))
+        val compressionAlgorithms = zipValuesSupported?.map { CompressionAlgorithm(it) }
+        val encryptionMethods = methodsSupported.map { EncryptionMethod.parse(it) }
+        return SupportedRequestEncryptionParameters(encryptionKeys, encryptionMethods, compressionAlgorithms)
+    }
+
+    return if (null == this) {
+        CredentialRequestEncryption.NotSupported
+    } else {
+        if (encryptionRequired) {
+            CredentialRequestEncryption.Required(requestEncryptionParams())
+        } else {
+            CredentialRequestEncryption.SupportedNotRequired(requestEncryptionParams())
         }
     }
 }
 
 @Serializable
+private data class CredentialRequestEncryptionTO(
+    @SerialName("jwks") @Required val jwks: JsonObject,
+    @SerialName("enc_values_supported") @Required val methodsSupported: List<String>,
+    @SerialName("zip_values_supported") val zipValuesSupported: List<String>? = emptyList(),
+    @SerialName("encryption_required") @Required val encryptionRequired: Boolean = false,
+)
+
+@Serializable
 private data class CredentialResponseEncryptionTO(
     @SerialName("alg_values_supported") val algorithmsSupported: List<String>,
     @SerialName("enc_values_supported") val methodsSupported: List<String>,
+    @SerialName("zip_values_supported") val zipValuesSupported: List<String>? = emptyList(),
     @SerialName("encryption_required") val encryptionRequired: Boolean = false,
 )
 
@@ -638,7 +602,7 @@ private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTy
             keyAttestationRequirement = meta.keyAttestationRequirement.toDomain(),
         )
 
-        "ldp_vp" -> ProofTypeMeta.LdpVp
+        "di_vp" -> ProofTypeMeta.DiVp
 
         "attestation" -> ProofTypeMeta.Attestation(
             algorithms = meta.algorithms.map {
@@ -676,25 +640,6 @@ private fun JsonPrimitive.toCoseAlgorithm(): CoseAlgorithm? {
     val strOrNull by lazy { contentOrNull }
     return intOrNull?.toCose() ?: strOrNull?.toCodeByValue() ?: strOrNull?.toCoseByName()
 }
-
-/**
- * Merges the values of [this] with [other] giving precedence to the values of [this].
- */
-private fun CredentialIssuerMetadataTO.mergeWith(other: CredentialIssuerMetadataTO): CredentialIssuerMetadataTO =
-    CredentialIssuerMetadataTO(
-        credentialIssuerIdentifier = credentialIssuerIdentifier ?: other.credentialIssuerIdentifier,
-        authorizationServers = authorizationServers ?: other.authorizationServers,
-        credentialEndpoint = credentialEndpoint ?: other.credentialEndpoint,
-        nonceEndpoint = nonceEndpoint ?: other.nonceEndpoint,
-        deferredCredentialEndpoint = deferredCredentialEndpoint ?: other.deferredCredentialEndpoint,
-        notificationEndpoint = notificationEndpoint ?: other.notificationEndpoint,
-        credentialResponseEncryption = credentialResponseEncryption ?: other.credentialResponseEncryption,
-        batchCredentialIssuance = batchCredentialIssuance ?: other.batchCredentialIssuance,
-        signedMetadata = signedMetadata ?: other.signedMetadata,
-        credentialConfigurationsSupported = credentialConfigurationsSupported
-            ?: other.credentialConfigurationsSupported,
-        display = display ?: other.display,
-    )
 
 /**
  * Converts and validates [CredentialIssuerMetadataTO] as [CredentialIssuerMetadata] instance.
@@ -753,6 +698,7 @@ private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuer
         }.ensureSuccess { CredentialIssuerMetadataValidationError.InvalidBatchSize() }
     } ?: BatchCredentialIssuance.NotSupported
 
+    val credentialRequestEncryption = credentialRequestEncryption.toDomain()
     val credentialResponseEncryption = credentialResponseEncryption.toDomain()
 
     return CredentialIssuerMetadata(
@@ -762,6 +708,7 @@ private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuer
         nonceEndpoint,
         deferredCredentialEndpoint,
         notificationEndpoint,
+        credentialRequestEncryption,
         credentialResponseEncryption,
         batchIssuance,
         credentialsSupported,
