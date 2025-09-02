@@ -169,7 +169,7 @@ fun interface RequestIssuance {
  * that the wallet expects in the response of its issuance request.
  */
 typealias ResponseEncryptionSpecFactory =
-    (SupportedEncryptionAlgorithmsAndMethods, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec?
+    (SupportedResponseEncryptionParameters, KeyGenerationConfig) -> IssuanceResponseEncryptionSpec?
 
 /**
  * Errors that can happen in the process of issuance process

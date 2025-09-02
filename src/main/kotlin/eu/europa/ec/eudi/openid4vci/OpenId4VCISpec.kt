@@ -31,4 +31,8 @@ object OpenId4VCISpec {
     const val KEY_ATTESTATION_ATTESTED_KEYS = "attested_keys"
     const val KEY_ATTESTATION_KEY_STORAGE = "key_storage"
     const val KEY_ATTESTATION_USER_AUTHENTICATION = "user_authentication"
+
+    const val CREDENTIAL_ISSUER_WELL_KNOWN_PATH = "/.well-known/openid-credential-issuer"
+
+    const val SIGNED_METADATA_JWT_TYPE = "openidvci-issuer-metadata+jwt"
 }

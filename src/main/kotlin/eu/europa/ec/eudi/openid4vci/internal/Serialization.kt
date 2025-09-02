@@ -55,7 +55,7 @@ internal object ProofSerializer : KSerializer<Proof> {
     data class ProofJson(
         @SerialName("proof_type") val proofType: String,
         @SerialName("jwt") val jwt: String? = null,
-        @SerialName("ldp_vp") val ldpVp: String? = null,
+        @SerialName("di_vp") val diVp: String? = null,
         @SerialName("attestation") val attestation: String? = null,
     )
 
@@ -85,11 +85,11 @@ internal object ProofSerializer : KSerializer<Proof> {
                 ),
             )
 
-            is Proof.LdpVp -> internal.serialize(
+            is Proof.DiVp -> internal.serialize(
                 encoder,
                 ProofJson(
-                    proofType = ProofType.LDP_VP.toString().lowercase(),
-                    jwt = value.ldpVp,
+                    proofType = ProofType.DI_VP.toString().lowercase(),
+                    jwt = value.diVp,
                 ),
             )
 
@@ -113,7 +113,6 @@ internal object GrantedAuthorizationDetailsSerializer :
     @Serializable
     data class AuthorizationDetailJson(
         @SerialName("type") @Required val type: String,
-        @SerialName("format") val format: String? = null,
         @SerialName("credential_configuration_id") val credentialConfigurationId: String,
         @SerialName("credential_identifiers") val credentialIdentifiers: List<String> = emptyList(),
     ) {

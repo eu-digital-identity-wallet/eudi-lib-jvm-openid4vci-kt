@@ -58,7 +58,7 @@ sealed interface CryptographicBindingMethod : Serializable {
  */
 enum class ProofType : Serializable {
     JWT,
-    LDP_VP,
+    DI_VP,
     ATTESTATION,
 }
 
@@ -72,8 +72,8 @@ sealed interface ProofTypeMeta : Serializable {
         }
     }
 
-    data object LdpVp : ProofTypeMeta {
-        private fun readResolve(): Any = LdpVp
+    data object DiVp : ProofTypeMeta {
+        private fun readResolve(): Any = DiVp
     }
 
     data class Attestation(
@@ -128,7 +128,7 @@ sealed interface KeyAttestationRequirement {
 
 fun ProofTypeMeta.type(): ProofType? = when (this) {
     is ProofTypeMeta.Jwt -> ProofType.JWT
-    is ProofTypeMeta.LdpVp -> ProofType.LDP_VP
+    is ProofTypeMeta.DiVp -> ProofType.DI_VP
     is ProofTypeMeta.Attestation -> ProofType.ATTESTATION
     is ProofTypeMeta.Unsupported -> null
 }
@@ -173,6 +173,11 @@ data class Display(
     ) : Serializable
 }
 
+data class CredentialMetadata(
+    val display: List<Display>? = emptyList(),
+    val claims: List<Claim>? = emptyList(),
+)
+
 /**
  * Credentials supported by an Issuer.
  */
@@ -181,8 +186,7 @@ sealed interface CredentialConfiguration : Serializable {
     val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod>
     val credentialSigningAlgorithmsSupported: List<String>
     val proofTypesSupported: ProofTypesSupported
-    val display: List<Display>
-    val claims: List<Claim>?
+    val credentialMetadata: CredentialMetadata?
 }
 
 /**
@@ -219,9 +223,8 @@ data class MsoMdocCredential(
     val isoCredentialCurvesSupported: List<CoseCurve> = emptyList(),
     val isoPolicy: MsoMdocPolicy?,
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
-    override val display: List<Display> = emptyList(),
+    override val credentialMetadata: CredentialMetadata?,
     val docType: String,
-    override val claims: List<Claim> = emptyList(),
 ) : CredentialConfiguration
 
 data class SdJwtVcCredential(
@@ -229,9 +232,8 @@ data class SdJwtVcCredential(
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
-    override val display: List<Display> = emptyList(),
+    override val credentialMetadata: CredentialMetadata?,
     val type: String,
-    override val claims: List<Claim> = emptyList(),
 ) : CredentialConfiguration
 
 data class W3CJsonLdCredentialDefinition(
@@ -247,9 +249,8 @@ data class W3CJsonLdDataIntegrityCredential(
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
-    override val display: List<Display> = emptyList(),
+    override val credentialMetadata: CredentialMetadata?,
     val credentialDefinition: W3CJsonLdCredentialDefinition,
-    override val claims: List<Claim> = emptyList(),
 ) : CredentialConfiguration
 
 /**
@@ -260,9 +261,8 @@ data class W3CJsonLdSignedJwtCredential(
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
-    override val display: List<Display> = emptyList(),
+    override val credentialMetadata: CredentialMetadata?,
     val credentialDefinition: W3CJsonLdCredentialDefinition,
-    override val claims: List<Claim> = emptyList(),
 ) : CredentialConfiguration
 
 /**
@@ -273,9 +273,8 @@ data class W3CSignedJwtCredential(
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
-    override val display: List<Display> = emptyList(),
+    override val credentialMetadata: CredentialMetadata?,
     val credentialDefinition: CredentialDefinition,
-    override val claims: List<Claim> = emptyList(),
 ) : CredentialConfiguration {
 
     data class CredentialDefinition(
