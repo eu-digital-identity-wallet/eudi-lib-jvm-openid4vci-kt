@@ -57,10 +57,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
 
     private suspend fun Url.requestUnsigned(): String {
         val response = getAcceptingContentTypes(ContentType.Application.Json.toString())
-        val expectedHeaders = Headers.build {
-            append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-        }
-        require(response.headers == expectedHeaders) {
+        require(response.headers[HttpHeaders.ContentType] == ContentType.Application.Json.toString()) {
             "Credential issuer responded with invalid content type: " +
                 "expected ${ContentType.Application.Json} but was ${response.headers[HttpHeaders.ContentType]}"
         }
@@ -69,10 +66,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
 
     private suspend fun Url.requestSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): String {
         val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT)
-        val expectedHeaders = Headers.build {
-            append(HttpHeaders.ContentType, CONTENT_TYPE_APPLICATION_JWT)
-        }
-        ensure(response.headers == expectedHeaders) {
+        ensure(response.headers[HttpHeaders.ContentType] == CONTENT_TYPE_APPLICATION_JWT) {
             CredentialIssuerMetadataError.MissingSignedMetadata()
         }
         return parseAndVerifySignedMetadata(response.body<String>(), issuerTrust, issuer)
@@ -114,10 +108,11 @@ internal class DefaultCredentialIssuerMetadataResolver(
         issuerTrust: IssuerTrust,
         issuer: CredentialIssuerId,
     ): Result<String> = runCatching {
+        val signedJwt = SignedJWT.parse(jwt)
         val processor = DefaultJWTProcessor<SecurityContext>()
             .apply {
                 jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
-                jwsKeySelector = issuerTrust.keySelector(jwt)
+                jwsKeySelector = issuerTrust.keySelector(signedJwt)
                 jwtClaimsSetVerifier =
                     DefaultJWTClaimsVerifier(
                         null,
@@ -128,12 +123,11 @@ internal class DefaultCredentialIssuerMetadataResolver(
                     )
             }
 
-        val claimsSet = processor.process(jwt, null)
+        val claimsSet = processor.process(signedJwt, null)
         JSONObjectUtils.toJSONString(claimsSet.toJSONObject())
     }
 
-    private suspend fun IssuerTrust.keySelector(jwt: String): JWSKeySelector<SecurityContext> {
-        val signedJwt = SignedJWT.parse(jwt)
+    private suspend fun IssuerTrust.keySelector(signedJwt: SignedJWT): JWSKeySelector<SecurityContext> {
         val jwk = when (this) {
             is IssuerTrust.ByPublicKey -> jwk.toPublicJWK()
 
