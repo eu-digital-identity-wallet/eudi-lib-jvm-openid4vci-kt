@@ -248,6 +248,7 @@ data class IssuanceResponseEncryptionSpec(
     val encryptionKeyAlgorithm: JWEAlgorithm get() = jwk.algorithm as JWEAlgorithm
 
     init {
+        // Validate key is for encryption operation
         val keyUse: KeyUse? = jwk.keyUse
         if (keyUse != null) {
             require(keyUse == KeyUse.ENCRYPTION) {
@@ -265,10 +266,6 @@ data class IssuanceResponseEncryptionSpec(
         // Validate algorithm matches key
         require(jwk.keyType == KeyType.forAlgorithm(keyAlgorithm)) {
             "Encryption key and encryption algorithm do not match"
-        }
-        // Validate key is for encryption operation
-        require(jwk.keyUse == KeyUse.ENCRYPTION) {
-            "Provided key use is not encryption"
         }
     }
 }
