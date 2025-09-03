@@ -245,7 +245,7 @@ data class IssuanceResponseEncryptionSpec(
     val compressionAlgorithm: CompressionAlgorithm? = null,
 ) : java.io.Serializable {
 
-    val encryptionKeyAlgorithm: JWEAlgorithm get() = jwk.algorithm as JWEAlgorithm
+    val algorithm: JWEAlgorithm get() = jwk.algorithm as JWEAlgorithm
 
     init {
         // Validate key is for encryption operation

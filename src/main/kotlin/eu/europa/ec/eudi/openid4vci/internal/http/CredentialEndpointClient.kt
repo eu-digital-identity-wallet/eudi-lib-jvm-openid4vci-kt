@@ -200,7 +200,7 @@ private suspend inline fun <reified ResponseTO, Response> responsePossiblyEncryp
             val jwt = response.body<String>()
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
                 jweKeySelector = JWEDecryptionKeySelector(
-                    encryptionSpec.encryptionKeyAlgorithm,
+                    encryptionSpec.algorithm,
                     encryptionSpec.encryptionMethod,
                     ImmutableJWKSet(JWKSet(encryptionSpec.jwk)),
                 )

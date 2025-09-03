@@ -238,7 +238,7 @@ data class DeferredIssuanceStoredContextTO(
             val jwkJson = Json.parseToJsonElement(spec.jwk.toJSONString())
             return buildJsonObject {
                 put("jwk", jwkJson)
-                put("algorithm", spec.encryptionKeyAlgorithm.toString())
+                put("algorithm", spec.algorithm.toString())
                 put("encryption_method", spec.encryptionMethod.toString())
             }
         }

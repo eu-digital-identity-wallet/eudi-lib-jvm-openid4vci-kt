@@ -572,7 +572,7 @@ class IssuanceIssuerMetadataVersionTest {
                         content = encypt(
                             JWTClaimsSet.parse(responseJson),
                             responseEncryption.jwk,
-                            responseEncryption.encryptionKeyAlgorithm,
+                            responseEncryption.algorithm,
                             responseEncryption.encryptionMethod,
                         ).getOrThrow(),
                         status = HttpStatusCode.OK,

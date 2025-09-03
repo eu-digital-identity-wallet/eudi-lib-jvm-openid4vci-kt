@@ -26,7 +26,7 @@ internal fun responseEncryptionSpec(
     fun IssuanceResponseEncryptionSpec.validate(
         supportedResponseEncryptionParameters: SupportedResponseEncryptionParameters,
     ) {
-        val algorithm = encryptionKeyAlgorithm
+        val algorithm = algorithm
         requireNotNull(algorithm) {
             ResponseEncryptionKeyDoesNotSpecifyAlgorithm()
         }
