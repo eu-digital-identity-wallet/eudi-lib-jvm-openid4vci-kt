@@ -311,16 +311,16 @@ interface Issuer :
         }
 
         val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =
-            { supportedResponseEncryptionParameters, keyGenerationConfig, walletCompressionAlgorithms ->
-                val supportedPayloadCompression = supportedResponseEncryptionParameters.payloadCompression
-                val compressionAlg = when (supportedPayloadCompression) {
+            { issuerSupportedResponseEncryptedParameters, walletKeyGenerationConfig, walletSupportedCompressionAlgorithms ->
+                val issuerSupportedPayloadCompression = issuerSupportedResponseEncryptedParameters.payloadCompression
+                val compressionAlg = when (issuerSupportedPayloadCompression) {
                     PayloadCompression.NotSupported -> null
                     is PayloadCompression.Supported ->
-                        walletCompressionAlgorithms?.intersect(supportedPayloadCompression.algorithms)?.firstOrNull()
+                        walletSupportedCompressionAlgorithms?.intersect(issuerSupportedPayloadCompression.algorithms)?.firstOrNull()
                 }
-                val method = supportedResponseEncryptionParameters.encryptionMethods[0]
-                supportedResponseEncryptionParameters.algorithms.firstNotNullOfOrNull { alg ->
-                    KeyGenerator.genKeyIfSupported(keyGenerationConfig, alg)?.let { jwk ->
+                val method = issuerSupportedResponseEncryptedParameters.encryptionMethods[0]
+                issuerSupportedResponseEncryptedParameters.algorithms.firstNotNullOfOrNull { alg ->
+                    KeyGenerator.genKeyIfSupported(walletKeyGenerationConfig, alg)?.let { jwk ->
                         IssuanceResponseEncryptionSpec(jwk, method, compressionAlg)
                     }
                 }
