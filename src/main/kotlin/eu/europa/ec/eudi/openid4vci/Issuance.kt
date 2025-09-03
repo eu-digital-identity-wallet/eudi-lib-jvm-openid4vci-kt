@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.CompressionAlgorithm
 import kotlinx.serialization.json.JsonObject
+import kotlin.time.Duration
 
 /**
  * Represents the credential as it is serialized by the credential issuer
@@ -83,9 +84,13 @@ sealed interface SubmissionOutcome : java.io.Serializable {
      * to request the credential from issuer's Deferred Credential Endpoint.
      *
      * @param transactionId  A string identifying a Deferred Issuance transaction.
-     * @param interval Represents the minimum amount of time in seconds before sending a new deferred issuance request.
+     * @param interval Represents the minimum amount of time before sending a new deferred issuance request.
      */
-    data class Deferred(val transactionId: TransactionId, val interval: Long) : SubmissionOutcome
+    data class Deferred(val transactionId: TransactionId, val interval: Duration) : SubmissionOutcome {
+        init {
+            require(interval.isPositive()) { "interval must be positive" }
+        }
+    }
 
     /**
      * State that denotes that the credential issuance request has failed

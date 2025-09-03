@@ -103,9 +103,6 @@ class IssuanceDeferredRequestTest {
                     .getOrThrow()
 
             assertIs<DeferredCredentialQueryOutcome.IssuancePending>(requestDeferredIssuance)
-            assertTrue("Expected interval but was not present") {
-                requestDeferredIssuance.interval != null
-            }
         }
     }
 

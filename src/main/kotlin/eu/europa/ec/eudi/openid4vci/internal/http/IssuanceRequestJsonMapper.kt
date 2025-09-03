@@ -22,6 +22,8 @@ import eu.europa.ec.eudi.openid4vci.internal.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 //
 // Credential request / response
@@ -174,7 +176,10 @@ internal data class CredentialResponseSuccessTO(
                 notificationId,
             )
 
-            transactionId != null -> SubmissionOutcomeInternal.Deferred(transactionId, checkNotNull(interval))
+            transactionId != null && interval != null -> SubmissionOutcomeInternal.Deferred(
+                transactionId,
+                interval.toDuration(DurationUnit.SECONDS),
+            )
             else -> error("Cannot happen")
         }
     }
@@ -233,7 +238,7 @@ internal data class DeferredIssuanceSuccessResponseTO(
     fun toDomain(): DeferredCredentialQueryOutcome =
         when {
             interval != null && notificationId == null && credentials == null -> {
-                DeferredCredentialQueryOutcome.IssuancePending(interval)
+                DeferredCredentialQueryOutcome.IssuancePending(interval.toDuration(DurationUnit.SECONDS))
             }
             interval == null && !credentials.isNullOrEmpty() -> {
                 val notificationId = notificationId?.let { NotificationId(it) }

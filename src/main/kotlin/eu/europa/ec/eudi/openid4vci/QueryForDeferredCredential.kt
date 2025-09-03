@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.IssuerDoesNotSupportDeferredIssuance
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessToken
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
+import kotlin.time.Duration
 
 sealed interface DeferredCredentialQueryOutcome : java.io.Serializable {
 
@@ -27,8 +28,12 @@ sealed interface DeferredCredentialQueryOutcome : java.io.Serializable {
     ) : DeferredCredentialQueryOutcome
 
     data class IssuancePending(
-        val interval: Long? = null,
-    ) : DeferredCredentialQueryOutcome
+        val interval: Duration,
+    ) : DeferredCredentialQueryOutcome {
+        init {
+            require(interval.isPositive()) { "interval must be positive" }
+        }
+    }
 
     data class Errored(
         val error: String,
