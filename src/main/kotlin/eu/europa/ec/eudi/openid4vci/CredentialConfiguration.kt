@@ -133,6 +133,13 @@ fun ProofTypeMeta.type(): ProofType? = when (this) {
     is ProofTypeMeta.Unsupported -> null
 }
 
+fun ProofTypeMeta.algorithms(): List<JWSAlgorithm> = when (this) {
+    is ProofTypeMeta.Jwt -> algorithms
+    is ProofTypeMeta.Attestation -> algorithms
+    is ProofTypeMeta.DiVp -> emptyList()
+    is ProofTypeMeta.Unsupported -> emptyList()
+}
+
 @JvmInline
 value class ProofTypesSupported private constructor(val values: Set<ProofTypeMeta>) {
 
