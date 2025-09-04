@@ -38,11 +38,11 @@ internal class RequestIssuanceImpl(
 
     init {
         val nonceEndpoint = credentialOffer.credentialIssuerMetadata.nonceEndpoint
-        if (nonceEndpoint != null && nonceEndpointClient == null) {
-            throw IllegalStateException("A nonce endpoint client needs to be configured if issuer advertises a nonce endpoint")
+        check(!(nonceEndpoint != null && nonceEndpointClient == null)) {
+            " A nonce endpoint client needs to be configured if issuer advertises a nonce endpoint"
         }
-        if (nonceEndpoint == null && nonceEndpointClient != null) {
-            throw IllegalStateException("A nonce endpoint client is configured although issuer does not advertises a nonce endpoint")
+        check(!(nonceEndpoint == null && nonceEndpointClient != null)) {
+            "A nonce endpoint client is configured although issuer does not advertises a nonce endpoint"
         }
     }
 
@@ -253,6 +253,7 @@ internal class RequestIssuanceImpl(
         )
     }
 
+    @Suppress("kotlin:S6619")
     private fun verifyKeyAttestationJwtProofSignature(jwtProof: SignedJWT) {
         val keyAttestationJwt = jwtProof.header.getCustomParam("key_attestation") as? String
             ?: throw IllegalArgumentException("Missing 'key_attestation' in JWT header")
