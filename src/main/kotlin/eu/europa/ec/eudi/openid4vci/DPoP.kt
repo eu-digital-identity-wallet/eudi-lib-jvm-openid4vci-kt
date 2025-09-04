@@ -27,7 +27,6 @@ import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
 import eu.europa.ec.eudi.openid4vci.internal.use
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.put
 import java.net.URL

@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.ECKey
@@ -38,11 +39,15 @@ internal class RequestIssuanceImpl(
 
     init {
         val nonceEndpoint = credentialOffer.credentialIssuerMetadata.nonceEndpoint
-        if (nonceEndpoint != null && nonceEndpointClient == null) {
-            throw IllegalStateException("A nonce endpoint client needs to be configured if issuer advertises a nonce endpoint")
+        if (nonceEndpoint != null) {
+            check(nonceEndpointClient != null) {
+                " A nonce endpoint client needs to be configured if issuer advertises a nonce endpoint"
+            }
         }
-        if (nonceEndpoint == null && nonceEndpointClient != null) {
-            throw IllegalStateException("A nonce endpoint client is configured although issuer does not advertises a nonce endpoint")
+        if (nonceEndpointClient != null) {
+            check(nonceEndpoint != null) {
+                "A nonce endpoint client is configured although issuer does not advertises a nonce endpoint"
+            }
         }
     }
 
@@ -260,7 +265,7 @@ internal class RequestIssuanceImpl(
         val attestedKeys = keyAttestation.attestedKeys
         val jwk = attestedKeys.firstOrNull { jwk: JWK ->
             try {
-                val verifier = when (jwk) {
+                val verifier: JWSVerifier? = when (jwk) {
                     is RSAKey -> RSASSAVerifier(jwk)
                     is ECKey -> ECDSAVerifier(jwk)
                     else -> null

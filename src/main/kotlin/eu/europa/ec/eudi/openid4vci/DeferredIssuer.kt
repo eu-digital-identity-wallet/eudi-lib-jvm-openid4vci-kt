@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.JWK
-import eu.europa.ec.eudi.openid4vci.DeferredIssuer.Companion.make
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessToken
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient

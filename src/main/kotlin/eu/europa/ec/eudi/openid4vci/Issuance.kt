@@ -148,7 +148,7 @@ sealed interface ProofsSpecification {
 /**
  * An interface for submitting a credential issuance request.
  */
-interface RequestIssuance {
+fun interface RequestIssuance {
 
     /**
      * Places a request to the credential issuance endpoint.

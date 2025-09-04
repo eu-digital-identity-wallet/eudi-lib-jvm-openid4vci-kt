@@ -24,7 +24,6 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.JWTID
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.client.request.*
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
@@ -51,7 +50,7 @@ internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder
 
     private fun Client.Attested.popJwtHeader(): JWSHeader =
         JWSHeader.Builder(popJwtSpec.signingAlgorithm).apply {
-            popJwtSpec.typ?.let { type(JOSEObjectType(it)) }
+            type(JOSEObjectType(popJwtSpec.typ))
         }.build()
 
     private fun Client.Attested.popJwtClaimSet(authServerId: URL, now: Instant): JWTClaimsSet {
