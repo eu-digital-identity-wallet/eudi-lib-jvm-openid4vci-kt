@@ -262,14 +262,17 @@ private fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(request: H
     }
 }
 
-fun MockRequestHandleScope.respondToIssuanceRequestWithDeferredResponseDataBuilder(request: HttpRequestData?): HttpResponseData {
+fun MockRequestHandleScope.respondToIssuanceRequestWithDeferredResponseDataBuilder(
+    request: HttpRequestData?,
+    transactionId: TransactionId? = null,
+): HttpResponseData {
     val textContent = request?.body as TextContent
     val issuanceRequest = Json.decodeFromString<CredentialRequestTO>(textContent.text)
     return if (issuanceRequest.proofs != null) {
         respond(
             content = """
                     {                      
-                      "transaction_id": "1234565768122",
+                      "transaction_id": "${transactionId?.value ?: UUID.randomUUID().toString()}",
                       "interval": 12345
                     }
             """.trimIndent(),
@@ -295,6 +298,7 @@ fun MockRequestHandleScope.respondToIssuanceRequestWithDeferredResponseDataBuild
 
 fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(
     credentialIsReady: Boolean,
+    transactionId: TransactionId? = null,
     transactionIdIsValid: Boolean = true,
 ): HttpResponseData =
     if (transactionIdIsValid) {
@@ -313,7 +317,8 @@ fun MockRequestHandleScope.defaultIssuanceResponseDataBuilder(
         } else {
             respond(
                 content = """
-                        {                     
+                        {
+                          "transaction_id": "${transactionId?.value ?: UUID.randomUUID().toString()}",
                           "interval": 12345
                         }
                 """.trimIndent(),
