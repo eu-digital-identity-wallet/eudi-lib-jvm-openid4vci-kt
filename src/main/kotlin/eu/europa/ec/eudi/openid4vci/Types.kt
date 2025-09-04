@@ -160,6 +160,10 @@ value class AuthorizationCode(val code: String) {
     override fun toString(): String = code
 }
 
+private fun String.ensureNotEmpty() {
+    require(isNotEmpty()) { "Value cannot be empty" }
+}
+
 /**
  * A c_nonce as provided from issuance server's nonce endpoint.
  *
@@ -168,7 +172,7 @@ value class AuthorizationCode(val code: String) {
 @JvmInline
 value class CNonce(val value: String) : java.io.Serializable {
     init {
-        require(value.isNotEmpty()) { "Value cannot be empty" }
+        value.ensureNotEmpty()
     }
     override fun toString(): String = value
 }
@@ -181,7 +185,7 @@ value class CNonce(val value: String) : java.io.Serializable {
 @JvmInline
 value class TransactionId(val value: String) {
     init {
-        require(value.isNotEmpty()) { "Value cannot be empty" }
+        value.ensureNotEmpty()
     }
     override fun toString(): String = value
 }
@@ -194,7 +198,7 @@ value class TransactionId(val value: String) {
 @JvmInline
 value class NotificationId(val value: String) {
     init {
-        require(value.isNotEmpty()) { "Value cannot be empty" }
+        value.ensureNotEmpty()
     }
     override fun toString(): String = value
 }

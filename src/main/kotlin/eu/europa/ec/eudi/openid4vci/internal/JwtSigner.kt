@@ -73,16 +73,13 @@ internal fun interface JwtBatchSigner<in Claims, out PUB> {
             batchSignOperation: BatchSignOperation<PUB>,
             algorithm: JWSAlgorithm,
             customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-        ): JwtBatchSigner<Claims, PUB> =
-            object : JwtBatchSigner<Claims, PUB> {
-
-                override suspend fun sign(claims: Claims): List<Pair<PUB, String>> =
-                    batchSignOperation.operations.map { signOperation ->
-                        val jwtSigner = JwtSigner(serializer, signOperation, algorithm, customizeHeader)
-                        val jwt = jwtSigner.sign(claims)
-                        jwtSigner.publicMaterial to jwt
-                    }
+        ): JwtBatchSigner<Claims, PUB> = JwtBatchSigner { claims ->
+            batchSignOperation.operations.map { signOperation ->
+                val jwtSigner = JwtSigner(serializer, signOperation, algorithm, customizeHeader)
+                val jwt = jwtSigner.sign(claims)
+                jwtSigner.publicMaterial to jwt
             }
+        }
 
         inline operator fun <reified Claims, PUB> invoke(
             batchSignOperation: BatchSignOperation<PUB>,
