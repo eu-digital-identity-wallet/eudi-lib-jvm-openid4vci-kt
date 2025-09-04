@@ -17,7 +17,7 @@ package eu.europa.ec.eudi.openid4vci.examples
 
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.proofsSpecForEcKeys
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.noKeyAttestationJwtProofsSpec
 import io.ktor.client.*
 import kotlinx.coroutines.runBlocking
 
@@ -94,7 +94,7 @@ private suspend fun Issuer.submitCredentialRequest(
     issuanceLog("Requesting issuance of '$credentialConfigurationId'")
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
     val (newAuthorized, outcome) =
-        authorizedRequest.request(requestPayload, proofsSpecForEcKeys(Curve.P_256)).getOrThrow()
+        authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
 
     return when (outcome) {
         is SubmissionOutcome.Success -> newAuthorized to outcome.credentials
