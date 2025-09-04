@@ -24,13 +24,25 @@ internal fun responseEncryptionSpec(
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
 ): Result<IssuanceResponseEncryptionSpec?> = runCatching {
     fun IssuanceResponseEncryptionSpec.validate(
-        supportedAlgorithmsAndMethods: SupportedResponseEncryptionParameters,
+        supportedResponseEncryptionParameters: SupportedResponseEncryptionParameters,
     ) {
-        ensure(algorithm in supportedAlgorithmsAndMethods.algorithms) {
+        val algorithm = algorithm
+        requireNotNull(algorithm) {
+            ResponseEncryptionKeyDoesNotSpecifyAlgorithm()
+        }
+        ensure(algorithm in supportedResponseEncryptionParameters.algorithms) {
             ResponseEncryptionAlgorithmNotSupportedByIssuer()
         }
-        ensure(encryptionMethod in supportedAlgorithmsAndMethods.encryptionMethods) {
+        ensure(encryptionMethod in supportedResponseEncryptionParameters.encryptionMethods) {
             ResponseEncryptionMethodNotSupportedByIssuer()
+        }
+        compressionAlgorithm?.let {
+            ensure(supportedResponseEncryptionParameters.payloadCompression is PayloadCompression.Supported) {
+                IssuerDoesNotSupportEncryptedPayloadCompression()
+            }
+            ensure(it in supportedResponseEncryptionParameters.payloadCompression.algorithms) {
+                IssuerDoesNotSupportEncryptedPayloadCompressionAlgorithm()
+            }
         }
     }
 
@@ -47,12 +59,13 @@ internal fun responseEncryptionSpec(
             // Issuance server supports but does not require Credential Response encryption.
             // Fail in case Wallet requires Credential Response encryption but no crypto material can be generated,
             // or in case algorithm/method supported by Wallet is not supported by issuance server.
-            val supportedAlgorithmsAndMethods = encryption.encryptionParameters
+            val supportedResponseEncryptionParameters = encryption.encryptionParameters
             val maybeSpec = runCatching {
-                responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)
-                    ?.apply {
-                        validate(supportedAlgorithmsAndMethods)
-                    }
+                responseEncryptionSpecFactory(
+                    supportedResponseEncryptionParameters,
+                    config.keyGenerationConfig,
+                    config.supportedCompressionAlgorithms,
+                )?.apply { validate(supportedResponseEncryptionParameters) }
             }.getOrNull()
 
             when (config.credentialResponseEncryptionPolicy) {
@@ -70,9 +83,12 @@ internal fun responseEncryptionSpec(
             // Issuance server requires Credential Response encryption.
             // Fail in case Wallet does not support Credential Response encryption or,
             // algorithms/methods supported by Wallet are not supported by issuance server.
-            val supportedAlgorithmsAndMethods = encryption.encryptionParameters
-            val maybeSpec = responseEncryptionSpecFactory(supportedAlgorithmsAndMethods, config.keyGenerationConfig)
-                ?.apply { validate(supportedAlgorithmsAndMethods) }
+            val supportedResponseEncryptionParameters = encryption.encryptionParameters
+            val maybeSpec = responseEncryptionSpecFactory(
+                supportedResponseEncryptionParameters,
+                config.keyGenerationConfig,
+                config.supportedCompressionAlgorithms,
+            )?.apply { validate(supportedResponseEncryptionParameters) }
             ensureNotNull(maybeSpec) { IssuerExpectsResponseEncryptionCryptoMaterialButNotProvided() }
         }
     }

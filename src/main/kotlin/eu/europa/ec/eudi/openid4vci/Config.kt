@@ -15,9 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
+import eu.europa.ec.eudi.openid4vci.ParUsage.*
 import java.net.URI
 import java.time.Clock
 
@@ -72,6 +74,7 @@ data class OpenId4VCIConfig(
     val client: Client,
     val authFlowRedirectionURI: URI,
     val keyGenerationConfig: KeyGenerationConfig,
+    val supportedCompressionAlgorithms: List<CompressionAlgorithm>? = emptyList(),
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPSigner: Signer<JWK>? = null,
@@ -85,6 +88,7 @@ data class OpenId4VCIConfig(
         clientId: ClientId,
         authFlowRedirectionURI: URI,
         keyGenerationConfig: KeyGenerationConfig,
+        supportedCompressionAlgorithms: List<CompressionAlgorithm>? = null,
         credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         dPoPSigner: Signer<JWK>? = null,
@@ -96,6 +100,7 @@ data class OpenId4VCIConfig(
         Client.Public(clientId),
         authFlowRedirectionURI,
         keyGenerationConfig,
+        supportedCompressionAlgorithms,
         credentialResponseEncryptionPolicy,
         authorizeIssuanceConfig,
         dPoPSigner,

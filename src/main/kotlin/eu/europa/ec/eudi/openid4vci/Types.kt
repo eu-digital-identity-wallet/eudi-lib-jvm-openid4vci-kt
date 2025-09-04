@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.JWK
@@ -240,21 +241,31 @@ sealed interface JwtBindingKey {
 
 data class IssuanceResponseEncryptionSpec(
     val jwk: JWK,
-    val algorithm: JWEAlgorithm,
     val encryptionMethod: EncryptionMethod,
+    val compressionAlgorithm: CompressionAlgorithm? = null,
 ) : java.io.Serializable {
+
+    val algorithm: JWEAlgorithm get() = jwk.algorithm as JWEAlgorithm
+
     init {
+        // Validate key is for encryption operation
+        val keyUse: KeyUse? = jwk.keyUse
+        if (keyUse != null) {
+            require(keyUse == KeyUse.ENCRYPTION) {
+                "Provided key use is not encryption"
+            }
+        }
+        val keyAlgorithm = jwk.algorithm
+        requireNotNull(keyAlgorithm) {
+            "Provided key does not contain an algorithm"
+        }
         // Validate algorithm provided is for asymmetric encryption
-        require(JWEAlgorithm.Family.ASYMMETRIC.contains(algorithm)) {
+        require(JWEAlgorithm.Family.ASYMMETRIC.contains(keyAlgorithm)) {
             "Provided encryption algorithm is not an asymmetric encryption algorithm"
         }
         // Validate algorithm matches key
-        require(jwk.keyType == KeyType.forAlgorithm(algorithm)) {
+        require(jwk.keyType == KeyType.forAlgorithm(keyAlgorithm)) {
             "Encryption key and encryption algorithm do not match"
-        }
-        // Validate key is for encryption operation
-        require(jwk.keyUse == KeyUse.ENCRYPTION) {
-            "Provided key use is not encryption"
         }
     }
 }

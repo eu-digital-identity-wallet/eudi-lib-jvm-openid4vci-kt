@@ -15,8 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
+import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.JWK
@@ -250,15 +250,17 @@ data class DeferredIssuanceStoredContextTO(
                     require(element is JsonObject)
                     JWK.parse(element.toString())
                 },
-                algorithm = run {
-                    val element = specTO["algorithm"]
-                    require(element is JsonPrimitive)
-                    JWEAlgorithm.parse(requireNotNull(element.contentOrNull))
-                },
                 encryptionMethod = run {
                     val element = specTO["encryption_method"]
                     require(element is JsonPrimitive)
                     EncryptionMethod.parse(requireNotNull(element.contentOrNull))
+                },
+                compressionAlgorithm = run {
+                    val element = specTO["zip"]
+                    element?.let {
+                        require(it is JsonPrimitive)
+                        CompressionAlgorithm(requireNotNull(it.contentOrNull))
+                    }
                 },
             )
     }

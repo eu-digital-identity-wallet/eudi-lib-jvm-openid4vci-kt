@@ -235,7 +235,6 @@ interface Issuer :
                             tokenEndpoint = tokenEndpoint,
                             dPoPSigner = dPoPJwtFactory?.signer,
                             clientAttestationPoPBuilder = config.clientAttestationPoPBuilder,
-                            responseEncryptionSpec = responseEncryptionSpec,
                             clock = config.clock,
                         ),
                         AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
@@ -312,11 +311,17 @@ interface Issuer :
         }
 
         val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =
-            { supportedAlgorithmsAndMethods, keyGenerationConfig ->
-                val method = supportedAlgorithmsAndMethods.encryptionMethods[0]
-                supportedAlgorithmsAndMethods.algorithms.firstNotNullOfOrNull { alg ->
-                    KeyGenerator.genKeyIfSupported(keyGenerationConfig, alg)?.let { jwk ->
-                        IssuanceResponseEncryptionSpec(jwk, alg, method)
+            { issuerSupportedResponseEncryptedParameters, walletKeyGenerationConfig, walletSupportedCompressionAlgorithms ->
+                val issuerSupportedPayloadCompression = issuerSupportedResponseEncryptedParameters.payloadCompression
+                val compressionAlg = when (issuerSupportedPayloadCompression) {
+                    PayloadCompression.NotSupported -> null
+                    is PayloadCompression.Supported ->
+                        walletSupportedCompressionAlgorithms?.intersect(issuerSupportedPayloadCompression.algorithms)?.firstOrNull()
+                }
+                val method = issuerSupportedResponseEncryptedParameters.encryptionMethods[0]
+                issuerSupportedResponseEncryptedParameters.algorithms.firstNotNullOfOrNull { alg ->
+                    KeyGenerator.genKeyIfSupported(walletKeyGenerationConfig, alg)?.let { jwk ->
+                        IssuanceResponseEncryptionSpec(jwk, method, compressionAlg)
                     }
                 }
             }
