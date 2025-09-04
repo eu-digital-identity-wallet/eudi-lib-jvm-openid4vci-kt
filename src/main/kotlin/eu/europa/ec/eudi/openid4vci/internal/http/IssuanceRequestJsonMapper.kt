@@ -231,16 +231,17 @@ internal data class DeferredRequestTO(
 
 @Serializable
 internal data class DeferredIssuanceSuccessResponseTO(
+    @SerialName("transaction_id") val transactionId: String? = null,
+    @SerialName("interval") val interval: Long? = null,
     @SerialName("credentials") val credentials: List<JsonObject>? = null,
     @SerialName("notification_id") val notificationId: String? = null,
-    @SerialName("interval") val interval: Long? = null,
 ) {
     fun toDomain(): DeferredCredentialQueryOutcome =
         when {
-            interval != null && notificationId == null && credentials == null -> {
-                DeferredCredentialQueryOutcome.IssuancePending(interval.toDuration(DurationUnit.SECONDS))
+            transactionId != null && interval != null && credentials == null && notificationId == null -> {
+                DeferredCredentialQueryOutcome.IssuancePending(TransactionId((transactionId)), interval.toDuration(DurationUnit.SECONDS))
             }
-            interval == null && !credentials.isNullOrEmpty() -> {
+            transactionId == null && interval == null && !credentials.isNullOrEmpty() -> {
                 val notificationId = notificationId?.let { NotificationId(it) }
                 val credentials = credentials.map { requireNotNull(it.issuedCredential()) }
                 DeferredCredentialQueryOutcome.Issued(credentials, notificationId)
@@ -248,8 +249,9 @@ internal data class DeferredIssuanceSuccessResponseTO(
             else -> {
                 throw ResponseUnparsable(
                     "Invalid deferred issuance response. " +
-                        "Either 'interval' or 'credentials' (potentially with 'notification_id') must be present," +
-                        " but not both. Interval: $interval, credentials: $credentials, notificationId: $notificationId",
+                        "Either 'transaction_id' and 'interval', or 'credentials' (potentially with 'notification_id') must be present," +
+                        " but not all. TransactionId: $transactionId, interval: $interval, credentials: $credentials, " +
+                        "notificationId: $notificationId",
                 )
             }
         }

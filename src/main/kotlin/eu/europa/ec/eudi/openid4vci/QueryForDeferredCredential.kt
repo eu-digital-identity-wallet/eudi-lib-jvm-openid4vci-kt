@@ -28,6 +28,7 @@ sealed interface DeferredCredentialQueryOutcome : java.io.Serializable {
     ) : DeferredCredentialQueryOutcome
 
     data class IssuancePending(
+        val transactionId: TransactionId,
         val interval: Duration,
     ) : DeferredCredentialQueryOutcome {
         init {

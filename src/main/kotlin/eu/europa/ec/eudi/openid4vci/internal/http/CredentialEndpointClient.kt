@@ -23,6 +23,7 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidResponseContentType
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.UnexpectedTransactionId
 import eu.europa.ec.eudi.openid4vci.internal.CredentialIssuanceRequest
 import eu.europa.ec.eudi.openid4vci.internal.SubmissionOutcomeInternal
 import eu.europa.ec.eudi.openid4vci.internal.ensure
@@ -160,6 +161,9 @@ internal class DeferredEndPointClient(
                     fromTransferObject = { it.toDomain() },
                     transferObjectFromJwtClaims = { DeferredIssuanceSuccessResponseTO.from(it) },
                 )
+            if (outcome is DeferredCredentialQueryOutcome.IssuancePending) {
+                outcome.ensureTransactionId(transactionId)
+            }
             val newResourceServerDpopNonce = response.dpopNonce()
             outcome to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
         } else {
@@ -218,5 +222,11 @@ private fun HttpResponse.ensureContentType(expectedContentType: ContentType) {
             expectedContentType = expectedContentType.toString(),
             invalidContentType = contentType().toString(),
         )
+    }
+}
+
+private fun DeferredCredentialQueryOutcome.IssuancePending.ensureTransactionId(expectedTransactionId: TransactionId) {
+    ensure(expectedTransactionId == transactionId) {
+        UnexpectedTransactionId(expected = expectedTransactionId, actual = transactionId)
     }
 }

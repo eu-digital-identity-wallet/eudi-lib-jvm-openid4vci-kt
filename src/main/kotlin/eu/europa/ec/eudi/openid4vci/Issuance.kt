@@ -239,6 +239,14 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     class InvalidTransactionId : CredentialIssuanceError("InvalidTransactionId")
 
     /**
+     * Unexpected Transaction Id returned by Issuance Server in the context of a Deferred Credential Request.
+     */
+    data class UnexpectedTransactionId(
+        val expected: TransactionId,
+        val actual: TransactionId,
+    ) : CredentialIssuanceError("UnexpectedTransactionId")
+
+    /**
      *  Requested Credential Configuration is unknown to issuance server
      */
     class UnknownCredentialConfiguration : CredentialIssuanceError("UnknownCredentialConfiguration")
