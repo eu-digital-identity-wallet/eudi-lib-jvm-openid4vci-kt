@@ -160,7 +160,7 @@ value class AuthorizationCode(val code: String) {
     override fun toString(): String = code
 }
 
-private fun String.ensureNotEmpty() {
+private fun String.requireNotEmpty() {
     require(isNotEmpty()) { "Value cannot be empty" }
 }
 
@@ -172,7 +172,7 @@ private fun String.ensureNotEmpty() {
 @JvmInline
 value class CNonce(val value: String) : java.io.Serializable {
     init {
-        value.ensureNotEmpty()
+        value.requireNotEmpty()
     }
     override fun toString(): String = value
 }
@@ -185,7 +185,7 @@ value class CNonce(val value: String) : java.io.Serializable {
 @JvmInline
 value class TransactionId(val value: String) {
     init {
-        value.ensureNotEmpty()
+        value.requireNotEmpty()
     }
     override fun toString(): String = value
 }
@@ -198,7 +198,7 @@ value class TransactionId(val value: String) {
 @JvmInline
 value class NotificationId(val value: String) {
     init {
-        value.ensureNotEmpty()
+        value.requireNotEmpty()
     }
     override fun toString(): String = value
 }
