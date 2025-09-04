@@ -160,10 +160,6 @@ value class AuthorizationCode(val code: String) {
     override fun toString(): String = code
 }
 
-private fun String.requireNotEmpty() {
-    require(isNotEmpty()) { "Value cannot be empty" }
-}
-
 /**
  * A c_nonce as provided from issuance server's nonce endpoint.
  *
@@ -340,4 +336,8 @@ sealed interface IssuerTrust {
     }
 
     data class ByCertificateChain(val certificateChainTrust: CertificateChainTrust) : IssuerTrust
+}
+
+private fun String.requireNotEmpty() {
+    require(isNotEmpty()) { "Value cannot be empty" }
 }
