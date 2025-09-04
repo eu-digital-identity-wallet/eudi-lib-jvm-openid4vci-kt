@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.ECKey
@@ -253,7 +254,6 @@ internal class RequestIssuanceImpl(
         )
     }
 
-    @Suppress("kotlin:S6619")
     private fun verifyKeyAttestationJwtProofSignature(jwtProof: SignedJWT) {
         val keyAttestationJwt = jwtProof.header.getCustomParam("key_attestation") as? String
             ?: throw IllegalArgumentException("Missing 'key_attestation' in JWT header")
@@ -261,7 +261,7 @@ internal class RequestIssuanceImpl(
         val attestedKeys = keyAttestation.attestedKeys
         val jwk = attestedKeys.firstOrNull { jwk: JWK ->
             try {
-                val verifier = when (jwk) {
+                val verifier: JWSVerifier? = when (jwk) {
                     is RSAKey -> RSASSAVerifier(jwk)
                     is ECKey -> ECDSAVerifier(jwk)
                     else -> null
