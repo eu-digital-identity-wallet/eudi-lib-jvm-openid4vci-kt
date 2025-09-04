@@ -39,11 +39,15 @@ internal class RequestIssuanceImpl(
 
     init {
         val nonceEndpoint = credentialOffer.credentialIssuerMetadata.nonceEndpoint
-        check(!(nonceEndpoint != null && nonceEndpointClient == null)) {
-            " A nonce endpoint client needs to be configured if issuer advertises a nonce endpoint"
+        if (nonceEndpoint != null) {
+            check(nonceEndpointClient != null) {
+                " A nonce endpoint client needs to be configured if issuer advertises a nonce endpoint"
+            }
         }
-        check(!(nonceEndpoint == null && nonceEndpointClient != null)) {
-            "A nonce endpoint client is configured although issuer does not advertises a nonce endpoint"
+        if (nonceEndpointClient != null) {
+            check(nonceEndpoint != null) {
+                "A nonce endpoint client is configured although issuer does not advertises a nonce endpoint"
+            }
         }
     }
 
