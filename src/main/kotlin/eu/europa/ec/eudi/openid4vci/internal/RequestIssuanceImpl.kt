@@ -27,6 +27,7 @@ import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.NonceEndpointClient
 import java.time.Instant
+import kotlin.time.Duration
 
 internal class RequestIssuanceImpl(
     private val credentialOffer: CredentialOffer,
@@ -325,7 +326,12 @@ internal sealed interface SubmissionOutcomeInternal {
 
     data class Deferred(
         val transactionId: TransactionId,
-    ) : SubmissionOutcomeInternal
+        val interval: Duration,
+    ) : SubmissionOutcomeInternal {
+        init {
+            require(interval.isPositive()) { "interval must be positive" }
+        }
+    }
 
     data class Failed(
         val error: CredentialIssuanceError,
@@ -334,7 +340,7 @@ internal sealed interface SubmissionOutcomeInternal {
     fun toPub(): SubmissionOutcome =
         when (this) {
             is Success -> SubmissionOutcome.Success(credentials, notificationId)
-            is Deferred -> SubmissionOutcome.Deferred(transactionId)
+            is Deferred -> SubmissionOutcome.Deferred(transactionId, interval)
             is Failed -> SubmissionOutcome.Failed(error)
         }
 }
