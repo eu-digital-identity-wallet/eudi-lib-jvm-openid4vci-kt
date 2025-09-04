@@ -57,10 +57,32 @@ sealed interface CredentialResponseEncryption : Serializable {
     ) : CredentialResponseEncryption
 }
 
+sealed interface PayloadCompression : Serializable {
+    data object NotSupported : PayloadCompression {
+        @Suppress("unused")
+        private fun readResolve(): Any = NotSupported
+    }
+
+    data class Supported(
+        val algorithms: List<CompressionAlgorithm>,
+    ) : PayloadCompression {
+        init {
+            require(algorithms.isNotEmpty()) { "Compression algorithms must be specified" }
+        }
+    }
+
+    companion object {
+        operator fun invoke(algorithms: List<CompressionAlgorithm>?) = when {
+            algorithms != null && algorithms.isNotEmpty() -> Supported(algorithms)
+            else -> NotSupported
+        }
+    }
+}
+
 data class SupportedResponseEncryptionParameters(
     val algorithms: List<JWEAlgorithm>,
     val encryptionMethods: List<EncryptionMethod>,
-    val compressionAlgorithms: List<CompressionAlgorithm>? = emptyList(),
+    val payloadCompression: PayloadCompression = PayloadCompression.NotSupported,
 ) {
     init {
         require(encryptionMethods.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
@@ -80,7 +102,7 @@ data class SupportedResponseEncryptionParameters(
 data class SupportedRequestEncryptionParameters(
     val encryptionKeys: JWKSet,
     val encryptionMethods: List<EncryptionMethod>,
-    val compressionAlgorithms: List<CompressionAlgorithm>? = emptyList(),
+    val payloadCompression: PayloadCompression = PayloadCompression.NotSupported,
 ) {
     init {
         require(encryptionMethods.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
