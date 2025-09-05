@@ -307,19 +307,19 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
             encryptionKeys = JWKSet.parse(
                 """
                     {
-                    "keys": [
+                      "keys": [
                         {
-                            "kty": "EC",
+                          "kty": "EC",
                           "use": "enc",
-                            "crv": "P-256",
+                          "crv": "P-256",
                           "alg": "ECDH-ES",
                           "kid": "encKey-0",
                           "x": "TmcsNF6JpWjP85wKfBXKybHaJNowtp6jCuToppDosdw",
                           "y": "egzDuJuSxyypCE0qUoo1oKOnslpaw1Om-flQ4knafas",
                           "iat": 1755352588
                         }
-                    ]
-                }
+                      ]
+                    }
                 """,
             ),
             encryptionMethods = listOf(EncryptionMethod.XC20P),
@@ -367,7 +367,30 @@ internal fun credentialIssuerSignedMetadata() = CredentialIssuerMetadata(
     CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/nonce").getOrThrow(),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/credentials/deferred").getOrThrow(),
     CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/notification").getOrThrow(),
-    CredentialRequestEncryption.NotSupported,
+    CredentialRequestEncryption.Required(
+        SupportedRequestEncryptionParameters(
+            encryptionKeys = JWKSet.parse(
+                """
+                    {
+                      "keys": [
+                        {
+                          "kty": "EC",
+                          "use": "enc",
+                          "crv": "P-256",
+                          "alg": "ECDH-ES",
+                          "kid": "encKey-0",
+                          "x": "TmcsNF6JpWjP85wKfBXKybHaJNowtp6jCuToppDosdw",
+                          "y": "egzDuJuSxyypCE0qUoo1oKOnslpaw1Om-flQ4knafas",
+                          "iat": 1755352588
+                        }
+                      ]
+                    }
+                """,
+            ),
+            encryptionMethods = listOf(EncryptionMethod.XC20P),
+            payloadCompression = PayloadCompression(listOf(CompressionAlgorithm.DEF)),
+        ),
+    ),
     CredentialResponseEncryption.Required(
         SupportedResponseEncryptionParameters(
             listOf(JWEAlgorithm.RSA_OAEP_256),

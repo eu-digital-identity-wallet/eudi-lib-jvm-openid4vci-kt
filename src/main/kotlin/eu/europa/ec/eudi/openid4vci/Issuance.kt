@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.CompressionAlgorithm
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration
 
@@ -176,7 +175,10 @@ interface RequestIssuance {
  * that the wallet expects in the response of its issuance request.
  */
 typealias ResponseEncryptionSpecFactory =
-    (SupportedResponseEncryptionParameters, KeyGenerationConfig, List<CompressionAlgorithm>?) -> IssuanceResponseEncryptionSpec?
+    (SupportedResponseEncryptionParameters, EncryptionSupportConfig) -> EncryptionSpec?
+
+typealias RequestEncryptionSpecFactory =
+    (SupportedRequestEncryptionParameters, EncryptionSupportConfig) -> EncryptionSpec?
 
 /**
  * Errors that can happen in the process of issuance process
@@ -321,6 +323,30 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     }
 
     /**
+     * Sealed hierarchy of errors related to validation of request encryption parameters.
+     */
+    sealed class RequestEncryptionError(message: String) : CredentialIssuanceError(message) {
+
+        /**
+         * Request encryption JWK is not of the ones advertised by issuer.
+         */
+        class RequestEncryptionKeyNotAnIssuerKey :
+            RequestEncryptionError("RequestEncryptionKeyNotAnIssuerKey")
+
+        /**
+         * Request encryption method specified is not supported from issuance server.
+         */
+        class RequestEncryptionMethodNotSupportedByIssuer :
+            RequestEncryptionError("RequestEncryptionMethodNotSupportedByIssuer")
+
+        /**
+         * Issuer enforces encrypted requests but request encryption parameters cannot be formulated.
+         */
+        class IssuerRequiresEncryptedRequestButEncryptionSpecCannotBeFormulated :
+            RequestEncryptionError("IssuerRequiresEncryptedRequestButEncryptionSpecCannotBeFormulated")
+    }
+
+    /**
      * Sealed hierarchy of errors related to validation of encryption parameters passed along with the issuance request.
      */
     sealed class ResponseEncryptionError(message: String) : CredentialIssuanceError(message) {
@@ -368,10 +394,16 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
             ResponseEncryptionError("IssuerDoesNotSupportEncryptedPayloadCompression")
 
         /**
-         * Issuer does not support ecrypted payload compression
+         * Issuer does not support ecrypted payload compression.
          */
         class IssuerDoesNotSupportEncryptedPayloadCompressionAlgorithm :
             ResponseEncryptionError("IssuerDoesNotSupportEncryptedPayloadCompressionAlgorithm")
+
+        /**
+         * Response encryption specification is available but no request specification could be created.
+         */
+        class MissingRequiredRequestEncryptionSpecification :
+            ResponseEncryptionError("MissingRequiredRequestEncryptionSpecification")
     }
 
     /**

@@ -23,21 +23,21 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import eu.europa.ec.eudi.openid4vci.EcConfig
-import eu.europa.ec.eudi.openid4vci.KeyGenerationConfig
+import eu.europa.ec.eudi.openid4vci.EncryptionSupportConfig
 import eu.europa.ec.eudi.openid4vci.RsaConfig
 import java.util.*
 
 internal object KeyGenerator {
 
-    fun genKeyIfSupported(keyGenerationConfig: KeyGenerationConfig, alg: JWEAlgorithm): JWK? {
+    fun genKeyIfSupported(encryptionSupportConfig: EncryptionSupportConfig, alg: JWEAlgorithm): JWK? {
         return when (alg) {
             in JWEAlgorithm.Family.ECDH_ES ->
-                keyGenerationConfig.ecConfig?.takeIf { alg in it.supportedJWEAlgorithms }?.let {
+                encryptionSupportConfig.ecConfig?.takeIf { alg in it.supportedJWEAlgorithms }?.let {
                     randomECEncryptionKey(it, alg)
                 }
 
             in JWEAlgorithm.Family.RSA ->
-                keyGenerationConfig.rsaConfig?.takeIf { alg in it.supportedJWEAlgorithms }?.let {
+                encryptionSupportConfig.rsaConfig?.takeIf { alg in it.supportedJWEAlgorithms }?.let {
                     randomRSAEncryptionKey(it, alg)
                 }
 

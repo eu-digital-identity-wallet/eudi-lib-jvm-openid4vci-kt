@@ -20,8 +20,7 @@ import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired
-import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
 import eu.europa.ec.eudi.openid4vci.internal.wellKnown
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -277,6 +276,47 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             assertFailsWith<InvalidCredentialIssuerId> {
                 resolver.resolve(credentialIssuerId, policy).getOrThrow()
             }
+        }
+
+    @Test
+    internal fun `resolution fails when response encryption params included but no request encryption params included`() =
+        runTest {
+            val credentialIssuerId = SampleIssuer.Id
+
+            val resolver = resolver(
+                credentialIssuerMetaDataHandler(
+                    credentialIssuerId,
+                    "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_no_request_encryption.json",
+                ),
+            )
+
+            val policy = IssuerMetadataPolicy.IgnoreSigned
+
+            assertFailsWith<CredentialRequestEncryptionMustExistIfCredentialResponseEncryptionExists> {
+                resolver.resolve(credentialIssuerId, policy).getOrThrow()
+            }
+        }
+
+    @Test
+    internal fun `resolution succeeds when no response encryption params included but request encryption params included`() =
+        runTest {
+            val credentialIssuerId = SampleIssuer.Id
+
+            val resolver = resolver(
+                credentialIssuerMetaDataHandler(
+                    credentialIssuerId,
+                    "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_no_response_encryption.json",
+                ),
+            )
+
+            val policy = IssuerMetadataPolicy.IgnoreSigned
+
+            val issuerMetadata = credentialIssuerMetadata().copy(
+                credentialResponseEncryption = CredentialResponseEncryption.NotSupported,
+            )
+
+            val metadata = assertDoesNotThrow { resolver.resolve(credentialIssuerId, policy).getOrThrow() }
+            assertEquals(issuerMetadata, metadata)
         }
 
     @Test
