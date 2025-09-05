@@ -16,7 +16,10 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.CompressionAlgorithm
+import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.crypto.ECDHEncrypter
+import com.nimbusds.jose.crypto.RSAEncrypter
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.ParUsage.*
@@ -152,7 +155,12 @@ data class EncryptionSupportConfig(
     val supportedEncryptionAlgorithms: List<JWEAlgorithm> get() = buildList {
         ecConfig?.supportedJWEAlgorithms?.let { addAll(it) }
         rsaConfig?.supportedJWEAlgorithms?.let { addAll(it) }
-    }
+    }.distinctBy { it.name }
+
+    val supportedEncryptionMethods: List<EncryptionMethod> get() = buildList {
+        ecConfig?.supportedEncryptionMethods?.let { addAll(it) }
+        rsaConfig?.supportedEncryptionMethods?.let { addAll(it) }
+    }.distinctBy { it.name }
 
     companion object {
         operator fun invoke(
@@ -169,22 +177,38 @@ data class EncryptionSupportConfig(
 
 data class RsaConfig(
     val rcaKeySize: Int,
-    val supportedJWEAlgorithms: List<JWEAlgorithm> = JWEAlgorithm.Family.RSA.toList(),
+    val supportedJWEAlgorithms: List<JWEAlgorithm> = RSAEncrypter.SUPPORTED_ALGORITHMS.toList(),
+    val supportedEncryptionMethods: List<EncryptionMethod> = RSAEncrypter.SUPPORTED_ENCRYPTION_METHODS.toList(),
 ) {
     init {
-        require(JWEAlgorithm.Family.RSA.containsAll(supportedJWEAlgorithms)) {
-            "Provided algorithms that are not part of RSA family"
+        require(supportedJWEAlgorithms.isNotEmpty()) { "At least one encryption algorithm must be provided" }
+        val unsupportedJWEAlgorithms = supportedJWEAlgorithms.filterNot { it in RSAEncrypter.SUPPORTED_ALGORITHMS }
+        require(unsupportedJWEAlgorithms.isEmpty()) {
+            "Unsupported encryption algorithms: ${unsupportedJWEAlgorithms.joinToString(", ") { it.name }}"
+        }
+        require(supportedEncryptionMethods.isNotEmpty()) { "At least one encryption method must be provided" }
+        val unsupportedEncryptionMethods = supportedEncryptionMethods.filterNot { it in RSAEncrypter.SUPPORTED_ENCRYPTION_METHODS }
+        require(unsupportedEncryptionMethods.isEmpty()) {
+            "Unsupported encryption methods: ${unsupportedEncryptionMethods.joinToString(", ") { it.name }}"
         }
     }
 }
 
 data class EcConfig(
     val ecKeyCurve: Curve,
-    val supportedJWEAlgorithms: List<JWEAlgorithm> = JWEAlgorithm.Family.ECDH_ES.toList(),
+    val supportedJWEAlgorithms: List<JWEAlgorithm> = ECDHEncrypter.SUPPORTED_ALGORITHMS.toList(),
+    val supportedEncryptionMethods: List<EncryptionMethod> = ECDHEncrypter.SUPPORTED_ENCRYPTION_METHODS.toList(),
 ) {
     init {
-        require(JWEAlgorithm.Family.ECDH_ES.containsAll(supportedJWEAlgorithms)) {
-            "Provided algorithms that are not part of ECDH_ES family"
+        require(supportedJWEAlgorithms.isNotEmpty()) { "At least one encryption algorithm must be provided" }
+        val unsupportedJWEAlgorithms = supportedJWEAlgorithms.filterNot { it in ECDHEncrypter.SUPPORTED_ALGORITHMS }
+        require(unsupportedJWEAlgorithms.isEmpty()) {
+            "Unsupported encryption algorithms: ${unsupportedJWEAlgorithms.joinToString(", ") { it.name }}"
+        }
+        require(supportedEncryptionMethods.isNotEmpty()) { "At least one encryption method must be provided" }
+        val unsupportedEncryptionMethods = supportedEncryptionMethods.filterNot { it in ECDHEncrypter.SUPPORTED_ENCRYPTION_METHODS }
+        require(unsupportedEncryptionMethods.isEmpty()) {
+            "Unsupported encryption methods: ${unsupportedEncryptionMethods.joinToString(", ") { it.name }}"
         }
     }
 }

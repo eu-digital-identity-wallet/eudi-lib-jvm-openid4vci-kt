@@ -15,7 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.crypto.ECDHEncrypter
+import com.nimbusds.jose.crypto.RSAEncrypter
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
@@ -29,20 +32,22 @@ import java.util.*
 
 internal object KeyGenerator {
 
-    fun genKeyIfSupported(encryptionSupportConfig: EncryptionSupportConfig, alg: JWEAlgorithm): JWK? {
-        return when (alg) {
-            in JWEAlgorithm.Family.ECDH_ES ->
-                encryptionSupportConfig.ecConfig?.takeIf { alg in it.supportedJWEAlgorithms }?.let {
-                    randomECEncryptionKey(it, alg)
-                }
+    fun genKeyIfSupported(
+        encryptionSupportConfig: EncryptionSupportConfig,
+        algorithm: JWEAlgorithm,
+        method: EncryptionMethod,
+    ): JWK? = when {
+        algorithm in ECDHEncrypter.SUPPORTED_ALGORITHMS && method in ECDHEncrypter.SUPPORTED_ENCRYPTION_METHODS ->
+            encryptionSupportConfig.ecConfig
+                ?.takeIf { algorithm in it.supportedJWEAlgorithms && method in it.supportedEncryptionMethods }
+                ?.let { randomECEncryptionKey(it, algorithm) }
 
-            in JWEAlgorithm.Family.RSA ->
-                encryptionSupportConfig.rsaConfig?.takeIf { alg in it.supportedJWEAlgorithms }?.let {
-                    randomRSAEncryptionKey(it, alg)
-                }
+        algorithm in RSAEncrypter.SUPPORTED_ALGORITHMS && method in RSAEncrypter.SUPPORTED_ENCRYPTION_METHODS ->
+            encryptionSupportConfig.rsaConfig
+                ?.takeIf { algorithm in it.supportedJWEAlgorithms && method in it.supportedEncryptionMethods }
+                ?.let { randomRSAEncryptionKey(it, algorithm) }
 
-            else -> null
-        }
+        else -> null
     }
 
     fun randomRSAEncryptionKey(rsaConfig: RsaConfig, alg: JWEAlgorithm): RSAKey = RSAKeyGenerator(rsaConfig.rcaKeySize)

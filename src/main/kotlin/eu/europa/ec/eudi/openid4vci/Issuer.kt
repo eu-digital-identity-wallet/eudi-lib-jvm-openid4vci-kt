@@ -322,10 +322,13 @@ interface Issuer :
                             issuerSupportedPayloadCompression.algorithms,
                         )?.firstOrNull()
                 }
-                val method = issuerSupportedResponseEncryptedParameters.encryptionMethods[0]
-                issuerSupportedResponseEncryptedParameters.algorithms.firstNotNullOfOrNull { alg ->
-                    KeyGenerator.genKeyIfSupported(walletEncryptionSupportConfig, alg)?.let { jwk ->
-                        EncryptionSpec(jwk, method, compressionAlg)
+
+                with(issuerSupportedResponseEncryptedParameters) {
+                    algorithms.firstNotNullOfOrNull { algorithm ->
+                        encryptionMethods.firstNotNullOfOrNull { method ->
+                            KeyGenerator.genKeyIfSupported(walletEncryptionSupportConfig, algorithm, method)
+                                ?.let { jwk -> EncryptionSpec(jwk, method, compressionAlg) }
+                        }
                     }
                 }
             }
@@ -339,14 +342,18 @@ interface Issuer :
                     is PayloadCompression.Supported ->
                         walletSupportedCompressionAlgs?.intersect(issuerSupportedPayloadCompression.algorithms)?.firstOrNull()
                 }
-                val method = issuerSupportedRequestEncryptionParameters.encryptionMethods[0]
-                val walletSupportedEncryptionAlgs = walletEncryptionSupportConfig.supportedEncryptionAlgorithms
-                issuerSupportedRequestEncryptionParameters.encryptionKeys.keys.firstNotNullOfOrNull { key ->
-                    val alg = key.algorithm
-                    if (walletSupportedEncryptionAlgs.contains(alg)) {
-                        EncryptionSpec(key, method, compressionAlg)
-                    } else
-                        null
+
+                val walletSupportedEncryptionAlgorithms = walletEncryptionSupportConfig.supportedEncryptionAlgorithms
+                val walletSupportedEncryptionMethods = walletEncryptionSupportConfig.supportedEncryptionMethods
+                with(issuerSupportedRequestEncryptionParameters) {
+                    encryptionKeys.keys.firstNotNullOfOrNull { key ->
+                        val algorithm = key.algorithm
+                        encryptionMethods.firstNotNullOfOrNull { method ->
+                            if (algorithm in walletSupportedEncryptionAlgorithms && method in walletSupportedEncryptionMethods) {
+                                EncryptionSpec(key, method, compressionAlg)
+                            } else null
+                        }
+                    }
                 }
             }
     }

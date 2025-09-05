@@ -85,7 +85,7 @@ data class SupportedResponseEncryptionParameters(
     val payloadCompression: PayloadCompression = PayloadCompression.NotSupported,
 ) {
     init {
-        require(encryptionMethods.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
+        require(encryptionMethods.isNotEmpty()) { "encryptionMethods cannot be empty" }
 
         if (algorithms.isEmpty()) {
             throw CredentialIssuerMetadataValidationError.CredentialResponseEncryptionAlgorithmsRequired()
@@ -105,7 +105,7 @@ data class SupportedRequestEncryptionParameters(
     val payloadCompression: PayloadCompression = PayloadCompression.NotSupported,
 ) {
     init {
-        require(encryptionMethods.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
+        require(encryptionMethods.isNotEmpty()) { "encryptionMethods cannot be empty" }
         if (encryptionKeys.isEmpty()) {
             throw CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysRequired()
         }
