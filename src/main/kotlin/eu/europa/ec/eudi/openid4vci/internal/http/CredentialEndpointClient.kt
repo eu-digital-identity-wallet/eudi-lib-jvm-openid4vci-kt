@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal.http
 
 import com.nimbusds.jose.JOSEObjectType
+import com.nimbusds.jose.JWEEncrypter
 import com.nimbusds.jose.JWEHeader
 import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.RSAEncrypter
@@ -234,13 +235,12 @@ private fun EncryptionSpec.encrypt(jwtClaimSet: JWTClaimsSet): String {
 }
 
 private fun EncryptedJWT.encrypt(jwk: JWK) {
-    val enc = when (jwk) {
+    val encrypter: JWEEncrypter = when (jwk) {
         is RSAKey -> RSAEncrypter(jwk)
         is ECKey -> ECDHEncrypter(jwk)
-        else -> null
+        else -> error("unsupported 'kty': '${jwk.keyType.value}'")
     }
-    enc?.let { encrypt(it) }
-        ?: error("unsupported 'kty': '${jwk.keyType.value}'")
+    encrypt(encrypter)
 }
 
 private suspend inline fun <reified ResponseTO, Response> responsePossiblyEncrypted(
