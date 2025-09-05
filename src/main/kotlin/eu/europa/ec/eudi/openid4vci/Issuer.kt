@@ -331,17 +331,17 @@ interface Issuer :
             }
 
         val DefaultRequestEncryptionSpecFactory: RequestEncryptionSpecFactory =
-            { supportedRequestEncryptionParameters, walletEncryptionSupportConfig ->
-                val supportedPayloadCompression = supportedRequestEncryptionParameters.payloadCompression
+            { issuerSupportedRequestEncryptionParameters, walletEncryptionSupportConfig ->
+                val issuerSupportedPayloadCompression = issuerSupportedRequestEncryptionParameters.payloadCompression
                 val walletSupportedCompressionAlgs = walletEncryptionSupportConfig.compressionAlgorithms
-                val compressionAlg = when (supportedPayloadCompression) {
+                val compressionAlg = when (issuerSupportedPayloadCompression) {
                     PayloadCompression.NotSupported -> null
                     is PayloadCompression.Supported ->
-                        walletSupportedCompressionAlgs?.intersect(supportedPayloadCompression.algorithms)?.firstOrNull()
+                        walletSupportedCompressionAlgs?.intersect(issuerSupportedPayloadCompression.algorithms)?.firstOrNull()
                 }
-                val method = supportedRequestEncryptionParameters.encryptionMethods[0]
+                val method = issuerSupportedRequestEncryptionParameters.encryptionMethods[0]
                 val walletSupportedEncryptionAlgs = walletEncryptionSupportConfig.supportedEncryptionAlgorithms
-                supportedRequestEncryptionParameters.encryptionKeys.keys.firstNotNullOfOrNull { key ->
+                issuerSupportedRequestEncryptionParameters.encryptionKeys.keys.firstNotNullOfOrNull { key ->
                     val alg = key.algorithm
                     if (walletSupportedEncryptionAlgs.contains(alg)) {
                         EncryptionSpec(key, method, compressionAlg)

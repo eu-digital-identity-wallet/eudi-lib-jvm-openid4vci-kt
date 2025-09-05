@@ -57,36 +57,36 @@ internal fun issuanceEncryptionSpecs(
  * the supported credential response encryption methods of the issuer, wallet's configuration,
  * and the required encryption parameters.
  *
- * @param supportedCredentialResponseEncryption The credential response encryption as declared by the issuer.
+ * @param issuerSupportedCredentialResponseEncryption The credential response encryption as declared by the issuer.
  * @param walletEncryptionSupportConfig The configuration object that provides wallet-specific details including encryption policies and rules.
  * @param responseEncryptionSpecFactory A factory function to generate encryption specifications based on supported parameters and wallet configuration.
  * @return A Result containing the generated EncryptionSpec if encryption is supported or required, or null if optional and no encryption is generated.
  */
 private fun responseEncryptionSpec(
-    supportedCredentialResponseEncryption: CredentialResponseEncryption,
+    issuerSupportedCredentialResponseEncryption: CredentialResponseEncryption,
     walletEncryptionSupportConfig: EncryptionSupportConfig,
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
 ): Result<EncryptionSpec?> = runCatching {
     fun EncryptionSpec.validate(
-        supportedResponseEncryptionParameters: SupportedResponseEncryptionParameters,
+        issuerSupportedResponseEncryptionParameters: SupportedResponseEncryptionParameters,
     ) {
-        ensure(algorithm in supportedResponseEncryptionParameters.algorithms) {
+        ensure(algorithm in issuerSupportedResponseEncryptionParameters.algorithms) {
             ResponseEncryptionAlgorithmNotSupportedByIssuer()
         }
-        ensure(encryptionMethod in supportedResponseEncryptionParameters.encryptionMethods) {
+        ensure(encryptionMethod in issuerSupportedResponseEncryptionParameters.encryptionMethods) {
             ResponseEncryptionMethodNotSupportedByIssuer()
         }
         compressionAlgorithm?.let {
-            ensure(supportedResponseEncryptionParameters.payloadCompression is PayloadCompression.Supported) {
+            ensure(issuerSupportedResponseEncryptionParameters.payloadCompression is PayloadCompression.Supported) {
                 IssuerDoesNotSupportEncryptedPayloadCompression()
             }
-            ensure(it in supportedResponseEncryptionParameters.payloadCompression.algorithms) {
+            ensure(it in issuerSupportedResponseEncryptionParameters.payloadCompression.algorithms) {
                 IssuerDoesNotSupportEncryptedPayloadCompressionAlgorithm()
             }
         }
     }
 
-    when (val encryption = supportedCredentialResponseEncryption) {
+    when (val encryption = issuerSupportedCredentialResponseEncryption) {
         CredentialResponseEncryption.NotSupported ->
             // Issuance server does not support Credential Response encryption.
             // In case Wallet requires Credential Response encryption, fail.
@@ -146,7 +146,7 @@ private fun responseEncryptionSpec(
  * If the issuer requires encryption and a valid specification cannot be formulated,
  * an exception is thrown.
  *
- * @param supportedCredentialRequestEncryption The supported credential request encryption
+ * @param issuerSupportedCredentialRequestEncryption The supported credential request encryption
  * configuration from the issuer indicating whether encryption is supported, required, or not supported.
  * @param walletEncryptionSupportConfig The OpenId4VCI configuration containing encryption-related settings and other configurations
  * for the credential issuance process.
@@ -156,51 +156,51 @@ private fun responseEncryptionSpec(
  * or required by the issuer.
  */
 private fun requestEncryptionSpec(
-    supportedCredentialRequestEncryption: CredentialRequestEncryption,
+    issuerSupportedCredentialRequestEncryption: CredentialRequestEncryption,
     walletEncryptionSupportConfig: EncryptionSupportConfig,
     requestEncryptionSpecFactory: RequestEncryptionSpecFactory,
 ): Result<EncryptionSpec?> = runCatching {
     fun EncryptionSpec.validate(
-        supportedRequestEncryptionParameters: SupportedRequestEncryptionParameters,
+        issuerSupportedRequestEncryptionParameters: SupportedRequestEncryptionParameters,
     ) {
-        ensure(jwk in supportedRequestEncryptionParameters.encryptionKeys.keys) {
+        ensure(jwk in issuerSupportedRequestEncryptionParameters.encryptionKeys.keys) {
             RequestEncryptionKeyNotAnIssuerKey()
         }
-        ensure(encryptionMethod in supportedRequestEncryptionParameters.encryptionMethods) {
+        ensure(encryptionMethod in issuerSupportedRequestEncryptionParameters.encryptionMethods) {
             RequestEncryptionMethodNotSupportedByIssuer()
         }
         compressionAlgorithm?.let {
-            ensure(supportedRequestEncryptionParameters.payloadCompression is PayloadCompression.Supported) {
+            ensure(issuerSupportedRequestEncryptionParameters.payloadCompression is PayloadCompression.Supported) {
                 IssuerDoesNotSupportEncryptedPayloadCompression()
             }
-            ensure(it in supportedRequestEncryptionParameters.payloadCompression.algorithms) {
+            ensure(it in issuerSupportedRequestEncryptionParameters.payloadCompression.algorithms) {
                 IssuerDoesNotSupportEncryptedPayloadCompressionAlgorithm()
             }
         }
     }
 
-    when (val encryption = supportedCredentialRequestEncryption) {
+    when (val encryption = issuerSupportedCredentialRequestEncryption) {
         CredentialRequestEncryption.NotSupported -> null
 
         is CredentialRequestEncryption.SupportedNotRequired -> {
-            val supportedRequestEncryptionParameters = encryption.encryptionParameters
+            val issuerSupportedRequestEncryptionParameters = encryption.encryptionParameters
             runCatching {
                 requestEncryptionSpecFactory(
-                    supportedRequestEncryptionParameters,
+                    issuerSupportedRequestEncryptionParameters,
                     walletEncryptionSupportConfig,
                 )?.apply {
-                    validate(supportedRequestEncryptionParameters)
+                    validate(issuerSupportedRequestEncryptionParameters)
                 }
             }.getOrNull()
         }
 
         is CredentialRequestEncryption.Required -> {
-            val supportedRequestEncryptionParameters = encryption.encryptionParameters
+            val issuerSupportedRequestEncryptionParameters = encryption.encryptionParameters
             val maybeSpec = requestEncryptionSpecFactory(
-                supportedRequestEncryptionParameters,
+                issuerSupportedRequestEncryptionParameters,
                 walletEncryptionSupportConfig,
             )?.apply {
-                validate(supportedRequestEncryptionParameters)
+                validate(issuerSupportedRequestEncryptionParameters)
             }
             ensureNotNull(maybeSpec) {
                 IssuerRequiresEncryptedRequestButEncryptionSpecCannotBeFormulated()
