@@ -70,9 +70,6 @@ private fun responseEncryptionSpec(
     fun EncryptionSpec.validate(
         supportedResponseEncryptionParameters: SupportedResponseEncryptionParameters,
     ) {
-        requireNotNull(algorithm) {
-            ResponseEncryptionKeyDoesNotSpecifyAlgorithm()
-        }
         ensure(algorithm in supportedResponseEncryptionParameters.algorithms) {
             ResponseEncryptionAlgorithmNotSupportedByIssuer()
         }
