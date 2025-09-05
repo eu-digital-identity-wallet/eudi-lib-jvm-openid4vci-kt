@@ -327,7 +327,7 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
         CredentialIssuerMetadataValidationError(IllegalArgumentException("Credentials Supported Required"))
 
     /**
-     * Supported Credentials are required.
+     * Credential Request Encryption must be supported by Issuer when Credential Response Encryption is supported.
      */
     class CredentialRequestEncryptionMustExistIfCredentialResponseEncryptionExists :
         CredentialIssuerMetadataValidationError(
