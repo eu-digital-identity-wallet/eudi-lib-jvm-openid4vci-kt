@@ -345,15 +345,12 @@ interface Issuer :
 
                 val walletSupportedEncryptionAlgorithms = walletEncryptionSupportConfig.supportedEncryptionAlgorithms
                 val walletSupportedEncryptionMethods = walletEncryptionSupportConfig.supportedEncryptionMethods
-                with(issuerSupportedRequestEncryptionParameters) {
-                    encryptionKeys.keys.firstNotNullOfOrNull { key ->
-                        val algorithm = key.algorithm
-                        encryptionMethods.firstNotNullOfOrNull { method ->
-                            if (algorithm in walletSupportedEncryptionAlgorithms && method in walletSupportedEncryptionMethods) {
-                                EncryptionSpec(key, method, compressionAlg)
-                            } else null
-                        }
-                    }
+                val encryptionMethod =
+                    issuerSupportedRequestEncryptionParameters.encryptionMethods.intersect(walletSupportedEncryptionMethods).firstOrNull()
+                encryptionMethod?.let { method ->
+                    issuerSupportedRequestEncryptionParameters.encryptionKeys.keys
+                        .filter { it.algorithm in walletSupportedEncryptionAlgorithms }
+                        .firstNotNullOfOrNull { key -> EncryptionSpec(key, method, compressionAlg) }
                 }
             }
     }
