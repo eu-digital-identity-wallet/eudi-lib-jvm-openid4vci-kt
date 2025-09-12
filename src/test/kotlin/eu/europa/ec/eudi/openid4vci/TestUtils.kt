@@ -18,8 +18,9 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.ecSigner
+import eu.europa.ec.eudi.openid4vci.Issuer.Companion.DefaultRequestEncryptionSpecFactory
 import eu.europa.ec.eudi.openid4vci.Issuer.Companion.DefaultResponseEncryptionSpecFactory
-import io.ktor.client.HttpClient
+import io.ktor.client.*
 import java.net.URI
 import java.util.*
 
@@ -88,15 +89,13 @@ val CredentialOfferMixedDocTypes_AUTH_GRANT = """
 val OpenId4VCIConfiguration = OpenId4VCIConfig(
     client = Client.Public("MyWallet_ClientId"),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-    keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+    encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
 )
 
 val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
     client = Client.Public("MyWallet_ClientId"),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-    keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
-    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+    encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
     dPoPSigner = ecSigner(
         curve = Curve.P_256,
         alg = JWSAlgorithm.ES256,
@@ -107,6 +106,7 @@ suspend fun authorizeRequestForCredentialOffer(
     config: OpenId4VCIConfig? = OpenId4VCIConfiguration,
     credentialOfferStr: String,
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+    requestEncryptionSpecFactory: RequestEncryptionSpecFactory = DefaultRequestEncryptionSpecFactory,
     httpClient: HttpClient,
 ): Pair<AuthorizedRequest, Issuer> {
     val issuer = Issuer.make(
@@ -114,6 +114,7 @@ suspend fun authorizeRequestForCredentialOffer(
         credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
         httpClient = httpClient,
         responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+        requestEncryptionSpecFactory = requestEncryptionSpecFactory,
     ).getOrThrow()
 
     val authorizedRequest =

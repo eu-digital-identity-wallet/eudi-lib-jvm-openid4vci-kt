@@ -16,7 +16,11 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.CompressionAlgorithm
+import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.crypto.ECDHEncrypter
+import com.nimbusds.jose.crypto.RSAEncrypter
+import com.nimbusds.jose.crypto.impl.ContentCryptoProvider
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.ParUsage.*
@@ -59,8 +63,7 @@ sealed interface Client : java.io.Serializable {
  *
  * @param client the OAUTH2 client kind of the wallet
  * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
- * @param keyGenerationConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
- * @param credentialResponseEncryptionPolicy Wallet's policy for Credential Response encryption
+ * @param encryptionSupportConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
  * @param authorizeIssuanceConfig Instruction on how to assemble the authorization request. If scopes are supported
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
@@ -73,9 +76,7 @@ sealed interface Client : java.io.Serializable {
 data class OpenId4VCIConfig(
     val client: Client,
     val authFlowRedirectionURI: URI,
-    val keyGenerationConfig: KeyGenerationConfig,
-    val supportedCompressionAlgorithms: List<CompressionAlgorithm>? = emptyList(),
-    val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+    val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPSigner: Signer<JWK>? = null,
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
@@ -87,9 +88,7 @@ data class OpenId4VCIConfig(
     constructor(
         clientId: ClientId,
         authFlowRedirectionURI: URI,
-        keyGenerationConfig: KeyGenerationConfig,
-        supportedCompressionAlgorithms: List<CompressionAlgorithm>? = null,
-        credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+        encryptionSupportConfig: EncryptionSupportConfig,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         dPoPSigner: Signer<JWK>? = null,
         clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
@@ -99,9 +98,7 @@ data class OpenId4VCIConfig(
     ) : this(
         Client.Public(clientId),
         authFlowRedirectionURI,
-        keyGenerationConfig,
-        supportedCompressionAlgorithms,
-        credentialResponseEncryptionPolicy,
+        encryptionSupportConfig,
         authorizeIssuanceConfig,
         dPoPSigner,
         clientAttestationPoPBuilder,
@@ -149,41 +146,70 @@ enum class CredentialResponseEncryptionPolicy {
     SUPPORTED,
 }
 
-data class KeyGenerationConfig(
+data class EncryptionSupportConfig(
+    val compressionAlgorithms: List<CompressionAlgorithm>? = listOf(CompressionAlgorithm.DEF),
+    val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val ecConfig: EcConfig?,
     val rsaConfig: RsaConfig?,
+    val supportedEncryptionMethods: List<EncryptionMethod> = ContentCryptoProvider.SUPPORTED_ENCRYPTION_METHODS.toList(),
 ) {
+    init {
+        require(supportedEncryptionMethods.isNotEmpty()) { "At least one encryption method must be provided" }
+        val unsupportedEncryptionMethods = supportedEncryptionMethods.filterNot { it in ContentCryptoProvider.SUPPORTED_ENCRYPTION_METHODS }
+        require(unsupportedEncryptionMethods.isEmpty()) {
+            "Unsupported encryption methods: ${unsupportedEncryptionMethods.joinToString(", ") { it.name }}"
+        }
+        require(supportedEncryptionMethods.distinctBy { it.name }.size == supportedEncryptionMethods.size) {
+            "supportedEncryptionMethods contains duplicate values"
+        }
+    }
+
+    val supportedEncryptionAlgorithms: List<JWEAlgorithm> get() = buildList {
+        ecConfig?.supportedJWEAlgorithms?.let { addAll(it) }
+        rsaConfig?.supportedJWEAlgorithms?.let { addAll(it) }
+    }
+
     companion object {
         operator fun invoke(
             ecKeyCurve: Curve,
             rcaKeySize: Int,
-        ): KeyGenerationConfig = KeyGenerationConfig(EcConfig(ecKeyCurve), RsaConfig(rcaKeySize))
-
-        fun ecOnly(
-            ecKeyCurve: Curve,
-            supportedJWEAlgorithms: List<JWEAlgorithm> = JWEAlgorithm.Family.ECDH_ES.toList(),
-        ): KeyGenerationConfig = KeyGenerationConfig(EcConfig(ecKeyCurve, supportedJWEAlgorithms), null)
+            credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+        ): EncryptionSupportConfig = EncryptionSupportConfig(
+            ecConfig = EcConfig(ecKeyCurve),
+            rsaConfig = RsaConfig(rcaKeySize),
+            credentialResponseEncryptionPolicy = credentialResponseEncryptionPolicy,
+        )
     }
 }
 
 data class RsaConfig(
     val rcaKeySize: Int,
-    val supportedJWEAlgorithms: List<JWEAlgorithm> = JWEAlgorithm.Family.RSA.toList(),
+    val supportedJWEAlgorithms: List<JWEAlgorithm> = RSAEncrypter.SUPPORTED_ALGORITHMS.toList(),
 ) {
     init {
-        require(JWEAlgorithm.Family.RSA.containsAll(supportedJWEAlgorithms)) {
-            "Provided algorithms that are not part of RSA family"
+        require(supportedJWEAlgorithms.isNotEmpty()) { "At least one encryption algorithm must be provided" }
+        val unsupportedJWEAlgorithms = supportedJWEAlgorithms.filterNot { it in RSAEncrypter.SUPPORTED_ALGORITHMS }
+        require(unsupportedJWEAlgorithms.isEmpty()) {
+            "Unsupported encryption algorithms: ${unsupportedJWEAlgorithms.joinToString(", ") { it.name }}"
+        }
+        require(supportedJWEAlgorithms.distinctBy { it.name }.size == supportedJWEAlgorithms.size) {
+            "supportedJWEAlgorithms contains duplicate values"
         }
     }
 }
 
 data class EcConfig(
     val ecKeyCurve: Curve,
-    val supportedJWEAlgorithms: List<JWEAlgorithm> = JWEAlgorithm.Family.ECDH_ES.toList(),
+    val supportedJWEAlgorithms: List<JWEAlgorithm> = ECDHEncrypter.SUPPORTED_ALGORITHMS.toList(),
 ) {
     init {
-        require(JWEAlgorithm.Family.ECDH_ES.containsAll(supportedJWEAlgorithms)) {
-            "Provided algorithms that are not part of ECDH_ES family"
+        require(supportedJWEAlgorithms.isNotEmpty()) { "At least one encryption algorithm must be provided" }
+        val unsupportedJWEAlgorithms = supportedJWEAlgorithms.filterNot { it in ECDHEncrypter.SUPPORTED_ALGORITHMS }
+        require(unsupportedJWEAlgorithms.isEmpty()) {
+            "Unsupported encryption algorithms: ${unsupportedJWEAlgorithms.joinToString(", ") { it.name }}"
+        }
+        require(supportedJWEAlgorithms.distinctBy { it.name }.size == supportedJWEAlgorithms.size) {
+            "supportedJWEAlgorithms contains duplicate values"
         }
     }
 }

@@ -701,6 +701,13 @@ private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuer
     val credentialRequestEncryption = credentialRequestEncryption.toDomain()
     val credentialResponseEncryption = credentialResponseEncryption.toDomain()
 
+    // If issuer supports or requires credential response encryption then it must advertise its request encryption capabilities
+    if (credentialResponseEncryption !is CredentialResponseEncryption.NotSupported) {
+        ensure(credentialRequestEncryption !is CredentialRequestEncryption.NotSupported) {
+            CredentialIssuerMetadataValidationError.CredentialRequestEncryptionMustExistIfCredentialResponseEncryptionExists()
+        }
+    }
+
     return CredentialIssuerMetadata(
         credentialIssuerIdentifier,
         authorizationServers,
