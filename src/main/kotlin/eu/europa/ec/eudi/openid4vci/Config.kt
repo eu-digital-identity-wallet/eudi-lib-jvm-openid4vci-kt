@@ -155,7 +155,7 @@ data class EncryptionSupportConfig(
     val supportedEncryptionAlgorithms: List<JWEAlgorithm> get() = buildList {
         ecConfig?.supportedJWEAlgorithms?.let { addAll(it) }
         rsaConfig?.supportedJWEAlgorithms?.let { addAll(it) }
-    }.distinctBy { it.name }
+    }
 
     val supportedEncryptionMethods: List<EncryptionMethod> get() = buildList {
         ecConfig?.supportedEncryptionMethods?.let { addAll(it) }
@@ -186,10 +186,17 @@ data class RsaConfig(
         require(unsupportedJWEAlgorithms.isEmpty()) {
             "Unsupported encryption algorithms: ${unsupportedJWEAlgorithms.joinToString(", ") { it.name }}"
         }
+        require(supportedJWEAlgorithms.distinctBy { it.name }.size == supportedJWEAlgorithms.size) {
+            "supportedJWEAlgorithms contains duplicate values"
+        }
+
         require(supportedEncryptionMethods.isNotEmpty()) { "At least one encryption method must be provided" }
         val unsupportedEncryptionMethods = supportedEncryptionMethods.filterNot { it in RSAEncrypter.SUPPORTED_ENCRYPTION_METHODS }
         require(unsupportedEncryptionMethods.isEmpty()) {
             "Unsupported encryption methods: ${unsupportedEncryptionMethods.joinToString(", ") { it.name }}"
+        }
+        require(supportedEncryptionMethods.distinctBy { it.name }.size == supportedEncryptionMethods.size) {
+            "supportedEncryptionMethods contains duplicate values"
         }
     }
 }
@@ -205,10 +212,17 @@ data class EcConfig(
         require(unsupportedJWEAlgorithms.isEmpty()) {
             "Unsupported encryption algorithms: ${unsupportedJWEAlgorithms.joinToString(", ") { it.name }}"
         }
+        require(supportedJWEAlgorithms.distinctBy { it.name }.size == supportedJWEAlgorithms.size) {
+            "supportedJWEAlgorithms contains duplicate values"
+        }
+
         require(supportedEncryptionMethods.isNotEmpty()) { "At least one encryption method must be provided" }
         val unsupportedEncryptionMethods = supportedEncryptionMethods.filterNot { it in ECDHEncrypter.SUPPORTED_ENCRYPTION_METHODS }
         require(unsupportedEncryptionMethods.isEmpty()) {
             "Unsupported encryption methods: ${unsupportedEncryptionMethods.joinToString(", ") { it.name }}"
+        }
+        require(supportedEncryptionMethods.distinctBy { it.name }.size == supportedEncryptionMethods.size) {
+            "supportedEncryptionMethods contains duplicate values"
         }
     }
 }
