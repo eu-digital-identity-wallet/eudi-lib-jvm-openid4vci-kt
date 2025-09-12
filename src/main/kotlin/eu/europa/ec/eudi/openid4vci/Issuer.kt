@@ -323,12 +323,12 @@ interface Issuer :
                         )?.firstOrNull()
                 }
 
-                with(issuerSupportedResponseEncryptedParameters) {
-                    algorithms.firstNotNullOfOrNull { algorithm ->
-                        encryptionMethods.firstNotNullOfOrNull { method ->
-                            KeyGenerator.genKeyIfSupported(walletEncryptionSupportConfig, algorithm, method)
-                                ?.let { jwk -> EncryptionSpec(jwk, method, compressionAlg) }
-                        }
+                val encryptionMethod = issuerSupportedResponseEncryptedParameters.encryptionMethods
+                    .intersect(walletEncryptionSupportConfig.supportedEncryptionMethods).firstOrNull()
+                encryptionMethod?.let { method ->
+                    issuerSupportedResponseEncryptedParameters.algorithms.firstNotNullOfOrNull { algorithm ->
+                        KeyGenerator.genKeyIfSupported(walletEncryptionSupportConfig, algorithm)
+                            ?.let { jwk -> EncryptionSpec(jwk, method, compressionAlg) }
                     }
                 }
             }
