@@ -19,7 +19,7 @@ import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.Grants.PreAuthorizedCode
 import eu.europa.ec.eudi.openid4vci.internal.GrantedAuthorizationDetailsSerializer
-import eu.europa.ec.eudi.openid4vci.internal.TokenResponse
+import eu.europa.ec.eudi.openid4vci.internal.Tokens
 import eu.europa.ec.eudi.openid4vci.internal.clientAttestationHeaders
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -67,10 +67,10 @@ internal sealed interface TokenResponseTO {
         @SerialName("error_description") val errorDescription: String? = null,
     ) : TokenResponseTO
 
-    fun tokensOrFail(clock: Clock): TokenResponse =
+    fun tokensOrFail(clock: Clock): Tokens =
         when (this) {
             is Success -> {
-                TokenResponse(
+                Tokens(
                     accessToken = AccessToken(
                         accessToken = accessToken,
                         expiresInSec = expiresIn,
@@ -86,12 +86,19 @@ internal sealed interface TokenResponseTO {
         }
 }
 
+internal class TokensResponse(
+    val tokens: Tokens,
+    val abcaChallenge: Nonce?,
+    val dpopNonce: Nonce?,
+)
+
 internal class TokenEndpointClient(
     private val credentialIssuerId: CredentialIssuerId,
     private val clock: Clock,
     private val client: Client,
     private val authFlowRedirectionURI: URI,
     private val authServerId: URL,
+    private val challengeEndpoint: URL?,
     private val tokenEndpoint: URL,
     private val dPoPJwtFactory: DPoPJwtFactory?,
     private val clientAttestationPoPBuilder: ClientAttestationPoPBuilder,
@@ -100,6 +107,10 @@ internal class TokenEndpointClient(
 
     private val isCredentialIssuerAuthorizationServer: Boolean
         get() = credentialIssuerId.toString() == authServerId.toString()
+
+    private val challengeEndpointClient: ChallengeEndpointClient? by lazy {
+        challengeEndpoint?.let { ChallengeEndpointClient(it, httpClient) }
+    }
 
     constructor(
         credentialIssuerId: CredentialIssuerId,
@@ -111,9 +122,10 @@ internal class TokenEndpointClient(
         credentialIssuerId,
         config.clock,
         config.client,
-        config.authFlowRedirectionURI,
-        URI(authorizationServerMetadata.issuer.value).toURL(),
-        authorizationServerMetadata.tokenEndpointURI.toURL(),
+        authFlowRedirectionURI = config.authFlowRedirectionURI,
+        authServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
+        challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL(),
+        tokenEndpoint = authorizationServerMetadata.tokenEndpointURI.toURL(),
         dPoPJwtFactory,
         config.clientAttestationPoPBuilder,
         httpClient,
@@ -133,8 +145,9 @@ internal class TokenEndpointClient(
         authorizationCode: AuthorizationCode,
         pkceVerifier: PKCEVerifier,
         credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
+        abcaChallenge: Nonce?,
         dpopNonce: Nonce?,
-    ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
+    ): Result<TokensResponse> = runCatching {
         // Append authorization_details form param if needed
         val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
             authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
@@ -147,7 +160,7 @@ internal class TokenEndpointClient(
                 pkceVerifier = pkceVerifier,
                 authorizationDetails = authDetails,
             )
-        placeTokenRequest(params, dpopNonce)
+        placeTokenRequest(params, abcaChallenge = abcaChallenge, dpopNonce = dpopNonce)
     }
 
     /**
@@ -164,8 +177,9 @@ internal class TokenEndpointClient(
         preAuthorizedCode: PreAuthorizedCode,
         txCode: String?,
         credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
+        abcaChallenge: Nonce?,
         dpopNonce: Nonce?,
-    ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
+    ): Result<TokensResponse> = runCatching {
         // Append authorization_details form param if needed
         val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
             authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
@@ -177,7 +191,7 @@ internal class TokenEndpointClient(
                 txCode = txCode,
                 authorizationDetails = authDetails,
             )
-        placeTokenRequest(params, dpopNonce)
+        placeTokenRequest(params, abcaChallenge = abcaChallenge, dpopNonce = dpopNonce)
     }
 
     /**
@@ -185,25 +199,29 @@ internal class TokenEndpointClient(
      * the refresh token
      * @param refreshToken the token to be used for refreshing the access token
      *
-     * @return the token end point response, which will include a new [TokenResponse.accessToken] and possibly
-     * a new [TokenResponse.refreshToken]
+     * @return the token end point response, which will include a new [Tokens.accessToken] and possibly
+     * a new [Tokens.refreshToken]
      */
     suspend fun refreshAccessToken(
         refreshToken: RefreshToken,
+        abcaChallenge: Nonce?,
         dpopNonce: Nonce?,
-    ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
+    ): Result<TokensResponse> = runCatching {
         val params = TokenEndpointForm.refreshAccessToken(client.id, refreshToken)
-        placeTokenRequest(params, dpopNonce)
+        placeTokenRequest(params, abcaChallenge = abcaChallenge, dpopNonce = dpopNonce)
     }
 
     private suspend fun placeTokenRequest(
         params: Map<String, String>,
+        abcaChallenge: Nonce?,
         dpopNonce: Nonce?,
-    ): Pair<TokenResponse, Nonce?> {
+    ): TokensResponse {
         suspend fun requestInternal(
+            existingAbcaChallenge: Nonce?,
             existingDpopNonce: Nonce?,
-            retried: Boolean,
-        ): Pair<TokenResponseTO, Nonce?> {
+            retriedAbcaChallenge: Boolean,
+            retriedDPoPNonce: Boolean,
+        ): TokensResponse {
             val response = run {
                 val formParameters = Parameters.build {
                     params.entries.forEach { (k, v) -> append(k, v) }
@@ -212,28 +230,63 @@ internal class TokenEndpointClient(
                     dPoPJwtFactory?.createDPoPJwt(Htm.POST, tokenEndpoint, null, existingDpopNonce)
                         ?.getOrThrow()?.serialize()
 
+                val abcaChallenge = when (client) {
+                    is Client.Attested -> existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
+                    else -> null
+                }
+
                 httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
                     jwt?.let { header(DPoP, jwt) }
-                    generateClientAttestationIfNeeded()?.let(::clientAttestationHeaders)
+                    generateClientAttestationIfNeeded(abcaChallenge)?.let(::clientAttestationHeaders)
                 }
             }
 
             return when {
                 response.status.isSuccess() -> {
                     val responseTO = response.body<TokenResponseTO.Success>()
+                    val newAbcaChallenge = response.abcaChallege()
                     val newDopNonce = response.dpopNonce()
-                    responseTO to (newDopNonce ?: existingDpopNonce)
+                    TokensResponse(
+                        responseTO.tokensOrFail(clock),
+                        abcaChallenge = newAbcaChallenge ?: existingAbcaChallenge,
+                        dpopNonce = newDopNonce ?: existingDpopNonce,
+                    )
                 }
 
                 response.status == HttpStatusCode.BadRequest -> {
                     val errorTO = response.body<TokenResponseTO.Failure>()
+                    val newAbcaChallenge = response.abcaChallege()
                     val newDopNonce = response.dpopNonce()
                     when {
-                        errorTO.error == "use_dpop_nonce" && newDopNonce != null && !retried -> {
-                            requestInternal(newDopNonce, true)
+                        errorTO.error == "use_dpop_nonce" && newDopNonce != null && !retriedDPoPNonce -> {
+                            requestInternal(
+                                existingAbcaChallenge = newAbcaChallenge ?: existingAbcaChallenge,
+                                existingDpopNonce = newDopNonce,
+                                retriedAbcaChallenge = retriedAbcaChallenge,
+                                retriedDPoPNonce = true,
+                            )
                         }
 
-                        else -> errorTO to (newDopNonce ?: existingDpopNonce)
+                        errorTO.error == AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR &&
+                            !retriedAbcaChallenge -> {
+                            check(null != challengeEndpointClient || null != newAbcaChallenge) {
+                                "Authorization Server replied with " +
+                                    "'${AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR}'" +
+                                    " error code, but doesn't support " +
+                                    "'${AttestationBasedClientAuthenticationSpec.CHALLENGE_ENDPOINT}', " +
+                                    "nor has provided a challenge using the " +
+                                    "'${AttestationBasedClientAuthenticationSpec.CHALLENGE_HEADER}' header"
+                            }
+
+                            requestInternal(
+                                existingAbcaChallenge = newAbcaChallenge,
+                                existingDpopNonce = newDopNonce ?: existingDpopNonce,
+                                retriedAbcaChallenge = true,
+                                retriedDPoPNonce = retriedDPoPNonce,
+                            )
+                        }
+
+                        else -> throw AccessTokenRequestFailed(errorTO.error, errorTO.errorDescription)
                     }
                 }
 
@@ -241,8 +294,12 @@ internal class TokenEndpointClient(
             }
         }
 
-        val (responseTO, newDopNonce) = requestInternal(dpopNonce, false)
-        return responseTO.tokensOrFail(clock) to newDopNonce
+        return requestInternal(
+            existingAbcaChallenge = abcaChallenge,
+            existingDpopNonce = dpopNonce,
+            retriedAbcaChallenge = false,
+            retriedDPoPNonce = false,
+        )
     }
 
     private fun authorizationDetailsFormParam(
@@ -258,11 +315,11 @@ internal class TokenEndpointClient(
             .toFormParamString()
     }
 
-    private fun generateClientAttestationIfNeeded(): ClientAttestation? =
+    private fun generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
         when (client) {
             is Client.Attested ->
                 with(clientAttestationPoPBuilder) {
-                    val popJWT = client.attestationPoPJWT(clock, authServerId, null)
+                    val popJWT = client.attestationPoPJWT(clock, authServerId, challenge)
                     client.attestationJWT to popJWT
                 }
 

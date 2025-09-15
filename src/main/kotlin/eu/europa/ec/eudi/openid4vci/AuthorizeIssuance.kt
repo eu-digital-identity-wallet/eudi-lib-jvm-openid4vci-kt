@@ -34,6 +34,7 @@ data class AuthorizationRequestPrepared(
     val pkceVerifier: PKCEVerifier,
     val state: String,
     val identifiersSentAsAuthDetails: List<CredentialConfigurationIdentifier>,
+    val abcaChallenge: Nonce?,
     val dpopNonce: Nonce?,
 ) : java.io.Serializable
 
@@ -49,6 +50,7 @@ enum class Grant : java.io.Serializable {
  * @param accessToken Access token authorizing the request(s) to issue credential(s)
  * @param refreshToken Refresh token to refresh the access token, if needed
  * @param credentialIdentifiers authorization details, if provided by the token endpoint
+ * @param abcaChallenge Challenge value for Attestation-Based Client Authentication provided by the Authorization Server
  * @param authorizationServerDpopNonce Nonce value for DPoP provided by the Authorization Server
  * @param timestamp the point in time of the authorization (when tokens were issued)
  * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
@@ -59,6 +61,7 @@ data class AuthorizedRequest(
     val refreshToken: RefreshToken?,
     val credentialIdentifiers: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>?,
     val timestamp: Instant,
+    val abcaChallenge: Nonce?,
     val authorizationServerDpopNonce: Nonce?,
     val resourceServerDpopNonce: Nonce?,
     val grant: Grant,
@@ -70,17 +73,20 @@ data class AuthorizedRequest(
         refreshedAccessToken: AccessToken,
         newRefreshToken: RefreshToken?,
         at: Instant,
+        newAbcaChallenge: Nonce?,
         newAuthorizationServerDpopNonce: Nonce?,
     ): AuthorizedRequest =
         copy(
             accessToken = refreshedAccessToken,
             refreshToken = newRefreshToken ?: refreshToken,
             timestamp = at,
+            abcaChallenge = newAbcaChallenge,
             authorizationServerDpopNonce = newAuthorizationServerDpopNonce,
         )
 
-    fun withResourceServerDpopNonce(newResourceServerDpopNonce: Nonce?): AuthorizedRequest =
-        copy(resourceServerDpopNonce = newResourceServerDpopNonce)
+    fun withResourceServerDpopNonce(newResourceServerDpopNonce: Nonce?): AuthorizedRequest = copy(
+        resourceServerDpopNonce = newResourceServerDpopNonce,
+    )
 }
 
 sealed interface AccessTokenOption {

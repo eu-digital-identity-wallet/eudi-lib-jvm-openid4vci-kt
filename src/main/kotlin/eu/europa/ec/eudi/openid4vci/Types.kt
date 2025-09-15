@@ -337,6 +337,9 @@ value class Scope(val value: String) {
 
 typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata
 
+val CIAuthorizationServerMetadata.challengeEndpointURI: URI?
+    get() = getCustomURIParameter(AttestationBasedClientAuthenticationSpec.CHALLENGE_ENDPOINT)
+
 @JvmInline
 value class CoseAlgorithm(val value: Int) {
 

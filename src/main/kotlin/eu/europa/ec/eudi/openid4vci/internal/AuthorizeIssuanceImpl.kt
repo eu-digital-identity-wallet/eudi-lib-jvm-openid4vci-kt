@@ -24,7 +24,7 @@ import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
 import java.time.Instant
 import com.nimbusds.oauth2.sdk.id.State as NimbusState
 
-internal data class TokenResponse(
+internal data class Tokens(
     val accessToken: AccessToken,
     val refreshToken: RefreshToken?,
     val authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> = emptyMap(),
@@ -49,14 +49,21 @@ internal class AuthorizeIssuanceImpl(
             }
             val state = walletState ?: NimbusState().value
             val issuerState = credentialOffer.grants?.authorizationCode()?.issuerState
-            val (codeVerifier, authorizationCodeUrl, dpopNonce) =
+            val authorizationRequestContext =
                 authorizationEndpointClient.submitParOrCreateAuthorizationRequestUrl(
                     scopes,
                     configurationIds,
                     state,
                     issuerState,
                 ).getOrThrow()
-            AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier, state, configurationIds, dpopNonce)
+            AuthorizationRequestPrepared(
+                authorizationRequestContext.authorizationUrl,
+                authorizationRequestContext.pkceVerifier,
+                state,
+                configurationIds,
+                abcaChallenge = authorizationRequestContext.abcaChallenge,
+                dpopNonce = authorizationRequestContext.dpopNonce,
+            )
         }
 
     private fun scopesAndCredentialConfigurationIds(): Pair<List<Scope>, List<CredentialConfigurationIdentifier>> {
@@ -87,20 +94,22 @@ internal class AuthorizeIssuanceImpl(
     ): Result<AuthorizedRequest> = runCatching {
         ensure(serverState == state) { InvalidAuthorizationState() }
         val credConfigIdsAsAuthDetails = identifiersSentAsAuthDetails.filter(authDetailsOption)
-        val (tokenResponse, newDpopNonce) =
+        val tokensResponse =
             tokenEndpointClient.requestAccessTokenAuthFlow(
                 authorizationCode,
                 pkceVerifier,
                 credConfigIdsAsAuthDetails,
-                dpopNonce,
+                abcaChallenge = abcaChallenge,
+                dpopNonce = dpopNonce,
             ).getOrThrow()
 
         AuthorizedRequest(
-            accessToken = tokenResponse.accessToken,
-            refreshToken = tokenResponse.refreshToken,
-            credentialIdentifiers = tokenResponse.authorizationDetails,
-            timestamp = tokenResponse.timestamp,
-            authorizationServerDpopNonce = newDpopNonce,
+            accessToken = tokensResponse.tokens.accessToken,
+            refreshToken = tokensResponse.tokens.refreshToken,
+            credentialIdentifiers = tokensResponse.tokens.authorizationDetails,
+            timestamp = tokensResponse.tokens.timestamp,
+            abcaChallenge = tokensResponse.abcaChallenge,
+            authorizationServerDpopNonce = tokensResponse.dpopNonce,
             resourceServerDpopNonce = null,
             grant = Grant.AuthorizationCode,
         )
@@ -120,20 +129,22 @@ internal class AuthorizeIssuanceImpl(
         val credConfigIdsAsAuthDetails =
             credentialOffer.credentialConfigurationIdentifiers.filter(authDetailsOption)
 
-        val (tokenResponse, newDpopNonce) =
+        val tokensResponse =
             tokenEndpointClient.requestAccessTokenPreAuthFlow(
                 preAuthorizedCode,
                 txCode,
                 credConfigIdsAsAuthDetails,
+                abcaChallenge = null,
                 dpopNonce = null,
             ).getOrThrow()
 
         AuthorizedRequest(
-            accessToken = tokenResponse.accessToken,
-            refreshToken = tokenResponse.refreshToken,
-            credentialIdentifiers = tokenResponse.authorizationDetails,
-            timestamp = tokenResponse.timestamp,
-            authorizationServerDpopNonce = newDpopNonce,
+            accessToken = tokensResponse.tokens.accessToken,
+            refreshToken = tokensResponse.tokens.refreshToken,
+            credentialIdentifiers = tokensResponse.tokens.authorizationDetails,
+            timestamp = tokensResponse.tokens.timestamp,
+            abcaChallenge = tokensResponse.abcaChallenge,
+            authorizationServerDpopNonce = tokensResponse.dpopNonce,
             resourceServerDpopNonce = null,
             grant = Grant.PreAuthorizedCodeGrant,
         )

@@ -33,6 +33,7 @@ import java.time.Clock
  *
  * @param client the client for the wallet
  * @param deferredEndpoint the URL of the deferred endpoint
+ * @param challengeEndpoint the URL of the challenge endpoint for Attestation-Based Client Authentication provided by the Authorization Server
  * @param tokenEndpoint the URL of the token endpoint. Will be used if needed, to refresh the access token
  * @param authServerId the URL of the authorization server that was selected for authenticating the initial request.
  * @param credentialIssuerId the ID of the Credential Issuer
@@ -48,6 +49,7 @@ data class DeferredIssuerConfig(
     val client: Client,
     val deferredEndpoint: URL,
     val authorizationServerId: URL,
+    val challengeEndpoint: URL?,
     val tokenEndpoint: URL,
     val requestEncryptionSpec: EncryptionSpec?,
     val responseEncryptionParams: Pair<EncryptionMethod, CompressionAlgorithm?>?,
@@ -167,7 +169,8 @@ interface DeferredIssuer : QueryForDeferredCredential {
                 config.client,
                 URI.create("https://willNotBeUsed"), // this will not be used
                 config.authorizationServerId,
-                config.tokenEndpoint,
+                challengeEndpoint = config.challengeEndpoint,
+                tokenEndpoint = config.tokenEndpoint,
                 dPoPJwtFactory,
                 config.clientAttestationPoPBuilder,
                 httpClient,

@@ -227,6 +227,8 @@ interface Issuer :
                             "Missing deferred credential endpoint"
                         }
 
+                    val challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL()
+
                     val tokenEndpoint =
                         checkNotNull(authorizationServerMetadata.tokenEndpointURI?.toURL()) {
                             "Missing token endpoint"
@@ -238,6 +240,7 @@ interface Issuer :
                             client = config.client,
                             deferredEndpoint = deferredEndpoint,
                             authorizationServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
+                            challengeEndpoint = challengeEndpoint,
                             tokenEndpoint = tokenEndpoint,
                             requestEncryptionSpec = issuanceEncryptionSpecs.requestEncryptionSpec,
                             responseEncryptionParams = issuanceEncryptionSpecs.responseEncryptionSpec?.let {

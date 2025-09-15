@@ -24,6 +24,9 @@ object AttestationBasedClientAuthenticationSpec {
     const val ATTESTATION_JWT_TYPE: String = "oauth-client-attestation+jwt"
     const val ATTESTATION_POP_JWT_TYPE: String = "oauth-client-attestation-pop+jwt"
 
+    const val CHALLENGE_ENDPOINT: String = "challenge_endpoint"
+    const val ATTESTATION_CHALLENGE: String = "attestation_challenge"
+
     const val CHALLENGE_CLAIM: String = "challenge"
     const val CHALLENGE_HEADER: String = "OAuth-Client-Attestation-Challenge"
 
