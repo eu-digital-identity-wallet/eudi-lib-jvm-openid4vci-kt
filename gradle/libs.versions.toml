@@ -1,10 +1,10 @@
 [versions]
 coroutines = "1.10.2"
 dependency-check = "12.1.1"
-kotlin = "2.1.21"
+kotlin = "2.2.20"
 spotless = "7.0.2"
-nimbus-sdk = "11.20.1"
-ktor = "3.2.3"
+nimbus-sdk = "11.28"
+ktor = "3.3.0"
 jsoup = "1.19.1"
 cbor = "0.9"
 java = "17"
