@@ -268,7 +268,7 @@ internal class AuthorizationEndpointClient(
                     ?.getOrThrow()?.serialize()
 
             val response = httpClient.submitForm(url.toString(), formParameters) {
-                config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL())?.let {
+                config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL(), null)?.let {
                     clientAttestationHeaders(it)
                 }
                 jwt?.let { header(DPoP, jwt) }

@@ -262,7 +262,7 @@ internal class TokenEndpointClient(
         when (client) {
             is Client.Attested ->
                 with(clientAttestationPoPBuilder) {
-                    val popJWT = client.attestationPoPJWT(clock, authServerId)
+                    val popJWT = client.attestationPoPJWT(clock, authServerId, null)
                     client.attestationJWT to popJWT
                 }
 

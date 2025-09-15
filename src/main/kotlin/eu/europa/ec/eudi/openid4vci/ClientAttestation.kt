@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.JWSSigner
@@ -27,8 +28,6 @@ import eu.europa.ec.eudi.openid4vci.internal.cnfJwk
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
 import java.time.Clock
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 
 /**
  * These JWTs are transmitted via HTTP headers in an HTTP request from a Client Instance
@@ -45,19 +44,21 @@ typealias ClientAttestation = Pair<ClientAttestationJWT, ClientAttestationPoPJWT
  * which is bound to a key managed by a Client Instance which can then
  * be used by the instance for client authentication
  */
-data class ClientAttestationJWT(val jwt: SignedJWT) {
+@JvmInline
+value class ClientAttestationJWT(val jwt: SignedJWT) {
     init {
+        jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
+        requireNotNull(jwt.jwtClaimsSet.issuer) { "Invalid Attestation JWT. Misses `iss` claim" }
+        requireNotNull(jwt.jwtClaimsSet.subject) { "Invalid Attestation JWT. Misses `sub` claim" }
+        requireNotNull(jwt.jwtClaimsSet.expirationTime) { "Invalid Attestation JWT. Misses `exp` claim" }
+        val cnf = requireNotNull(jwt.jwtClaimsSet.cnf()) { "Invalid Attestation JWT. Misses `cnf` claim" }
+        requireNotNull(cnf.cnfJwk()) { "Invalid Attestation JWT. Misses `jwk` claim from `cnf`" }
         jwt.ensureSignedNotMAC()
-        requireNotNull(jwt.jwtClaimsSet.subject) { "Invalid Attestation JWT. Misses subject claim" }
-        val cnf = requireNotNull(jwt.jwtClaimsSet.cnf()) { "Invalid Attestation JWT. Misses cnf claim" }
-        requireNotNull(cnf.cnfJwk()) { "Invalid Attestation JWT. Misses jwk claim from cnf" }
-        requireNotNull(jwt.jwtClaimsSet.expirationTime) { "Invalid Attestation JWT. Misses exp claim" }
     }
 
-    val clientId: ClientId
-        get() = jwt.jwtClaimsSet.subject
-    val cnf: JsonObject by lazy { checkNotNull(jwt.jwtClaimsSet.cnf()) }
-    val pubKey: JWK by lazy { checkNotNull(cnf.cnfJwk()) }
+    val clientId: ClientId get() = checkNotNull(jwt.jwtClaimsSet.subject)
+    val cnf: JsonObject get() = checkNotNull(jwt.jwtClaimsSet.cnf())
+    val publicKey: JWK get() = checkNotNull(cnf.cnfJwk())
 }
 
 /**
@@ -70,12 +71,15 @@ data class ClientAttestationJWT(val jwt: SignedJWT) {
 @JvmInline
 value class ClientAttestationPoPJWT(val jwt: SignedJWT) {
     init {
+        jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE))
+        requireNotNull(jwt.jwtClaimsSet.issuer) { "Invalid PoP JWT. Misses `iss` claim" }
+        val audience = requireNotNull(jwt.jwtClaimsSet.audience) { "Invalid PoP JWT. Misses `aud` claim" }
+        require(1 == audience.size) { "Invalid PoP JWT. Has more than one values in `aud` claim" }
+        requireNotNull(jwt.jwtClaimsSet.jwtid) { "Invalid PoP JWT. Misses `jti` claim" }
         jwt.ensureSignedNotMAC()
-        requireNotNull(jwt.jwtClaimsSet.issuer) { "Invalid PoP JWT. Misses iss claim" }
-        requireNotNull(jwt.jwtClaimsSet.expirationTime) { "Invalid PoP JWT. Misses exp claim" }
-        requireNotNull(jwt.jwtClaimsSet.jwtid) { "Invalid PoP JWT. Misses jti claim" }
-        require(!jwt.jwtClaimsSet.audience.isNullOrEmpty()) { "Invalid PoP JWT. Misses aud claim" }
     }
+
+    val clientId: ClientId get() = checkNotNull(jwt.jwtClaimsSet.issuer)
 }
 
 //
@@ -84,17 +88,10 @@ value class ClientAttestationPoPJWT(val jwt: SignedJWT) {
 
 data class ClientAttestationPoPJWTSpec(
     val signingAlgorithm: JWSAlgorithm,
-    val duration: Duration = 5.minutes,
-    val typ: String = TYPE,
     val jwsSigner: JWSSigner,
 ) {
     init {
         requireIsNotMAC(signingAlgorithm)
-        require(duration.isPositive()) { "popJwtDuration must be positive" }
-    }
-
-    companion object {
-        const val TYPE: String = "oauth-client-attestation-pop+jwt"
     }
 }
 
@@ -108,13 +105,13 @@ fun interface ClientAttestationPoPBuilder {
      * Builds a PoP JWT
      *
      * @param clock wallet's clock
-     * @param authServerId the issuer claim of the OAuth 2.0 authorization server to which
+     * @param authorizationServerId the issuer claim of the OAuth 2.0 authorization server to which
      * the attestation will be presented for authentication.
      * @receiver the client for which to create the PoP
      *
      * @return the PoP JWT
      */
-    fun Client.Attested.attestationPoPJWT(clock: Clock, authServerId: URL): ClientAttestationPoPJWT
+    fun Client.Attested.attestationPoPJWT(clock: Clock, authorizationServerId: URL, challenge: Nonce?): ClientAttestationPoPJWT
 
     companion object {
         val Default: ClientAttestationPoPBuilder = DefaultClientAttestationPoPBuilder
@@ -122,7 +119,7 @@ fun interface ClientAttestationPoPBuilder {
 }
 
 internal fun SignedJWT.ensureSignedNotMAC() {
-    check(state == JWSObject.State.SIGNED || state == JWSObject.State.VERIFIED) {
+    require(state == JWSObject.State.SIGNED || state == JWSObject.State.VERIFIED) {
         "Provided JWT is not signed"
     }
     val alg = requireNotNull(header.algorithm) { "Invalid JWT misses header alg" }
@@ -133,3 +130,9 @@ internal fun requireIsNotMAC(alg: JWSAlgorithm) =
     require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
 
 internal fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
+
+private fun SignedJWT.ensureType(expectedType: JOSEObjectType) {
+    require(expectedType == header.type) {
+        "Expected SignedJWT `typ` to be '${expectedType.type}', but found '${header.type?.type}' instead"
+    }
+}

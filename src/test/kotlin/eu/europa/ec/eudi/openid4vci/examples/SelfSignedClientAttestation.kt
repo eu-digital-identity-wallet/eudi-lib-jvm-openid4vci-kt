@@ -61,11 +61,7 @@ internal fun selfSignedClient(
         val builder = ClientAttestationJwtBuilder(clock, duration, algorithm, signer, claims, headerCustomization)
         builder.build()
     }
-    val popJwtSpec = ClientAttestationPoPJWTSpec(
-        JWSAlgorithm.ES256,
-        duration,
-        jwsSigner = signer,
-    )
+    val popJwtSpec = ClientAttestationPoPJWTSpec(JWSAlgorithm.ES256, signer)
     return Client.Attested(clientAttestationJWT, popJwtSpec)
 }
 

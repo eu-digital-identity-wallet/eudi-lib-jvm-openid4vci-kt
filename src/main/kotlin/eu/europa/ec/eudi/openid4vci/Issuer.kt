@@ -237,7 +237,7 @@ interface Issuer :
                             credentialIssuerId = credentialOffer.credentialIssuerIdentifier,
                             client = config.client,
                             deferredEndpoint = deferredEndpoint,
-                            authServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
+                            authorizationServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
                             tokenEndpoint = tokenEndpoint,
                             requestEncryptionSpec = issuanceEncryptionSpecs.requestEncryptionSpec,
                             responseEncryptionParams = issuanceEncryptionSpecs.responseEncryptionSpec?.let {
@@ -324,17 +324,17 @@ interface Issuer :
     }
 }
 
-private const val ATTEST_JWT_CLIENT_AUTH = "attest_jwt_client_auth"
-
 internal fun Client.ensureSupportedByAuthorizationServer(authorizationServerMetadata: CIAuthorizationServerMetadata) {
     val tokenEndPointAuthMethods =
         authorizationServerMetadata.tokenEndpointAuthMethods.orEmpty()
 
     when (this) {
         is Client.Attested -> {
-            val expectedMethod = ClientAuthenticationMethod(ATTEST_JWT_CLIENT_AUTH)
+            val expectedMethod =
+                ClientAuthenticationMethod(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_CLIENT_AUTHENTICATION_METHOD)
             require(expectedMethod in tokenEndPointAuthMethods) {
-                "$ATTEST_JWT_CLIENT_AUTH not supported by authorization server"
+                "${AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_CLIENT_AUTHENTICATION_METHOD} " +
+                    "not supported by authorization server"
             }
         }
 

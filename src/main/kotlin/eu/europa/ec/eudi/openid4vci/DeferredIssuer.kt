@@ -47,7 +47,7 @@ data class DeferredIssuerConfig(
     val credentialIssuerId: CredentialIssuerId,
     val client: Client,
     val deferredEndpoint: URL,
-    val authServerId: URL,
+    val authorizationServerId: URL,
     val tokenEndpoint: URL,
     val requestEncryptionSpec: EncryptionSpec?,
     val responseEncryptionParams: Pair<EncryptionMethod, CompressionAlgorithm?>?,
@@ -166,7 +166,7 @@ interface DeferredIssuer : QueryForDeferredCredential {
                 config.clock,
                 config.client,
                 URI.create("https://willNotBeUsed"), // this will not be used
-                config.authServerId,
+                config.authorizationServerId,
                 config.tokenEndpoint,
                 dPoPJwtFactory,
                 config.clientAttestationPoPBuilder,
