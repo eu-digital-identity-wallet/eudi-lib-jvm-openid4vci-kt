@@ -285,7 +285,7 @@ internal class AuthorizationEndpointClient(
             }
         }
 
-        suspend fun requestInternal(
+        tailrec suspend fun requestInternal(
             existingAbcaChallenge: Nonce?,
             existingDpopNonce: Nonce?,
             abcaChallengeRetried: Boolean,
