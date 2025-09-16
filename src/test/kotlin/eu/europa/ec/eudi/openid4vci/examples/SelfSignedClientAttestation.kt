@@ -40,6 +40,7 @@ import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -271,7 +272,7 @@ internal fun HttpRequestData.verifySelfSignedClientAttestation(walletInstanceKey
     val clientAttestation = run {
         val jwt = SignedJWT.parse(assertNotNull(headers[AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_HEADER]))
             .apply {
-                verify(ECDSAVerifier(walletInstanceKey))
+                assertTrue(verify(ECDSAVerifier(walletInstanceKey)))
             }
         ClientAttestationJWT(jwt)
     }
@@ -279,8 +280,8 @@ internal fun HttpRequestData.verifySelfSignedClientAttestation(walletInstanceKey
     val clientAttestationPOP = run {
         val jwt = SignedJWT.parse(assertNotNull(headers[AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_POP_HEADER]))
             .apply {
-                verify(ECDSAVerifier(walletInstanceKey))
-                verify(DefaultJWSVerifierFactory().createJWSVerifier(header, clientAttestation.publicKey.publicKey))
+                assertTrue(verify(ECDSAVerifier(walletInstanceKey)))
+                assertTrue(verify(DefaultJWSVerifierFactory().createJWSVerifier(header, clientAttestation.publicKey.publicKey)))
             }
         ClientAttestationPoPJWT(jwt)
     }
