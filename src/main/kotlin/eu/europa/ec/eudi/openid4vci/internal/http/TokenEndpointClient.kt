@@ -248,7 +248,7 @@ internal class TokenEndpointClient(
                     val newDopNonce = response.dpopNonce()
                     TokensResponse(
                         responseTO.tokensOrFail(clock),
-                        abcaChallenge = newAbcaChallenge ?: existingAbcaChallenge,
+                        abcaChallenge = newAbcaChallenge ?: abcaChallenge,
                         dpopNonce = newDopNonce ?: existingDpopNonce,
                     )
                 }
@@ -260,7 +260,7 @@ internal class TokenEndpointClient(
                     when {
                         errorTO.error == "use_dpop_nonce" && newDopNonce != null && !retriedDPoPNonce -> {
                             requestInternal(
-                                existingAbcaChallenge = newAbcaChallenge ?: existingAbcaChallenge,
+                                existingAbcaChallenge = newAbcaChallenge ?: abcaChallenge,
                                 existingDpopNonce = newDopNonce,
                                 retriedAbcaChallenge = retriedAbcaChallenge,
                                 retriedDPoPNonce = true,

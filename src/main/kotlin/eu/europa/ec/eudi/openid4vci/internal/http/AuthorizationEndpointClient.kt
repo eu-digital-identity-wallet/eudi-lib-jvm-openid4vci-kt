@@ -314,7 +314,7 @@ internal class AuthorizationEndpointClient(
                     val newDopNonce = response.dpopNonce()
                     PushedAuthorizationRequestResponse(
                         responseTO,
-                        abcaChallenge = newAbcaChallenge ?: existingAbcaChallenge,
+                        abcaChallenge = newAbcaChallenge ?: abcaChallenge,
                         dpopNonce = newDopNonce ?: existingDpopNonce,
                     )
                 }
@@ -327,7 +327,7 @@ internal class AuthorizationEndpointClient(
                     when {
                         errorTO.error == "use_dpop_nonce" && newDopNonce != null && !dpopNonceRetried -> {
                             requestInternal(
-                                existingAbcaChallenge = newAbcaChallenge ?: existingAbcaChallenge,
+                                existingAbcaChallenge = newAbcaChallenge ?: abcaChallenge,
                                 existingDpopNonce = newDopNonce,
                                 abcaChallengeRetried = abcaChallengeRetried,
                                 dpopNonceRetried = true,
