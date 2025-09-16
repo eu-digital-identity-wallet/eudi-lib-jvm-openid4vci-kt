@@ -336,12 +336,10 @@ internal class AuthorizationEndpointClient(
 
                         errorTO.error == AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR &&
                             !abcaChallengeRetried -> {
-                            check(null != challengeEndpointClient || null != newAbcaChallenge) {
+                            check(null != newAbcaChallenge) {
                                 "Authorization Server replied with " +
-                                    "'${AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR}'" +
-                                    " error code, but doesn't support " +
-                                    "'${AttestationBasedClientAuthenticationSpec.CHALLENGE_ENDPOINT}', " +
-                                    "nor has provided a challenge using the " +
+                                    "'${AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR}' " +
+                                    "error code, but hasn't provided a challenge using the " +
                                     "'${AttestationBasedClientAuthenticationSpec.CHALLENGE_HEADER}' header"
                             }
 
