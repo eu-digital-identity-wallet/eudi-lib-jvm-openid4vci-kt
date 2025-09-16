@@ -18,9 +18,11 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.MissingRequiredRequestEncryptionSpecification
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
@@ -338,7 +340,21 @@ value class Scope(val value: String) {
 typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata
 
 val CIAuthorizationServerMetadata.challengeEndpointURI: URI?
-    get() = getCustomURIParameter(AttestationBasedClientAuthenticationSpec.CHALLENGE_ENDPOINT)
+    get() = JSONObjectUtils.getURI(customParameters, AttestationBasedClientAuthenticationSpec.CHALLENGE_ENDPOINT)
+
+val CIAuthorizationServerMetadata.clientAttestationJWSAlgs: List<JWSAlgorithm>?
+    get() = JSONObjectUtils.getStringList(
+        customParameters,
+        AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_SIGNING_ALGORITHMS_SUPPORTED,
+    )
+        ?.mapNotNull { JWSAlgorithm.parse(it) }
+
+val CIAuthorizationServerMetadata.clientAttestationPOPJWSAlgs: List<JWSAlgorithm>?
+    get() = JSONObjectUtils.getStringList(
+        customParameters,
+        AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_SIGNING_ALGORITHMS_SUPPORTED,
+    )
+        ?.mapNotNull { JWSAlgorithm.parse(it) }
 
 @JvmInline
 value class CoseAlgorithm(val value: Int) {

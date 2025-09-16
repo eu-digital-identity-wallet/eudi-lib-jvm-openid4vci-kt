@@ -328,19 +328,24 @@ interface Issuer :
 }
 
 internal fun Client.ensureSupportedByAuthorizationServer(authorizationServerMetadata: CIAuthorizationServerMetadata) {
-    val tokenEndPointAuthMethods =
-        authorizationServerMetadata.tokenEndpointAuthMethods.orEmpty()
-
-    when (this) {
-        is Client.Attested -> {
-            val expectedMethod =
-                ClientAuthenticationMethod(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_CLIENT_AUTHENTICATION_METHOD)
-            require(expectedMethod in tokenEndPointAuthMethods) {
-                "${AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_CLIENT_AUTHENTICATION_METHOD} " +
-                    "not supported by authorization server"
-            }
+    if (this is Client.Attested) {
+        val supportedAuthenticationMethods = authorizationServerMetadata.tokenEndpointAuthMethods.orEmpty()
+        val authenticationMethod =
+            ClientAuthenticationMethod(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_CLIENT_AUTHENTICATION_METHOD)
+        require(authenticationMethod in supportedAuthenticationMethods) {
+            "${authenticationMethod.value} Authentication Method not supported by Authorization Server"
         }
 
-        else -> Unit
+        val supportedClientAttestationJWSAlgs = authorizationServerMetadata.clientAttestationJWSAlgs.orEmpty()
+        val clientAttestationJWSAlg = attestationJWT.jwt.header.algorithm
+        require(clientAttestationJWSAlg in supportedClientAttestationJWSAlgs) {
+            "${clientAttestationJWSAlg.name} Client Attestation JWS Algorithm not supported by Authorization Server"
+        }
+
+        val supportedClientAttestationPOPJWSAlgs = authorizationServerMetadata.clientAttestationPOPJWSAlgs.orEmpty()
+        val clientAttestationPOPJWSAlg = popJwtSpec.signingAlgorithm
+        require(clientAttestationPOPJWSAlg in supportedClientAttestationPOPJWSAlgs) {
+            "${clientAttestationPOPJWSAlg.name} Client Attestation POP JWS Algorithm not supported by Authorization Server"
+        }
     }
 }
