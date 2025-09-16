@@ -641,12 +641,12 @@ This feature cannot be disabled.
 
 ### OAUTH2 Attestation-Based Client Authentication
 
-Library supports [OAUTH2 Attestation-Based Client Authentication - Draft 03](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-03.html)
+Library supports [OAuth 2.0 Attestation-Based Client Authentication - Draft 07](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html)
 
-To enable this, caller must have obtained a [Client/Wallet Attestation JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-03.html#name-client-attestation-jwt)
+To enable this, caller must have obtained a [Client/Wallet Attestation JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html#name-client-attestation-jwt)
 How this is done, it is outside the scope of the library.
 
-Furthermore, caller must provide a specification on how to produce the [Client Attestation PoP JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-03.html#name-client-attestation-pop-jwt)
+Furthermore, caller must provide a specification on how to produce the [Client Attestation PoP JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html#name-client-attestation-pop-jwt)
 
 ```kotlin
 
@@ -667,11 +667,16 @@ val openId4VCIConfig = OpenId4VCIConfig(
 ```
 With this configuration library is able to 
 - Automatically generate the Client Attestation PoP JWT, with every call to the PAR and/or Token endpoint
-- Populate the [HTTP headers](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-03.html#name-client-attestation-http-hea) when accessing PAR and/or Token endpoints 
+- Populate the [HTTP headers](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html#name-client-attestation-http-hea) when accessing PAR and/or Token endpoints 
 
-Library will check that the authorization server of the issuer, 
-includes method `attest_jwt_client_auth` in claim `token_endpoint_auth_methods_supported`
-of its metadata.
+Library will check that the authorization server of the issuer:
+1. includes authentication method `attest_jwt_client_auth` in claim `token_endpoint_auth_methods_supported` of its metadata
+2. supports the JWS Algorithm of the Client Attestation JWT, i.e., the authorization server advertises the JWS Algorithm in the claim `client_attestation_signing_alg_values_supported` of its metadata
+3. supports the JWS Algorithm of the Client Attestation POP JWT, i.e., the authorization server advertises the JWS Algorithm in the claim `client_attestation_pop_signing_alg_values_supported` of its metadata
+
+Finally, library supports Client Attestation POP JWT [challenges](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html#name-challenge-retrieval) using: 
+* either the Challenge Endpoint, if advertised by the authorization server in claim `challenge_endpoint` of its metadata
+* or the `OAuth-Client-Attestation-Challenge` HTTP Header
 
 ## Features not supported
 
