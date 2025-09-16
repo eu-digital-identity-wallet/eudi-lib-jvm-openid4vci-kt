@@ -33,6 +33,7 @@ import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.*
+import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.http.*
 import eu.europa.ec.eudi.openid4vci.internal.issuanceEncryptionSpecs
 import io.ktor.client.engine.mock.*
@@ -103,6 +104,7 @@ internal fun issuerMetadataJsonContent(issuerMetadataVersion: IssuerMetadataVers
 enum class AuthServerMetadataVersion {
     FULL,
     NO_DPOP,
+    NO_CLIENT_ATTESTATION,
 }
 
 internal fun authServerWellKnownMocker(
@@ -115,6 +117,9 @@ internal fun authServerWellKnownMocker(
         val content = when (metadataVersion) {
             AuthServerMetadataVersion.FULL -> getResourceAsText("well-known/openid-configuration.json")
             AuthServerMetadataVersion.NO_DPOP -> getResourceAsText("well-known/openid-configuration_no_dpop.json")
+            AuthServerMetadataVersion.NO_CLIENT_ATTESTATION -> getResourceAsText(
+                "well-known/openid-configuration-no-client-attestation.json",
+            )
         }
         respond(
             content = content,
@@ -126,21 +131,54 @@ internal fun authServerWellKnownMocker(
     },
 )
 
-internal fun parPostMocker(validator: (request: HttpRequestData) -> Unit = {}): RequestMocker =
+internal fun challengePostMocker(challenge: Nonce? = null, validator: (request: HttpRequestData) -> Unit = {}): RequestMocker =
+    RequestMocker(
+        requestMatcher = endsWith("/ext/challenge", HttpMethod.Post),
+        responseBuilder = {
+            respond(
+                content =
+                    """
+                    {
+                        "${AttestationBasedClientAuthenticationSpec.ATTESTATION_CHALLENGE}": "${challenge?.value ?: UUID.randomUUID().toString()}"
+                    }
+                    """.trimIndent(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
+                ),
+            )
+        },
+        requestValidator = validator,
+    )
+
+internal fun parPostMocker(
+    updatedAbcaChallenge: Nonce? = null,
+    error: String? = null,
+    validator: (request: HttpRequestData) -> Unit = {
+    },
+): RequestMocker =
     RequestMocker(
         requestMatcher = endsWith("/ext/par/request", HttpMethod.Post),
         responseBuilder = {
             respond(
-                content = Json.encodeToString(
-                    PushedAuthorizationRequestResponseTO.Success(
-                        "org:example:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
-                        3600,
-                    ),
-                ),
-                status = HttpStatusCode.OK,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf("application/json"),
-                ),
+                content =
+                    if (null != error) {
+                        val body = GenericErrorResponseTO(error = error)
+                        JsonSupport.encodeToString(body)
+                    } else {
+                        val body = PushedAuthorizationRequestResponseTO.Success(
+                            "org:example:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
+                            3600,
+                        )
+                        JsonSupport.encodeToString(body)
+                    },
+                status = error?.let { HttpStatusCode.BadRequest } ?: HttpStatusCode.OK,
+                headers = headers {
+                    append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    updatedAbcaChallenge?.let {
+                        append(AttestationBasedClientAuthenticationSpec.CHALLENGE_HEADER, it.value)
+                    }
+                },
             )
         },
         requestValidator = validator,
