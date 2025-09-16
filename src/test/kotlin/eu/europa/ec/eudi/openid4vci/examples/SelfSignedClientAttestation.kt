@@ -206,7 +206,7 @@ private class ClientAttestationJwtBuilder(
     private fun jwsHeader(): JWSHeader =
         JWSHeader.Builder(algorithm).apply {
             headerCustomization()
-            type(JOSEObjectType(TYPE))
+            type(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
         }.build()
 
     private fun claimSetForm(claims: ClientAttestationClaims): JWTClaimsSet =
@@ -215,13 +215,13 @@ private class ClientAttestationJwtBuilder(
             val exp = now.plusSeconds(duration.inWholeSeconds)
             issuer(claims.issuer)
             subject(claims.clientId)
+            expirationTime(Date.from(exp))
             claim("cnf", cnf(claims.cnf))
             issueTime(Date.from(now))
-            expirationTime(Date.from(exp))
+            notBeforeTime(Date.from(now))
         }.build()
 
     companion object {
-        const val TYPE: String = "oauth-client-attestation+jwt"
         fun ecKey256(
             clock: Clock,
             duration: Duration,
