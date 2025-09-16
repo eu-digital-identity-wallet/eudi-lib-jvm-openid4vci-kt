@@ -53,7 +53,7 @@ value class ClientAttestationJWT(val jwt: SignedJWT) {
         requireNotNull(jwt.jwtClaimsSet.expirationTime) { "Invalid Attestation JWT. Misses `exp` claim" }
         val cnf = requireNotNull(jwt.jwtClaimsSet.cnf()) { "Invalid Attestation JWT. Misses `cnf` claim" }
         requireNotNull(cnf.cnfJwk()) { "Invalid Attestation JWT. Misses `jwk` claim from `cnf`" }
-        jwt.ensureSignedNotMAC()
+        jwt.ensureSignedOrVerified()
     }
 
     val clientId: ClientId get() = checkNotNull(jwt.jwtClaimsSet.subject)
@@ -76,6 +76,7 @@ value class ClientAttestationPoPJWT(val jwt: SignedJWT) {
         val audience = requireNotNull(jwt.jwtClaimsSet.audience) { "Invalid PoP JWT. Misses `aud` claim" }
         require(1 == audience.size) { "Invalid PoP JWT. Has more than one values in `aud` claim" }
         requireNotNull(jwt.jwtClaimsSet.jwtid) { "Invalid PoP JWT. Misses `jti` claim" }
+        requireNotNull(jwt.jwtClaimsSet.issueTime) { "Invalid PoP JWT. Misses `iat` claim" }
         jwt.ensureSignedNotMAC()
     }
 
@@ -118,10 +119,14 @@ fun interface ClientAttestationPoPBuilder {
     }
 }
 
-internal fun SignedJWT.ensureSignedNotMAC() {
+internal fun SignedJWT.ensureSignedOrVerified() {
     require(state == JWSObject.State.SIGNED || state == JWSObject.State.VERIFIED) {
         "Provided JWT is not signed"
     }
+}
+
+internal fun SignedJWT.ensureSignedNotMAC() {
+    ensureSignedOrVerified()
     val alg = requireNotNull(header.algorithm) { "Invalid JWT misses header alg" }
     requireIsNotMAC(alg)
 }
