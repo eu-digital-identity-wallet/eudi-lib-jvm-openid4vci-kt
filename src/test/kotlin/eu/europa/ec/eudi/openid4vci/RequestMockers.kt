@@ -184,22 +184,35 @@ internal fun parPostMocker(
         requestValidator = validator,
     )
 
-internal fun tokenPostMocker(dpopAccessToken: Boolean = false, validator: (request: HttpRequestData) -> Unit = {}): RequestMocker =
+internal fun tokenPostMocker(
+    dpopAccessToken: Boolean = false,
+    updatedAbcaChallenge: Nonce? = null,
+    error: String? = null,
+    validator: (request: HttpRequestData) -> Unit = {},
+): RequestMocker =
     RequestMocker(
         requestMatcher = endsWith("/token", HttpMethod.Post),
         responseBuilder = {
             respond(
-                content = Json.encodeToString(
-                    TokenResponseTO.Success(
-                        accessToken = UUID.randomUUID().toString(),
-                        expiresIn = 3600,
-                        tokenType = if (dpopAccessToken) "DPoP" else null,
-                    ),
-                ),
-                status = HttpStatusCode.OK,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf("application/json"),
-                ),
+                content =
+                    if (null != error) {
+                        val body = GenericErrorResponseTO(error = error)
+                        JsonSupport.encodeToString(body)
+                    } else {
+                        val body = TokenResponseTO.Success(
+                            accessToken = UUID.randomUUID().toString(),
+                            expiresIn = 3600,
+                            tokenType = if (dpopAccessToken) "DPoP" else null,
+                        )
+                        JsonSupport.encodeToString(body)
+                    },
+                status = error?.let { HttpStatusCode.BadRequest } ?: HttpStatusCode.OK,
+                headers = headers {
+                    append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    updatedAbcaChallenge?.let {
+                        append(AttestationBasedClientAuthenticationSpec.CHALLENGE_HEADER, it.value)
+                    }
+                },
             )
         },
         requestValidator = validator,

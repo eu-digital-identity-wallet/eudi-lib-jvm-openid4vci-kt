@@ -900,7 +900,7 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
-    fun `attested client uses updated challenge when authorization server provides one`() = runTest {
+    fun `attested client uses updated challenge when authorization server provides one in HTTP Header`() = runTest {
         val walletInstanceKey = ECKeyGenerator(Curve.P_521).keyID(UUID.randomUUID().toString()).generate()
         val client = selfSignedClient(
             walletInstanceKey = walletInstanceKey,
@@ -937,4 +937,94 @@ class IssuanceSingleRequestTest {
             authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
         }
     }
+
+    @Test
+    fun `issuance fails for attested client when authorization server returns use_attestation_challenge and no challenge`() =
+        runTest {
+            val walletInstanceKey = ECKeyGenerator(Curve.P_521).keyID(UUID.randomUUID().toString()).generate()
+            val client = selfSignedClient(
+                walletInstanceKey = walletInstanceKey,
+                clientId = "MyWallet_ClientId",
+            )
+            val abcaChallenge = Nonce(UUID.randomUUID().toString())
+
+            val mockedHttpClient = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
+                authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+                challengePostMocker(abcaChallenge),
+                parPostMocker(error = AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR) {
+                    it.verifySelfSignedClientAttestation(walletInstanceKey, abcaChallenge)
+                },
+            )
+
+            val config = OpenId4VCIConfiguration.copy(client = client)
+
+            val error = assertFailsWith<IllegalStateException> {
+                authorizeRequestForCredentialOffer(
+                    config = config,
+                    credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+                    httpClient = mockedHttpClient,
+                )
+            }
+            assertEquals(
+                "Authorization Server replied with " +
+                    "'${AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR}' " +
+                    "error code, but hasn't provided a challenge using the " +
+                    "'${AttestationBasedClientAuthenticationSpec.CHALLENGE_HEADER}' header",
+                error.message,
+            )
+        }
+
+    @Test
+    fun `attested client retries with updated challenge when authorization server returns use_attestation_challenge and a new challenge`() =
+        runTest {
+            val walletInstanceKey = ECKeyGenerator(Curve.P_521).keyID(UUID.randomUUID().toString()).generate()
+            val client = selfSignedClient(
+                walletInstanceKey = walletInstanceKey,
+                clientId = "MyWallet_ClientId",
+            )
+            val abcaChallenge = Nonce(UUID.randomUUID().toString())
+            val firstAbcaChallengeUpdate = Nonce(UUID.randomUUID().toString())
+            val secondAbcaChallengeUpdate = Nonce(UUID.randomUUID().toString())
+
+            val mockedHttpClient = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
+                authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+                challengePostMocker(abcaChallenge),
+                parPostMocker(
+                    updatedAbcaChallenge = firstAbcaChallengeUpdate,
+                    error = AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR,
+                ) {
+                    it.verifySelfSignedClientAttestation(walletInstanceKey, abcaChallenge)
+                },
+                parPostMocker {
+                    it.verifySelfSignedClientAttestation(walletInstanceKey, firstAbcaChallengeUpdate)
+                },
+                tokenPostMocker(
+                    updatedAbcaChallenge = secondAbcaChallengeUpdate,
+                    error = AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR,
+                ) {
+                    it.verifySelfSignedClientAttestation(walletInstanceKey, firstAbcaChallengeUpdate)
+                },
+                tokenPostMocker {
+                    it.verifySelfSignedClientAttestation(walletInstanceKey, secondAbcaChallengeUpdate)
+                },
+                nonceEndpointMocker(),
+                singleIssuanceRequestMocker(),
+            )
+
+            val config = OpenId4VCIConfiguration.copy(client = client)
+
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                config = config,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+                httpClient = mockedHttpClient,
+            )
+
+            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
+            }
+        }
 }
