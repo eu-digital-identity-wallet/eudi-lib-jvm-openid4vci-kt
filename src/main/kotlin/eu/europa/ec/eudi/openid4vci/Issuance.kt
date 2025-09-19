@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.internal.KeyGenerator
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration
 
@@ -174,11 +175,67 @@ interface RequestIssuance {
  * A factory method that based on the issuer's supported encryption and the wallet's configuration creates the encryption specification
  * that the wallet expects in the response of its issuance request.
  */
-typealias ResponseEncryptionSpecFactory =
-    (SupportedResponseEncryptionParameters, EncryptionSupportConfig) -> EncryptionSpec?
+fun interface ResponseEncryptionSpecFactory {
 
-typealias RequestEncryptionSpecFactory =
-    (SupportedRequestEncryptionParameters, EncryptionSupportConfig) -> EncryptionSpec?
+    fun make(
+        issuerSupportedResponseEncryptedParameters: SupportedResponseEncryptionParameters,
+        walletEncryptionSupportConfig: EncryptionSupportConfig,
+    ): EncryptionSpec?
+
+    companion object {
+        val DEFAULT: ResponseEncryptionSpecFactory =
+            ResponseEncryptionSpecFactory { issuerSupportedResponseEncryptedParameters, walletEncryptionSupportConfig ->
+                val issuerSupportedPayloadCompression = issuerSupportedResponseEncryptedParameters.payloadCompression
+                val compressionAlg = when (issuerSupportedPayloadCompression) {
+                    PayloadCompression.NotSupported -> null
+                    is PayloadCompression.Supported ->
+                        walletEncryptionSupportConfig.compressionAlgorithms?.intersect(
+                            issuerSupportedPayloadCompression.algorithms,
+                        )?.firstOrNull()
+                }
+
+                val encryptionMethod = issuerSupportedResponseEncryptedParameters.encryptionMethods
+                    .intersect(walletEncryptionSupportConfig.supportedEncryptionMethods).firstOrNull()
+                encryptionMethod?.let { method ->
+                    issuerSupportedResponseEncryptedParameters.algorithms.firstNotNullOfOrNull { algorithm ->
+                        KeyGenerator.genKeyIfSupported(walletEncryptionSupportConfig, algorithm)
+                            ?.let { jwk -> EncryptionSpec(jwk, method, compressionAlg) }
+                    }
+                }
+            }
+    }
+}
+
+fun interface RequestEncryptionSpecFactory {
+
+    fun make(
+        issuerSupportedRequestEncryptionParameters: SupportedRequestEncryptionParameters,
+        walletEncryptionSupportConfig: EncryptionSupportConfig,
+    ): EncryptionSpec?
+
+    companion object {
+        val DEFAULT: RequestEncryptionSpecFactory =
+            RequestEncryptionSpecFactory { issuerSupportedRequestEncryptionParameters, walletEncryptionSupportConfig ->
+                val issuerSupportedPayloadCompression = issuerSupportedRequestEncryptionParameters.payloadCompression
+                val walletSupportedCompressionAlgs = walletEncryptionSupportConfig.compressionAlgorithms
+                val compressionAlg = when (issuerSupportedPayloadCompression) {
+                    PayloadCompression.NotSupported -> null
+                    is PayloadCompression.Supported ->
+                        walletSupportedCompressionAlgs?.intersect(issuerSupportedPayloadCompression.algorithms)?.firstOrNull()
+                }
+
+                val walletSupportedEncryptionAlgorithms = walletEncryptionSupportConfig.supportedEncryptionAlgorithms
+                val walletSupportedEncryptionMethods = walletEncryptionSupportConfig.supportedEncryptionMethods
+                val encryptionMethod =
+                    issuerSupportedRequestEncryptionParameters.encryptionMethods.intersect(walletSupportedEncryptionMethods).firstOrNull()
+                encryptionMethod?.let { method ->
+                    issuerSupportedRequestEncryptionParameters.encryptionKeys.keys
+                        .filter { it.algorithm in walletSupportedEncryptionAlgorithms }
+                        .firstNotNullOfOrNull { key -> EncryptionSpec(key, method, compressionAlg) }
+                }
+            }
+    }
+}
 
 /**
  * Errors that can happen in the process of issuance process

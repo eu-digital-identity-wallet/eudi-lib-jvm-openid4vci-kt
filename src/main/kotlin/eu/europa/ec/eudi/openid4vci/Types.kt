@@ -311,7 +311,7 @@ data class EncryptionSpec(
  * @throws MissingRequiredRequestEncryptionSpecification Thrown when a response encryption specification is provided
  * but request encryption specification is missing.
  */
-data class IssuanceEncryptionSpecs(
+data class ExchangeEncryptionSpecification(
     val requestEncryptionSpec: EncryptionSpec?,
     val responseEncryptionSpec: EncryptionSpec?,
 ) {

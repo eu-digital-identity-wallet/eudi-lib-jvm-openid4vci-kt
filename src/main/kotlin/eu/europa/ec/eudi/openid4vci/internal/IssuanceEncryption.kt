@@ -37,7 +37,7 @@ internal fun issuanceEncryptionSpecs(
     credentialResponseEncryption: CredentialResponseEncryption,
     requestEncryptionSpecFactory: RequestEncryptionSpecFactory,
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
-): Result<IssuanceEncryptionSpecs> = runCatching {
+): Result<ExchangeEncryptionSpecification> = runCatching {
     val requestEncryptionSpec = requestEncryptionSpec(
         credentialRequestEncryption,
         encryptionSupportConfig,
@@ -49,7 +49,7 @@ internal fun issuanceEncryptionSpecs(
         responseEncryptionSpecFactory,
     ).getOrThrow()
 
-    IssuanceEncryptionSpecs(requestEncryptionSpec = requestEncryptionSpec, responseEncryptionSpec = responseEncryptionSpec)
+    ExchangeEncryptionSpecification(requestEncryptionSpec = requestEncryptionSpec, responseEncryptionSpec = responseEncryptionSpec)
 }
 
 /**
@@ -101,7 +101,7 @@ private fun responseEncryptionSpec(
             // or in case algorithm/method supported by Wallet is not supported by issuance server.
             val supportedResponseEncryptionParameters = encryption.encryptionParameters
             val maybeSpec = runCatching {
-                responseEncryptionSpecFactory(
+                responseEncryptionSpecFactory.make(
                     supportedResponseEncryptionParameters,
                     walletEncryptionSupportConfig,
                 )?.apply {
@@ -125,7 +125,7 @@ private fun responseEncryptionSpec(
             // Fail in case Wallet does not support Credential Response encryption or,
             // algorithms/methods supported by Wallet are not supported by issuance server.
             val supportedResponseEncryptionParameters = encryption.encryptionParameters
-            val maybeSpec = responseEncryptionSpecFactory(
+            val maybeSpec = responseEncryptionSpecFactory.make(
                 supportedResponseEncryptionParameters,
                 walletEncryptionSupportConfig,
             )?.apply {
@@ -185,7 +185,7 @@ private fun requestEncryptionSpec(
         is CredentialRequestEncryption.SupportedNotRequired -> {
             val issuerSupportedRequestEncryptionParameters = encryption.encryptionParameters
             runCatching {
-                requestEncryptionSpecFactory(
+                requestEncryptionSpecFactory.make(
                     issuerSupportedRequestEncryptionParameters,
                     walletEncryptionSupportConfig,
                 )?.apply {
@@ -196,7 +196,7 @@ private fun requestEncryptionSpec(
 
         is CredentialRequestEncryption.Required -> {
             val issuerSupportedRequestEncryptionParameters = encryption.encryptionParameters
-            val maybeSpec = requestEncryptionSpecFactory(
+            val maybeSpec = requestEncryptionSpecFactory.make(
                 issuerSupportedRequestEncryptionParameters,
                 walletEncryptionSupportConfig,
             )?.apply {

@@ -17,8 +17,6 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.DeferredIssuer.Companion.make
-import eu.europa.ec.eudi.openid4vci.Issuer.Companion.DefaultRequestEncryptionSpecFactory
-import eu.europa.ec.eudi.openid4vci.Issuer.Companion.DefaultResponseEncryptionSpecFactory
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessToken
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
@@ -188,8 +186,8 @@ interface DeferredIssuer : QueryForDeferredCredential {
                 encryptionSupportConfig = encryptionSupportConfig,
                 credentialRequestEncryption = issuerMetadata.credentialRequestEncryption,
                 credentialResponseEncryption = issuerMetadata.credentialResponseEncryption,
-                requestEncryptionSpecFactory = DefaultRequestEncryptionSpecFactory,
-                responseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+                requestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
+                responseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
             ).getOrThrow()
 
             val queryForDeferredCredential =

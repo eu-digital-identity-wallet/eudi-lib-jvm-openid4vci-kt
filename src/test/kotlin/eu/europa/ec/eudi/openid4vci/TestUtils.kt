@@ -18,8 +18,6 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.ecSigner
-import eu.europa.ec.eudi.openid4vci.Issuer.Companion.DefaultRequestEncryptionSpecFactory
-import eu.europa.ec.eudi.openid4vci.Issuer.Companion.DefaultResponseEncryptionSpecFactory
 import io.ktor.client.*
 import java.net.URI
 import java.util.*
@@ -105,8 +103,8 @@ val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
 suspend fun authorizeRequestForCredentialOffer(
     config: OpenId4VCIConfig? = OpenId4VCIConfiguration,
     credentialOfferStr: String,
-    responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
-    requestEncryptionSpecFactory: RequestEncryptionSpecFactory = DefaultRequestEncryptionSpecFactory,
+    responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
+    requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
     httpClient: HttpClient,
 ): Pair<AuthorizedRequest, Issuer> {
     val issuer = Issuer.make(
@@ -132,7 +130,7 @@ suspend fun authorizeRequestForCredentialOffer(
 suspend fun preAuthorizeRequestForCredentialOffer(
     config: OpenId4VCIConfig? = OpenId4VCIConfiguration,
     credentialOfferStr: String,
-    responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+    responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
     httpClient: HttpClient,
     txCode: String = "1234",
 ): Pair<AuthorizedRequest, Issuer> {

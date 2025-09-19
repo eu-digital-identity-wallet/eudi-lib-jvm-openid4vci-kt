@@ -32,8 +32,6 @@ import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
-import eu.europa.ec.eudi.openid4vci.Issuer.Companion.DefaultRequestEncryptionSpecFactory
-import eu.europa.ec.eudi.openid4vci.Issuer.Companion.DefaultResponseEncryptionSpecFactory
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.*
 import eu.europa.ec.eudi.openid4vci.internal.http.*
 import eu.europa.ec.eudi.openid4vci.internal.issuanceEncryptionSpecs
@@ -468,7 +466,7 @@ internal class RequestDecrypter(
 ) {
 
     private val credentialRequestEncryption: CredentialRequestEncryption
-    private val issuanceEncryptionSpecs: IssuanceEncryptionSpecs
+    private val exchangeEncryptionSpecification: ExchangeEncryptionSpecification
 
     init {
         val issuerMetadataJsonContent = issuerMetadataJsonContent(issuerMetadataVersion)
@@ -476,12 +474,12 @@ internal class RequestDecrypter(
         val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(issuerMetadataJsonContent, issuerId)
         credentialRequestEncryption = metadata.credentialRequestEncryption
 
-        issuanceEncryptionSpecs = issuanceEncryptionSpecs(
+        exchangeEncryptionSpecification = issuanceEncryptionSpecs(
             encryptionSupportConfig = walletConfig.encryptionSupportConfig,
             credentialRequestEncryption = metadata.credentialRequestEncryption,
             credentialResponseEncryption = metadata.credentialResponseEncryption,
-            requestEncryptionSpecFactory = DefaultRequestEncryptionSpecFactory,
-            responseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+            requestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
+            responseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ).getOrElse {
             fail(
                 "Failed to create encryption specs based on issuer metadata: $issuerMetadataVersion and " +
@@ -512,7 +510,7 @@ internal class RequestDecrypter(
 
         return when (contentType) {
             "application/jwt" -> {
-                val spec = issuanceEncryptionSpecs.requestEncryptionSpec
+                val spec = exchangeEncryptionSpecification.requestEncryptionSpec
                 assertNotNull(spec, "Request encryption spec expected")
                 val jwtClaimSet =
                     decrypt(textContent.text, spec.algorithm, spec.encryptionMethod, loadKeySet())

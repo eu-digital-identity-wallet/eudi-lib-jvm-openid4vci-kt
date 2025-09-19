@@ -120,21 +120,21 @@ internal class DeferredEndPointClient(
      * @param accessToken Access token authorizing the request
      * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
      * @param transactionId The identifier of the Deferred Issuance transaction
-     * @param issuanceEncryptionSpecs Encryption specifications for deferred request and response encryption
+     * @param exchangeEncryptionSpecification Encryption specifications for deferred request and response encryption
      * @return response from issuer. Can be either positive if a credential is issued or error in case issuance is still pending
      */
     suspend fun placeDeferredCredentialRequest(
         accessToken: AccessToken,
         resourceServerDpopNonce: Nonce?,
         transactionId: TransactionId,
-        issuanceEncryptionSpecs: IssuanceEncryptionSpecs,
+        exchangeEncryptionSpecification: ExchangeEncryptionSpecification,
     ): Result<Pair<DeferredCredentialQueryOutcome, Nonce?>> =
         runCatching {
             placeDeferredCredentialRequestInternal(
                 accessToken,
                 resourceServerDpopNonce,
                 transactionId,
-                issuanceEncryptionSpecs,
+                exchangeEncryptionSpecification,
                 false,
             )
         }
@@ -143,7 +143,7 @@ internal class DeferredEndPointClient(
         accessToken: AccessToken,
         resourceServerDpopNonce: Nonce?,
         transactionId: TransactionId,
-        issuanceEncryptionSpecs: IssuanceEncryptionSpecs,
+        exchangeEncryptionSpecification: ExchangeEncryptionSpecification,
         retried: Boolean,
     ): Pair<DeferredCredentialQueryOutcome, Nonce?> {
         val url = deferredCredentialEndpoint.value
@@ -154,7 +154,7 @@ internal class DeferredEndPointClient(
 
         val deferredRequestTO = DeferredRequestTO(
             transactionId = transactionId.value,
-            credentialResponseEncryption = issuanceEncryptionSpecs.responseEncryptionSpec?.let {
+            credentialResponseEncryption = exchangeEncryptionSpecification.responseEncryptionSpec?.let {
                 CredentialResponseEncryptionSpecTO.from(it)
             },
         )
@@ -163,7 +163,7 @@ internal class DeferredEndPointClient(
             bearerOrDPoPAuth(accessToken, jwt)
             encryptRequest(
                 requestTO = deferredRequestTO,
-                requestEncryptionSpec = issuanceEncryptionSpecs.requestEncryptionSpec,
+                requestEncryptionSpec = exchangeEncryptionSpecification.requestEncryptionSpec,
                 transferObjectToJwtClaims = { DeferredRequestTO.toJwtClaimsSet(it) },
             )
         }
@@ -172,7 +172,7 @@ internal class DeferredEndPointClient(
             val outcome =
                 responsePossiblyEncrypted<DeferredIssuanceSuccessResponseTO, DeferredCredentialQueryOutcome>(
                     response,
-                    issuanceEncryptionSpecs.responseEncryptionSpec,
+                    exchangeEncryptionSpecification.responseEncryptionSpec,
                     fromTransferObject = { it.toDomain() },
                     transferObjectFromJwtClaims = { DeferredIssuanceSuccessResponseTO.from(it) },
                 )
@@ -188,7 +188,7 @@ internal class DeferredEndPointClient(
                     accessToken,
                     newResourceServerDpopNonce,
                     transactionId,
-                    issuanceEncryptionSpecs,
+                    exchangeEncryptionSpecification,
                     true,
                 )
             } else {
