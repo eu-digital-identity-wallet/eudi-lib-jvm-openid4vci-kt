@@ -475,9 +475,8 @@ internal class RequestDecrypter(
         credentialRequestEncryption = metadata.credentialRequestEncryption
 
         exchangeEncryptionSpecification = issuanceEncryptionSpecs(
+            issuerMetadata = metadata,
             encryptionSupportConfig = walletConfig.encryptionSupportConfig,
-            credentialRequestEncryption = metadata.credentialRequestEncryption,
-            credentialResponseEncryption = metadata.credentialResponseEncryption,
             requestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ).getOrElse {

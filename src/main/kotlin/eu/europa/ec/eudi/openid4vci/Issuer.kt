@@ -154,9 +154,8 @@ interface Issuer :
                 )
 
             val issuanceEncryptionSpecs = issuanceEncryptionSpecs(
+                issuerMetadata = credentialOffer.credentialIssuerMetadata,
                 encryptionSupportConfig = config.encryptionSupportConfig,
-                credentialRequestEncryption = credentialOffer.credentialIssuerMetadata.credentialRequestEncryption,
-                credentialResponseEncryption = credentialOffer.credentialIssuerMetadata.credentialResponseEncryption,
                 requestEncryptionSpecFactory = requestEncryptionSpecFactory,
                 responseEncryptionSpecFactory = responseEncryptionSpecFactory,
             ).getOrThrow()

@@ -24,8 +24,7 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionEr
  * credential offer, configuration, and encryption specification factories.
  *
  * @param encryptionSupportConfig The configuration object containing wallet-specific properties and policies for encryption.
- * @param credentialRequestEncryption Issuer metadata about its capability to encrypt issuance requests.
- * @param credentialResponseEncryption Issuer metadata about its capability to encrypt issuance responses.
+ * @param issuerMetadata The metadata object containing the issuer's supported encryption parameters.
  * @param responseEncryptionSpecFactory A factory for creating the response encryption specification based on supported parameters.
  * @param requestEncryptionSpecFactory A factory for creating the request encryption specification needed for secure communication.
  * @return A Result object containing the `IssuanceEncryptionSpecs` that hold the encryption specifications
@@ -33,18 +32,17 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionEr
  */
 internal fun issuanceEncryptionSpecs(
     encryptionSupportConfig: EncryptionSupportConfig,
-    credentialRequestEncryption: CredentialRequestEncryption,
-    credentialResponseEncryption: CredentialResponseEncryption,
+    issuerMetadata: CredentialIssuerMetadata,
     requestEncryptionSpecFactory: RequestEncryptionSpecFactory,
     responseEncryptionSpecFactory: ResponseEncryptionSpecFactory,
 ): Result<ExchangeEncryptionSpecification> = runCatching {
     val requestEncryptionSpec = requestEncryptionSpec(
-        credentialRequestEncryption,
+        issuerMetadata.credentialRequestEncryption,
         encryptionSupportConfig,
         requestEncryptionSpecFactory,
     ).getOrThrow()
     val responseEncryptionSpec = responseEncryptionSpec(
-        credentialResponseEncryption,
+        issuerMetadata.credentialResponseEncryption,
         encryptionSupportConfig,
         responseEncryptionSpecFactory,
     ).getOrThrow()

@@ -183,9 +183,8 @@ interface DeferredIssuer : QueryForDeferredCredential {
 
             // Re-calculate the encryption parameters
             val issuanceEncryptionSpecs = issuanceEncryptionSpecs(
+                issuerMetadata = issuerMetadata,
                 encryptionSupportConfig = encryptionSupportConfig,
-                credentialRequestEncryption = issuerMetadata.credentialRequestEncryption,
-                credentialResponseEncryption = issuerMetadata.credentialResponseEncryption,
                 requestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
                 responseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
             ).getOrThrow()
