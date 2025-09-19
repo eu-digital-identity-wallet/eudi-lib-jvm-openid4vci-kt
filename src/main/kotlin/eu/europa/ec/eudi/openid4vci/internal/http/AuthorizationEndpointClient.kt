@@ -69,16 +69,6 @@ internal sealed interface PushedAuthorizationRequestResponseTO : java.io.Seriali
     ) : PushedAuthorizationRequestResponseTO
 }
 
-/**
- * The context of an Authorization Request.
- */
-internal data class AuthorizationRequestContext(
-    val authorizationUrl: HttpsUrl,
-    val pkceVerifier: PKCEVerifier,
-    val abcaChallenge: Nonce?,
-    val dpopNonce: Nonce?,
-) : java.io.Serializable
-
 internal class AuthorizationEndpointClient(
     private val credentialIssuerId: CredentialIssuerId,
     private val authorizationIssuer: String,
@@ -360,9 +350,3 @@ private object AuthorizationEndpointParams {
     const val PARAM_REQUEST_URI = "request_uri"
     const val PARAM_STATE = "state"
 }
-
-private data class PushedAuthorizationRequestResponse(
-    val response: PushedAuthorizationRequestResponseTO,
-    val abcaChallenge: Nonce?,
-    val dpopNonce: Nonce?,
-) : java.io.Serializable
