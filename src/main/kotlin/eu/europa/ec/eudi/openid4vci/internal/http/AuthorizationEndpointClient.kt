@@ -122,7 +122,7 @@ internal class AuthorizationEndpointClient(
         credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
         state: String,
         issuerState: String?,
-    ): Result<AuthorizationRequestContext> {
+    ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> {
         val usePar = when (config.parUsage) {
             ParUsage.IfSupported -> supportsPar
             ParUsage.Never -> false
@@ -136,15 +136,9 @@ internal class AuthorizationEndpointClient(
         return if (usePar) {
             submitPushedAuthorizationRequest(scopes, credentialsConfigurationIds, state, issuerState)
         } else {
-            authorizationRequestUrl(scopes, credentialsConfigurationIds, state, issuerState)
-                .map { (pkceVerifier, authorizationUrl) ->
-                    AuthorizationRequestContext(
-                        authorizationUrl = authorizationUrl,
-                        pkceVerifier = pkceVerifier,
-                        abcaChallenge = null,
-                        dpopNonce = null,
-                    )
-                }
+            authorizationRequestUrl(scopes, credentialsConfigurationIds, state, issuerState).map { (a, b) ->
+                Triple(a, b, null)
+            }
         }
     }
 
@@ -165,7 +159,7 @@ internal class AuthorizationEndpointClient(
         credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
         state: String,
         issuerState: String?,
-    ): Result<AuthorizationRequestContext> = runCatching {
+    ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> = runCatching {
         require(scopes.isNotEmpty() || credentialsConfigurationIds.isNotEmpty()) {
             "No scopes or authorization details provided. Cannot submit par."
         }
@@ -199,14 +193,9 @@ internal class AuthorizationEndpointClient(
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
         }
-        val parResponse = pushAuthorizationRequest(parEndpoint, pushedAuthorizationRequest)
-        val (pkceVerifier, url) = parResponse.response.authorizationCodeUrlOrFail(clientID, codeVerifier, state)
-        AuthorizationRequestContext(
-            authorizationUrl = url,
-            pkceVerifier = pkceVerifier,
-            abcaChallenge = parResponse.abcaChallenge,
-            dpopNonce = parResponse.dpopNonce,
-        )
+        val (response, dpopNonce) = pushAuthorizationRequest(parEndpoint, pushedAuthorizationRequest)
+        val (pkceVerifier, url) = response.authorizationCodeUrlOrFail(clientID, codeVerifier, state)
+        Triple(pkceVerifier, url, dpopNonce)
     }
 
     private fun authorizationRequestUrl(
@@ -276,7 +265,7 @@ internal class AuthorizationEndpointClient(
     private suspend fun pushAuthorizationRequest(
         parEndpoint: URI,
         pushedAuthorizationRequest: PushedAuthorizationRequest,
-    ): PushedAuthorizationRequestResponse {
+    ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> {
         val url = parEndpoint.toURL()
         val formParameters = run {
             val fps = pushedAuthorizationRequest.asFormPostParams()
@@ -290,7 +279,7 @@ internal class AuthorizationEndpointClient(
             existingDpopNonce: Nonce?,
             abcaChallengeRetried: Boolean,
             dpopNonceRetried: Boolean,
-        ): PushedAuthorizationRequestResponse {
+        ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> {
             val dpopProof =
                 dPoPJwtFactory?.createDPoPJwt(Htm.POST, url, null, existingDpopNonce)
                     ?.getOrThrow()?.serialize()
@@ -310,13 +299,8 @@ internal class AuthorizationEndpointClient(
             return when {
                 response.status.isSuccess() -> {
                     val responseTO = response.body<PushedAuthorizationRequestResponseTO.Success>()
-                    val newAbcaChallenge = response.abcaChallege()
                     val newDopNonce = response.dpopNonce()
-                    PushedAuthorizationRequestResponse(
-                        responseTO,
-                        abcaChallenge = newAbcaChallenge ?: abcaChallenge,
-                        dpopNonce = newDopNonce ?: existingDpopNonce,
-                    )
+                    responseTO to (newDopNonce ?: existingDpopNonce)
                 }
 
                 response.status == HttpStatusCode.BadRequest -> {
@@ -351,11 +335,7 @@ internal class AuthorizationEndpointClient(
                             )
                         }
 
-                        else -> PushedAuthorizationRequestResponse(
-                            errorTO,
-                            abcaChallenge = newAbcaChallenge ?: existingAbcaChallenge,
-                            dpopNonce = newDopNonce ?: existingDpopNonce,
-                        )
+                        else -> errorTO to (newDopNonce ?: existingDpopNonce)
                     }
                 }
 

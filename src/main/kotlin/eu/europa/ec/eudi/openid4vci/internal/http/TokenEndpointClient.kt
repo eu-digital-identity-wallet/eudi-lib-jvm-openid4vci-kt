@@ -19,7 +19,7 @@ import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.Grants.PreAuthorizedCode
 import eu.europa.ec.eudi.openid4vci.internal.GrantedAuthorizationDetailsSerializer
-import eu.europa.ec.eudi.openid4vci.internal.Tokens
+import eu.europa.ec.eudi.openid4vci.internal.TokenResponse
 import eu.europa.ec.eudi.openid4vci.internal.clientAttestationHeaders
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -67,10 +67,10 @@ internal sealed interface TokenResponseTO {
         @SerialName("error_description") val errorDescription: String? = null,
     ) : TokenResponseTO
 
-    fun tokensOrFail(clock: Clock): Tokens =
+    fun tokensOrFail(clock: Clock): TokenResponse =
         when (this) {
             is Success -> {
-                Tokens(
+                TokenResponse(
                     accessToken = AccessToken(
                         accessToken = accessToken,
                         expiresInSec = expiresIn,
@@ -85,12 +85,6 @@ internal sealed interface TokenResponseTO {
             is Failure -> throw AccessTokenRequestFailed(error, errorDescription)
         }
 }
-
-internal class TokensResponse(
-    val tokens: Tokens,
-    val abcaChallenge: Nonce?,
-    val dpopNonce: Nonce?,
-)
 
 internal class TokenEndpointClient(
     private val credentialIssuerId: CredentialIssuerId,
@@ -145,9 +139,8 @@ internal class TokenEndpointClient(
         authorizationCode: AuthorizationCode,
         pkceVerifier: PKCEVerifier,
         credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
-        abcaChallenge: Nonce?,
         dpopNonce: Nonce?,
-    ): Result<TokensResponse> = runCatching {
+    ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
         // Append authorization_details form param if needed
         val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
             authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
@@ -160,7 +153,7 @@ internal class TokenEndpointClient(
                 pkceVerifier = pkceVerifier,
                 authorizationDetails = authDetails,
             )
-        placeTokenRequest(params, abcaChallenge = abcaChallenge, dpopNonce = dpopNonce)
+        placeTokenRequest(params, dpopNonce)
     }
 
     /**
@@ -177,9 +170,8 @@ internal class TokenEndpointClient(
         preAuthorizedCode: PreAuthorizedCode,
         txCode: String?,
         credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
-        abcaChallenge: Nonce?,
         dpopNonce: Nonce?,
-    ): Result<TokensResponse> = runCatching {
+    ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
         // Append authorization_details form param if needed
         val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
             authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
@@ -191,7 +183,7 @@ internal class TokenEndpointClient(
                 txCode = txCode,
                 authorizationDetails = authDetails,
             )
-        placeTokenRequest(params, abcaChallenge = abcaChallenge, dpopNonce = dpopNonce)
+        placeTokenRequest(params, dpopNonce)
     }
 
     /**
@@ -199,29 +191,32 @@ internal class TokenEndpointClient(
      * the refresh token
      * @param refreshToken the token to be used for refreshing the access token
      *
-     * @return the token end point response, which will include a new [Tokens.accessToken] and possibly
-     * a new [Tokens.refreshToken]
+     * @return the token end point response, which will include a new [TokenResponse.accessToken] and possibly
+     * a new [TokenResponse.refreshToken]
      */
     suspend fun refreshAccessToken(
         refreshToken: RefreshToken,
-        abcaChallenge: Nonce?,
         dpopNonce: Nonce?,
-    ): Result<TokensResponse> = runCatching {
+    ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
         val params = TokenEndpointForm.refreshAccessToken(client.id, refreshToken)
-        placeTokenRequest(params, abcaChallenge = abcaChallenge, dpopNonce = dpopNonce)
+        placeTokenRequest(params, dpopNonce)
     }
 
     private suspend fun placeTokenRequest(
         params: Map<String, String>,
-        abcaChallenge: Nonce?,
         dpopNonce: Nonce?,
-    ): TokensResponse {
+    ): Pair<TokenResponse, Nonce?> {
         tailrec suspend fun requestInternal(
             existingAbcaChallenge: Nonce?,
             existingDpopNonce: Nonce?,
             retriedAbcaChallenge: Boolean,
             retriedDPoPNonce: Boolean,
-        ): TokensResponse {
+        ): Pair<TokenResponseTO, Nonce?> {
+            val abcaChallenge = when (client) {
+                is Client.Attested -> existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
+                else -> null
+            }
+
             val response = run {
                 val formParameters = Parameters.build {
                     params.entries.forEach { (k, v) -> append(k, v) }
@@ -229,11 +224,6 @@ internal class TokenEndpointClient(
                 val jwt =
                     dPoPJwtFactory?.createDPoPJwt(Htm.POST, tokenEndpoint, null, existingDpopNonce)
                         ?.getOrThrow()?.serialize()
-
-                val abcaChallenge = when (client) {
-                    is Client.Attested -> existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
-                    else -> null
-                }
 
                 httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
                     jwt?.let { header(DPoP, jwt) }
@@ -244,13 +234,8 @@ internal class TokenEndpointClient(
             return when {
                 response.status.isSuccess() -> {
                     val responseTO = response.body<TokenResponseTO.Success>()
-                    val newAbcaChallenge = response.abcaChallege()
                     val newDopNonce = response.dpopNonce()
-                    TokensResponse(
-                        responseTO.tokensOrFail(clock),
-                        abcaChallenge = newAbcaChallenge ?: abcaChallenge,
-                        dpopNonce = newDopNonce ?: existingDpopNonce,
-                    )
+                    responseTO to (newDopNonce ?: existingDpopNonce)
                 }
 
                 response.status == HttpStatusCode.BadRequest -> {
@@ -284,7 +269,7 @@ internal class TokenEndpointClient(
                             )
                         }
 
-                        else -> throw AccessTokenRequestFailed(errorTO.error, errorTO.errorDescription)
+                        else -> errorTO to (newDopNonce ?: existingDpopNonce)
                     }
                 }
 
@@ -292,12 +277,13 @@ internal class TokenEndpointClient(
             }
         }
 
-        return requestInternal(
-            existingAbcaChallenge = abcaChallenge,
+        val (responseTO, newDopNonce) = requestInternal(
+            existingAbcaChallenge = null,
             existingDpopNonce = dpopNonce,
             retriedAbcaChallenge = false,
             retriedDPoPNonce = false,
         )
+        return responseTO.tokensOrFail(clock) to newDopNonce
     }
 
     private fun authorizationDetailsFormParam(

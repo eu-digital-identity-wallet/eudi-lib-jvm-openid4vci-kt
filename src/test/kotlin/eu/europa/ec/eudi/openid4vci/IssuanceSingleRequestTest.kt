@@ -869,6 +869,7 @@ class IssuanceSingleRequestTest {
             clientId = "MyWallet_ClientId",
         )
         val abcaChallenge = Nonce(UUID.randomUUID().toString())
+        val updatedAbcaChallenge = Nonce(UUID.randomUUID().toString())
 
         val mockedHttpClient = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
@@ -877,45 +878,7 @@ class IssuanceSingleRequestTest {
             parPostMocker {
                 it.verifySelfSignedClientAttestation(walletInstanceKey, abcaChallenge)
             },
-            tokenPostMocker {
-                it.verifySelfSignedClientAttestation(walletInstanceKey, abcaChallenge)
-            },
-            nonceEndpointMocker(),
-            singleIssuanceRequestMocker(),
-        )
-
-        val config = OpenId4VCIConfiguration.copy(client = client)
-
-        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            config = config,
-            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            httpClient = mockedHttpClient,
-        )
-
-        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-        with(issuer) {
-            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
-        }
-    }
-
-    @Test
-    fun `attested client uses updated challenge when authorization server provides one in HTTP Header`() = runTest {
-        val walletInstanceKey = ECKeyGenerator(Curve.P_521).keyID(UUID.randomUUID().toString()).generate()
-        val client = selfSignedClient(
-            walletInstanceKey = walletInstanceKey,
-            clientId = "MyWallet_ClientId",
-        )
-        val abcaChallenge = Nonce(UUID.randomUUID().toString())
-        val updatedAbcaChallenge = Nonce(UUID.randomUUID().toString())
-
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
-            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
-            challengePostMocker(abcaChallenge),
-            parPostMocker(updatedAbcaChallenge) {
-                it.verifySelfSignedClientAttestation(walletInstanceKey, abcaChallenge)
-            },
+            challengePostMocker(updatedAbcaChallenge),
             tokenPostMocker {
                 it.verifySelfSignedClientAttestation(walletInstanceKey, updatedAbcaChallenge)
             },
@@ -1000,6 +963,7 @@ class IssuanceSingleRequestTest {
                 parPostMocker {
                     it.verifySelfSignedClientAttestation(walletInstanceKey, firstAbcaChallengeUpdate)
                 },
+                challengePostMocker(firstAbcaChallengeUpdate),
                 tokenPostMocker(
                     updatedAbcaChallenge = secondAbcaChallengeUpdate,
                     error = AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR,

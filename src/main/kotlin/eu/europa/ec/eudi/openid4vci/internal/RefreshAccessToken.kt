@@ -35,17 +35,13 @@ internal class RefreshAccessToken(
 
     private suspend fun refresh(authorizedRequest: AuthorizedRequest): AuthorizedRequest {
         val refreshToken = requireNotNull(authorizedRequest.refreshToken)
-        val tokensResponse = tokenEndpointClient.refreshAccessToken(
-            refreshToken,
-            abcaChallenge = authorizedRequest.abcaChallenge,
-            dpopNonce = authorizedRequest.authorizationServerDpopNonce,
-        ).getOrThrow()
+        val (tokenResponse, newDpopNonce) =
+            tokenEndpointClient.refreshAccessToken(refreshToken, authorizedRequest.authorizationServerDpopNonce).getOrThrow()
         return authorizedRequest.withRefreshedAccessToken(
-            refreshedAccessToken = tokensResponse.tokens.accessToken,
-            newRefreshToken = tokensResponse.tokens.refreshToken,
-            at = tokensResponse.tokens.timestamp,
-            newAbcaChallenge = tokensResponse.abcaChallenge,
-            newAuthorizationServerDpopNonce = tokensResponse.dpopNonce,
+            refreshedAccessToken = tokenResponse.accessToken,
+            newRefreshToken = tokenResponse.refreshToken,
+            at = tokenResponse.timestamp,
+            newAuthorizationServerDpopNonce = newDpopNonce,
         )
     }
 }
