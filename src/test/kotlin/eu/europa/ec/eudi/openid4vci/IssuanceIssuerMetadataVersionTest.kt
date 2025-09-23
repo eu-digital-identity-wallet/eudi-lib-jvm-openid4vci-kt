@@ -55,7 +55,7 @@ class IssuanceIssuerMetadataVersionTest {
                 credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             )
             val issuanceResponseEncryptionSpec = EncryptionSpec(
-                jwk = randomRSAEncryptionKey(2048, JWEAlgorithm.RSA_OAEP_384),
+                recipientKey = randomRSAEncryptionKey(2048, JWEAlgorithm.RSA_OAEP_384),
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
@@ -80,7 +80,7 @@ class IssuanceIssuerMetadataVersionTest {
                 credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             )
             val issuanceResponseEncryptionSpec = EncryptionSpec(
-                jwk = randomRSAEncryptionKey(2048),
+                recipientKey = randomRSAEncryptionKey(2048),
                 encryptionMethod = EncryptionMethod.A256GCM,
             )
 
@@ -105,7 +105,7 @@ class IssuanceIssuerMetadataVersionTest {
                 credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_NOT_SUPPORTED),
             )
             val issuanceResponseEncryptionSpec = EncryptionSpec(
-                jwk = randomRSAEncryptionKey(2048),
+                recipientKey = randomRSAEncryptionKey(2048),
                 encryptionMethod = EncryptionMethod.A256GCM,
             )
 
@@ -171,7 +171,7 @@ class IssuanceIssuerMetadataVersionTest {
                 ),
             )
             val issuanceResponseEncryptionSpec = EncryptionSpec(
-                jwk = randomRSAEncryptionKey(2048),
+                recipientKey = randomRSAEncryptionKey(2048),
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
@@ -222,7 +222,7 @@ class IssuanceIssuerMetadataVersionTest {
                 ),
             )
             val issuanceResponseEncryptionSpec = EncryptionSpec(
-                jwk = randomRSAEncryptionKey(2048),
+                recipientKey = randomRSAEncryptionKey(2048),
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
@@ -299,7 +299,7 @@ class IssuanceIssuerMetadataVersionTest {
                 credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_SUPPORTED_NOT_REQUIRED),
             )
             val issuanceResponseEncryptionSpec = EncryptionSpec(
-                jwk = randomRSAEncryptionKey(2048),
+                recipientKey = randomRSAEncryptionKey(2048),
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
             assertFailsWith<MissingRequiredRequestEncryptionSpecification> {
@@ -322,7 +322,7 @@ class IssuanceIssuerMetadataVersionTest {
                 credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ENCRYPTION_REQUIRED),
             )
             val issuanceResponseEncryptionSpec = EncryptionSpec(
-                jwk = randomRSAEncryptionKey(2048),
+                recipientKey = randomRSAEncryptionKey(2048),
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
             assertFailsWith<IssuerRequiresEncryptedRequestButEncryptionSpecCannotBeFormulated> {
@@ -420,7 +420,7 @@ class IssuanceIssuerMetadataVersionTest {
             )
 
             val issuanceResponseEncryptionSpec = EncryptionSpec(
-                jwk = randomRSAEncryptionKey(2048),
+                recipientKey = randomRSAEncryptionKey(2048),
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
@@ -484,7 +484,7 @@ class IssuanceIssuerMetadataVersionTest {
             )
 
             val issuanceResponseEncryptionSpec = EncryptionSpec(
-                jwk = randomRSAEncryptionKey(2048),
+                recipientKey = randomRSAEncryptionKey(2048),
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
@@ -530,7 +530,7 @@ class IssuanceIssuerMetadataVersionTest {
             )
 
             val issuanceResponseEncryptionSpec = EncryptionSpec(
-                jwk = randomRSAEncryptionKey(2048),
+                recipientKey = randomRSAEncryptionKey(2048),
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
@@ -629,7 +629,7 @@ class IssuanceIssuerMetadataVersionTest {
             )
 
             val issuanceResponseEncryptionSpec = EncryptionSpec(
-                jwk = randomRSAEncryptionKey(2048),
+                recipientKey = randomRSAEncryptionKey(2048),
                 encryptionMethod = EncryptionMethod.A128CBC_HS256,
             )
 
@@ -655,7 +655,7 @@ class IssuanceIssuerMetadataVersionTest {
     @Test
     fun `when issuer metadata mandate encrypted responses, deferred responses must be encrypted`() = runTest {
         val responseEncryption = EncryptionSpec(
-            jwk = randomRSAEncryptionKey(2048),
+            recipientKey = randomRSAEncryptionKey(2048),
             encryptionMethod = EncryptionMethod.A128CBC_HS256,
         )
         val mockedKtorHttpClientFactory = mockedHttpClient(
@@ -681,7 +681,7 @@ class IssuanceIssuerMetadataVersionTest {
                     respond(
                         content = encypt(
                             JWTClaimsSet.parse(responseJson),
-                            responseEncryption.jwk,
+                            responseEncryption.recipientKey,
                             responseEncryption.algorithm,
                             responseEncryption.encryptionMethod,
                         ).getOrThrow(),

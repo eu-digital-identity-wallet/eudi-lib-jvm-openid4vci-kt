@@ -41,7 +41,7 @@ internal data class CredentialResponseEncryptionSpecTO(
 
         fun from(responseEncryption: EncryptionSpec): CredentialResponseEncryptionSpecTO {
             val credentialEncryptionJwk =
-                Json.parseToJsonElement(responseEncryption.jwk.toPublicJWK().toString()).jsonObject
+                Json.parseToJsonElement(responseEncryption.recipientKey.toPublicJWK().toString()).jsonObject
             val credentialResponseEncryptionMethod = responseEncryption.encryptionMethod.toString()
             val encryptedPayloadCompressionAlgorithm = responseEncryption.compressionAlgorithm?.toString()
             return CredentialResponseEncryptionSpecTO(

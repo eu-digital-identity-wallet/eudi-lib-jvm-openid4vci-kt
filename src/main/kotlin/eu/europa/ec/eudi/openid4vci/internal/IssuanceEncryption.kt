@@ -161,7 +161,7 @@ private fun requestEncryptionSpec(
     fun EncryptionSpec.validate(
         issuerSupportedRequestEncryptionParameters: SupportedRequestEncryptionParameters,
     ) {
-        ensure(jwk in issuerSupportedRequestEncryptionParameters.encryptionKeys.keys) {
+        ensure(recipientKey in issuerSupportedRequestEncryptionParameters.encryptionKeys.keys) {
             RequestEncryptionKeyNotAnIssuerKey()
         }
         ensure(encryptionMethod in issuerSupportedRequestEncryptionParameters.encryptionMethods) {

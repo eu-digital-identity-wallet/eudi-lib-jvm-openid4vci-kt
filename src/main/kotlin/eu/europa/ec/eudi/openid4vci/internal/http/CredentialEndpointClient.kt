@@ -223,14 +223,14 @@ private inline fun <reified RequestTO> HttpRequestBuilder.encryptRequest(
 private fun EncryptionSpec.encrypt(jwtClaimSet: JWTClaimsSet): String {
     fun EncryptionSpec.jweHeader() =
         JWEHeader.Builder(algorithm, encryptionMethod).apply {
-            jwk(jwk)
+            jwk(recipientKey)
             type(JOSEObjectType.JWT)
-            jwk.keyID?.let { keyID(it) }
+            recipientKey.keyID?.let { keyID(it) }
             compressionAlgorithm?.let { compressionAlgorithm(it) }
         }.build()
 
     return EncryptedJWT(jweHeader(), jwtClaimSet)
-        .apply { encrypt(jwk) }
+        .apply { encrypt(recipientKey) }
         .serialize()
 }
 
@@ -264,7 +264,7 @@ private suspend inline fun <reified ResponseTO, Response> responsePossiblyEncryp
                 jweKeySelector = JWEDecryptionKeySelector(
                     encryptionSpec.algorithm,
                     encryptionSpec.encryptionMethod,
-                    ImmutableJWKSet(JWKSet(encryptionSpec.jwk)),
+                    ImmutableJWKSet(JWKSet(encryptionSpec.recipientKey)),
                 )
             }
             val jwtClaimSet = jwtProcessor.process(jwt, null)

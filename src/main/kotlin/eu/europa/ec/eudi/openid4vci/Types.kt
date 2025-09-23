@@ -251,7 +251,7 @@ sealed interface JwtBindingKey {
  * encryption operation and ensures that they adhere to the expected asymmetric
  * encryption standards.
  *
- * @property jwk The JSON Web Key (JWK) used for encryption, representing the cryptographic key.
+ * @property recipientKey The JSON Web Key (JWK) used for encryption, representing the cryptographic key.
  * @property encryptionMethod The encryption method specifying the algorithm for payload encryption.
  * @property compressionAlgorithm An optional compression algorithm to apply before encryption.
  * @property encryptionKeyAlgorithm The derived encryption key algorithm from the JWK's algorithm property, expected to be of type JWEAlgorithm.
@@ -260,23 +260,23 @@ sealed interface JwtBindingKey {
  * or the algorithm is incompatible with the key or encryption process.
  */
 data class EncryptionSpec(
-    val jwk: JWK,
+    val recipientKey: JWK,
     val encryptionMethod: EncryptionMethod,
     val compressionAlgorithm: CompressionAlgorithm? = null,
 ) : java.io.Serializable {
 
     val algorithm: JWEAlgorithm
-        get() = JWEAlgorithm.parse(jwk.algorithm.name)
+        get() = JWEAlgorithm.parse(recipientKey.algorithm.name)
 
     init {
         // Validate key is for encryption operation
-        val keyUse: KeyUse? = jwk.keyUse
+        val keyUse: KeyUse? = recipientKey.keyUse
         if (keyUse != null) {
             require(keyUse == KeyUse.ENCRYPTION) {
                 "Provided key use is not encryption"
             }
         }
-        val keyAlgorithm = jwk.algorithm
+        val keyAlgorithm = recipientKey.algorithm
         requireNotNull(keyAlgorithm) {
             "Provided key does not contain an algorithm"
         }
@@ -285,7 +285,7 @@ data class EncryptionSpec(
             "Provided encryption algorithm is not an asymmetric encryption algorithm"
         }
         // Validate algorithm matches key
-        require(jwk.keyType == KeyType.forAlgorithm(keyAlgorithm)) {
+        require(recipientKey.keyType == KeyType.forAlgorithm(keyAlgorithm)) {
             "Encryption key and encryption algorithm do not match"
         }
     }
