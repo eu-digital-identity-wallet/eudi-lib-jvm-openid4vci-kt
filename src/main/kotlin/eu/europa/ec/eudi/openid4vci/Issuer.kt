@@ -219,7 +219,13 @@ interface Issuer :
                 override fun AuthorizedRequest.deferredContext(
                     deferredCredential: SubmissionOutcome.Deferred,
                 ): DeferredIssuanceContext {
+                    val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
                     val authorizationServerMetadata = credentialOffer.authorizationServerMetadata
+
+                    val deferredEndpoint =
+                        checkNotNull(credentialIssuerMetadata.deferredCredentialEndpoint?.value) {
+                            "Missing deferred credential endpoint"
+                        }
 
                     val tokenEndpoint =
                         checkNotNull(authorizationServerMetadata.tokenEndpointURI?.toURL()) {
@@ -230,6 +236,7 @@ interface Issuer :
                         DeferredIssuerConfig(
                             credentialIssuerId = credentialOffer.credentialIssuerIdentifier,
                             client = config.client,
+                            deferredEndpoint = deferredEndpoint,
                             authServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
                             tokenEndpoint = tokenEndpoint,
                             dPoPSigner = dPoPJwtFactory?.signer,

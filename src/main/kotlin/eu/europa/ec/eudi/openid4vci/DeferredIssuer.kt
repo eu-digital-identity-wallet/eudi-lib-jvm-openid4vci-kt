@@ -32,13 +32,19 @@ import java.time.Clock
  * the [DeferredIssuer].
  *
  * @param client the client for the wallet
+ * @param deferredEndpoint the URL of the deferred endpoint
  * @param tokenEndpoint the URL of the token endpoint. Will be used if needed, to refresh the access token
+ * @param authServerId the URL of the authorization server that was selected for authenticating the initial request.
+ * @param credentialIssuerId the ID of the Credential Issuer
+ * @param clientAttestationPoPBuilder the builder for the client attestation proof of possession.
+ *   Must be provided only if client was of Client.Attested kind.
  * @param dPoPSigner the signer that was used for DPoP. Must be provided only if DPoP was used.
  * @param clock Wallet's clock
  */
 data class DeferredIssuerConfig(
     val credentialIssuerId: CredentialIssuerId,
     val client: Client,
+    val deferredEndpoint: URL,
     val authServerId: URL,
     val tokenEndpoint: URL,
     val dPoPSigner: Signer<JWK>? = null,
@@ -171,12 +177,8 @@ interface DeferredIssuer : QueryForDeferredCredential {
                 resolver.resolve(config.credentialIssuerId, issuerMetadataPolicy).getOrThrow()
             }
 
-            val deferredCredentialEndpoint = issuerMetadata.deferredCredentialEndpoint
-            requireNotNull(deferredCredentialEndpoint) {
-                "Cannot construct DeferredIssuer as the credential issuer does not advertise an endpoint for deferred issuance requests."
-            }
             val deferredEndPointClient = DeferredEndPointClient(
-                CredentialIssuerEndpoint.invoke(deferredCredentialEndpoint.toString()).getOrThrow(),
+                CredentialIssuerEndpoint.invoke(config.deferredEndpoint.toString()).getOrThrow(),
                 dPoPJwtFactory,
                 httpClient,
             )

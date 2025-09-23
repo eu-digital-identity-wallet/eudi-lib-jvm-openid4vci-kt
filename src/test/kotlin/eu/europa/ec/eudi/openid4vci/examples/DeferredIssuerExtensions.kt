@@ -135,6 +135,7 @@ data class DeferredIssuanceStoredContextTO(
     @SerialName("client_attestation_pop_alg") val clientAttestationPopAlgorithm: String? = null,
     @SerialName("client_attestation_pop_typ") val clientAttestationPopType: String? = null,
     @SerialName("client_attestation_pop_key_id") val clientAttestationPopKeyId: String? = null,
+    @Required @SerialName("deferred_endpoint") val deferredEndpoint: String,
     @Required @SerialName("auth_server_id") val authServerId: String,
     @Required @SerialName("token_endpoint") val tokenEndpoint: String,
     @SerialName("dpop_key_id") val dPoPSignerKid: String? = null,
@@ -174,6 +175,7 @@ data class DeferredIssuanceStoredContextTO(
 
                         Client.Attested(jwt, poPJWTSpec)
                     },
+                deferredEndpoint = URI(deferredEndpoint).toURL(),
                 authServerId = URI(authServerId).toURL(),
                 tokenEndpoint = URI(tokenEndpoint).toURL(),
                 dPoPSigner = dPoPSignerKid?.let { requireNotNull(recreatePopSigner).invoke(it) },
@@ -216,6 +218,7 @@ data class DeferredIssuanceStoredContextTO(
                 clientAttestationPopDuration = dCtx.config.client.ifAttested { popJwtSpec.duration.inWholeSeconds },
                 clientAttestationPopAlgorithm = dCtx.config.client.ifAttested { popJwtSpec.signingAlgorithm.toJSONString() },
                 clientAttestationPopKeyId = dCtx.config.client.ifAttested { checkNotNull(clientAttestationPopKeyId) },
+                deferredEndpoint = dCtx.config.deferredEndpoint.toString(),
                 authServerId = dCtx.config.authServerId.toString(),
                 tokenEndpoint = dCtx.config.tokenEndpoint.toString(),
                 dPoPSignerKid = dPoPSignerKid,
