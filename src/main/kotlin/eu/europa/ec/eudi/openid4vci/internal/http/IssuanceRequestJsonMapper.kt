@@ -118,18 +118,7 @@ internal data class CredentialRequestTO(
         }
 
         fun toJwtClaimsSet(to: CredentialRequestTO): JWTClaimsSet =
-            JWTClaimsSet.Builder().apply {
-                to.credentialIdentifier?.let { claim("credential_identifier", it) }
-                to.credentialConfigurationId?.let { claim("credential_configuration_id", it) }
-                to.proofs?.let {
-                    val value = JSONObjectUtils.parse(Json.encodeToString(it))
-                    claim("proofs", value)
-                }
-                to.credentialResponseEncryption?.let {
-                    val value = JSONObjectUtils.parse(Json.encodeToString(it))
-                    claim("credential_response_encryption", value)
-                }
-            }.build()
+            JWTClaimsSet.parse(JsonSupport.encodeToString(to))
 
         private fun List<Proof>?.proofsTO(): ProofsTO? =
             if (this.isNullOrEmpty()) null
@@ -204,23 +193,9 @@ internal data class CredentialResponseSuccessTO(
     }
 
     companion object {
-
-        fun from(jwtClaimsSet: JWTClaimsSet): CredentialResponseSuccessTO {
-            val claims = jwtClaimsSet.asJsonObject()
-            return CredentialResponseSuccessTO(
-                credentials = claims["credentials"]?.let { Json.decodeFromJsonElement<List<JsonObject>>(it) },
-                transactionId = jwtClaimsSet.getStringClaim("transaction_id"),
-                interval = jwtClaimsSet.getLongClaim("interval"),
-                notificationId = jwtClaimsSet.getStringClaim("notification_id"),
-            )
-        }
+        fun from(jwtClaimsSet: JWTClaimsSet): CredentialResponseSuccessTO =
+            JsonSupport.decodeFromString(JSONObjectUtils.toJSONString(jwtClaimsSet.toJSONObject()))
     }
-}
-
-private fun JWTClaimsSet.asJsonObject(): JsonObject {
-    val json = Json.parseToJsonElement(toString())
-    check(json is JsonObject)
-    return json
 }
 
 private fun JsonObject.issuedCredential(): IssuedCredential? {
@@ -248,15 +223,8 @@ internal data class DeferredRequestTO(
     @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionSpecTO? = null,
 ) {
     companion object {
-
         fun toJwtClaimsSet(to: DeferredRequestTO): JWTClaimsSet =
-            JWTClaimsSet.Builder().apply {
-                claim("transaction_id", to.transactionId)
-                to.credentialResponseEncryption?.let {
-                    val value = JSONObjectUtils.parse(Json.encodeToString(it))
-                    claim("credential_response_encryption", value)
-                }
-            }.build()
+            JWTClaimsSet.parse(JsonSupport.encodeToString(to))
     }
 }
 
@@ -290,14 +258,8 @@ internal data class DeferredIssuanceSuccessResponseTO(
         }
 
     companion object {
-        fun from(jwtClaimsSet: JWTClaimsSet): DeferredIssuanceSuccessResponseTO {
-            val claims = jwtClaimsSet.asJsonObject()
-            return DeferredIssuanceSuccessResponseTO(
-                credentials = claims["credentials"]?.let { Json.decodeFromJsonElement<List<JsonObject>>(it) },
-                notificationId = jwtClaimsSet.getStringClaim("notification_id"),
-                interval = jwtClaimsSet.getLongClaim("interval"),
-            )
-        }
+        fun from(jwtClaimsSet: JWTClaimsSet): DeferredIssuanceSuccessResponseTO =
+            JsonSupport.decodeFromString(JSONObjectUtils.toJSONString(jwtClaimsSet.toJSONObject()))
     }
 }
 
