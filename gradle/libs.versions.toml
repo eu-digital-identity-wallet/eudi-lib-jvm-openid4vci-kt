@@ -13,6 +13,7 @@ dokka = "2.0.0"
 maven-publish = "0.32.0"
 logback = "1.5.18"
 kover = "0.9.1"
+tink = "1.17.0"
 
 [libraries]
 nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
@@ -29,6 +30,7 @@ ktor-client-logging = {module ="io.ktor:ktor-client-logging", version.ref="ktor"
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 cbor = { module = "co.nstant.in:cbor", version.ref = "cbor" }
 logback-classic = {module="ch.qos.logback:logback-classic", version.ref="logback"}
+tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
 
 [plugins]
 dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependency-check" }

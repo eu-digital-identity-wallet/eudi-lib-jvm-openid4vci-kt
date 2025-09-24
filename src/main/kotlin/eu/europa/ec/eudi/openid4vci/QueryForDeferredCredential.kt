@@ -71,13 +71,13 @@ fun interface QueryForDeferredCredential {
          *
          * @param refreshAccessToken the ability to refresh the [AuthorizedRequest]
          * @param deferredEndPointClient client of the deferred endpoint
-         * @param responseEncryptionSpec the credential response encryption specification
+         * @param exchangeEncryptionSpecification encryption specifications for encrypted request and response
          * that has been sent to the credential issuer
          */
         internal operator fun invoke(
             refreshAccessToken: RefreshAccessToken,
             deferredEndPointClient: DeferredEndPointClient,
-            responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+            exchangeEncryptionSpecification: ExchangeEncryptionSpecification,
         ): QueryForDeferredCredential = object : QueryForDeferredCredential {
 
             override suspend fun AuthorizedRequest.queryForDeferredCredential(
@@ -101,7 +101,7 @@ fun interface QueryForDeferredCredential {
                     authorizedRequest.accessToken,
                     authorizedRequest.resourceServerDpopNonce,
                     transactionId,
-                    responseEncryptionSpec,
+                    exchangeEncryptionSpecification,
                 ).getOrThrow()
         }
     }
