@@ -101,6 +101,7 @@ interface Issuer :
          * @param credentialOffer the offer for which the issuer is being created
          * @param httpClient an http client, used while interacting with issuer
          * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
+         * @param requestEncryptionSpecFactory a factory method to generate the issuance request encryption
          *
          * @return if wallet's [config] can satisfy the requirements of [credentialOffer] an [Issuer] will be
          * created. Otherwise, there would be a failed result
@@ -109,7 +110,8 @@ interface Issuer :
             config: OpenId4VCIConfig,
             credentialOffer: CredentialOffer,
             httpClient: HttpClient,
-            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+            requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<Issuer> = runCatching {
             config.client.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
 
@@ -151,8 +153,12 @@ interface Issuer :
                     tokenEndpointClient,
                 )
 
-            val responseEncryptionSpec =
-                responseEncryptionSpec(credentialOffer, config, responseEncryptionSpecFactory).getOrThrow()
+            val issuanceEncryptionSpecs = issuanceEncryptionSpecs(
+                issuerMetadata = credentialOffer.credentialIssuerMetadata,
+                encryptionSupportConfig = config.encryptionSupportConfig,
+                requestEncryptionSpecFactory = requestEncryptionSpecFactory,
+                responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+            ).getOrThrow()
 
             val requestIssuance = run {
                 val credentialEndpointClient =
@@ -173,7 +179,7 @@ interface Issuer :
                     credentialEndpointClient,
                     nonceEndpointClient,
                     credentialOffer.credentialIssuerMetadata.batchCredentialIssuance,
-                    responseEncryptionSpec,
+                    issuanceEncryptionSpecs,
                 )
             }
 
@@ -184,7 +190,7 @@ interface Issuer :
                         val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
                         val deferredEndPointClient =
                             DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, httpClient)
-                        QueryForDeferredCredential(refreshAccessToken, deferredEndPointClient, responseEncryptionSpec)
+                        QueryForDeferredCredential(refreshAccessToken, deferredEndPointClient, issuanceEncryptionSpecs)
                     }
                 }
 
@@ -233,6 +239,10 @@ interface Issuer :
                             deferredEndpoint = deferredEndpoint,
                             authServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
                             tokenEndpoint = tokenEndpoint,
+                            requestEncryptionSpec = issuanceEncryptionSpecs.requestEncryptionSpec,
+                            responseEncryptionParams = issuanceEncryptionSpecs.responseEncryptionSpec?.let {
+                                it.encryptionMethod to it.compressionAlgorithm
+                            },
                             dPoPSigner = dPoPJwtFactory?.signer,
                             clientAttestationPoPBuilder = config.clientAttestationPoPBuilder,
                             clock = config.clock,
@@ -260,11 +270,12 @@ interface Issuer :
             config: OpenId4VCIConfig,
             credentialOfferUri: String,
             httpClient: HttpClient,
-            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+            requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<Issuer> = runCatching {
             val credentialOfferRequestResolver = CredentialOfferRequestResolver(httpClient, config.issuerMetadataPolicy)
             val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUri).getOrThrow()
-            make(config, credentialOffer, httpClient, responseEncryptionSpecFactory).getOrThrow()
+            make(config, credentialOffer, httpClient, requestEncryptionSpecFactory, responseEncryptionSpecFactory).getOrThrow()
         }
 
         /**
@@ -289,7 +300,8 @@ interface Issuer :
             credentialIssuerId: CredentialIssuerId,
             credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
             httpClient: HttpClient,
-            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = DefaultResponseEncryptionSpecFactory,
+            requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<Issuer> = runCatching {
             require(credentialConfigurationIdentifiers.isNotEmpty()) {
                 "At least one credential configuration identifier must be specified"
@@ -307,24 +319,8 @@ interface Issuer :
                     Grants.AuthorizationCode(issuerState = null),
                 )
 
-            make(config, credentialOffer, httpClient, responseEncryptionSpecFactory).getOrThrow()
+            make(config, credentialOffer, httpClient, requestEncryptionSpecFactory, responseEncryptionSpecFactory).getOrThrow()
         }
-
-        val DefaultResponseEncryptionSpecFactory: ResponseEncryptionSpecFactory =
-            { issuerSupportedResponseEncryptedParameters, walletKeyGenerationConfig, walletSupportedCompressionAlgorithms ->
-                val issuerSupportedPayloadCompression = issuerSupportedResponseEncryptedParameters.payloadCompression
-                val compressionAlg = when (issuerSupportedPayloadCompression) {
-                    PayloadCompression.NotSupported -> null
-                    is PayloadCompression.Supported ->
-                        walletSupportedCompressionAlgorithms?.intersect(issuerSupportedPayloadCompression.algorithms)?.firstOrNull()
-                }
-                val method = issuerSupportedResponseEncryptedParameters.encryptionMethods[0]
-                issuerSupportedResponseEncryptedParameters.algorithms.firstNotNullOfOrNull { alg ->
-                    KeyGenerator.genKeyIfSupported(walletKeyGenerationConfig, alg)?.let { jwk ->
-                        IssuanceResponseEncryptionSpec(jwk, method, compressionAlg)
-                    }
-                }
-            }
     }
 }
 

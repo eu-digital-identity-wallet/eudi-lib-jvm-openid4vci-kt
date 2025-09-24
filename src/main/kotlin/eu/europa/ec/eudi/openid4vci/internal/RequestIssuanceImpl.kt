@@ -35,7 +35,7 @@ internal class RequestIssuanceImpl(
     private val credentialEndpointClient: CredentialEndpointClient,
     private val nonceEndpointClient: NonceEndpointClient?,
     private val batchCredentialIssuance: BatchCredentialIssuance,
-    private val responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+    private val exchangeEncryptionSpecification: ExchangeEncryptionSpecification,
 ) : RequestIssuance {
 
     init {
@@ -325,7 +325,7 @@ internal class RequestIssuanceImpl(
             CredentialIssuanceRequest.byCredentialConfigurationId(
                 requestPayload.credentialConfigurationIdentifier,
                 proofs,
-                responseEncryptionSpec,
+                exchangeEncryptionSpecification,
             )
         }
 
@@ -334,7 +334,7 @@ internal class RequestIssuanceImpl(
             CredentialIssuanceRequest.byCredentialId(
                 requestPayload.credentialIdentifier,
                 proofs,
-                responseEncryptionSpec,
+                exchangeEncryptionSpecification,
             )
         }
     }
