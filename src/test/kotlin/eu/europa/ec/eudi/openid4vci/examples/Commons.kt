@@ -152,35 +152,32 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
     httpClient: HttpClient,
 ) where
       ENV : HasTestUser<USER>,
-      ENV : CanAuthorizeIssuance<USER>,
-      ENV : CanBeUsedWithVciLib =
+      ENV : CanAuthorizeIssuance<USER> =
     coroutineScope {
         val authorizedReq = authorizeUsingAuthorizationCodeFlow(env, httpClient)
         val (updatedAuthorizedReq, outcome) =
             submitCredentialRequest(authorizedReq, credCfgId, proofsType)
 
-        ensureIssued(updatedAuthorizedReq, outcome, httpClient, env.cfg)
+        ensureIssued(updatedAuthorizedReq, outcome, httpClient)
     }
 
-suspend fun <ENV> Issuer.testIssuanceWithPreAuthorizedCodeFlow(
-    env: ENV,
+suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
     txCode: String?,
     credCfgId: CredentialConfigurationIdentifier,
     proofsType: ProofsType,
     httpClient: HttpClient,
-) where ENV : CanBeUsedWithVciLib = coroutineScope {
+) = coroutineScope {
     val (authorized, outcome) = run {
         val authorizedRequest = authorizeWithPreAuthorizationCode(txCode).getOrThrow()
         submitCredentialRequest(authorizedRequest, credCfgId, proofsType)
     }
-    ensureIssued(authorized, outcome, httpClient, env.cfg)
+    ensureIssued(authorized, outcome, httpClient)
 }
 
 suspend fun Issuer.ensureIssued(
     authorized: AuthorizedRequest,
     outcome: SubmissionOutcome,
     httpClient: HttpClient,
-    walletConfig: OpenId4VCIConfig,
 ) {
     when (outcome) {
         is SubmissionOutcome.Failed -> {
@@ -191,7 +188,7 @@ suspend fun Issuer.ensureIssued(
                 "Got a deferred issuance response from server with transaction_id ${outcome.transactionId.value}. Retrying issuance...",
             )
             val deferredCtx = authorized.deferredContext(outcome)
-            handleDeferred(deferredCtx, httpClient, walletConfig).onEach(::println)
+            handleDeferred(deferredCtx, httpClient).onEach(::println)
         }
         is SubmissionOutcome.Success -> {
             outcome.credentials.forEach(::println)
@@ -202,7 +199,6 @@ suspend fun Issuer.ensureIssued(
 suspend fun handleDeferred(
     initialContext: DeferredIssuanceContext,
     httpClient: HttpClient,
-    walletConfig: OpenId4VCIConfig,
 ): List<IssuedCredential> {
     var ctx = initialContext
     var cred: List<IssuedCredential>
@@ -210,8 +206,7 @@ suspend fun handleDeferred(
         val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(
             ctx = ctx,
             httpClient = httpClient,
-            issuerMetadataPolicy = walletConfig.issuerMetadataPolicy,
-            encryptionSupportConfig = walletConfig.encryptionSupportConfig,
+            responseEncryptionKey = null,
         ).getOrThrow()
 
         ctx = newCtx ?: ctx
@@ -281,7 +276,6 @@ suspend fun <ENV, USER> ENV.testIssuanceWithPreAuthorizedCodeFlow(
         val credCfg = credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credCfgId]
         assertNotNull(credCfg)
         testIssuanceWithPreAuthorizedCodeFlow(
-            env = this@testIssuanceWithPreAuthorizedCodeFlow,
             txCode = txCode,
             credCfgId = credCfgId,
             proofsType = proofsOptions,

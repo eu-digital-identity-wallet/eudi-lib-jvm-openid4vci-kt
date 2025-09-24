@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
+import com.nimbusds.jose.CompressionAlgorithm
+import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.JWK
@@ -24,6 +26,7 @@ import io.ktor.client.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
 import java.net.URI
 import java.time.Clock
 import java.time.Duration
@@ -36,11 +39,10 @@ suspend fun DeferredIssuer.Companion.queryForDeferredCredential(
     recreatePopSigner: ((String) -> Signer<JWK>)? = null,
     recreateClientAttestationPodSigner: ((String) -> JWSSigner)? = null,
     httpClient: HttpClient,
-    issuerMetadataPolicy: IssuerMetadataPolicy,
-    encryptionSupportConfig: EncryptionSupportConfig,
+    responseEncryptionKey: JWK? = null,
 ): Result<Pair<DeferredIssuanceStoredContextTO?, DeferredCredentialQueryOutcome>> = runCatching {
     val ctx = ctxTO.toDeferredIssuanceStoredContext(clock, recreatePopSigner, recreateClientAttestationPodSigner)
-    val (newCtx, outcome) = queryForDeferredCredential(ctx, httpClient, issuerMetadataPolicy, encryptionSupportConfig).getOrThrow()
+    val (newCtx, outcome) = queryForDeferredCredential(ctx, httpClient, responseEncryptionKey).getOrThrow()
     val newCtxTO =
         newCtx?.let { DeferredIssuanceStoredContextTO.from(it, ctxTO.dPoPSignerKid, ctxTO.clientAttestationPopKeyId) }
     newCtxTO to outcome
@@ -138,6 +140,8 @@ data class DeferredIssuanceStoredContextTO(
     @Required @SerialName("deferred_endpoint") val deferredEndpoint: String,
     @Required @SerialName("auth_server_id") val authServerId: String,
     @Required @SerialName("token_endpoint") val tokenEndpoint: String,
+    @SerialName("credential_request_encryption_spec") val requestEncryptionSpec: JsonObject? = null,
+    @SerialName("credential_response_encryption_params") val responseEncryptionParams: JsonObject? = null,
     @SerialName("dpop_key_id") val dPoPSignerKid: String? = null,
     @SerialName("transaction_id") val transactionId: String,
     @SerialName("access_token") val accessToken: AccessTokenTO,
@@ -178,6 +182,8 @@ data class DeferredIssuanceStoredContextTO(
                 deferredEndpoint = URI(deferredEndpoint).toURL(),
                 authServerId = URI(authServerId).toURL(),
                 tokenEndpoint = URI(tokenEndpoint).toURL(),
+                requestEncryptionSpec = requestEncryptionSpec?.let { requestEncryption(it) },
+                responseEncryptionParams = responseEncryptionParams?.let { responseEncryptionParams(it) },
                 dPoPSigner = dPoPSignerKid?.let { requireNotNull(recreatePopSigner).invoke(it) },
             ),
             authorizedTransaction = AuthorizedTransaction(
@@ -221,6 +227,8 @@ data class DeferredIssuanceStoredContextTO(
                 deferredEndpoint = dCtx.config.deferredEndpoint.toString(),
                 authServerId = dCtx.config.authServerId.toString(),
                 tokenEndpoint = dCtx.config.tokenEndpoint.toString(),
+                requestEncryptionSpec = dCtx.config.requestEncryptionSpec?.let { requestEncryptionSpecTO(it) },
+                responseEncryptionParams = dCtx.config.responseEncryptionParams?.let { responseEncryptionParamsTO(it) },
                 dPoPSignerKid = dPoPSignerKid,
                 transactionId = authorizedTransaction.transactionId.value,
                 accessToken = AccessTokenTO.from(authorizedTransaction.authorizedRequest.accessToken),
@@ -230,4 +238,56 @@ data class DeferredIssuanceStoredContextTO(
             )
         }
     }
+}
+
+private fun requestEncryptionSpecTO(spec: EncryptionSpec): JsonObject {
+    val jwkJson = Json.parseToJsonElement(spec.recipientKey.toJSONString())
+    return buildJsonObject {
+        put("recipient_key", jwkJson)
+        put("encryption_method", spec.encryptionMethod.toString())
+        put("compression_algorithm", spec.compressionAlgorithm.toString())
+    }
+}
+
+private fun requestEncryption(specTO: JsonObject): EncryptionSpec =
+    EncryptionSpec(
+        recipientKey = run {
+            val element = specTO["recipient_key"]
+            require(element is JsonObject)
+            JWK.parse(element.toString())
+        },
+        encryptionMethod = run {
+            val element = specTO["encryption_method"]
+            require(element is JsonPrimitive)
+            EncryptionMethod.parse(requireNotNull(element.contentOrNull))
+        },
+        compressionAlgorithm = run {
+            val element = specTO["compression_algorithm"]
+            element?.let {
+                require(it is JsonPrimitive)
+                CompressionAlgorithm(requireNotNull(it.contentOrNull))
+            }
+        },
+    )
+
+private fun responseEncryptionParamsTO(params: Pair<EncryptionMethod, CompressionAlgorithm?>): JsonObject =
+    buildJsonObject {
+        put("encryption_method", params.first.toString())
+        put("compression_algorithm", params.second?.toString())
+    }
+
+private fun responseEncryptionParams(specTO: JsonObject): Pair<EncryptionMethod, CompressionAlgorithm?> {
+    val encryptionMethod = run {
+        val element = specTO["encryption_method"]
+        require(element is JsonPrimitive)
+        EncryptionMethod.parse(requireNotNull(element.contentOrNull))
+    }
+    val compressionAlgorithm = run {
+        val element = specTO["compression_algorithm"]
+        element?.let {
+            require(it is JsonPrimitive)
+            CompressionAlgorithm(requireNotNull(it.contentOrNull))
+        }
+    }
+    return encryptionMethod to compressionAlgorithm
 }

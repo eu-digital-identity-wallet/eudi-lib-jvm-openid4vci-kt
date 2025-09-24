@@ -52,7 +52,6 @@ fun runUseCase(
                     authorizedRequest,
                     credentialIdentifier,
                     httpClient,
-                    config,
                 ).also { (newAuthorizedRequest, credential) ->
                     println("--> Issued credential: $credential \n")
                     authorizedRequest = newAuthorizedRequest
@@ -91,7 +90,6 @@ private suspend fun Issuer.submitCredentialRequest(
     authorizedRequest: AuthorizedRequest,
     credentialConfigurationId: CredentialConfigurationIdentifier,
     httpClient: HttpClient,
-    config: OpenId4VCIConfig,
 ): AuthorizedRequestAnd<List<IssuedCredential>> {
     issuanceLog("Requesting issuance of '$credentialConfigurationId'")
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
@@ -104,7 +102,7 @@ private suspend fun Issuer.submitCredentialRequest(
             println("Hm we got a deferred issuance case with ${outcome.transactionId.value}")
             val vcs = run {
                 val ctx = newAuthorized.deferredContext(outcome)
-                queryDeferredEndpoint(ctx, httpClient, config)
+                queryDeferredEndpoint(ctx, httpClient)
             }
 
             newAuthorized to vcs
@@ -120,7 +118,6 @@ private suspend fun Issuer.submitCredentialRequest(
 private suspend fun queryDeferredEndpoint(
     deferredContext: DeferredIssuanceContext,
     httpClient: HttpClient,
-    walletConfig: OpenId4VCIConfig,
 ): List<IssuedCredential> {
     var ctx = deferredContext
     var cred: List<IssuedCredential>
@@ -128,8 +125,7 @@ private suspend fun queryDeferredEndpoint(
         val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(
             ctx = ctx,
             httpClient = httpClient,
-            issuerMetadataPolicy = walletConfig.issuerMetadataPolicy,
-            encryptionSupportConfig = walletConfig.encryptionSupportConfig,
+            responseEncryptionKey = null,
         ).getOrThrow()
         ctx = newCtx ?: ctx
         cred = when (outcome) {

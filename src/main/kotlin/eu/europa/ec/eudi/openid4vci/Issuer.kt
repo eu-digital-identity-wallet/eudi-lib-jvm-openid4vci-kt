@@ -239,6 +239,10 @@ interface Issuer :
                             deferredEndpoint = deferredEndpoint,
                             authServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
                             tokenEndpoint = tokenEndpoint,
+                            requestEncryptionSpec = issuanceEncryptionSpecs.requestEncryptionSpec,
+                            responseEncryptionParams = issuanceEncryptionSpecs.responseEncryptionSpec?.let {
+                                it.encryptionMethod to it.compressionAlgorithm
+                            },
                             dPoPSigner = dPoPJwtFactory?.signer,
                             clientAttestationPoPBuilder = config.clientAttestationPoPBuilder,
                             clock = config.clock,

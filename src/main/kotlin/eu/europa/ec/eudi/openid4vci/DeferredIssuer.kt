@@ -15,13 +15,13 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.CompressionAlgorithm
+import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.DeferredIssuer.Companion.make
-import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessToken
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
-import eu.europa.ec.eudi.openid4vci.internal.issuanceEncryptionSpecs
 import io.ktor.client.*
 import java.net.URI
 import java.net.URL
@@ -38,6 +38,8 @@ import java.time.Clock
  * @param credentialIssuerId the ID of the Credential Issuer
  * @param clientAttestationPoPBuilder the builder for the client attestation proof of possession.
  *   Must be provided only if client was of Client.Attested kind.
+ * @param requestEncryptionSpec the request encryption spec. Must be provided only if request encryption was used in the initial request.
+ * @param responseEncryptionParams encryption method and compression algorithm as/if used in the initial request.
  * @param dPoPSigner the signer that was used for DPoP. Must be provided only if DPoP was used.
  * @param clock Wallet's clock
  */
@@ -47,6 +49,8 @@ data class DeferredIssuerConfig(
     val deferredEndpoint: URL,
     val authServerId: URL,
     val tokenEndpoint: URL,
+    val requestEncryptionSpec: EncryptionSpec?,
+    val responseEncryptionParams: Pair<EncryptionMethod, CompressionAlgorithm?>?,
     val dPoPSigner: Signer<JWK>? = null,
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val clock: Clock = Clock.systemDefaultZone(),
@@ -78,11 +82,14 @@ data class DeferredIssuanceContext(
  *
  * In contrast to the [Issuer] that already supports this functionality
  * the [DeferredIssuer] requires a [minimal set of data][DeferredIssuanceContext]
- * in ordered to be [instantiated][make].
+ * in ordered to be [instantiated][make]. Its lifespan is limited to the lifespan of the authorized request stored in
+ * DeferredIssuanceContext (as the `AuthorizedTransaction` property).
  *
- * Regarding the encryption of the deferred issuance request and response, the credential issuer's metadata is resolved
- * and the encryption parameters and keys are re-calculated, alleviating the need to persist and re-use the initial request's
- * encryption keys and algorithms.
+ * Regarding the encryption of the deferred issuance request and response, the `DeferredIssuerConfig` is expected to contain:
+ * - the [request encryption spec][DeferredIssuerConfig.requestEncryptionSpec] as this was used in the initial request
+ * - [response encryption parameters][DeferredIssuerConfig.responseEncryptionParams] other than the encryption key used in the initial request.
+ * This is to allow the caller to define anew the encryption key to be used in the deferred request. The parameters stored are
+ * the encryption method and compression algorithm as they were negotiated with issuer, in the initial request.
  *
  * Typically, wallet could persist [DeferredIssuanceContext] and
  * use the [DeferredIssuer.queryForDeferredCredential] to query again the deferred endpoint.
@@ -99,13 +106,10 @@ interface DeferredIssuer : QueryForDeferredCredential {
          * A convenient method for querying the deferred endpoint given a [ctx].
          * Creates a [DeferredIssuer] using the [ctx] and then queries the endpoint.
          *
-         * The passed [encryptionSupportConfig] will be used to re-calculate the encryption parameters and keys for
-         * the deferred issuance request and response encryption. The credential issuer's current metadata is needed for that.
-         *
          * @param ctx the context containing the data needed to instantiate the issuer and query the endpoint
          * @param httpClient an http client, used while interacting with issuer
-         * @param issuerMetadataPolicy policy concerning issuer's signed metadata usage
-         * @param encryptionSupportConfig a configuration object containing wallet-specific capabilities and policies for encryption.
+         * @param responseEncryptionKey the key to be used for response encryption. Its presence denotes the caller's preference for
+         *  encrypted response. If null, no response encryption will be requested to issuer.
          *
          * @return The method returns a pair comprised of:
          * - On the right side, there is the [outcome][DeferredCredentialQueryOutcome] of querying the endpoint
@@ -115,10 +119,9 @@ interface DeferredIssuer : QueryForDeferredCredential {
         suspend fun queryForDeferredCredential(
             ctx: DeferredIssuanceContext,
             httpClient: HttpClient,
-            issuerMetadataPolicy: IssuerMetadataPolicy,
-            encryptionSupportConfig: EncryptionSupportConfig,
+            responseEncryptionKey: JWK?,
         ): Result<Pair<DeferredIssuanceContext?, DeferredCredentialQueryOutcome>> = runCatching {
-            val deferredIssuer = make(ctx.config, httpClient, issuerMetadataPolicy, encryptionSupportConfig).getOrThrow()
+            val deferredIssuer = make(ctx.config, responseEncryptionKey, httpClient).getOrThrow()
             val (newAuthorized, outcome) = with(deferredIssuer) {
                 with(ctx.authorizedTransaction.authorizedRequest) {
                     val transactionId = ctx.authorizedTransaction.transactionId
@@ -145,14 +148,14 @@ interface DeferredIssuer : QueryForDeferredCredential {
          *
          * @param config the minimal configuration needed.
          * @param httpClient an http client, used while interacting with issuer
+         * @param responseEncryptionKey the response encryption key. Its presence denotes the caller's preference for response encryption.
          *
          * @return the deferred issuer instance
          */
-        suspend fun make(
+        fun make(
             config: DeferredIssuerConfig,
+            responseEncryptionKey: JWK?,
             httpClient: HttpClient,
-            issuerMetadataPolicy: IssuerMetadataPolicy,
-            encryptionSupportConfig: EncryptionSupportConfig,
         ): Result<DeferredIssuer> = runCatching {
             val dPoPJwtFactory = config.dPoPSigner?.let { signer ->
                 DPoPJwtFactory(signer = signer, clock = config.clock)
@@ -172,24 +175,25 @@ interface DeferredIssuer : QueryForDeferredCredential {
 
             val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
 
-            val issuerMetadata = run {
-                val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
-                resolver.resolve(config.credentialIssuerId, issuerMetadataPolicy).getOrThrow()
-            }
-
             val deferredEndPointClient = DeferredEndPointClient(
                 CredentialIssuerEndpoint.invoke(config.deferredEndpoint.toString()).getOrThrow(),
                 dPoPJwtFactory,
                 httpClient,
             )
 
-            // Re-calculate the encryption parameters
-            val issuanceEncryptionSpecs = issuanceEncryptionSpecs(
-                issuerMetadata = issuerMetadata,
-                encryptionSupportConfig = encryptionSupportConfig,
-                requestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
-                responseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-            ).getOrThrow()
+            val issuanceEncryptionSpecs = ExchangeEncryptionSpecification(
+                requestEncryptionSpec = config.requestEncryptionSpec,
+                responseEncryptionSpec = responseEncryptionKey?.let { recipientKey ->
+                    config.responseEncryptionParams?.let {
+                        val (encryptionMethod, compressionAlgorithm) = it
+                        EncryptionSpec(
+                            recipientKey = recipientKey,
+                            encryptionMethod = encryptionMethod,
+                            compressionAlgorithm = compressionAlgorithm,
+                        )
+                    }
+                },
+            )
 
             val queryForDeferredCredential =
                 QueryForDeferredCredential(
