@@ -85,7 +85,7 @@ data class SupportedResponseEncryptionParameters(
     val payloadCompression: PayloadCompression = PayloadCompression.NotSupported,
 ) {
     init {
-        require(encryptionMethods.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
+        require(encryptionMethods.isNotEmpty()) { "encryptionMethods cannot be empty" }
 
         if (algorithms.isEmpty()) {
             throw CredentialIssuerMetadataValidationError.CredentialResponseEncryptionAlgorithmsRequired()
@@ -105,7 +105,7 @@ data class SupportedRequestEncryptionParameters(
     val payloadCompression: PayloadCompression = PayloadCompression.NotSupported,
 ) {
     init {
-        require(encryptionMethods.isNotEmpty()) { "encryptionMethodsSupported cannot be empty" }
+        require(encryptionMethods.isNotEmpty()) { "encryptionMethods cannot be empty" }
         if (encryptionKeys.isEmpty()) {
             throw CredentialIssuerMetadataValidationError.CredentialRequestEncryptionKeysRequired()
         }
@@ -325,6 +325,16 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
      */
     class CredentialsSupportedRequired :
         CredentialIssuerMetadataValidationError(IllegalArgumentException("Credentials Supported Required"))
+
+    /**
+     * Credential Request Encryption must be supported by Issuer when Credential Response Encryption is supported.
+     */
+    class CredentialRequestEncryptionMustExistIfCredentialResponseEncryptionExists :
+        CredentialIssuerMetadataValidationError(
+            IllegalArgumentException(
+                "Issuer must specify Credential Request Encryption if Credential Response Encryption is specified",
+            ),
+        )
 
     class InvalidBatchSize :
         CredentialIssuerMetadataValidationError(IllegalArgumentException("batch_size should be greater than zero"))

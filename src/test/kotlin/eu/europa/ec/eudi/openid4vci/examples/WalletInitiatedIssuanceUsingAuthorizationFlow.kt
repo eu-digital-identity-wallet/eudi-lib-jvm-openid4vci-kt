@@ -122,7 +122,11 @@ private suspend fun queryDeferredEndpoint(
     var ctx = deferredContext
     var cred: List<IssuedCredential>
     do {
-        val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(ctx = ctx, httpClient).getOrThrow()
+        val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(
+            ctx = ctx,
+            httpClient = httpClient,
+            responseEncryptionKey = null,
+        ).getOrThrow()
         ctx = newCtx ?: ctx
         cred = when (outcome) {
             is DeferredCredentialQueryOutcome.Errored -> error(outcome.error)

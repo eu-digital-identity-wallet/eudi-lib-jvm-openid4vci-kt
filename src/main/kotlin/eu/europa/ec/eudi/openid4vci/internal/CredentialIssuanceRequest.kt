@@ -15,7 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
+import eu.europa.ec.eudi.openid4vci.CredentialIdentifier
+import eu.europa.ec.eudi.openid4vci.ExchangeEncryptionSpecification
 
 internal sealed interface CredentialConfigurationReference {
     data class ByCredentialId(val credentialIdentifier: CredentialIdentifier) : CredentialConfigurationReference
@@ -30,30 +32,30 @@ internal sealed interface CredentialConfigurationReference {
 internal data class CredentialIssuanceRequest(
     val reference: CredentialConfigurationReference,
     val proofs: List<Proof>,
-    val encryption: IssuanceResponseEncryptionSpec?,
+    val encryptionSpecs: ExchangeEncryptionSpecification,
 ) {
 
     companion object {
         internal fun byCredentialId(
             credentialIdentifier: CredentialIdentifier,
             proofs: List<Proof>,
-            responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+            encryptionSpecs: ExchangeEncryptionSpecification,
         ): CredentialIssuanceRequest =
             CredentialIssuanceRequest(
                 CredentialConfigurationReference.ByCredentialId(credentialIdentifier),
                 proofs,
-                responseEncryptionSpec,
+                encryptionSpecs,
             )
 
         internal fun byCredentialConfigurationId(
             credentialConfigurationId: CredentialConfigurationIdentifier,
             proofs: List<Proof>,
-            responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+            encryptionSpecs: ExchangeEncryptionSpecification,
         ): CredentialIssuanceRequest =
             CredentialIssuanceRequest(
                 CredentialConfigurationReference.ByCredentialConfigurationId(credentialConfigurationId),
                 proofs,
-                responseEncryptionSpec,
+                encryptionSpecs,
             )
     }
 }

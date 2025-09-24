@@ -171,7 +171,6 @@ suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
         val authorizedRequest = authorizeWithPreAuthorizationCode(txCode).getOrThrow()
         submitCredentialRequest(authorizedRequest, credCfgId, proofsType)
     }
-
     ensureIssued(authorized, outcome, httpClient)
 }
 
@@ -204,7 +203,12 @@ suspend fun handleDeferred(
     var ctx = initialContext
     var cred: List<IssuedCredential>
     do {
-        val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(ctx = ctx, httpClient).getOrThrow()
+        val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(
+            ctx = ctx,
+            httpClient = httpClient,
+            responseEncryptionKey = null,
+        ).getOrThrow()
+
         ctx = newCtx ?: ctx
         cred = when (outcome) {
             is DeferredCredentialQueryOutcome.Errored -> error(outcome.error)
@@ -271,7 +275,12 @@ suspend fun <ENV, USER> ENV.testIssuanceWithPreAuthorizedCodeFlow(
     with(issuer) {
         val credCfg = credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credCfgId]
         assertNotNull(credCfg)
-        testIssuanceWithPreAuthorizedCodeFlow(txCode, credCfgId, proofsOptions, httpClient)
+        testIssuanceWithPreAuthorizedCodeFlow(
+            txCode = txCode,
+            credCfgId = credCfgId,
+            proofsType = proofsOptions,
+            httpClient = httpClient,
+        )
     }
 }
 

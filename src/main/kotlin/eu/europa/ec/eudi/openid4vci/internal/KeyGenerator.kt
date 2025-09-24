@@ -23,26 +23,23 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import eu.europa.ec.eudi.openid4vci.EcConfig
-import eu.europa.ec.eudi.openid4vci.KeyGenerationConfig
+import eu.europa.ec.eudi.openid4vci.EncryptionSupportConfig
 import eu.europa.ec.eudi.openid4vci.RsaConfig
 import java.util.*
 
 internal object KeyGenerator {
 
-    fun genKeyIfSupported(keyGenerationConfig: KeyGenerationConfig, alg: JWEAlgorithm): JWK? {
-        return when (alg) {
-            in JWEAlgorithm.Family.ECDH_ES ->
-                keyGenerationConfig.ecConfig?.takeIf { alg in it.supportedJWEAlgorithms }?.let {
-                    randomECEncryptionKey(it, alg)
-                }
+    fun genKeyIfSupported(
+        encryptionSupportConfig: EncryptionSupportConfig,
+        algorithm: JWEAlgorithm,
+    ): JWK? = when {
+        null != encryptionSupportConfig.ecConfig && algorithm in encryptionSupportConfig.ecConfig.supportedJWEAlgorithms ->
+            randomECEncryptionKey(encryptionSupportConfig.ecConfig, algorithm)
 
-            in JWEAlgorithm.Family.RSA ->
-                keyGenerationConfig.rsaConfig?.takeIf { alg in it.supportedJWEAlgorithms }?.let {
-                    randomRSAEncryptionKey(it, alg)
-                }
+        null != encryptionSupportConfig.rsaConfig && algorithm in encryptionSupportConfig.rsaConfig.supportedJWEAlgorithms ->
+            randomRSAEncryptionKey(encryptionSupportConfig.rsaConfig, algorithm)
 
-            else -> null
-        }
+        else -> null
     }
 
     fun randomRSAEncryptionKey(rsaConfig: RsaConfig, alg: JWEAlgorithm): RSAKey = RSAKeyGenerator(rsaConfig.rcaKeySize)

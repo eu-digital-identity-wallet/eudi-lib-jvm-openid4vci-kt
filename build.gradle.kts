@@ -45,6 +45,7 @@ dependencies {
     testImplementation(libs.ktor.client.logging)
     testImplementation(libs.logback.classic)
     testImplementation(libs.cbor)
+    testImplementation(libs.tink)
 }
 
 java {
