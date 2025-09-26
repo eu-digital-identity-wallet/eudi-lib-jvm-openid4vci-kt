@@ -33,7 +33,7 @@ internal class NotificationEndPointClient(
         resourceServerDpopNonce: Nonce?,
         event: CredentialIssuanceEvent,
     ): Result<Nonce?> =
-        runCatching {
+        runCatchingCancellable {
             notifyIssuerInternal(accessToken, resourceServerDpopNonce, event, false)
         }
 

@@ -60,7 +60,7 @@ internal class CredentialEndpointClient(
         resourceServerDpopNonce: Nonce?,
         request: CredentialIssuanceRequest,
     ): Result<Pair<SubmissionOutcomeInternal, Nonce?>> =
-        runCatching {
+        runCatchingCancellable {
             placeIssuanceRequestInternal(accessToken, resourceServerDpopNonce, request, false)
         }
 
@@ -129,7 +129,7 @@ internal class DeferredEndPointClient(
         transactionId: TransactionId,
         exchangeEncryptionSpecification: ExchangeEncryptionSpecification,
     ): Result<Pair<DeferredCredentialQueryOutcome, Nonce?>> =
-        runCatching {
+        runCatchingCancellable {
             placeDeferredCredentialRequestInternal(
                 accessToken,
                 resourceServerDpopNonce,

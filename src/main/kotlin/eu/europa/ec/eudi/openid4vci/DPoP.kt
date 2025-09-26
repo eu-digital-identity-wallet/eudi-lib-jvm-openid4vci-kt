@@ -61,7 +61,7 @@ class DPoPJwtFactory(
         htu: URL,
         accessToken: AccessToken.DPoP? = null,
         nonce: Nonce? = null,
-    ): Result<SignedJWT> = runCatching {
+    ): Result<SignedJWT> = runCatchingCancellable {
         val jwtClaimsSet = DPoPUtils.createJWTClaimsSet(
             jti(),
             htm.name,

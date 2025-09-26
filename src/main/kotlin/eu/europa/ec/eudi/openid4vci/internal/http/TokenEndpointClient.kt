@@ -140,7 +140,7 @@ internal class TokenEndpointClient(
         pkceVerifier: PKCEVerifier,
         credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
         dpopNonce: Nonce?,
-    ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
+    ): Result<Pair<TokenResponse, Nonce?>> = runCatchingCancellable {
         // Append authorization_details form param if needed
         val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
             authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
@@ -171,7 +171,7 @@ internal class TokenEndpointClient(
         txCode: String?,
         credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
         dpopNonce: Nonce?,
-    ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
+    ): Result<Pair<TokenResponse, Nonce?>> = runCatchingCancellable {
         // Append authorization_details form param if needed
         val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
             authorizationDetailsFormParam(credConfigIdsAsAuthDetails)

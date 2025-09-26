@@ -279,7 +279,7 @@ fun interface CredentialOfferRequestResolver {
     /**
      * Tries to parse a Credential Offer Endpoint [URL][uri], extract and validate a Credential Offer Request.
      */
-    suspend fun resolve(uri: String): Result<CredentialOffer> = runCatching {
+    suspend fun resolve(uri: String): Result<CredentialOffer> = runCatchingCancellable {
         val request = CredentialOfferRequest(uri).getOrThrow()
         resolve(request).getOrThrow()
     }
