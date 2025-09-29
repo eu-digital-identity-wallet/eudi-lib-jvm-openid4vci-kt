@@ -45,7 +45,7 @@ internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder
         val claimSet = ClientAttestationPOPClaims(
             issuer = id,
             audience = authorizationServerId,
-            jwtId = JWTID(),
+            jwtId = JwtId(JWTID().value),
             issuedAt = now,
             challenge = challenge,
             notBefore = now,

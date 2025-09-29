@@ -422,3 +422,14 @@ sealed interface IssuerTrust {
 
     data class ByCertificateChain(val certificateChainTrust: CertificateChainTrust) : IssuerTrust
 }
+
+/**
+ * Unique identifier for a JWT.
+ */
+@JvmInline
+@Serializable
+value class JwtId(val value: String) {
+    init {
+        require(value.isNotBlank()) { "value cannot be blank" }
+    }
+}
