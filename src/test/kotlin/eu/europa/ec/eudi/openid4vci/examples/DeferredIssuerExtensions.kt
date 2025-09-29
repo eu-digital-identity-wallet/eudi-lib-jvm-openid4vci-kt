@@ -154,8 +154,8 @@ data class DeferredIssuanceStoredContextTO(
             config = DeferredIssuerConfig(
                 credentialIssuerId = CredentialIssuerId(credentialIssuerId).getOrThrow(),
                 clock = clock,
-                client =
-                    if (clientAttestationJwt == null) Client.Public(clientId)
+                clientAuthentication =
+                    if (clientAttestationJwt == null) ClientAuthentication.None(clientId)
                     else {
                         val jwt = runCatching {
                             ClientAttestationJWT(SignedJWT.parse(clientAttestationJwt))
@@ -165,7 +165,7 @@ data class DeferredIssuanceStoredContextTO(
                             recreateClientAttestationPodSigner?.let { recreate -> recreate(keyId) }
                         }
                         val poPJWTSpec = ClientAttestationPoPJWTSpec(checkNotNull(signer))
-                        Client.Attested(jwt, poPJWTSpec)
+                        ClientAuthentication.AttestationBased(jwt, poPJWTSpec)
                     },
                 deferredEndpoint = URI(deferredEndpoint).toURL(),
                 authorizationServerId = URI(authServerId).toURL(),
@@ -193,10 +193,10 @@ data class DeferredIssuanceStoredContextTO(
 
     companion object {
 
-        fun <A> Client.ifAttested(getter: Client.Attested.() -> A?): A? =
+        fun <A> ClientAuthentication.ifAttested(getter: ClientAuthentication.AttestationBased.() -> A?): A? =
             when (this) {
-                is Client.Attested -> getter()
-                is Client.Public -> null
+                is ClientAuthentication.AttestationBased -> getter()
+                is ClientAuthentication.None -> null
             }
 
         fun from(
@@ -207,9 +207,9 @@ data class DeferredIssuanceStoredContextTO(
             val authorizedTransaction = dCtx.authorizedTransaction
             return DeferredIssuanceStoredContextTO(
                 credentialIssuerId = dCtx.config.credentialIssuerId.toString(),
-                clientId = dCtx.config.client.id,
-                clientAttestationJwt = dCtx.config.client.ifAttested { attestationJWT.jwt.serialize() },
-                clientAttestationPopKeyId = dCtx.config.client.ifAttested { checkNotNull(clientAttestationPopKeyId) },
+                clientId = dCtx.config.clientAuthentication.id,
+                clientAttestationJwt = dCtx.config.clientAuthentication.ifAttested { attestationJWT.jwt.serialize() },
+                clientAttestationPopKeyId = dCtx.config.clientAuthentication.ifAttested { checkNotNull(clientAttestationPopKeyId) },
                 deferredEndpoint = dCtx.config.deferredEndpoint.toString(),
                 authServerId = dCtx.config.authorizationServerId.toString(),
                 tokenEndpoint = dCtx.config.tokenEndpoint.toString(),

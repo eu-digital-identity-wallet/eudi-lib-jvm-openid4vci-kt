@@ -89,7 +89,7 @@ internal sealed interface TokenResponseTO {
 internal class TokenEndpointClient(
     private val credentialIssuerId: CredentialIssuerId,
     private val clock: Clock,
-    private val client: Client,
+    private val clientAuthentication: ClientAuthentication,
     private val authFlowRedirectionURI: URI,
     private val authServerId: URL,
     private val challengeEndpoint: URL?,
@@ -115,7 +115,7 @@ internal class TokenEndpointClient(
     ) : this(
         credentialIssuerId,
         config.clock,
-        config.client,
+        config.clientAuthentication,
         authFlowRedirectionURI = config.authFlowRedirectionURI,
         authServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
         challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL(),
@@ -147,7 +147,7 @@ internal class TokenEndpointClient(
         }
         val params =
             TokenEndpointForm.authCodeFlow(
-                clientId = client.id,
+                clientId = clientAuthentication.id,
                 authorizationCode = authorizationCode,
                 redirectionURI = authFlowRedirectionURI,
                 pkceVerifier = pkceVerifier,
@@ -178,7 +178,7 @@ internal class TokenEndpointClient(
         }
         val params =
             TokenEndpointForm.preAuthCodeFlow(
-                clientId = client.id,
+                clientId = clientAuthentication.id,
                 preAuthorizedCode = preAuthorizedCode,
                 txCode = txCode,
                 authorizationDetails = authDetails,
@@ -198,7 +198,7 @@ internal class TokenEndpointClient(
         refreshToken: RefreshToken,
         dpopNonce: Nonce?,
     ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
-        val params = TokenEndpointForm.refreshAccessToken(client.id, refreshToken)
+        val params = TokenEndpointForm.refreshAccessToken(clientAuthentication.id, refreshToken)
         placeTokenRequest(params, dpopNonce)
     }
 
@@ -212,8 +212,9 @@ internal class TokenEndpointClient(
             retriedAbcaChallenge: Boolean,
             retriedDPoPNonce: Boolean,
         ): Pair<TokenResponseTO, Nonce?> {
-            val abcaChallenge = when (client) {
-                is Client.Attested -> existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
+            val abcaChallenge = when (clientAuthentication) {
+                is ClientAuthentication.AttestationBased ->
+                    existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
                 else -> null
             }
 
@@ -301,11 +302,11 @@ internal class TokenEndpointClient(
     }
 
     private suspend fun generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
-        when (client) {
-            is Client.Attested ->
+        when (clientAuthentication) {
+            is ClientAuthentication.AttestationBased ->
                 with(clientAttestationPoPBuilder) {
-                    val popJWT = client.attestationPoPJWT(clock, authServerId, challenge)
-                    client.attestationJWT to popJWT
+                    val popJWT = clientAuthentication.attestationPoPJWT(clock, authServerId, challenge)
+                    clientAuthentication.attestationJWT to popJWT
                 }
 
             else -> null

@@ -31,7 +31,7 @@ import java.time.Clock
  * A minimal configuration needed to [instantiate][DeferredIssuer.make]
  * the [DeferredIssuer].
  *
- * @param client the client for the wallet
+ * @param clientAuthentication the client for the wallet
  * @param deferredEndpoint the URL of the deferred endpoint
  * @param challengeEndpoint the URL of the challenge endpoint for Attestation-Based Client Authentication provided by the Authorization Server
  * @param tokenEndpoint the URL of the token endpoint. Will be used if needed, to refresh the access token
@@ -46,7 +46,7 @@ import java.time.Clock
  */
 data class DeferredIssuerConfig(
     val credentialIssuerId: CredentialIssuerId,
-    val client: Client,
+    val clientAuthentication: ClientAuthentication,
     val deferredEndpoint: URL,
     val authorizationServerId: URL,
     val challengeEndpoint: URL?,
@@ -166,7 +166,7 @@ interface DeferredIssuer : QueryForDeferredCredential {
             val tokenEndpointClient = TokenEndpointClient(
                 config.credentialIssuerId,
                 config.clock,
-                config.client,
+                config.clientAuthentication,
                 URI.create("https://willNotBeUsed"), // this will not be used
                 config.authorizationServerId,
                 challengeEndpoint = config.challengeEndpoint,

@@ -36,7 +36,7 @@ import java.time.Clock
  */
 internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder {
 
-    override suspend fun Client.Attested.attestationPoPJWT(
+    override suspend fun ClientAuthentication.AttestationBased.attestationPoPJWT(
         clock: Clock,
         authorizationServerId: URL,
         challenge: Nonce?,
@@ -91,18 +91,26 @@ internal suspend fun OpenId4VCIConfig.generateClientAttestationIfNeeded(
     authorizationServerId: URL,
     challenge: Nonce?,
 ): ClientAttestation? =
-    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(clock, client, authorizationServerId, challenge)
+    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(
+        clock,
+        clientAuthentication,
+        authorizationServerId,
+        challenge,
+    )
 
 internal suspend fun DeferredIssuerConfig.generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
-    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(clock, client, authorizationServerId, challenge)
+    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(clock, clientAuthentication, authorizationServerId, challenge)
 
 private suspend fun ClientAttestationPoPBuilder.generateClientAttestationIfNeeded(
     clock: Clock,
-    client: Client,
+    clientAuthentication: ClientAuthentication,
     authorizationServerId: URL,
     challenge: Nonce?,
 ): ClientAttestation? =
-    when (client) {
-        is Client.Attested -> client.attestationJWT to client.attestationPoPJWT(clock, authorizationServerId, challenge)
+    when (clientAuthentication) {
+        is ClientAuthentication.AttestationBased -> {
+            val clientAttestationPoPJwt = clientAuthentication.attestationPoPJWT(clock, authorizationServerId, challenge)
+            clientAuthentication.attestationJWT to clientAttestationPoPJwt
+        }
         else -> null
     }

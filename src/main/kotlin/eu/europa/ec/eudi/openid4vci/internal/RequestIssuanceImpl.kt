@@ -271,21 +271,21 @@ internal class RequestIssuanceImpl(
         cNonce: Nonce?,
         grant: Grant,
     ): JwtProofClaims {
-        fun iss(client: Client, grant: Grant): ClientId? {
+        fun iss(clientAuthentication: ClientAuthentication, grant: Grant): ClientId? {
             val useIss = when (grant) {
                 Grant.AuthorizationCode -> true
-                Grant.PreAuthorizedCodeGrant -> when (client) {
-                    is Client.Attested -> true
-                    is Client.Public -> false
+                Grant.PreAuthorizedCodeGrant -> when (clientAuthentication) {
+                    is ClientAuthentication.AttestationBased -> true
+                    is ClientAuthentication.None -> false
                 }
             }
-            return client.id.takeIf { useIss }
+            return clientAuthentication.id.takeIf { useIss }
         }
 
         return JwtProofClaims(
             audience = credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier.toString(),
             issuedAt = Instant.now(),
-            issuer = iss(config.client, grant),
+            issuer = iss(config.clientAuthentication, grant),
             nonce = cNonce?.value,
         )
     }

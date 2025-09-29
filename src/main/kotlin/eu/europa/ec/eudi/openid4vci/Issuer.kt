@@ -113,7 +113,9 @@ interface Issuer :
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<Issuer> = runCatching {
-            config.client.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
+            config.clientAuthentication.ensureSupportedByAuthorizationServer(
+                credentialOffer.authorizationServerMetadata,
+            )
 
             val dPoPJwtFactory = config.dPoPSigner?.let { signer ->
                 DPoPJwtFactory.createForServer(
@@ -237,7 +239,7 @@ interface Issuer :
                     return DeferredIssuanceContext(
                         DeferredIssuerConfig(
                             credentialIssuerId = credentialOffer.credentialIssuerIdentifier,
-                            client = config.client,
+                            clientAuthentication = config.clientAuthentication,
                             deferredEndpoint = deferredEndpoint,
                             authorizationServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
                             challengeEndpoint = challengeEndpoint,
@@ -327,8 +329,8 @@ interface Issuer :
     }
 }
 
-internal fun Client.ensureSupportedByAuthorizationServer(authorizationServerMetadata: CIAuthorizationServerMetadata) {
-    if (this is Client.Attested) {
+internal fun ClientAuthentication.ensureSupportedByAuthorizationServer(authorizationServerMetadata: CIAuthorizationServerMetadata) {
+    if (this is ClientAuthentication.AttestationBased) {
         val supportedAuthenticationMethods = authorizationServerMetadata.tokenEndpointAuthMethods.orEmpty()
         val authenticationMethod =
             ClientAuthenticationMethod(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_CLIENT_AUTHENTICATION_METHOD)

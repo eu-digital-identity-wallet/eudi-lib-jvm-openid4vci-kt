@@ -156,7 +156,7 @@ internal class AuthorizationEndpointClient(
 
         val parEndpoint = pushedAuthorizationRequestEndpoint?.toURI()
         checkNotNull(parEndpoint) { "PAR endpoint not advertised" }
-        val clientID = ClientID(config.client.id)
+        val clientID = ClientID(config.clientAuthentication.id)
         val codeVerifier = CodeVerifier()
         val pushedAuthorizationRequest = run {
             val request = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
@@ -198,7 +198,7 @@ internal class AuthorizationEndpointClient(
             "No scopes or authorization details provided. Cannot prepare authorization request."
         }
 
-        val clientID = ClientID(config.client.id)
+        val clientID = ClientID(config.clientAuthentication.id)
         val codeVerifier = CodeVerifier()
         val authorizationRequest = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
             endpointURI(authorizationEndpoint.toURI())
@@ -274,8 +274,9 @@ internal class AuthorizationEndpointClient(
                 dPoPJwtFactory?.createDPoPJwt(Htm.POST, url, null, existingDpopNonce)
                     ?.getOrThrow()?.serialize()
 
-            val abcaChallenge = when (config.client) {
-                is Client.Attested -> existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
+            val abcaChallenge = when (config.clientAuthentication) {
+                is ClientAuthentication.AttestationBased ->
+                    existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
                 else -> null
             }
             val clientAttestation = config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL(), abcaChallenge)

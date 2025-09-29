@@ -817,7 +817,7 @@ class IssuanceSingleRequestTest {
             walletInstanceKey = walletInstanceKey,
             clientId = "MyWallet_ClientId",
         )
-        val config = OpenId4VCIConfiguration.copy(client = client)
+        val config = OpenId4VCIConfiguration.copy(clientAuthentication = client)
 
         val mockedHttpClient = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
@@ -841,7 +841,7 @@ class IssuanceSingleRequestTest {
             walletInstanceKey = walletInstanceKey,
             clientId = "MyWallet_ClientId",
         )
-        val config = OpenId4VCIConfiguration.copy(client = client)
+        val config = OpenId4VCIConfiguration.copy(clientAuthentication = client)
 
         val mockedHttpClient = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
@@ -886,7 +886,7 @@ class IssuanceSingleRequestTest {
             singleIssuanceRequestMocker(),
         )
 
-        val config = OpenId4VCIConfiguration.copy(client = client)
+        val config = OpenId4VCIConfiguration.copy(clientAuthentication = client)
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             config = config,
@@ -920,7 +920,7 @@ class IssuanceSingleRequestTest {
                 },
             )
 
-            val config = OpenId4VCIConfiguration.copy(client = client)
+            val config = OpenId4VCIConfiguration.copy(clientAuthentication = client)
 
             val error = assertFailsWith<IllegalStateException> {
                 authorizeRequestForCredentialOffer(
@@ -977,7 +977,7 @@ class IssuanceSingleRequestTest {
                 singleIssuanceRequestMocker(),
             )
 
-            val config = OpenId4VCIConfiguration.copy(client = client)
+            val config = OpenId4VCIConfiguration.copy(clientAuthentication = client)
 
             val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
                 config = config,

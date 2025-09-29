@@ -108,7 +108,7 @@ data class ClientAttestationPoPJWTSpec(
 
 /**
  * A function for building a [ClientAttestationPoPJWT]
- * in the context of a [Client.Attested] client
+ * in the context of a [ClientAuthentication.AttestationBased] client
  */
 fun interface ClientAttestationPoPBuilder {
 
@@ -122,7 +122,11 @@ fun interface ClientAttestationPoPBuilder {
      *
      * @return the PoP JWT
      */
-    suspend fun Client.Attested.attestationPoPJWT(clock: Clock, authorizationServerId: URL, challenge: Nonce?): ClientAttestationPoPJWT
+    suspend fun ClientAuthentication.AttestationBased.attestationPoPJWT(
+        clock: Clock,
+        authorizationServerId: URL,
+        challenge: Nonce?,
+    ): ClientAttestationPoPJWT
 
     companion object {
         val Default: ClientAttestationPoPBuilder = DefaultClientAttestationPoPBuilder

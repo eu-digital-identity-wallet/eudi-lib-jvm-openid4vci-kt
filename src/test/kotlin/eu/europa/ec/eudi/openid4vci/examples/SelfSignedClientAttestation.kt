@@ -62,7 +62,7 @@ internal fun selfSignedClient(
     keyType: KeyType? = null,
     userAuthentication: UserAuthentication? = null,
     headerCustomization: JWSHeader.Builder.() -> Unit = {},
-): Client.Attested {
+): ClientAuthentication.AttestationBased {
     val algorithm = walletInstanceKey.jwsAlgorithm
     val signer = DefaultJWSSignerFactory().createJWSSigner(walletInstanceKey, algorithm)
     val clientAttestationJWT = run {
@@ -79,7 +79,7 @@ internal fun selfSignedClient(
         builder.build()
     }
     val popJwtSpec = ClientAttestationPoPJWTSpec(Signer.fromNimbusEcKey(walletInstanceKey, walletInstanceKey.toPublicJWK(), null, null))
-    return Client.Attested(clientAttestationJWT, popJwtSpec)
+    return ClientAuthentication.AttestationBased(clientAttestationJWT, popJwtSpec)
 }
 
 /**
