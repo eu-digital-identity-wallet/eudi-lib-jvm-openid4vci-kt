@@ -166,19 +166,6 @@ value class AuthorizationCode(val code: String) {
 }
 
 /**
- * A c_nonce as provided from issuance server's nonce endpoint.
- *
- * @param value The c_nonce value
- */
-@JvmInline
-value class CNonce(val value: String) : java.io.Serializable {
-    init {
-        require(value.isNotEmpty()) { "Value cannot be empty" }
-    }
-    override fun toString(): String = value
-}
-
-/**
  * An identifier of a Deferred Issuance transaction.
  *
  * @param value The identifier's value
