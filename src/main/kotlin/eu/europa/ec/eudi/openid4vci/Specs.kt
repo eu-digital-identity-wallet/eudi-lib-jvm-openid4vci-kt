@@ -16,6 +16,28 @@
 package eu.europa.ec.eudi.openid4vci
 
 /**
+ * [OpenID for Verifiable Credential Issuance](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-15.html)
+ */
+object OpenId4VCISpec {
+
+    const val JWT_PROOF_TYPE = "openid4vci-proof+jwt"
+
+    const val JOSE_HEADER_KEY_ID = "kid"
+    const val JOSE_HEADER_JWK = "jwk"
+    const val JOSE_HEADER_X5C = "x5c"
+    const val JOSE_HEADER_KEY_ATTESTATION = "key_attestation"
+
+    const val KEY_ATTESTATION_JWT_TYPE = "key-attestation+jwt"
+    const val KEY_ATTESTATION_ATTESTED_KEYS = "attested_keys"
+    const val KEY_ATTESTATION_KEY_STORAGE = "key_storage"
+    const val KEY_ATTESTATION_USER_AUTHENTICATION = "user_authentication"
+
+    const val CREDENTIAL_ISSUER_WELL_KNOWN_PATH = "/.well-known/openid-credential-issuer"
+
+    const val SIGNED_METADATA_JWT_TYPE = "openidvci-issuer-metadata+jwt"
+}
+
+/**
  * [OAuth 2.0 Attestation-Based Client Authentication](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-attestation-based-client-auth-07)
  */
 object AttestationBasedClientAuthenticationSpec {
@@ -60,4 +82,27 @@ object AttestationBasedClientAuthenticationSpec {
     const val USE_ATTESTATION_CHALLENGE_ERROR: String = "use_attestation_challenge"
     const val USE_FRESH_ATTESTATION_ERROR: String = "use_fresh_attestation"
     const val INVALID_CLIENT_ATTESTATION_ERROR: String = "invalid_client_attestation"
+}
+
+/**
+ * [JSON Web Token (JWT)](https://www.rfc-editor.org/rfc/rfc7519)
+ */
+object RFC7519 {
+    //
+    // Registered Header Claims
+    //
+    const val ALGORITHM: String = "alg"
+    const val TYPE: String = "typ"
+    const val CONTENT_TYPE: String = "cty"
+
+    //
+    // Registered Claims
+    //
+    const val ISSUER: String = "iss"
+    const val SUBJECT: String = "sub"
+    const val AUDIENCE: String = "aud"
+    const val EXPIRATION_TIME: String = "exp"
+    const val NOT_BEFORE: String = "nbf"
+    const val ISSUED_AT: String = "iat"
+    const val JWT_ID: String = "jti"
 }

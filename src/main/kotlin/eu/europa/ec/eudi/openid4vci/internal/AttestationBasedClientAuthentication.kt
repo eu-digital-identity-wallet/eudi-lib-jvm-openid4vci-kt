@@ -15,8 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.JWTClaimsSet
@@ -27,10 +25,9 @@ import io.ktor.client.request.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.put
 import java.net.URL
 import java.time.Clock
-import java.time.Instant
-import java.util.*
 
 /**
  * Default implementation of [ClientAttestationPoPBuilder]
@@ -39,41 +36,30 @@ import java.util.*
  */
 internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder {
 
-    override fun Client.Attested.attestationPoPJWT(
+    override suspend fun Client.Attested.attestationPoPJWT(
         clock: Clock,
         authorizationServerId: URL,
         challenge: Nonce?,
     ): ClientAttestationPoPJWT {
-        val header = popJwtHeader()
-        val claimSet = popJwtClaimSet(authorizationServerId, clock.instant(), challenge)
-        val jwt = SignedJWT(header, claimSet).apply { sign(popJwtSpec.jwsSigner) }
-        return ClientAttestationPoPJWT(jwt)
-    }
-
-    private fun Client.Attested.popJwtHeader(): JWSHeader =
-        JWSHeader.Builder(popJwtSpec.signingAlgorithm)
-            .type(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE))
-            .build()
-
-    private fun Client.Attested.popJwtClaimSet(
-        authorizationServerId: URL,
-        now: Instant,
-        challenge: Nonce?,
-    ): JWTClaimsSet {
-        fun randomJwtId() = JWTID().value
-        val issuedAt = Date.from(now)
-        return JWTClaimsSet.Builder()
-            .issuer(id)
-            .audience(authorizationServerId.toString())
-            .jwtID(randomJwtId())
-            .apply {
-                challenge?.let {
-                    claim(AttestationBasedClientAuthenticationSpec.CHALLENGE_CLAIM, it.value)
-                }
-            }
-            .issueTime(issuedAt)
-            .notBeforeTime(issuedAt)
-            .build()
+        val now = clock.instant()
+        val claimSet = ClientAttestationPOPClaims(
+            issuer = id,
+            audience = authorizationServerId,
+            jwtId = JWTID(),
+            issuedAt = now,
+            challenge = challenge,
+            notBefore = now,
+        )
+        val signedJwt = popJwtSpec.signer.use { signOperation ->
+            JwtSigner<ClientAttestationPOPClaims, JWK>(
+                signOperation = signOperation,
+                algorithm = popJwtSpec.signer.javaAlgorithm.toJoseAlg(),
+                customizeHeader = {
+                    put(RFC7519.TYPE, AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE)
+                },
+            ).sign(claimSet)
+        }
+        return ClientAttestationPoPJWT(SignedJWT.parse(signedJwt))
     }
 }
 
@@ -101,16 +87,16 @@ internal fun HttpRequestBuilder.clientAttestationHeaders(
     header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_POP_HEADER, pop.jwt.serialize())
 }
 
-internal fun OpenId4VCIConfig.generateClientAttestationIfNeeded(
+internal suspend fun OpenId4VCIConfig.generateClientAttestationIfNeeded(
     authorizationServerId: URL,
     challenge: Nonce?,
 ): ClientAttestation? =
     clientAttestationPoPBuilder.generateClientAttestationIfNeeded(clock, client, authorizationServerId, challenge)
 
-internal fun DeferredIssuerConfig.generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
+internal suspend fun DeferredIssuerConfig.generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
     clientAttestationPoPBuilder.generateClientAttestationIfNeeded(clock, client, authorizationServerId, challenge)
 
-private fun ClientAttestationPoPBuilder.generateClientAttestationIfNeeded(
+private suspend fun ClientAttestationPoPBuilder.generateClientAttestationIfNeeded(
     clock: Clock,
     client: Client,
     authorizationServerId: URL,

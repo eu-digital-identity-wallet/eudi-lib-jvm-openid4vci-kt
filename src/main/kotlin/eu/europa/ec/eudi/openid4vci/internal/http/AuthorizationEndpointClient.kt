@@ -278,9 +278,10 @@ internal class AuthorizationEndpointClient(
                 is Client.Attested -> existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
                 else -> null
             }
+            val clientAttestation = config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL(), abcaChallenge)
 
             val response = httpClient.submitForm(url.toString(), formParameters) {
-                config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL(), abcaChallenge)?.let {
+                clientAttestation?.let {
                     clientAttestationHeaders(it)
                 }
                 dpopProof?.let { header(DPoP, dpopProof) }

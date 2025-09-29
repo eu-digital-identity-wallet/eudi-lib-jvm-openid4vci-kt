@@ -74,6 +74,7 @@ internal fun ByteArray.transcodeSignatureToConcat(alg: JWSAlgorithm): ByteArray 
 internal fun String.toJoseAlg(): JWSAlgorithm =
     this.toJoseECAlg()
         ?: error("Unsupported algorithm for JWS signature: $this")
+
 internal fun String.toJoseECAlg(): JWSAlgorithm? = when (this) {
     "SHA256withECDSA" -> JWSAlgorithm.ES256
     "SHA384withECDSA" -> JWSAlgorithm.ES384

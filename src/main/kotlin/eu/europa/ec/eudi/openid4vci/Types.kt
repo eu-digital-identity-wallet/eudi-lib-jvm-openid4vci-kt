@@ -394,6 +394,7 @@ value class CoseCurve(val value: Int) {
  * Nonce (single use) value provided either by the Authorization or Resource server.
  */
 @JvmInline
+@Serializable
 value class Nonce(val value: String) {
     init {
         require(value.isNotEmpty()) { "Nonce value cannot be empty" }

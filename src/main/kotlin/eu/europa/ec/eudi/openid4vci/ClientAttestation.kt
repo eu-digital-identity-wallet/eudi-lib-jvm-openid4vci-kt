@@ -18,16 +18,24 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
-import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.oauth2.sdk.id.JWTID
 import eu.europa.ec.eudi.openid4vci.internal.DefaultClientAttestationPoPBuilder
+import eu.europa.ec.eudi.openid4vci.internal.JWTIDSerializer
+import eu.europa.ec.eudi.openid4vci.internal.NumericInstantSerializer
+import eu.europa.ec.eudi.openid4vci.internal.URLSerializer
 import eu.europa.ec.eudi.openid4vci.internal.cnf
 import eu.europa.ec.eudi.openid4vci.internal.cnfJwk
+import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
 import java.time.Clock
+import java.time.Instant
 
 /**
  * These JWTs are transmitted via HTTP headers in an HTTP request from a Client Instance
@@ -83,16 +91,25 @@ value class ClientAttestationPoPJWT(val jwt: SignedJWT) {
     val clientId: ClientId get() = checkNotNull(jwt.jwtClaimsSet.issuer)
 }
 
+@Serializable
+data class ClientAttestationPOPClaims(
+    @SerialName(RFC7519.ISSUER) @Required val issuer: ClientId,
+    @SerialName(RFC7519.AUDIENCE) @Required @Serializable(with = URLSerializer::class) val audience: URL,
+    @SerialName(RFC7519.JWT_ID) @Required @Serializable(with = JWTIDSerializer::class) val jwtId: JWTID,
+    @SerialName(RFC7519.ISSUED_AT) @Required @Serializable(with = NumericInstantSerializer::class) val issuedAt: Instant,
+    @SerialName(AttestationBasedClientAuthenticationSpec.CHALLENGE_CLAIM) val challenge: Nonce? = null,
+    @SerialName(RFC7519.NOT_BEFORE) @Serializable(with = NumericInstantSerializer::class) val notBefore: Instant? = null,
+)
+
 //
 // Creation of ClientAttestationPoPJWT
 //
 
 data class ClientAttestationPoPJWTSpec(
-    val signingAlgorithm: JWSAlgorithm,
-    val jwsSigner: JWSSigner,
+    val signer: Signer<JWK>,
 ) {
     init {
-        requireIsNotMAC(signingAlgorithm)
+        requireIsNotMAC(signer.javaAlgorithm.toJoseAlg())
     }
 }
 
@@ -112,7 +129,7 @@ fun interface ClientAttestationPoPBuilder {
      *
      * @return the PoP JWT
      */
-    fun Client.Attested.attestationPoPJWT(clock: Clock, authorizationServerId: URL, challenge: Nonce?): ClientAttestationPoPJWT
+    suspend fun Client.Attested.attestationPoPJWT(clock: Clock, authorizationServerId: URL, challenge: Nonce?): ClientAttestationPoPJWT
 
     companion object {
         val Default: ClientAttestationPoPBuilder = DefaultClientAttestationPoPBuilder

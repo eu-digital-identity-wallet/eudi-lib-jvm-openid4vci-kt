@@ -19,6 +19,7 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.oauth2.sdk.id.JWTID
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.ClaimPathElement.AllArrayElements
 import eu.europa.ec.eudi.openid4vci.ClaimPathElement.ArrayElement
@@ -29,6 +30,8 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
+import java.net.URI
+import java.net.URL
 import java.security.cert.X509Certificate
 import java.time.Instant
 import java.util.*
@@ -214,3 +217,23 @@ fun JWK.asJsonElement(): JsonElement = Json.parseToJsonElement(this.toPublicJWK(
 fun List<X509Certificate>.asJsonElement(): JsonArray = JsonArray(
     this.map { Json.encodeToJsonElement(Base64.getEncoder().encodeToString(it.encoded)) },
 )
+
+object JWTIDSerializer : KSerializer<JWTID> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("JWTID", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: JWTID) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: Decoder): JWTID = JWTID(decoder.decodeString())
+}
+
+object URLSerializer : KSerializer<URL> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("URL", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: URL) {
+        encoder.encodeString(value.toExternalForm())
+    }
+
+    override fun deserialize(decoder: Decoder): URL = URI.create(decoder.decodeString()).toURL()
+}

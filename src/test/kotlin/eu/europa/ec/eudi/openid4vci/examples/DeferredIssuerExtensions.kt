@@ -17,8 +17,6 @@ package eu.europa.ec.eudi.openid4vci.examples
 
 import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
@@ -36,7 +34,7 @@ suspend fun DeferredIssuer.Companion.queryForDeferredCredential(
     clock: Clock = Clock.systemDefaultZone(),
     ctxTO: DeferredIssuanceStoredContextTO,
     recreatePopSigner: ((String) -> Signer<JWK>)? = null,
-    recreateClientAttestationPodSigner: ((String) -> JWSSigner)? = null,
+    recreateClientAttestationPodSigner: ((String) -> Signer<JWK>)? = null,
     httpClient: HttpClient,
     responseEncryptionKey: JWK? = null,
 ): Result<Pair<DeferredIssuanceStoredContextTO?, DeferredCredentialQueryOutcome>> = runCatching {
@@ -132,7 +130,6 @@ data class DeferredIssuanceStoredContextTO(
     @Required @SerialName("credential_issuer") val credentialIssuerId: String,
     @Required @SerialName("client_id") val clientId: String,
     @SerialName("client_attestation_jwt") val clientAttestationJwt: String? = null,
-    @SerialName("client_attestation_pop_alg") val clientAttestationPopAlgorithm: String? = null,
     @SerialName("client_attestation_pop_key_id") val clientAttestationPopKeyId: String? = null,
     @Required @SerialName("deferred_endpoint") val deferredEndpoint: String,
     @Required @SerialName("auth_server_id") val authServerId: String,
@@ -151,7 +148,7 @@ data class DeferredIssuanceStoredContextTO(
     fun toDeferredIssuanceStoredContext(
         clock: Clock,
         recreatePopSigner: ((String) -> Signer<JWK>)?,
-        recreateClientAttestationPodSigner: ((String) -> JWSSigner)?,
+        recreateClientAttestationPodSigner: ((String) -> Signer<JWK>)?,
     ): DeferredIssuanceContext {
         return DeferredIssuanceContext(
             config = DeferredIssuerConfig(
@@ -163,15 +160,11 @@ data class DeferredIssuanceStoredContextTO(
                         val jwt = runCatching {
                             ClientAttestationJWT(SignedJWT.parse(clientAttestationJwt))
                         }.getOrNull() ?: error("Invalid client attestation JWT")
-                        val poPJWTSpec = ClientAttestationPoPJWTSpec(
-                            signingAlgorithm = JWSAlgorithm.parse(checkNotNull(clientAttestationPopAlgorithm)),
-                            jwsSigner = checkNotNull(recreateClientAttestationPodSigner).invoke(
-                                checkNotNull(
-                                    clientAttestationPopKeyId,
-                                ),
-                            ),
-                        )
-
+                        val signer = clientAttestationPopKeyId?.let {
+                                keyId ->
+                            recreateClientAttestationPodSigner?.let { recreate -> recreate(keyId) }
+                        }
+                        val poPJWTSpec = ClientAttestationPoPJWTSpec(checkNotNull(signer))
                         Client.Attested(jwt, poPJWTSpec)
                     },
                 deferredEndpoint = URI(deferredEndpoint).toURL(),
@@ -216,7 +209,6 @@ data class DeferredIssuanceStoredContextTO(
                 credentialIssuerId = dCtx.config.credentialIssuerId.toString(),
                 clientId = dCtx.config.client.id,
                 clientAttestationJwt = dCtx.config.client.ifAttested { attestationJWT.jwt.serialize() },
-                clientAttestationPopAlgorithm = dCtx.config.client.ifAttested { popJwtSpec.signingAlgorithm.toJSONString() },
                 clientAttestationPopKeyId = dCtx.config.client.ifAttested { checkNotNull(clientAttestationPopKeyId) },
                 deferredEndpoint = dCtx.config.deferredEndpoint.toString(),
                 authServerId = dCtx.config.authorizationServerId.toString(),

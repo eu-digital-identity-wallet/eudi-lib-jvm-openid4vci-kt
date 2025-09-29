@@ -221,13 +221,14 @@ internal class TokenEndpointClient(
                 val formParameters = Parameters.build {
                     params.entries.forEach { (k, v) -> append(k, v) }
                 }
-                val jwt =
+                val dpopProof =
                     dPoPJwtFactory?.createDPoPJwt(Htm.POST, tokenEndpoint, null, existingDpopNonce)
                         ?.getOrThrow()?.serialize()
+                val clientAttestation = generateClientAttestationIfNeeded(abcaChallenge)
 
                 httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
-                    jwt?.let { header(DPoP, jwt) }
-                    generateClientAttestationIfNeeded(abcaChallenge)?.let(::clientAttestationHeaders)
+                    dpopProof?.let { header(DPoP, it) }
+                    clientAttestation?.let(::clientAttestationHeaders)
                 }
             }
 
@@ -299,7 +300,7 @@ internal class TokenEndpointClient(
             .toFormParamString()
     }
 
-    private fun generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
+    private suspend fun generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
         when (client) {
             is Client.Attested ->
                 with(clientAttestationPoPBuilder) {

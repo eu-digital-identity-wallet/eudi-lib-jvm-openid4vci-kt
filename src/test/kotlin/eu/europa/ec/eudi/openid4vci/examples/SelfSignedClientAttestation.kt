@@ -29,6 +29,7 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import io.ktor.client.request.HttpRequestData
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -77,7 +78,7 @@ internal fun selfSignedClient(
         val builder = ClientAttestationJwtBuilder(clock, duration, algorithm, signer, claims, headerCustomization)
         builder.build()
     }
-    val popJwtSpec = ClientAttestationPoPJWTSpec(algorithm, signer)
+    val popJwtSpec = ClientAttestationPoPJWTSpec(Signer.fromNimbusEcKey(walletInstanceKey, walletInstanceKey.toPublicJWK(), null, null))
     return Client.Attested(clientAttestationJWT, popJwtSpec)
 }
 

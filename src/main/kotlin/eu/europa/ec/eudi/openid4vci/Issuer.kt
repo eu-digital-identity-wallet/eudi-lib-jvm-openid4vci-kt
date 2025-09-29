@@ -343,7 +343,7 @@ internal fun Client.ensureSupportedByAuthorizationServer(authorizationServerMeta
         }
 
         val supportedClientAttestationPOPJWSAlgs = authorizationServerMetadata.clientAttestationPOPJWSAlgs.orEmpty()
-        val clientAttestationPOPJWSAlg = popJwtSpec.signingAlgorithm
+        val clientAttestationPOPJWSAlg = popJwtSpec.signer.javaAlgorithm.toJoseAlg()
         require(clientAttestationPOPJWSAlg in supportedClientAttestationPOPJWSAlgs) {
             "${clientAttestationPOPJWSAlg.name} Client Attestation POP JWS Algorithm not supported by Authorization Server"
         }
