@@ -23,6 +23,7 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.http.CNonceAndDPoPNonce
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialEndpointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.NonceEndpointClient
 import java.time.Instant
@@ -80,39 +81,39 @@ internal class RequestIssuanceImpl(
             is ProofsSpecification.NoProofs -> emptyList<Proof>() to null
 
             is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
-                val (cNonce, dPopNonce) = cNonce() ?: (null to null)
+                val cNonceAndDPoPNonce = cNonce()
                 val proofs = listOf(
                     jwtProofWithKeyAttestation(
                         proofsSpecification,
                         credentialConfigId,
                         grant,
-                        cNonce,
+                        cNonceAndDPoPNonce?.cnonce,
                     ),
                 )
-                proofs to dPopNonce
+                proofs to cNonceAndDPoPNonce?.dpopNonce
             }
 
             is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
-                val (cNonce, dPopNonce) = cNonce() ?: (null to null)
+                val cNonceAndDPoPNonce = cNonce()
                 val proofs = jwtProofsWithoutKeyAttestation(
                     proofsSpecification,
                     credentialConfigId,
                     grant,
-                    cNonce,
+                    cNonceAndDPoPNonce?.cnonce,
                 )
-                proofs to dPopNonce
+                proofs to cNonceAndDPoPNonce?.dpopNonce
             }
 
             is ProofsSpecification.AttestationProof -> {
-                val (cNonce, dPopNonce) = cNonce() ?: (null to null)
+                val cNonceAndDPoPNonce = cNonce()
                 val proofs = listOf(
                     attestationProof(
                         proofsSpecification,
                         credentialConfigId,
-                        cNonce,
+                        cNonceAndDPoPNonce?.cnonce,
                     ),
                 )
-                proofs to dPopNonce
+                proofs to cNonceAndDPoPNonce?.dpopNonce
             }
         }
     }
@@ -170,7 +171,7 @@ internal class RequestIssuanceImpl(
         proofsSpecification: ProofsSpecification.JwtProofs.WithKeyAttestation,
         credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
-        cNonce: CNonce?,
+        cNonce: Nonce?,
     ): Proof.Jwt {
         val (proofSignerProvider, keyIndex) = proofsSpecification
         val proofSigner = proofSignerProvider(cNonce)
@@ -205,7 +206,7 @@ internal class RequestIssuanceImpl(
         proofsSpecification: ProofsSpecification.JwtProofs.NoKeyAttestation,
         credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
-        cNonce: CNonce?,
+        cNonce: Nonce?,
     ): List<Proof.Jwt> {
         val joseAlg = run {
             val javaSigningAlgorithm = proofsSpecification.proofsSigner.javaAlgorithm
@@ -224,7 +225,7 @@ internal class RequestIssuanceImpl(
     private suspend fun attestationProof(
         proofsSpecification: ProofsSpecification.AttestationProof,
         credentialConfigId: CredentialConfigurationIdentifier,
-        cNonce: CNonce?,
+        cNonce: Nonce?,
     ): Proof.Attestation {
         val keyAttestationJwt = proofsSpecification.attestationProvider(cNonce)
         keyAttestationJwt.ensureKeyAttestationJwtAlgIsSupported(credentialConfigId, ProofType.ATTESTATION)
@@ -264,27 +265,27 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private suspend fun cNonce(): Pair<CNonce, Nonce?>? = nonceEndpointClient?.getNonce()?.getOrThrow()
+    private suspend fun cNonce(): CNonceAndDPoPNonce? = nonceEndpointClient?.getNonce()?.getOrThrow()
 
     private fun jwtProofClaims(
-        cNonce: CNonce?,
+        cNonce: Nonce?,
         grant: Grant,
     ): JwtProofClaims {
-        fun iss(client: Client, grant: Grant): ClientId? {
+        fun iss(clientAuthentication: ClientAuthentication, grant: Grant): ClientId? {
             val useIss = when (grant) {
                 Grant.AuthorizationCode -> true
-                Grant.PreAuthorizedCodeGrant -> when (client) {
-                    is Client.Attested -> true
-                    is Client.Public -> false
+                Grant.PreAuthorizedCodeGrant -> when (clientAuthentication) {
+                    is ClientAuthentication.AttestationBased -> true
+                    is ClientAuthentication.None -> false
                 }
             }
-            return client.id.takeIf { useIss }
+            return clientAuthentication.id.takeIf { useIss }
         }
 
         return JwtProofClaims(
             audience = credentialOffer.credentialIssuerMetadata.credentialIssuerIdentifier.toString(),
             issuedAt = Instant.now(),
-            issuer = iss(config.client, grant),
+            issuer = iss(config.clientAuthentication, grant),
             nonce = cNonce?.value,
         )
     }

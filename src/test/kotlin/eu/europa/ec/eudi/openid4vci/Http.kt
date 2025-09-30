@@ -21,6 +21,8 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import java.net.URI
 
@@ -65,21 +67,30 @@ internal data class RequestMocker(
 
 /**
  * Factory method to create mocked http clients. Http clients behavior is based on the passed [requestMockers].
+ *
+ * Each [RequestMocker] is used exactly once, and then discarded. If multiple invocations of the same endpoint have to be mocked,
+ * multiple instances of the same [RequestMocker] must be provided.
  */
 internal fun mockedHttpClient(
     vararg requestMockers: RequestMocker,
     expectSuccessOnly: Boolean = false,
-): HttpClient =
-    HttpClient(MockEngine) {
+): HttpClient {
+    val mutex = Mutex()
+    val mockers = requestMockers.toMutableList()
+
+    return HttpClient(MockEngine) {
         engine {
-            this.addHandler { request ->
-                requestMockers
-                    .firstOrNull { it.requestMatcher(request) }
-                    ?.apply {
-                        requestValidator(request)
+            addHandler { request ->
+                mutex.withLock {
+                    val mocker = mockers.firstOrNull { it.requestMatcher(request) }
+                    if (null != mocker) {
+                        mockers.remove(mocker)
+                        mocker.requestValidator(request)
+                        mocker.responseBuilder(this, request)
+                    } else {
+                        respondError(HttpStatusCode.NotFound)
                     }
-                    ?.responseBuilder?.invoke(this, request)
-                    ?: respondError(HttpStatusCode.NotFound)
+                }
             }
         }
         install(ContentNegotiation) {
@@ -89,3 +100,4 @@ internal fun mockedHttpClient(
         }
         expectSuccess = expectSuccessOnly
     }
+}

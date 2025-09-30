@@ -33,7 +33,6 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
-import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
@@ -43,7 +42,7 @@ import com.nimbusds.oauth2.sdk.Scope as NimbusScope
 /**
  * Sealed hierarchy of possible responses to a Pushed Authorization Request.
  */
-internal sealed interface PushedAuthorizationRequestResponseTO {
+internal sealed interface PushedAuthorizationRequestResponseTO : java.io.Serializable {
 
     /**
      * Successful request submission.
@@ -75,6 +74,7 @@ internal class AuthorizationEndpointClient(
     private val authorizationIssuer: String,
     private val authorizationEndpoint: URL,
     private val pushedAuthorizationRequestEndpoint: URL?,
+    private val challengeEndpoint: URL?,
     private val config: OpenId4VCIConfig,
     private val dPoPJwtFactory: DPoPJwtFactory?,
     private val httpClient: HttpClient,
@@ -89,8 +89,9 @@ internal class AuthorizationEndpointClient(
     ) : this(
         credentialIssuerId,
         authorizationServerMetadata.issuer.value,
-        authorizationServerMetadata.authorizationEndpointURI.toURL(),
-        authorizationServerMetadata.pushedAuthorizationRequestEndpointURI?.toURL(),
+        authorizationEndpoint = authorizationServerMetadata.authorizationEndpointURI.toURL(),
+        pushedAuthorizationRequestEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI?.toURL(),
+        challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL(),
         config,
         dPoPJwtFactory,
         httpClient,
@@ -101,6 +102,10 @@ internal class AuthorizationEndpointClient(
 
     private val supportsPar: Boolean
         get() = pushedAuthorizationRequestEndpoint != null
+
+    private val challengeEndpointClient: ChallengeEndpointClient? by lazy {
+        challengeEndpoint?.let { ChallengeEndpointClient(it, httpClient) }
+    }
 
     suspend fun submitParOrCreateAuthorizationRequestUrl(
         scopes: List<Scope>,
@@ -151,7 +156,7 @@ internal class AuthorizationEndpointClient(
 
         val parEndpoint = pushedAuthorizationRequestEndpoint?.toURI()
         checkNotNull(parEndpoint) { "PAR endpoint not advertised" }
-        val clientID = ClientID(config.client.id)
+        val clientID = ClientID(config.clientAuthentication.id)
         val codeVerifier = CodeVerifier()
         val pushedAuthorizationRequest = run {
             val request = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
@@ -193,7 +198,7 @@ internal class AuthorizationEndpointClient(
             "No scopes or authorization details provided. Cannot prepare authorization request."
         }
 
-        val clientID = ClientID(config.client.id)
+        val clientID = ClientID(config.clientAuthentication.id)
         val codeVerifier = CodeVerifier()
         val authorizationRequest = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
             endpointURI(authorizationEndpoint.toURI())
@@ -250,7 +255,7 @@ internal class AuthorizationEndpointClient(
     private suspend fun pushAuthorizationRequest(
         parEndpoint: URI,
         pushedAuthorizationRequest: PushedAuthorizationRequest,
-    ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> = coroutineScope {
+    ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> {
         val url = parEndpoint.toURL()
         val formParameters = run {
             val fps = pushedAuthorizationRequest.asFormPostParams()
@@ -259,21 +264,31 @@ internal class AuthorizationEndpointClient(
             }
         }
 
-        suspend fun requestInternal(
+        tailrec suspend fun requestInternal(
+            existingAbcaChallenge: Nonce?,
             existingDpopNonce: Nonce?,
-            retried: Boolean,
-        ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> = coroutineScope {
-            val jwt =
+            abcaChallengeRetried: Boolean,
+            dpopNonceRetried: Boolean,
+        ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> {
+            val dpopProof =
                 dPoPJwtFactory?.createDPoPJwt(Htm.POST, url, null, existingDpopNonce)
                     ?.getOrThrow()?.serialize()
 
+            val abcaChallenge = when (config.clientAuthentication) {
+                is ClientAuthentication.AttestationBased ->
+                    existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
+                else -> null
+            }
+            val clientAttestation = config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL(), abcaChallenge)
+
             val response = httpClient.submitForm(url.toString(), formParameters) {
-                config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL())?.let {
+                clientAttestation?.let {
                     clientAttestationHeaders(it)
                 }
-                jwt?.let { header(DPoP, jwt) }
+                dpopProof?.let { header(DPoP, dpopProof) }
             }
-            when {
+
+            return when {
                 response.status.isSuccess() -> {
                     val responseTO = response.body<PushedAuthorizationRequestResponseTO.Success>()
                     val newDopNonce = response.dpopNonce()
@@ -282,10 +297,34 @@ internal class AuthorizationEndpointClient(
 
                 response.status == HttpStatusCode.BadRequest -> {
                     val errorTO = response.body<PushedAuthorizationRequestResponseTO.Failure>()
+                    val newAbcaChallenge = response.abcaChallege()
                     val newDopNonce = response.dpopNonce()
+
                     when {
-                        errorTO.error == "use_dpop_nonce" && newDopNonce != null && !retried -> {
-                            requestInternal(newDopNonce, true)
+                        errorTO.error == "use_dpop_nonce" && newDopNonce != null && !dpopNonceRetried -> {
+                            requestInternal(
+                                existingAbcaChallenge = newAbcaChallenge ?: abcaChallenge,
+                                existingDpopNonce = newDopNonce,
+                                abcaChallengeRetried = abcaChallengeRetried,
+                                dpopNonceRetried = true,
+                            )
+                        }
+
+                        errorTO.error == AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR &&
+                            !abcaChallengeRetried -> {
+                            check(null != newAbcaChallenge) {
+                                "Authorization Server replied with " +
+                                    "'${AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR}' " +
+                                    "error code, but hasn't provided a challenge using the " +
+                                    "'${AttestationBasedClientAuthenticationSpec.CHALLENGE_HEADER}' header"
+                            }
+
+                            requestInternal(
+                                existingAbcaChallenge = newAbcaChallenge,
+                                existingDpopNonce = newDopNonce ?: existingDpopNonce,
+                                abcaChallengeRetried = true,
+                                dpopNonceRetried = dpopNonceRetried,
+                            )
                         }
 
                         else -> errorTO to (newDopNonce ?: existingDpopNonce)
@@ -296,7 +335,12 @@ internal class AuthorizationEndpointClient(
             }
         }
 
-        requestInternal(null, false)
+        return requestInternal(
+            existingAbcaChallenge = null,
+            existingDpopNonce = null,
+            abcaChallengeRetried = false,
+            dpopNonceRetried = false,
+        )
     }
 
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =

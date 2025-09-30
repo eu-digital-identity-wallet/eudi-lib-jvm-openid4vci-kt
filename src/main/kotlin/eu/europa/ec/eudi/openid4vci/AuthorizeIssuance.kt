@@ -79,8 +79,9 @@ data class AuthorizedRequest(
             authorizationServerDpopNonce = newAuthorizationServerDpopNonce,
         )
 
-    fun withResourceServerDpopNonce(newResourceServerDpopNonce: Nonce?): AuthorizedRequest =
-        copy(resourceServerDpopNonce = newResourceServerDpopNonce)
+    fun withResourceServerDpopNonce(newResourceServerDpopNonce: Nonce?): AuthorizedRequest = copy(
+        resourceServerDpopNonce = newResourceServerDpopNonce,
+    )
 }
 
 sealed interface AccessTokenOption {

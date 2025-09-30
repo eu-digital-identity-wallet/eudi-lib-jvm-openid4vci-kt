@@ -85,13 +85,13 @@ val CredentialOfferMixedDocTypes_AUTH_GRANT = """
 """.trimIndent()
 
 val OpenId4VCIConfiguration = OpenId4VCIConfig(
-    client = Client.Public("MyWallet_ClientId"),
+    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
 )
 
 val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
-    client = Client.Public("MyWallet_ClientId"),
+    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
     dPoPSigner = ecSigner(
