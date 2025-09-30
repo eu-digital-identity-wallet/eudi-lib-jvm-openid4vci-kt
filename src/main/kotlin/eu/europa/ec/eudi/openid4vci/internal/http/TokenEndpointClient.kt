@@ -197,7 +197,7 @@ internal class TokenEndpointClient(
     suspend fun refreshAccessToken(
         refreshToken: RefreshToken,
         dpopNonce: Nonce?,
-    ): Result<Pair<TokenResponse, Nonce?>> = runCatching {
+    ): Result<Pair<TokenResponse, Nonce?>> = runCatchingCancellable {
         val params = TokenEndpointForm.refreshAccessToken(clientAuthentication.id, refreshToken)
         placeTokenRequest(params, dpopNonce)
     }
