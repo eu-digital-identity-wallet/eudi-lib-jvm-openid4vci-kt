@@ -74,7 +74,7 @@ object CryptoGenerator {
         attestedKeysCount: Int = 3,
     ): ProofsSpecification {
         val ecKeys = List(attestedKeysCount) { randomECSigningKey(curve) }
-        val signerProvider: suspend (CNonce?) -> Signer<KeyAttestationJWT> = { cNonce ->
+        val signerProvider: suspend (Nonce?) -> Signer<KeyAttestationJWT> = { cNonce ->
             Signer.fromNimbusEcKey(
                 ecPrivateKey = ecKeys[0],
                 keyInfo =
@@ -128,7 +128,7 @@ object CryptoGenerator {
 
     fun keyAttestationJwt(
         attestedKeys: List<JWK>? = null,
-        nonce: CNonce? = null,
+        nonce: Nonce? = null,
     ) = run {
         val privateKey = loadECPrivateKeyFromFile("eu/europa/ec/eudi/openid4vci/internal/key_attestation_jwt.key")
         val certificate = loadCertificateFromFile("eu/europa/ec/eudi/openid4vci/internal/key_attestation_jwt.cert")
@@ -145,7 +145,7 @@ object CryptoGenerator {
         attestedKeys: List<JWK>,
         certificate: X509Certificate,
         signer: JWSSigner,
-        nonce: CNonce? = null,
+        nonce: Nonce? = null,
     ): SignedJWT = SignedJWT(
         JWSHeader.Builder(JWSAlgorithm.ES256)
             .type(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))

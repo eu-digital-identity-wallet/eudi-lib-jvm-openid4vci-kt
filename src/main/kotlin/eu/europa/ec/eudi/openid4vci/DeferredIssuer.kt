@@ -30,8 +30,9 @@ import java.time.Clock
  * A minimal configuration needed to [instantiate][DeferredIssuer.make]
  * the [DeferredIssuer].
  *
- * @param client the client for the wallet
+ * @param clientAuthentication the client for the wallet
  * @param deferredEndpoint the URL of the deferred endpoint
+ * @param challengeEndpoint the URL of the challenge endpoint for Attestation-Based Client Authentication provided by the Authorization Server
  * @param tokenEndpoint the URL of the token endpoint. Will be used if needed, to refresh the access token
  * @param authServerId the URL of the authorization server that was selected for authenticating the initial request.
  * @param credentialIssuerId the ID of the Credential Issuer
@@ -44,9 +45,10 @@ import java.time.Clock
  */
 data class DeferredIssuerConfig(
     val credentialIssuerId: CredentialIssuerId,
-    val client: Client,
+    val clientAuthentication: ClientAuthentication,
     val deferredEndpoint: URL,
-    val authServerId: URL,
+    val authorizationServerId: URL,
+    val challengeEndpoint: URL?,
     val tokenEndpoint: URL,
     val requestEncryptionSpec: EncryptionSpec?,
     val responseEncryptionParams: Pair<EncryptionMethod, CompressionAlgorithm?>?,
@@ -163,10 +165,11 @@ interface DeferredIssuer : QueryForDeferredCredential {
             val tokenEndpointClient = TokenEndpointClient(
                 config.credentialIssuerId,
                 config.clock,
-                config.client,
+                config.clientAuthentication,
                 URI.create("https://willNotBeUsed"), // this will not be used
-                config.authServerId,
-                config.tokenEndpoint,
+                config.authorizationServerId,
+                challengeEndpoint = config.challengeEndpoint,
+                tokenEndpoint = config.tokenEndpoint,
                 dPoPJwtFactory,
                 config.clientAttestationPoPBuilder,
                 httpClient,

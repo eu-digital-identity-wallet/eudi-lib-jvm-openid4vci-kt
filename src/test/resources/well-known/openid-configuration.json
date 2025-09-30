@@ -60,7 +60,8 @@
     "client_secret_basic",
     "client_secret_post",
     "tls_client_auth",
-    "client_secret_jwt"
+    "client_secret_jwt",
+    "attest_jwt_client_auth"
   ],
   "token_endpoint_auth_signing_alg_values_supported": [
     "PS384",
@@ -299,5 +300,12 @@
   "frontchannel_logout_supported": true,
   "frontchannel_logout_session_supported": true,
   "backchannel_logout_supported": true,
-  "backchannel_logout_session_supported": true
+  "backchannel_logout_session_supported": true,
+  "challenge_endpoint": "https://auth-server.example.com/ext/challenge",
+  "client_attestation_signing_alg_values_supported": [
+    "ES512"
+  ],
+  "client_attestation_pop_signing_alg_values_supported": [
+    "ES512"
+  ]
 }

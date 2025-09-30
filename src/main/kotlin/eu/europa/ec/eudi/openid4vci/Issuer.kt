@@ -113,7 +113,9 @@ interface Issuer :
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<Issuer> = runCatching {
-            config.client.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
+            config.clientAuthentication.ensureSupportedByAuthorizationServer(
+                credentialOffer.authorizationServerMetadata,
+            )
 
             val dPoPJwtFactory = config.dPoPSigner?.let { signer ->
                 DPoPJwtFactory.createForServer(
@@ -227,6 +229,8 @@ interface Issuer :
                             "Missing deferred credential endpoint"
                         }
 
+                    val challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL()
+
                     val tokenEndpoint =
                         checkNotNull(authorizationServerMetadata.tokenEndpointURI?.toURL()) {
                             "Missing token endpoint"
@@ -235,9 +239,10 @@ interface Issuer :
                     return DeferredIssuanceContext(
                         DeferredIssuerConfig(
                             credentialIssuerId = credentialOffer.credentialIssuerIdentifier,
-                            client = config.client,
+                            clientAuthentication = config.clientAuthentication,
                             deferredEndpoint = deferredEndpoint,
-                            authServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
+                            authorizationServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
+                            challengeEndpoint = challengeEndpoint,
                             tokenEndpoint = tokenEndpoint,
                             requestEncryptionSpec = issuanceEncryptionSpecs.requestEncryptionSpec,
                             responseEncryptionParams = issuanceEncryptionSpecs.responseEncryptionSpec?.let {
@@ -324,20 +329,25 @@ interface Issuer :
     }
 }
 
-private const val ATTEST_JWT_CLIENT_AUTH = "attest_jwt_client_auth"
-
-internal fun Client.ensureSupportedByAuthorizationServer(authorizationServerMetadata: CIAuthorizationServerMetadata) {
-    val tokenEndPointAuthMethods =
-        authorizationServerMetadata.tokenEndpointAuthMethods.orEmpty()
-
-    when (this) {
-        is Client.Attested -> {
-            val expectedMethod = ClientAuthenticationMethod(ATTEST_JWT_CLIENT_AUTH)
-            require(expectedMethod in tokenEndPointAuthMethods) {
-                "$ATTEST_JWT_CLIENT_AUTH not supported by authorization server"
-            }
+internal fun ClientAuthentication.ensureSupportedByAuthorizationServer(authorizationServerMetadata: CIAuthorizationServerMetadata) {
+    if (this is ClientAuthentication.AttestationBased) {
+        val supportedAuthenticationMethods = authorizationServerMetadata.tokenEndpointAuthMethods.orEmpty()
+        val authenticationMethod =
+            ClientAuthenticationMethod(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_CLIENT_AUTHENTICATION_METHOD)
+        require(authenticationMethod in supportedAuthenticationMethods) {
+            "${authenticationMethod.value} Authentication Method not supported by Authorization Server"
         }
 
-        else -> Unit
+        val supportedClientAttestationJWSAlgs = authorizationServerMetadata.clientAttestationJWSAlgs.orEmpty()
+        val clientAttestationJWSAlg = attestationJWT.jwt.header.algorithm
+        require(clientAttestationJWSAlg in supportedClientAttestationJWSAlgs) {
+            "${clientAttestationJWSAlg.name} Client Attestation JWS Algorithm not supported by Authorization Server"
+        }
+
+        val supportedClientAttestationPOPJWSAlgs = authorizationServerMetadata.clientAttestationPOPJWSAlgs.orEmpty()
+        val clientAttestationPOPJWSAlg = popJwtSpec.signer.javaAlgorithm.toJoseAlg()
+        require(clientAttestationPOPJWSAlg in supportedClientAttestationPOPJWSAlgs) {
+            "${clientAttestationPOPJWSAlg.name} Client Attestation POP JWS Algorithm not supported by Authorization Server"
+        }
     }
 }

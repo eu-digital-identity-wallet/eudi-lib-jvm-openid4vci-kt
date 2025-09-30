@@ -30,38 +30,40 @@ import java.time.Clock
 typealias ClientId = String
 
 /**
- * Wallet's OAUTH2 client view
+ * The Client Authentication Method used by the Wallet.
  */
-sealed interface Client : java.io.Serializable {
+sealed interface ClientAuthentication : java.io.Serializable {
+
     /**
      * The client_id of the Wallet, issued when interacting with a credential issuer
      */
     val id: ClientId
 
     /**
-     * Public Client
+     * None, i.e. a Public Client.
      */
-    data class Public(override val id: ClientId) : Client
+    data class None(override val id: ClientId) : ClientAuthentication
 
-    data class Attested(
+    /**
+     * Attestation-Based Client Authentication.
+     */
+    data class AttestationBased(
         val attestationJWT: ClientAttestationJWT,
         val popJwtSpec: ClientAttestationPoPJWTSpec,
-    ) : Client {
+    ) : ClientAuthentication {
         init {
-            val id = attestationJWT.clientId
-            require(id.isNotBlank() && id.isNotEmpty())
-            val pubKey = attestationJWT.pubKey
-            require(!pubKey.isPrivate) { "InstanceKey should be public" }
+            require(attestationJWT.clientId.isNotBlank())
+            require(!attestationJWT.publicKey.isPrivate) { "InstanceKey should be public" }
         }
 
-        override val id: ClientId = attestationJWT.clientId
+        override val id: ClientId get() = attestationJWT.clientId
     }
 }
 
 /**
  * Configuration object to pass configuration properties to the issuance components.
  *
- * @param client the OAUTH2 client kind of the wallet
+ * @param clientAuthentication the OAuth 2.0 Client Authentication Method of the Wallet
  * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
  * @param encryptionSupportConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
  * @param authorizeIssuanceConfig Instruction on how to assemble the authorization request. If scopes are supported
@@ -74,7 +76,7 @@ sealed interface Client : java.io.Serializable {
  * @param issuerMetadataPolicy policy concerning signed metadata usage
  */
 data class OpenId4VCIConfig(
-    val client: Client,
+    val clientAuthentication: ClientAuthentication,
     val authFlowRedirectionURI: URI,
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
@@ -85,6 +87,9 @@ data class OpenId4VCIConfig(
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
 ) {
 
+    /**
+     * Creates a new [OpenId4VCIConfig] instance for a Wallet that uses [a Public OAuth 2.0 Client][ClientAuthentication.None].
+     */
     constructor(
         clientId: ClientId,
         authFlowRedirectionURI: URI,
@@ -96,7 +101,7 @@ data class OpenId4VCIConfig(
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     ) : this(
-        Client.Public(clientId),
+        ClientAuthentication.None(clientId),
         authFlowRedirectionURI,
         encryptionSupportConfig,
         authorizeIssuanceConfig,
@@ -108,11 +113,11 @@ data class OpenId4VCIConfig(
     )
 
     @Deprecated(
-        message = "Deprecated in favor of openId4VCIConfig client.id",
-        replaceWith = ReplaceWith("client.id"),
+        message = "Deprecated in favor of openId4VCIConfig clientAuthentication.id",
+        replaceWith = ReplaceWith("clientAuthentication.id"),
     )
     val clientId: ClientId
-        get() = client.id
+        get() = clientAuthentication.id
 }
 
 /**

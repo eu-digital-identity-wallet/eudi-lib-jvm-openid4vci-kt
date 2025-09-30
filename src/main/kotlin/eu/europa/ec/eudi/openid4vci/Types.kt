@@ -18,9 +18,11 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.MissingRequiredRequestEncryptionSpecification
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
@@ -161,19 +163,6 @@ value class AuthorizationCode(val code: String) {
         require(code.isNotEmpty()) { "Authorization code must not be empty" }
     }
     override fun toString(): String = code
-}
-
-/**
- * A c_nonce as provided from issuance server's nonce endpoint.
- *
- * @param value The c_nonce value
- */
-@JvmInline
-value class CNonce(val value: String) : java.io.Serializable {
-    init {
-        value.requireNotEmpty()
-    }
-    override fun toString(): String = value
 }
 
 /**
@@ -337,6 +326,23 @@ value class Scope(val value: String) {
 
 typealias CIAuthorizationServerMetadata = ReadOnlyAuthorizationServerMetadata
 
+val CIAuthorizationServerMetadata.challengeEndpointURI: URI?
+    get() = JSONObjectUtils.getURI(customParameters, AttestationBasedClientAuthenticationSpec.CHALLENGE_ENDPOINT)
+
+val CIAuthorizationServerMetadata.clientAttestationJWSAlgs: List<JWSAlgorithm>?
+    get() = JSONObjectUtils.getStringList(
+        customParameters,
+        AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_SIGNING_ALGORITHMS_SUPPORTED,
+    )
+        ?.mapNotNull { JWSAlgorithm.parse(it) }
+
+val CIAuthorizationServerMetadata.clientAttestationPOPJWSAlgs: List<JWSAlgorithm>?
+    get() = JSONObjectUtils.getStringList(
+        customParameters,
+        AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_SIGNING_ALGORITHMS_SUPPORTED,
+    )
+        ?.mapNotNull { JWSAlgorithm.parse(it) }
+
 @JvmInline
 value class CoseAlgorithm(val value: Int) {
 
@@ -375,6 +381,7 @@ value class CoseCurve(val value: Int) {
  * Nonce (single use) value provided either by the Authorization or Resource server.
  */
 @JvmInline
+@Serializable
 value class Nonce(val value: String) {
     init {
         require(value.isNotEmpty()) { "Nonce value cannot be empty" }
@@ -405,4 +412,16 @@ sealed interface IssuerTrust {
 
 private fun String.requireNotEmpty() {
     require(isNotEmpty()) { "Value cannot be empty" }
+}
+
+/**
+ * Unique identifier for a JWT.
+ */
+@JvmInline
+@Serializable
+value class JwtId(val value: String) {
+    init {
+        require(value.isNotBlank()) { "value cannot be blank" }
+    }
+    override fun toString(): String = value
 }

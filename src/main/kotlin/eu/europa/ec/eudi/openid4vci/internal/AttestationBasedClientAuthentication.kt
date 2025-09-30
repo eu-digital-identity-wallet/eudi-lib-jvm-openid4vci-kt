@@ -15,8 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.JWTClaimsSet
@@ -26,10 +24,9 @@ import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.client.request.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.put
 import java.net.URL
 import java.time.Clock
-import java.time.Instant
-import java.util.*
 
 /**
  * Default implementation of [ClientAttestationPoPBuilder]
@@ -38,31 +35,30 @@ import java.util.*
  */
 internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder {
 
-    override fun Client.Attested.attestationPoPJWT(
+    override suspend fun ClientAuthentication.AttestationBased.attestationPoPJWT(
         clock: Clock,
-        authServerId: URL,
+        authorizationServerId: URL,
+        challenge: Nonce?,
     ): ClientAttestationPoPJWT {
-        val header = popJwtHeader()
-        val claimSet = popJwtClaimSet(authServerId, clock.instant())
-        val jwt = SignedJWT(header, claimSet).apply { sign(popJwtSpec.jwsSigner) }
-        return ClientAttestationPoPJWT(jwt)
-    }
-
-    private fun Client.Attested.popJwtHeader(): JWSHeader =
-        JWSHeader.Builder(popJwtSpec.signingAlgorithm).apply {
-            type(JOSEObjectType(popJwtSpec.typ))
-        }.build()
-
-    private fun Client.Attested.popJwtClaimSet(authServerId: URL, now: Instant): JWTClaimsSet {
-        fun randomJwtId() = JWTID().value
-        return JWTClaimsSet.Builder().apply {
-            val exp = now.plusSeconds(popJwtSpec.duration.inWholeSeconds)
-            issuer(id)
-            jwtID(randomJwtId())
-            issueTime(Date.from(now))
-            expirationTime(Date.from(exp))
-            audience(authServerId.toString())
-        }.build()
+        val now = clock.instant()
+        val claimSet = ClientAttestationPOPClaims(
+            issuer = id,
+            audience = authorizationServerId,
+            jwtId = JwtId(JWTID().value),
+            issuedAt = now,
+            challenge = challenge,
+            notBefore = now,
+        )
+        val signedJwt = popJwtSpec.signer.use { signOperation ->
+            JwtSigner<ClientAttestationPOPClaims, JWK>(
+                signOperation = signOperation,
+                algorithm = popJwtSpec.signer.javaAlgorithm.toJoseAlg(),
+                customizeHeader = {
+                    put(RFC7519.TYPE, AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE)
+                },
+            ).sign(claimSet)
+        }
+        return ClientAttestationPoPJWT(SignedJWT.parse(signedJwt))
     }
 }
 
@@ -86,24 +82,34 @@ internal fun HttpRequestBuilder.clientAttestationHeaders(
     clientAttestation: ClientAttestation,
 ) {
     val (attestation, pop) = clientAttestation
-    header("OAuth-Client-Attestation", attestation.jwt.serialize())
-    header("OAuth-Client-Attestation-PoP", pop.jwt.serialize())
+    header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_HEADER, attestation.jwt.serialize())
+    header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_POP_HEADER, pop.jwt.serialize())
 }
 
-internal fun OpenId4VCIConfig.generateClientAttestationIfNeeded(
-    authServerId: URL,
+internal suspend fun OpenId4VCIConfig.generateClientAttestationIfNeeded(
+    authorizationServerId: URL,
+    challenge: Nonce?,
 ): ClientAttestation? =
-    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(clock, client, authServerId)
+    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(
+        clock,
+        clientAuthentication,
+        authorizationServerId,
+        challenge,
+    )
 
-internal fun DeferredIssuerConfig.generateClientAttestationIfNeeded(): ClientAttestation? =
-    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(clock, client, authServerId)
+internal suspend fun DeferredIssuerConfig.generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
+    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(clock, clientAuthentication, authorizationServerId, challenge)
 
-private fun ClientAttestationPoPBuilder.generateClientAttestationIfNeeded(
+private suspend fun ClientAttestationPoPBuilder.generateClientAttestationIfNeeded(
     clock: Clock,
-    client: Client,
-    authServerId: URL,
+    clientAuthentication: ClientAuthentication,
+    authorizationServerId: URL,
+    challenge: Nonce?,
 ): ClientAttestation? =
-    when (client) {
-        is Client.Attested -> client.attestationJWT to client.attestationPoPJWT(clock, authServerId)
+    when (clientAuthentication) {
+        is ClientAuthentication.AttestationBased -> {
+            val clientAttestationPoPJwt = clientAuthentication.attestationPoPJWT(clock, authorizationServerId, challenge)
+            clientAuthentication.attestationJWT to clientAttestationPoPJwt
+        }
         else -> null
     }
