@@ -29,6 +29,8 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
+import java.net.URI
+import java.net.URL
 import java.security.cert.X509Certificate
 import java.time.Instant
 import java.util.*
@@ -214,3 +216,13 @@ fun JWK.asJsonElement(): JsonElement = Json.parseToJsonElement(this.toPublicJWK(
 fun List<X509Certificate>.asJsonElement(): JsonArray = JsonArray(
     this.map { Json.encodeToJsonElement(Base64.getEncoder().encodeToString(it.encoded)) },
 )
+
+object URLSerializer : KSerializer<URL> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("URL", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: URL) {
+        encoder.encodeString(value.toExternalForm())
+    }
+
+    override fun deserialize(decoder: Decoder): URL = URI.create(decoder.decodeString()).toURL()
+}

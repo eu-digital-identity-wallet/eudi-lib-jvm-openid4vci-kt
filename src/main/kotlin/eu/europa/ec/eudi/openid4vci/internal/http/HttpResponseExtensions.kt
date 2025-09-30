@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
+import eu.europa.ec.eudi.openid4vci.AttestationBasedClientAuthenticationSpec
 import eu.europa.ec.eudi.openid4vci.Nonce
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -22,7 +23,14 @@ import io.ktor.http.*
 /**
  * Extracts the new Nonce value for DPoP from this [HttpResponse].
  */
-internal fun HttpResponse.dpopNonce(): Nonce? = headers["DPoP-Nonce"]?.let(::Nonce)
+internal fun HttpResponse.dpopNonce(): Nonce? = nonceHeader("DPoP-Nonce")
+
+/**
+ * Extracts the new Attestation-Based Client Authentication Challenge from this [HttpResponse].
+ */
+internal fun HttpResponse.abcaChallege(): Nonce? = nonceHeader(AttestationBasedClientAuthenticationSpec.CHALLENGE_HEADER)
+
+private fun HttpResponse.nonceHeader(name: String): Nonce? = headers[name]?.let(::Nonce)
 
 /**
  * Checks if this [HttpResponse] is from a Resource Server that requires a Nonce value to be included in the DPoP Header.
