@@ -121,7 +121,7 @@ interface DeferredIssuer : QueryForDeferredCredential {
             ctx: DeferredIssuanceContext,
             httpClient: HttpClient,
             responseEncryptionKey: JWK?,
-        ): Result<Pair<DeferredIssuanceContext?, DeferredCredentialQueryOutcome>> = runCatching {
+        ): Result<Pair<DeferredIssuanceContext?, DeferredCredentialQueryOutcome>> = runCatchingCancellable {
             val deferredIssuer = make(ctx.config, responseEncryptionKey, httpClient).getOrThrow()
             val (newAuthorized, outcome) = with(deferredIssuer) {
                 with(ctx.authorizedTransaction.authorizedRequest) {

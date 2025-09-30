@@ -37,7 +37,7 @@ suspend fun DeferredIssuer.Companion.queryForDeferredCredential(
     recreateClientAttestationPodSigner: ((String) -> Signer<JWK>)? = null,
     httpClient: HttpClient,
     responseEncryptionKey: JWK? = null,
-): Result<Pair<DeferredIssuanceStoredContextTO?, DeferredCredentialQueryOutcome>> = runCatching {
+): Result<Pair<DeferredIssuanceStoredContextTO?, DeferredCredentialQueryOutcome>> = runCatchingCancellable {
     val ctx = ctxTO.toDeferredIssuanceStoredContext(clock, recreatePopSigner, recreateClientAttestationPodSigner)
     val (newCtx, outcome) = queryForDeferredCredential(ctx, httpClient, responseEncryptionKey).getOrThrow()
     val newCtxTO =

@@ -45,7 +45,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
     override suspend fun resolve(
         issuer: CredentialIssuerId,
         policy: IssuerMetadataPolicy,
-    ): Result<CredentialIssuerMetadata> = runCatching {
+    ): Result<CredentialIssuerMetadata> = runCatchingCancellable {
         val wellKnownUrl = issuer.wellKnown()
         val json = when (policy) {
             IssuerMetadataPolicy.IgnoreSigned -> wellKnownUrl.requestUnsigned()
@@ -107,7 +107,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
         jwt: String,
         issuerTrust: IssuerTrust,
         issuer: CredentialIssuerId,
-    ): Result<String> = runCatching {
+    ): Result<String> = runCatchingCancellable {
         val signedJwt = SignedJWT.parse(jwt)
         val processor = DefaultJWTProcessor<SecurityContext>()
             .apply {

@@ -56,7 +56,7 @@ internal class RequestIssuanceImpl(
     override suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
         proofsSpecification: ProofsSpecification,
-    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatching {
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatchingCancellable {
         val (proofs, proofsDpopNonce) = buildProofs(proofsSpecification, requestPayload.credentialConfigurationIdentifier, grant)
         val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
 
