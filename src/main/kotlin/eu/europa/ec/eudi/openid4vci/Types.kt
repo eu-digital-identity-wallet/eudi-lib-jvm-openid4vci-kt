@@ -419,4 +419,5 @@ value class JwtId(val value: String) {
     init {
         require(value.isNotBlank()) { "value cannot be blank" }
     }
+    override fun toString(): String = value
 }
