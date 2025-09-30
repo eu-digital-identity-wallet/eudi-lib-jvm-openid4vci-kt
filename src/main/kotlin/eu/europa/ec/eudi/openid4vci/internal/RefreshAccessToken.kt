@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
+import eu.europa.ec.eudi.openid4vci.runCatchingCancellable
 import java.time.Clock
 
 internal class RefreshAccessToken(
@@ -24,7 +25,7 @@ internal class RefreshAccessToken(
     private val tokenEndpointClient: TokenEndpointClient,
 ) {
 
-    suspend fun AuthorizedRequest.refreshIfNeeded(): Result<AuthorizedRequest> = runCatching {
+    suspend fun AuthorizedRequest.refreshIfNeeded(): Result<AuthorizedRequest> = runCatchingCancellable {
         val at = clock.instant()
         when {
             !isAccessTokenExpired(at) -> this

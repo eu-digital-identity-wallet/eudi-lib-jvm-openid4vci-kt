@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci.internal.http
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerEndpoint
 import eu.europa.ec.eudi.openid4vci.Nonce
+import eu.europa.ec.eudi.openid4vci.runCatchingCancellable
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -38,7 +39,7 @@ internal class NonceEndpointClient(
 ) {
 
     suspend fun getNonce(): Result<CNonceAndDPoPNonce> =
-        runCatching {
+        runCatchingCancellable {
             requestNonce()
         }
 

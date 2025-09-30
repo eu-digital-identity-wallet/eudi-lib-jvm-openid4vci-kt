@@ -21,6 +21,7 @@ import eu.europa.ec.eudi.openid4vci.AuthorizationServerMetadataResolutionExcepti
 import eu.europa.ec.eudi.openid4vci.AuthorizationServerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.HttpsUrl
+import eu.europa.ec.eudi.openid4vci.runCatchingCancellable
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -40,7 +41,7 @@ internal class DefaultAuthorizationServerMetadataResolver(
      * The well-known location __/.well-known/oauth-authorization-server__ is used.
      */
     private suspend fun fetchOauthServerMetadata(issuer: HttpsUrl): Result<CIAuthorizationServerMetadata> =
-        runCatching {
+        runCatchingCancellable {
             val url = issuer.wellKnownUrl(
                 wellKnownPath = "/.well-known/oauth-authorization-server",
             )

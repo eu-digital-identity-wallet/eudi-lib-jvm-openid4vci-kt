@@ -39,7 +39,7 @@ internal class AuthorizeIssuanceImpl(
 ) : AuthorizeIssuance {
 
     override suspend fun prepareAuthorizationRequest(walletState: String?): Result<AuthorizationRequestPrepared> =
-        runCatching {
+        runCatchingCancellable {
             requireNotNull(authorizationEndpointClient) {
                 "Authorization server does not support Authorization Code Flow"
             }
@@ -84,7 +84,7 @@ internal class AuthorizeIssuanceImpl(
         authorizationCode: AuthorizationCode,
         serverState: String,
         authDetailsOption: AccessTokenOption,
-    ): Result<AuthorizedRequest> = runCatching {
+    ): Result<AuthorizedRequest> = runCatchingCancellable {
         ensure(serverState == state) { InvalidAuthorizationState() }
         val credConfigIdsAsAuthDetails = identifiersSentAsAuthDetails.filter(authDetailsOption)
         val (tokenResponse, newDpopNonce) =
@@ -109,7 +109,7 @@ internal class AuthorizeIssuanceImpl(
     override suspend fun authorizeWithPreAuthorizationCode(
         txCode: String?,
         authDetailsOption: AccessTokenOption,
-    ): Result<AuthorizedRequest> = runCatching {
+    ): Result<AuthorizedRequest> = runCatchingCancellable {
         val offeredGrants = requireNotNull(credentialOffer.grants) {
             "Grant not specified in credential offer."
         }

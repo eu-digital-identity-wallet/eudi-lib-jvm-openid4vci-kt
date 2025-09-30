@@ -277,7 +277,7 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): Result<Issuer> = runCatching {
+        ): Result<Issuer> = runCatchingCancellable {
             val credentialOfferRequestResolver = CredentialOfferRequestResolver(httpClient, config.issuerMetadataPolicy)
             val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUri).getOrThrow()
             make(config, credentialOffer, httpClient, requestEncryptionSpecFactory, responseEncryptionSpecFactory).getOrThrow()
@@ -307,7 +307,7 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): Result<Issuer> = runCatching {
+        ): Result<Issuer> = runCatchingCancellable {
             require(credentialConfigurationIdentifiers.isNotEmpty()) {
                 "At least one credential configuration identifier must be specified"
             }

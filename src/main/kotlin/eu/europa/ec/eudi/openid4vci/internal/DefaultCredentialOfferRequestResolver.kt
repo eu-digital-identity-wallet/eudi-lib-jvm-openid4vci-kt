@@ -84,7 +84,7 @@ internal class DefaultCredentialOfferRequestResolver(
     private val httpClient: HttpClient,
     private val issuerMetadataPolicy: IssuerMetadataPolicy,
 ) : CredentialOfferRequestResolver {
-    override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> = runCatching {
+    override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> = runCatchingCancellable {
         val credentialOffer = fetchOffer(request)
         val credentialIssuerId = CredentialIssuerId(credentialOffer.credentialIssuerIdentifier)
             .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).raise() }

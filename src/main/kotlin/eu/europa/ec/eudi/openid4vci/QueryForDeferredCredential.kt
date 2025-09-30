@@ -82,7 +82,7 @@ fun interface QueryForDeferredCredential {
 
             override suspend fun AuthorizedRequest.queryForDeferredCredential(
                 transactionId: TransactionId,
-            ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> = runCatching {
+            ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> = runCatchingCancellable {
                 val refreshed = refreshIfNeeded(this)
                 val (outcome, newResourceServerDpopNonce) = placeDeferredCredentialRequest(refreshed, transactionId)
                 refreshed.withResourceServerDpopNonce(newResourceServerDpopNonce) to outcome

@@ -149,7 +149,7 @@ internal class AuthorizationEndpointClient(
         credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
         state: String,
         issuerState: String?,
-    ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> = runCatching {
+    ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> = runCatchingCancellable {
         require(scopes.isNotEmpty() || credentialsConfigurationIds.isNotEmpty()) {
             "No scopes or authorization details provided. Cannot submit par."
         }

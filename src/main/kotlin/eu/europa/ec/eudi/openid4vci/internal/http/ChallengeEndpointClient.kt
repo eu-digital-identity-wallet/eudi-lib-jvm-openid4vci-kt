@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci.internal.http
 
 import eu.europa.ec.eudi.openid4vci.AttestationBasedClientAuthenticationSpec
 import eu.europa.ec.eudi.openid4vci.Nonce
+import eu.europa.ec.eudi.openid4vci.runCatchingCancellable
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.expectSuccess
@@ -32,7 +33,7 @@ internal class ChallengeEndpointClient(
     private val challengeEndpoint: URL,
     private val httpClient: HttpClient,
 ) {
-    suspend fun getChallenge(): Result<Nonce> = runCatching {
+    suspend fun getChallenge(): Result<Nonce> = runCatchingCancellable {
         val challenge = httpClient.post(challengeEndpoint) {
             expectSuccess = true
             accept(ContentType.Application.Json)
