@@ -20,6 +20,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.internal.*
 import kotlinx.serialization.Required
@@ -82,6 +83,11 @@ value class ClientAttestationPoPJWT(val jwt: SignedJWT) {
     }
 
     val clientId: ClientId get() = checkNotNull(jwt.jwtClaimsSet.issuer)
+    val claims: ClientAttestationPOPClaims
+        get() =
+            JsonSupport.decodeFromString<ClientAttestationPOPClaims>(
+                JSONObjectUtils.toJSONString(jwt.jwtClaimsSet.toJSONObject()),
+            )
 }
 
 @Serializable
