@@ -1,7 +1,7 @@
 # Module EUDI OpenId4VCI library
 
 This is a Kotlin library, targeting JVM, that supports
-the [OpenId4VCI (draft 14)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-14.html) protocol.
+the [OpenId4VCI 1.0](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) protocol.
 
 ## eu.europa.ec.eudi.openid4vci
 
