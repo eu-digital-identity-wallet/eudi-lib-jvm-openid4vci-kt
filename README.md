@@ -594,7 +594,7 @@ val openId4VCIConfig = OpenId4VCIConfig(
         credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses,
         ecConfig =  EcConfig(curve = Curve.P_256, supportedJWEAlgorithms = ECDHEncrypter.SUPPORTED_ALGORITHMS.toList()), // the EC Curve and JWE algorithms supported
         rsaConfig =  RsaConfig(rcaKeySize = 4096, supportedJWEAlgorithms = RSAEncrypter.SUPPORTED_ALGORITHMS.toList()), // the RSA key size and JWE algorithms supported
-        supportedEncryptionMethods = List<EncryptionMethod> = ContentCryptoProvider.SUPPORTED_ENCRYPTION_METHODS.toList() // which JWE encryption methods are supported
+        supportedEncryptionMethods = ContentCryptoProvider.SUPPORTED_ENCRYPTION_METHODS.toList() // which JWE encryption methods are supported
     )
 )
 val credentialOfferUri: String = "..." 
