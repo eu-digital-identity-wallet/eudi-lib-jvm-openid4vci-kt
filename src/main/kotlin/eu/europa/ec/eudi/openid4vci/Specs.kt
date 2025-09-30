@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 /**
- * [OpenID for Verifiable Credential Issuance](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-15.html)
+ * [OpenID for Verifiable Credential Issuance](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
  */
 object OpenId4VCISpec {
 

@@ -20,33 +20,33 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
 ## Overview
 
 This is a Kotlin library, targeting JVM, that supports
-the [OpenId4VCI (draft 15)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-15.html) protocol.
+the [OpenId4VCI 1.0](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) protocol.
 
 In particular, the library focuses on the wallet's role in and provides the following features:
 
-| Feature                                                                                         | Coverage                                                                                                           |
-|-------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| [Wallet-initiated issuance](#wallet-initiated-issuance)                                         | ✅                                                                                                                  |
-| [Resolve a credential offer](#resolve-a-credential-offer)                                       | ✅ Unsigned metadata ✅ signed metadata ❌ [accept-language](#issuer-metadata-accept-language)                        |
-| [Authorization code flow](#authorization-code-flow)                                             | ✅                                                                                                                  |
-| [Pre-authorized code flow](#pre-authorized-code-flow)                                           | ✅                                                                                                                  |
-| mso_mdoc format                                                                                 | ✅                                                                                                                  |
-| SD-JWT-VC format                                                                                | ✅                                                                                                                  |
-| W3C VC DM                                                                                       | VC Signed as a JWT, Not Using JSON-LD                                                                              |
-| [Place credential request](#place-credential-request)                                           | ✅ Including automatic handling of `invalid_proof` & multiple proofs                                                |
-| [Query for deferred credentials](#query-for-deferred-credentials)                               | ✅ Including automatic refresh of `access_token`                                                                    |
-| [Query for deferred credentials at a later time](#query-for-deferred-credentials-at-later-time) | ✅ Including automatic refresh of `access_token`                                                                    |
-| [Notify credential issuer](#notify-credential-issuer)                                           | ✅                                                                                                                  | 
-| Proof                                                                                           | ✅ JWT                                                                                                              |
-| Credential response encryption                                                                  | ✅                                                                                                                  |
-| [Pushed authorization requests](#pushed-authorization-requests)                                 | ✅ Used by default, if supported by issuer                                                                          |
-| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)             | ✅                                                                                                                  |
-| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                               | ✅                                                                                                                  |
-| Wallet authentication                                                                           | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth2-attestation-based-client-authentication) |
-| Use issuer's nonce endpoint to get c_nonce for proofs                                           | ✅                                                                                                                  |
-| `attestation` proof type                                                                        | ✅                                                                                                                  |
-| `key_attestation` to the JWT Proof (JOSE header)                                                | ✅                                                                                                                  |
-| Wallet attestation                                                                              | ❌                                                                                                                  |
+| Feature                                                                                         | Coverage                                                                                                                                                                                                                                                                                                    |
+|-------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [Wallet-initiated issuance](#wallet-initiated-issuance)                                         | ✅                                                                                                                                                                                                                                                                                                           |
+| [Resolve a credential offer](#resolve-a-credential-offer)                                       | ✅ Unsigned metadata ✅ signed metadata ❌ [accept-language](#issuer-metadata-accept-language)                                                                                                                                                                                                                 |
+| [Authorization code flow](#authorization-code-flow)                                             | ✅                                                                                                                                                                                                                                                                                                           |
+| [Pre-authorized code flow](#pre-authorized-code-flow)                                           | ✅                                                                                                                                                                                                                                                                                                           |
+| mso_mdoc format                                                                                 | ✅                                                                                                                                                                                                                                                                                                           |
+| SD-JWT-VC format                                                                                | ✅                                                                                                                                                                                                                                                                                                           |
+| W3C VC DM                                                                                       | VC Signed as a JWT, Not Using JSON-LD                                                                                                                                                                                                                                                                       |
+| [Place credential request](#place-credential-request)                                           | ✅ Including automatic handling of `invalid_proof` & multiple proofs                                                                                                                                                                                                                                         |
+| [Query for deferred credentials](#query-for-deferred-credentials)                               | ✅ Including automatic refresh of `access_token`                                                                                                                                                                                                                                                             |
+| [Query for deferred credentials at a later time](#query-for-deferred-credentials-at-later-time) | ✅ Including automatic refresh of `access_token`                                                                                                                                                                                                                                                             |
+| [Notify credential issuer](#notify-credential-issuer)                                           | ✅                                                                                                                                                                                                                                                                                                           | 
+| Proof                                                                                           | ✅ JWT, <br /> ✅ JWT with [Key Attestation](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-key-attestations) in JOSE Header (`key_attestation`), <br /> ✅ [Key Attestation](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-key-attestations) |
+| Credential request encryption                                                                   | ✅                                                                                                                                                                                                                                                                                                           |
+| Credential response encryption                                                                  | ✅                                                                                                                                                                                                                                                                                                           |
+| [Pushed authorization requests](#pushed-authorization-requests)                                 | ✅ Used by default, if supported by issuer                                                                                                                                                                                                                                                                   |
+| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)             | ✅                                                                                                                                                                                                                                                                                                           |
+| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                               | ✅                                                                                                                                                                                                                                                                                                           |
+| Wallet authentication                                                                           | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth-20-attestation-based-client-authentication)                                                                                                                                                                                        |
+| Use issuer's nonce endpoint to get c_nonce for proofs                                           | ✅                                                                                                                                                                                                                                                                                                           |
+| `attestation` proof type                                                                        | ✅                                                                                                                                                                                                                                                                                                           |
+| Wallet attestation                                                                              | ❌                                                                                                                                                                                                                                                                                                           |
 
 
 ## Disclaimer
@@ -549,12 +549,11 @@ The options available for the `Issuer` are represented by `OpenId4VCIConfig`
 
 ```kotlin
 data class OpenId4VCIConfig(
-    val client: Client,
+    val clientAuthentication: ClientAuthentication,
     val authFlowRedirectionURI: URI,
-    val keyGenerationConfig: KeyGenerationConfig,
-    val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
+    val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-    val dPoPSigner: PopSigner.Jwt? = null,
+    val dPoPSigner: Signer<JWK>? = null,
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
@@ -564,14 +563,14 @@ data class OpenId4VCIConfig(
 
 Options available:
 
-- client: Wallet `client authentication method` in the OAUTH2 sense while interacting with the Credential Issuer. 
-  - Either Public Client,
-  - [Attestation-Based Client Authentication](#oauth2-attestation-based-client-authentication)
+- clientAuthentication: Wallet `client authentication method` in the OAuth 2.0 sense while interacting with the Credential Issuer. 
+  - Either None, i.e. a Public Client,
+  - [Attestation-Based Client Authentication](#oauth-20-attestation-based-client-authentication)
 - authFlowRedirectionURI: It is the `redirect_uri` parameter that will be included in a PAR or simple authorization request.
-- keyGenerationConfig: A way of generating ephemeral keys used for `credential_response_encryption`
-- credentialResponseEncryptionPolicy: A wallet policy in regard to whether it accepts credentials without `credential_response_encyrption` or not
+- encryptionSupportConfig: Wallet supported encryption parameters to be used for Credential Request and Credential Response encryption.
 - authorizeIssuanceConfig: Preference on using `scope` or `authorization_details` during authorization code flow
-- dPoPSigner: An optional way of singing DPoP JWTs. If not provided DPoP is off. If provided, it will be used only if Credential Issuer advertises this feature
+- dPoPSigner: An optional way of singing DPoP JWTs. If not provided DPoP is off. If provided, it will be used only if Credential Issuer advertises this feature.
+- clientAttestationPoPBuilder: Wallet supported mechanism for creating Client Attestation POP JWTs when using [Attestation-Based Client Authentication](#oauth-20-attestation-based-client-authentication). 
 - parUsage: An indication to not use PAR endpoint or use it if advertised by the credential issuer
 - clock: Wallet/Caller clock.
 - issuerMetadataPolicy: Wallet policy concerning Credential Issuer metadata. Possible options:
@@ -588,10 +587,15 @@ Trust between the Wallet and the Signer of the signed metadata advertised by the
 import eu.europa.ec.eudi.openid4vci.*
 
 val openId4VCIConfig = OpenId4VCIConfig(
-    client = Client.Public("wallet-dev"), // the client id of wallet (acting as an OAUTH2 client)
+    clientAuthentication = ClientAuthentication.None("wallet-dev"), // the client id of wallet (acting as an OAUTH2 client)
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
-    keyGenerationConfig = KeyGenerationConfig.ecOnly(Curve.P_256), // what kind of ephemeral keys could be generated to encrypt credential issuance response
-    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses
+    encryptionSupportConfig = EncryptionSupportConfig(
+        compressionAlgorithms = listOf(CompressionAlgorithm.DEF), // which JWE compression algorithms are supported
+        credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses,
+        ecConfig =  EcConfig(curve = Curve.P_256, supportedJWEAlgorithms = ECDHEncrypter.SUPPORTED_ALGORITHMS.toList()), // the EC Curve and JWE algorithms supported
+        rsaConfig =  RsaConfig(rcaKeySize = 4096, supportedJWEAlgorithms = RSAEncrypter.SUPPORTED_ALGORITHMS.toList()), // the RSA key size and JWE algorithms supported
+        supportedEncryptionMethods = ContentCryptoProvider.SUPPORTED_ENCRYPTION_METHODS.toList() // which JWE encryption methods are supported
+    )
 )
 val credentialOfferUri: String = "..." 
 val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()
@@ -611,7 +615,7 @@ otherwise it will fall back to a regular authorization request.
 
 ### Proof Types Supported
 
-The current version of the library supports JWT proofs
+The current version of the library supports JWT proofs and Key Attestations.
 
 ### Demonstrating Proof of Possession (DPoP)
 
@@ -639,7 +643,7 @@ Library supports [RFC7636](https://www.rfc-editor.org/rfc/rfc7636.html) by defau
 while performing [Authorization code flow](#authorization-code-flow). 
 This feature cannot be disabled.
 
-### OAUTH2 Attestation-Based Client Authentication
+### OAuth 2.0 Attestation-Based Client Authentication
 
 Library supports [OAuth 2.0 Attestation-Based Client Authentication - Draft 07](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html)
 
@@ -652,10 +656,7 @@ Furthermore, caller must provide a specification on how to produce the [Client A
 
 val clientAttestationJWT: ClientAttestationJWT("...")
 val popJwtSpec: ClientAttestationPoPJWTSpec = ClientAttestationPoPJWTSpec(
-    signingAlgorithm = JWSAlgorithm.ES256, // Algorithm to sign the PoP JWT
-    duration = 1.minutes, // Duration of PoP JWT. Used for `exp` claim 
-    typ = null, // Optional, `typ` claim in the JWS header
-    jwsSigner = signer, // Nimbus signer
+    signer = ... // An implementation of Signer<JWK> which will be used to sign Client Attestation POP JWTs.
 )  
 val wallet = Client.Attested(clientAttestationJWT, popJwtSpec)
 val openId4VCIConfig = OpenId4VCIConfig(
@@ -682,20 +683,15 @@ Finally, library supports Client Attestation POP JWT [challenges](https://www.ie
 
 ### Issuer metadata accept-language
 
-[Specification](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-14.html#name-credential-issuer-metadata-) recommends the use of header `Accept-Language` to indicate the language(s) preferred for display.
+[Specification](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-issuer-metadata-) recommends the use of header `Accept-Language` to indicate the language(s) preferred for display.
 Current version of the library does not support this.
 
 ### Authorization
 
-[Specification](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-14.html#name-using-authorization-details) defines that a credential's issuance
+[Specification](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-using-authorization-details) defines that a credential's issuance
 can be requested using `authorization_details` or `scope` parameter when using authorization code flow. The current version of the library supports usage of both parameters.
 Though for `authorization_details` we don't support the `format` attribute and its specializations per format.
 Only `credential_configuration_id` attribute is supported.
-
-### Key attestations
-
-Current version of the library does not support [key attestations](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-15.html#appendix-D) 
-neither as a [proof type](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-15.html#section-8.2.1.3) nor as a `key_attestation` header in JWT proofs.
 
 ## How to contribute
 
