@@ -643,7 +643,7 @@ Library supports [RFC7636](https://www.rfc-editor.org/rfc/rfc7636.html) by defau
 while performing [Authorization code flow](#authorization-code-flow). 
 This feature cannot be disabled.
 
-### OAUTH2 Attestation-Based Client Authentication
+### OAuth 2.0 Attestation-Based Client Authentication
 
 Library supports [OAuth 2.0 Attestation-Based Client Authentication - Draft 07](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html)
 
@@ -656,10 +656,7 @@ Furthermore, caller must provide a specification on how to produce the [Client A
 
 val clientAttestationJWT: ClientAttestationJWT("...")
 val popJwtSpec: ClientAttestationPoPJWTSpec = ClientAttestationPoPJWTSpec(
-    signingAlgorithm = JWSAlgorithm.ES256, // Algorithm to sign the PoP JWT
-    duration = 1.minutes, // Duration of PoP JWT. Used for `exp` claim 
-    typ = null, // Optional, `typ` claim in the JWS header
-    jwsSigner = signer, // Nimbus signer
+    signer = ... // An implementation of Signer<JWK> which will be used to sign Client Attestation POP JWTs.
 )  
 val wallet = Client.Attested(clientAttestationJWT, popJwtSpec)
 val openId4VCIConfig = OpenId4VCIConfig(
