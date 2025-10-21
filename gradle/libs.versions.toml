@@ -1,19 +1,19 @@
 [versions]
 coroutines = "1.10.2"
-dependency-check = "12.1.1"
+dependency-check = "12.1.8"
 kotlin = "2.1.21"
-spotless = "7.0.2"
+spotless = "8.0.0"
 nimbus-sdk = "11.20.1"
 ktor = "3.2.3"
-jsoup = "1.19.1"
+jsoup = "1.21.2"
 cbor = "0.9"
 java = "17"
 ktlint = "0.50.0"
 dokka = "2.1.0"
 maven-publish = "0.34.0"
-logback = "1.5.18"
+logback = "1.5.20"
 kover = "0.9.1"
-tink = "1.17.0"
+tink = "1.19.0"
 
 [libraries]
 nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
