@@ -29,10 +29,13 @@ import kotlin.test.assertNull
 internal class DefaultCredentialOfferRequestResolverTest {
 
     @Test
-    fun `resolve a credential offer passed by value that contains a pre-authorized code grant without transaction code`() =
-        runTest {
+    fun `resolve a credential offer passed by value that contains a pre-authorized code grant without transaction code`() = runTest {
+        suspend fun test(credentialIssuerMetadataContentType: ContentType) {
             val httpClient =
-                mockedHttpClient(credentialIssuerMetadataWellKnownMocker(), authServerWellKnownMocker())
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(contentType = credentialIssuerMetadataContentType),
+                    authServerWellKnownMocker(),
+                )
             val resolver = DefaultCredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.IgnoreSigned)
             val credentialOfferJson =
                 """
@@ -72,11 +75,18 @@ internal class DefaultCredentialOfferRequestResolverTest {
             assertNull(preAuthorizedCode.txCode)
         }
 
+        test(ContentType.Application.Json)
+        test(ContentType.Application.Json.withCharset(Charsets.UTF_8))
+    }
+
     @Test
-    fun `resolve a credential offer passed by value that contains a pre-authorized code grant with transaction code`() =
-        runTest {
+    fun `resolve a credential offer passed by value that contains a pre-authorized code grant with transaction code`() = runTest {
+        suspend fun test(credentialIssuerMetadataContentType: ContentType) {
             val httpClient =
-                mockedHttpClient(credentialIssuerMetadataWellKnownMocker(), authServerWellKnownMocker())
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(contentType = credentialIssuerMetadataContentType),
+                    authServerWellKnownMocker(),
+                )
             val resolver = DefaultCredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.IgnoreSigned)
             val credentialOfferJson =
                 """
@@ -123,4 +133,8 @@ internal class DefaultCredentialOfferRequestResolverTest {
             assertEquals(TxCodeInputMode.NUMERIC, txCode.inputMode)
             assertEquals(5, txCode.length)
         }
+
+        test(ContentType.Application.Json)
+        test(ContentType.Application.Json.withCharset(Charsets.UTF_8))
+    }
 }

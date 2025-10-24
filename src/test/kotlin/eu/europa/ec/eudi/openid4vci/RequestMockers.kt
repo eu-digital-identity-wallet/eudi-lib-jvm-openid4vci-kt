@@ -64,15 +64,17 @@ internal fun oauthMetaDataHandler(oauth2ServerUrl: HttpsUrl, oauth2MetaDataResou
 
 internal fun credentialIssuerMetadataWellKnownMocker(
     issuerMetadataVersion: IssuerMetadataVersion = ENCRYPTION_NOT_SUPPORTED,
+    contentType: ContentType = ContentType.Application.Json,
 ): RequestMocker = RequestMocker(
     requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
     responseBuilder = {
+        require(contentType.withoutParameters() == ContentType.Application.Json) { "contentType must be application/json" }
         val content = issuerMetadataJsonContent(issuerMetadataVersion)
         respond(
             content = content,
             status = HttpStatusCode.OK,
             headers = headersOf(
-                HttpHeaders.ContentType to listOf("application/json"),
+                HttpHeaders.ContentType to listOf(contentType.toString()),
             ),
         )
     },

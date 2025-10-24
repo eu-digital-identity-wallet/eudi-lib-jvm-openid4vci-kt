@@ -58,7 +58,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
     private suspend fun Url.requestUnsigned(): String {
         val response = getAcceptingContentTypes(ContentType.Application.Json)
         val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
-        require(contentType == ContentType.Application.Json) {
+        require(contentType?.withoutParameters() == ContentType.Application.Json) {
             "Credential issuer responded with invalid content type: " +
                 "expected ${ContentType.Application.Json} but was $contentType"
         }
@@ -68,7 +68,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
     private suspend fun Url.requestSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): String {
         val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT)
         val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
-        ensure(contentType == CONTENT_TYPE_APPLICATION_JWT) {
+        ensure(contentType?.withoutParameters() == CONTENT_TYPE_APPLICATION_JWT) {
             CredentialIssuerMetadataError.MissingSignedMetadata()
         }
         return parseAndVerifySignedMetadata(response.body<String>(), issuerTrust, issuer)
@@ -82,7 +82,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
         val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
         requireNotNull(contentType) { "Credential issuer did not respond with a content type header" }
 
-        return when (contentType) {
+        return when (contentType.withoutParameters()) {
             CONTENT_TYPE_APPLICATION_JWT -> parseAndVerifySignedMetadata(
                 jwt = response.body<String>(),
                 issuerTrust = issuerTrust,
