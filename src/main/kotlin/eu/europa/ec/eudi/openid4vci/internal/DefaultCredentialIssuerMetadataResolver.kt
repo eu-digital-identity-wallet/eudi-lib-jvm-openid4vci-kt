@@ -36,7 +36,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 
-private const val CONTENT_TYPE_APPLICATION_JWT = "application/jwt"
+private val CONTENT_TYPE_APPLICATION_JWT = ContentType.parse("application/jwt")
 
 internal class DefaultCredentialIssuerMetadataResolver(
     private val httpClient: HttpClient,
@@ -50,23 +50,25 @@ internal class DefaultCredentialIssuerMetadataResolver(
         val json = when (policy) {
             IssuerMetadataPolicy.IgnoreSigned -> wellKnownUrl.requestUnsigned()
             is IssuerMetadataPolicy.RequireSigned -> wellKnownUrl.requestSigned(policy.issuerTrust, issuer)
-            is IssuerMetadataPolicy.PreferSigned -> wellKnownUrl.requestPreferingSigned(policy.issuerTrust, issuer)
+            is IssuerMetadataPolicy.PreferSigned -> wellKnownUrl.requestPreferringSigned(policy.issuerTrust, issuer)
         }
         CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer)
     }
 
     private suspend fun Url.requestUnsigned(): String {
-        val response = getAcceptingContentTypes(ContentType.Application.Json.toString())
-        require(response.headers[HttpHeaders.ContentType] == ContentType.Application.Json.toString()) {
+        val response = getAcceptingContentTypes(ContentType.Application.Json)
+        val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
+        require(contentType?.withoutParameters() == ContentType.Application.Json) {
             "Credential issuer responded with invalid content type: " +
-                "expected ${ContentType.Application.Json} but was ${response.headers[HttpHeaders.ContentType]}"
+                "expected ${ContentType.Application.Json} but was $contentType"
         }
         return response.body<String>()
     }
 
     private suspend fun Url.requestSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): String {
         val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT)
-        ensure(response.headers[HttpHeaders.ContentType] == CONTENT_TYPE_APPLICATION_JWT) {
+        val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
+        ensure(contentType?.withoutParameters() == CONTENT_TYPE_APPLICATION_JWT) {
             CredentialIssuerMetadataError.MissingSignedMetadata()
         }
         return parseAndVerifySignedMetadata(response.body<String>(), issuerTrust, issuer)
@@ -75,13 +77,12 @@ internal class DefaultCredentialIssuerMetadataResolver(
             }
     }
 
-    private suspend fun Url.requestPreferingSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): String {
-        val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT, ContentType.Application.Json.toString())
-        val contentType = response.headers[HttpHeaders.ContentType]
-
+    private suspend fun Url.requestPreferringSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): String {
+        val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT, ContentType.Application.Json)
+        val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
         requireNotNull(contentType) { "Credential issuer did not respond with a content type header" }
 
-        return when (contentType) {
+        return when (contentType.withoutParameters()) {
             CONTENT_TYPE_APPLICATION_JWT -> parseAndVerifySignedMetadata(
                 jwt = response.body<String>(),
                 issuerTrust = issuerTrust,
@@ -90,7 +91,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 throw CredentialIssuerMetadataError.InvalidSignedMetadata(it)
             }
 
-            ContentType.Application.Json.toString() -> response.body<String>()
+            ContentType.Application.Json -> response.body<String>()
 
             else -> "Unexpected content type $contentType when retrieving issuer metadata."
         }
@@ -150,12 +151,10 @@ internal class DefaultCredentialIssuerMetadataResolver(
         return SingleKeyJWSKeySelector(algorithm, jwk.toPublicKey())
     }
 
-    private suspend fun Url.getAcceptingContentTypes(vararg contentTypes: String): HttpResponse =
+    private suspend fun Url.getAcceptingContentTypes(vararg contentTypes: ContentType): HttpResponse =
         try {
             val response = httpClient.get(this) {
-                contentTypes.forEach {
-                    accept(ContentType.parse(it))
-                }
+                contentTypes.forEach { accept(it) }
             }
             require(response.status.isSuccess()) {
                 "Credential issuer responded with status code: ${response.status}"
