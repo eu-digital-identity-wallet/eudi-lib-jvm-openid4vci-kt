@@ -46,6 +46,8 @@ internal object PidDevIssuer :
     val MDL_config_id = CredentialConfigurationIdentifier("org.iso.18013.5.1.mDL")
     val EHIC_JwsJson_config_id = CredentialConfigurationIdentifier("urn:eudi:ehic:1:dc+sd-jwt-jws-json")
     val EHIC_Compact_config_id = CredentialConfigurationIdentifier("urn:eudi:ehic:1:dc+sd-jwt-compact")
+    val LearningCredential_SdJwtVcCompact_Config_Id =
+        CredentialConfigurationIdentifier("urn:eu.europa.ec.eudi:learning:credential:1:dc+sd-jwt-compact")
 
     val AllCredentialConfigurationIds = listOf(
         PID_SdJwtVC_config_id,
@@ -53,5 +55,6 @@ internal object PidDevIssuer :
         MDL_config_id,
         EHIC_JwsJson_config_id,
         EHIC_Compact_config_id,
+        LearningCredential_SdJwtVcCompact_Config_Id,
     )
 }
