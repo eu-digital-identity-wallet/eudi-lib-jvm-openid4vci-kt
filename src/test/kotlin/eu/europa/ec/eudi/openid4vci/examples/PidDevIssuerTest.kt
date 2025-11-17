@@ -78,7 +78,7 @@ class PidDevIssuerTest {
     fun `Issue Learning Credential in sd-jwt vc compact using authorize code flow and JWT proofs`() = runTest {
         repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.LearningCredential_SdJwtVcCompact_Config_Id,
-            ProofsType.JwtProofWithKeyAttestation(BatchOption.Specific(2)),
+            ProofsType.JwtProofsNoKeyAttestation(BatchOption.Specific(2)),
         )
     }
 }
