@@ -160,6 +160,10 @@ fun interface RequestIssuance {
     /**
      * Places a request to the credential issuance endpoint.
      *
+     * If the [AuthorizedRequest] contains authorization details for the requested
+     * [IssuanceRequestPayload.credentialConfigurationIdentifier], then the [requestPayload] must be
+     * [IssuanceRequestPayload.IdentifierBased] and the credential identifier must be one of the authorized identifiers.
+     *
      * @param requestPayload the payload of the request
      * @param proofsSpecification the specification of proofs to be included in the request
      * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh updated Resource-Server DPoP Nonce)

@@ -57,6 +57,16 @@ internal class RequestIssuanceImpl(
         requestPayload: IssuanceRequestPayload,
         proofsSpecification: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatchingCancellable {
+        val authorizedIdentifiers = credentialIdentifiers?.get(requestPayload.credentialConfigurationIdentifier)
+        if (!authorizedIdentifiers.isNullOrEmpty()) {
+            require(requestPayload is IssuanceRequestPayload.IdentifierBased) {
+                "Authorization detail type of openid_credential require usage of credential identifiers in credential request"
+            }
+            require(requestPayload.credentialIdentifier in authorizedIdentifiers) {
+                "Credential identifier ${requestPayload.credentialIdentifier.value} is not authorized"
+            }
+        }
+
         val (proofs, proofsDpopNonce) = buildProofs(proofsSpecification, requestPayload.credentialConfigurationIdentifier, grant)
         val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
 
