@@ -57,6 +57,8 @@ internal class RequestIssuanceImpl(
         requestPayload: IssuanceRequestPayload,
         proofsSpecification: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatchingCancellable {
+        validateRequestPayload(requestPayload, credentialIdentifiers.orEmpty())
+
         val (proofs, proofsDpopNonce) = buildProofs(proofsSpecification, requestPayload.credentialConfigurationIdentifier, grant)
         val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
 
@@ -73,6 +75,28 @@ internal class RequestIssuanceImpl(
         val updatedAuthorizedRequest =
             this.withResourceServerDpopNonce(newResourceServerDpopNonce ?: proofsOrAuthRequestDpopNonce)
         updatedAuthorizedRequest to outcome.toPub()
+    }
+
+    private fun validateRequestPayload(
+        requestPayload: IssuanceRequestPayload,
+        authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
+    ) {
+        if (authorizationDetails.isNotEmpty()) {
+            val authorizedIdentifiers = authorizationDetails[requestPayload.credentialConfigurationIdentifier]
+            check(!authorizedIdentifiers.isNullOrEmpty()) {
+                "No credential identifiers authorized for ${requestPayload.credentialConfigurationIdentifier}"
+            }
+            require(requestPayload is IssuanceRequestPayload.IdentifierBased) {
+                "Authorization detail type of openid_credential require usage of credential identifiers in credential request"
+            }
+            require(requestPayload.credentialIdentifier in authorizedIdentifiers) {
+                "Credential identifier ${requestPayload.credentialIdentifier.value} is not in authorized identifiers $authorizedIdentifiers"
+            }
+        } else {
+            require(requestPayload is IssuanceRequestPayload.ConfigurationBased) {
+                "Issuance request payload must be of type ConfigurationBased when no credential identifiers are authorized"
+            }
+        }
     }
 
     private suspend fun buildProofs(
