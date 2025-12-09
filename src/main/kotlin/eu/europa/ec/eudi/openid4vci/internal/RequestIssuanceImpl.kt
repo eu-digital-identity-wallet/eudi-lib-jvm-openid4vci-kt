@@ -81,13 +81,17 @@ internal class RequestIssuanceImpl(
         requestPayload: IssuanceRequestPayload,
         authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
     ) {
-        val authorizedIdentifiers = authorizationDetails[requestPayload.credentialConfigurationIdentifier]
-        if (!authorizedIdentifiers.isNullOrEmpty()) {
+        val authorizedIdentifiers = authorizationDetails[requestPayload.credentialConfigurationIdentifier].orEmpty()
+        if (authorizedIdentifiers.isNotEmpty()) {
             require(requestPayload is IssuanceRequestPayload.IdentifierBased) {
                 "Authorization detail type of openid_credential require usage of credential identifiers in credential request"
             }
             require(requestPayload.credentialIdentifier in authorizedIdentifiers) {
                 "Credential identifier ${requestPayload.credentialIdentifier.value} is not in authorized identifiers $authorizedIdentifiers"
+            }
+        } else {
+            require(requestPayload is IssuanceRequestPayload.ConfigurationBased) {
+                "Issuance request payload must be of type ConfigurationBased when no credential identifiers are authorized"
             }
         }
     }
