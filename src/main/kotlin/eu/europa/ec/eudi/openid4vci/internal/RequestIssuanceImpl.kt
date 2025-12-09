@@ -57,15 +57,7 @@ internal class RequestIssuanceImpl(
         requestPayload: IssuanceRequestPayload,
         proofsSpecification: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatchingCancellable {
-        val authorizedIdentifiers = credentialIdentifiers?.get(requestPayload.credentialConfigurationIdentifier)
-        if (!authorizedIdentifiers.isNullOrEmpty()) {
-            require(requestPayload is IssuanceRequestPayload.IdentifierBased) {
-                "Authorization detail type of openid_credential require usage of credential identifiers in credential request"
-            }
-            require(requestPayload.credentialIdentifier in authorizedIdentifiers) {
-                "Credential identifier ${requestPayload.credentialIdentifier.value} is not authorized"
-            }
-        }
+        validateRequestPayload(requestPayload, credentialIdentifiers.orEmpty())
 
         val (proofs, proofsDpopNonce) = buildProofs(proofsSpecification, requestPayload.credentialConfigurationIdentifier, grant)
         val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
@@ -83,6 +75,21 @@ internal class RequestIssuanceImpl(
         val updatedAuthorizedRequest =
             this.withResourceServerDpopNonce(newResourceServerDpopNonce ?: proofsOrAuthRequestDpopNonce)
         updatedAuthorizedRequest to outcome.toPub()
+    }
+
+    private fun validateRequestPayload(
+        requestPayload: IssuanceRequestPayload,
+        authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
+    ) {
+        val authorizedIdentifiers = authorizationDetails[requestPayload.credentialConfigurationIdentifier]
+        if (!authorizedIdentifiers.isNullOrEmpty()) {
+            require(requestPayload is IssuanceRequestPayload.IdentifierBased) {
+                "Authorization detail type of openid_credential require usage of credential identifiers in credential request"
+            }
+            require(requestPayload.credentialIdentifier in authorizedIdentifiers) {
+                "Credential identifier ${requestPayload.credentialIdentifier.value} is not in authorized identifiers $authorizedIdentifiers"
+            }
+        }
     }
 
     private suspend fun buildProofs(
