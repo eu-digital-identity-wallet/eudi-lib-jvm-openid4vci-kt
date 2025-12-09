@@ -83,7 +83,7 @@ internal class RequestIssuanceImpl(
     ) {
         if (authorizationDetails.isNotEmpty()) {
             val authorizedIdentifiers = authorizationDetails[requestPayload.credentialConfigurationIdentifier]
-            check(!authorizedIdentifiers.isNullOrEmpty()){
+            check(!authorizedIdentifiers.isNullOrEmpty()) {
                 "No credential identifiers authorized for ${requestPayload.credentialConfigurationIdentifier}"
             }
             require(requestPayload is IssuanceRequestPayload.IdentifierBased) {
