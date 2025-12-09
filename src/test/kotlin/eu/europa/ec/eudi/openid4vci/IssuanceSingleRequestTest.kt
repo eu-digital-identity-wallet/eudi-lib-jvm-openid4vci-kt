@@ -383,7 +383,7 @@ class IssuanceSingleRequestTest {
             CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
             CredentialIdentifier("id"),
         )
-        assertThrows<IllegalStateException> {
+        assertThrows<IllegalArgumentException> {
             with(issuer) {
                 authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
             }
