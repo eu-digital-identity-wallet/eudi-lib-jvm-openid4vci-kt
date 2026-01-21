@@ -84,12 +84,6 @@ private data class KeyAttestationRequirementTO(
     @SerialName("user_authentication") val userAuthentication: List<String>? = null,
 )
 
-@Serializable
-private data class PolicyTO(
-    @SerialName("one_time_use") val oneTimeUse: Boolean,
-    @SerialName("batch_size") val batchSize: Int? = null,
-)
-
 /**
  * The data of a Verifiable Credentials issued as an ISO mDL.
  */
@@ -102,10 +96,7 @@ private data class MsdMdocCredentialTO(
     @SerialName("cryptographic_binding_methods_supported")
     override val cryptographicBindingMethodsSupported: List<String>? = null,
     @SerialName("credential_signing_alg_values_supported")
-    val credentialSigningAlgorithmsSupported: List<JsonPrimitive>? = null,
-    @SerialName("credential_alg_values_supported") val isoCredentialSigningAlgorithmsSupported: List<JsonPrimitive>? = null,
-    @SerialName("credential_crv_values_supported") val isoCredentialCurvesSupported: List<Int>? = null,
-    @SerialName("policy") val isoPolicy: PolicyTO? = null,
+    val credentialSigningAlgorithmsSupported: List<Int>? = null,
     @SerialName("proof_types_supported")
     override val proofTypesSupported: Map<String, ProofTypeSupportedMetaTO>? = null,
     @SerialName("doctype") @Required val docType: String,
@@ -120,13 +111,8 @@ private data class MsdMdocCredentialTO(
             .map { cryptographicBindingMethodOf(it) }
 
         val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported
-            .orEmpty().mapNotNull { it.toCoseAlgorithm()?.name() }
-        val coseAlgs = isoCredentialSigningAlgorithmsSupported.orEmpty().map {
-            requireNotNull(it.toCoseAlgorithm()) { "Expecting COSE algorithm, yet got $it" }
-        }
-        val coseCurves = isoCredentialCurvesSupported.orEmpty().map { CoseCurve(it) }
-        val policy = isoPolicy?.let { policy -> MsoMdocPolicy(policy.oneTimeUse, policy.batchSize) }
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
+            .mapNotNull { CoseAlgorithm(it).name() }
 
         if (bindingMethods.isNotEmpty()) {
             require(proofTypesSupported.values.isNotEmpty()) {
@@ -142,9 +128,6 @@ private data class MsdMdocCredentialTO(
             scope,
             bindingMethods,
             cryptographicSuitesSupported,
-            coseAlgs,
-            coseCurves,
-            policy,
             proofTypesSupported,
             credentialMetadata?.toDomain(),
             docType,
@@ -632,14 +615,6 @@ private fun cryptographicBindingMethodOf(s: String): CryptographicBindingMethod 
         s.startsWith("did") -> CryptographicBindingMethod.DID(s)
         else -> CryptographicBindingMethod.Other(s)
     }
-
-private fun JsonPrimitive.toCoseAlgorithm(): CoseAlgorithm? {
-    fun Int.toCose() = CoseAlgorithm(this)
-    fun String.toCoseByName() = CoseAlgorithm.byName(this)
-    fun String.toCodeByValue() = toIntOrNull()?.toCose()
-    val strOrNull by lazy { contentOrNull }
-    return intOrNull?.toCose() ?: strOrNull?.toCodeByValue() ?: strOrNull?.toCoseByName()
-}
 
 /**
  * Converts and validates [CredentialIssuerMetadataTO] as [CredentialIssuerMetadata] instance.

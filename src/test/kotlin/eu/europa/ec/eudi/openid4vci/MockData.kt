@@ -248,9 +248,6 @@ internal fun mobileDrivingLicense() = MsoMdocCredential(
     "MobileDrivingLicense_msoMdoc",
     emptyList(),
     listOf("ES256", "ES384", "ES512"),
-    emptyList(),
-    emptyList(),
-    null,
     ProofTypesSupported.Empty,
     CredentialMetadata(
         listOf(

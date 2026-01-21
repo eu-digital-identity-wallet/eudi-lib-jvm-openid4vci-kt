@@ -217,8 +217,6 @@ data class Claim(
     ) : Serializable
 }
 
-data class MsoMdocPolicy(val oneTimeUse: Boolean, val batchSize: Int?) : Serializable
-
 /**
  * The data of a Verifiable Credentials issued as an ISO MDOC.
  */
@@ -226,9 +224,6 @@ data class MsoMdocCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
     override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
-    val isoCredentialSigningAlgorithmsSupported: List<CoseAlgorithm> = emptyList(),
-    val isoCredentialCurvesSupported: List<CoseCurve> = emptyList(),
-    val isoPolicy: MsoMdocPolicy?,
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val credentialMetadata: CredentialMetadata?,
     val docType: String,
