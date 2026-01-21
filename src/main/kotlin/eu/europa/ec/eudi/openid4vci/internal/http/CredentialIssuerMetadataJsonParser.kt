@@ -111,8 +111,7 @@ private data class MsdMdocCredentialTO(
             .map { cryptographicBindingMethodOf(it) }
 
         val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
-            .mapNotNull { CoseAlgorithm(it).name() }
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { CoseAlgorithm(it) }
 
         if (bindingMethods.isNotEmpty()) {
             require(proofTypesSupported.values.isNotEmpty()) {
@@ -159,7 +158,7 @@ private data class SdJwtVcCredentialTO(
             .map { cryptographicBindingMethodOf(it) }
 
         val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { JwsAlgorithm(it) }
 
         if (bindingMethods.isNotEmpty()) {
             require(proofTypesSupported.values.isNotEmpty()) {
@@ -220,7 +219,7 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
         val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { LinkedDataAlgorithm(it) }
 
         if (bindingMethods.isNotEmpty()) {
             require(proofTypesSupported.values.isNotEmpty()) {
@@ -270,7 +269,7 @@ private data class W3CJsonLdSignedJwtCredentialTO(
             .map { cryptographicBindingMethodOf(it) }
 
         val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { LinkedDataAlgorithm(it) }
 
         if (bindingMethods.isNotEmpty()) {
             require(proofTypesSupported.values.isNotEmpty()) {
@@ -331,7 +330,7 @@ private data class W3CSignedJwtCredentialTO(
             .map { cryptographicBindingMethodOf(it) }
 
         val proofTypesSupported = proofTypesSupported.toProofTypes()
-        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty()
+        val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { JwsAlgorithm(it) }
 
         if (bindingMethods.isNotEmpty()) {
             require(proofTypesSupported.values.isNotEmpty()) {
