@@ -185,15 +185,12 @@ data class CredentialMetadata(
     val claims: List<Claim>? = emptyList(),
 )
 
-sealed interface Algorithm : Serializable
-
 /**
  * Credentials supported by an Issuer.
  */
 sealed interface CredentialConfiguration : Serializable {
     val scope: String?
     val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod>
-    val credentialSigningAlgorithmsSupported: List<Algorithm>
     val proofTypesSupported: ProofTypesSupported
     val credentialMetadata: CredentialMetadata?
 }
@@ -225,7 +222,7 @@ data class Claim(
  * @see <a href="https://www.iana.org/assignments/cose/cose.xhtml">CBOR Object Signing and Encryption (COSE)</a>
  */
 @JvmInline
-value class CoseAlgorithm(val value: Int) : Algorithm {
+value class CoseAlgorithm(val value: Int) : Serializable {
     override fun toString(): String = value.toString()
 }
 
@@ -235,7 +232,7 @@ value class CoseAlgorithm(val value: Int) : Algorithm {
 data class MsoMdocCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val credentialSigningAlgorithmsSupported: List<CoseAlgorithm> = emptyList(),
+    val credentialSigningAlgorithmsSupported: List<CoseAlgorithm> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val credentialMetadata: CredentialMetadata?,
     val docType: String,
@@ -247,7 +244,7 @@ data class MsoMdocCredential(
  * @see <a href="https://www.iana.org/assignments/jose/jose.xhtml">JSON Object Signing and Encryption (JOSE)</a>
  */
 @JvmInline
-value class JwsAlgorithm(val name: String) : Algorithm {
+value class JwsAlgorithm(val name: String) : Serializable {
     override fun toString(): String = name
 }
 
@@ -257,7 +254,7 @@ value class JwsAlgorithm(val name: String) : Algorithm {
 data class SdJwtVcCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val credentialSigningAlgorithmsSupported: List<JwsAlgorithm> = emptyList(),
+    val credentialSigningAlgorithmsSupported: List<JwsAlgorithm> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val credentialMetadata: CredentialMetadata?,
     val type: String,
@@ -274,7 +271,7 @@ data class W3CJsonLdCredentialDefinition(
  * @see <a href="https://w3c-ccg.github.io/ld-cryptosuite-registry/">Linked Data Cryptographic Suite Registry</a>
  */
 @JvmInline
-value class LinkedDataAlgorithm(val identifier: String) : Algorithm {
+value class LinkedDataAlgorithm(val identifier: String) : Serializable {
     override fun toString(): String = identifier
 }
 
@@ -284,7 +281,7 @@ value class LinkedDataAlgorithm(val identifier: String) : Algorithm {
 data class W3CJsonLdDataIntegrityCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val credentialSigningAlgorithmsSupported: List<LinkedDataAlgorithm> = emptyList(),
+    val credentialSigningAlgorithmsSupported: List<LinkedDataAlgorithm> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val credentialMetadata: CredentialMetadata?,
     val credentialDefinition: W3CJsonLdCredentialDefinition,
@@ -296,7 +293,7 @@ data class W3CJsonLdDataIntegrityCredential(
 data class W3CJsonLdSignedJwtCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val credentialSigningAlgorithmsSupported: List<LinkedDataAlgorithm> = emptyList(),
+    val credentialSigningAlgorithmsSupported: List<LinkedDataAlgorithm> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val credentialMetadata: CredentialMetadata?,
     val credentialDefinition: W3CJsonLdCredentialDefinition,
@@ -308,7 +305,7 @@ data class W3CJsonLdSignedJwtCredential(
 data class W3CSignedJwtCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val credentialSigningAlgorithmsSupported: List<JwsAlgorithm> = emptyList(),
+    val credentialSigningAlgorithmsSupported: List<JwsAlgorithm> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val credentialMetadata: CredentialMetadata?,
     val credentialDefinition: CredentialDefinition,
