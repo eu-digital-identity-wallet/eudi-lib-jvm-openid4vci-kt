@@ -65,7 +65,7 @@ internal fun CredentialIssuerId.metaDataUrl() = HttpsUrl(
 internal fun universityDegreeJwt() = W3CSignedJwtCredential(
     "UniversityDegree_JWT",
     listOf(CryptographicBindingMethod.DID("did:example")),
-    listOf("ES256K"),
+    listOf(JwsAlgorithm("ES256K")),
     ProofTypesSupported(
         setOf(
             ProofTypeMeta.Jwt(
@@ -122,7 +122,7 @@ internal fun universityDegreeJwt() = W3CSignedJwtCredential(
 internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
     "UniversityDegree_LDP_VC",
     listOf(CryptographicBindingMethod.DID("did:example")),
-    listOf("Ed25519Signature2018"),
+    listOf(LinkedDataAlgorithm("Ed25519Signature2018")),
     ProofTypesSupported(
         setOf(
             ProofTypeMeta.Jwt(
@@ -183,7 +183,7 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
 internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
     "UniversityDegree_JWT_VC_JSON-LD",
     listOf(CryptographicBindingMethod.DID("did:example")),
-    listOf("Ed25519Signature2018"),
+    listOf(LinkedDataAlgorithm("Ed25519Signature2018")),
     ProofTypesSupported(
         setOf(
             ProofTypeMeta.Jwt(
@@ -247,10 +247,7 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
 internal fun mobileDrivingLicense() = MsoMdocCredential(
     "MobileDrivingLicense_msoMdoc",
     emptyList(),
-    listOf("ES256", "ES384", "ES512"),
-    emptyList(),
-    emptyList(),
-    null,
+    listOf(CoseAlgorithm(-7), CoseAlgorithm(-35), CoseAlgorithm(-36)),
     ProofTypesSupported.Empty,
     CredentialMetadata(
         listOf(

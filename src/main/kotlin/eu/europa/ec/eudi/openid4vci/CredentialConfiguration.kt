@@ -191,7 +191,6 @@ data class CredentialMetadata(
 sealed interface CredentialConfiguration : Serializable {
     val scope: String?
     val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod>
-    val credentialSigningAlgorithmsSupported: List<String>
     val proofTypesSupported: ProofTypesSupported
     val credentialMetadata: CredentialMetadata?
 }
@@ -217,7 +216,15 @@ data class Claim(
     ) : Serializable
 }
 
-data class MsoMdocPolicy(val oneTimeUse: Boolean, val batchSize: Int?) : Serializable
+/**
+ * COSE Algorithm value.
+ *
+ * @see <a href="https://www.iana.org/assignments/cose/cose.xhtml">CBOR Object Signing and Encryption (COSE)</a>
+ */
+@JvmInline
+value class CoseAlgorithm(val value: Int) : Serializable {
+    override fun toString(): String = value.toString()
+}
 
 /**
  * The data of a Verifiable Credentials issued as an ISO MDOC.
@@ -225,19 +232,29 @@ data class MsoMdocPolicy(val oneTimeUse: Boolean, val batchSize: Int?) : Seriali
 data class MsoMdocCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
-    val isoCredentialSigningAlgorithmsSupported: List<CoseAlgorithm> = emptyList(),
-    val isoCredentialCurvesSupported: List<CoseCurve> = emptyList(),
-    val isoPolicy: MsoMdocPolicy?,
+    val credentialSigningAlgorithmsSupported: List<CoseAlgorithm> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val credentialMetadata: CredentialMetadata?,
     val docType: String,
 ) : CredentialConfiguration
 
+/**
+ * JWS Algorithm Name
+ *
+ * @see <a href="https://www.iana.org/assignments/jose/jose.xhtml">JSON Object Signing and Encryption (JOSE)</a>
+ */
+@JvmInline
+value class JwsAlgorithm(val name: String) : Serializable {
+    override fun toString(): String = name
+}
+
+/**
+ * The data of a Verifiable Credentials issued as an SD-JWT VC.
+ */
 data class SdJwtVcCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
+    val credentialSigningAlgorithmsSupported: List<JwsAlgorithm> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val credentialMetadata: CredentialMetadata?,
     val type: String,
@@ -249,12 +266,22 @@ data class W3CJsonLdCredentialDefinition(
 )
 
 /**
- * The data of a W3C Verifiable Credential issued as using Data Integrity and JSON-LD.
+ * Linked Data Algorithm Identifier
+ *
+ * @see <a href="https://w3c-ccg.github.io/ld-cryptosuite-registry/">Linked Data Cryptographic Suite Registry</a>
+ */
+@JvmInline
+value class LinkedDataAlgorithm(val identifier: String) : Serializable {
+    override fun toString(): String = identifier
+}
+
+/**
+ * The data of a W3C Verifiable Credential issued using Data Integrity and JSON-LD.
  */
 data class W3CJsonLdDataIntegrityCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
+    val credentialSigningAlgorithmsSupported: List<LinkedDataAlgorithm> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val credentialMetadata: CredentialMetadata?,
     val credentialDefinition: W3CJsonLdCredentialDefinition,
@@ -266,7 +293,7 @@ data class W3CJsonLdDataIntegrityCredential(
 data class W3CJsonLdSignedJwtCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
+    val credentialSigningAlgorithmsSupported: List<LinkedDataAlgorithm> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val credentialMetadata: CredentialMetadata?,
     val credentialDefinition: W3CJsonLdCredentialDefinition,
@@ -278,7 +305,7 @@ data class W3CJsonLdSignedJwtCredential(
 data class W3CSignedJwtCredential(
     override val scope: String? = null,
     override val cryptographicBindingMethodsSupported: List<CryptographicBindingMethod> = emptyList(),
-    override val credentialSigningAlgorithmsSupported: List<String> = emptyList(),
+    val credentialSigningAlgorithmsSupported: List<JwsAlgorithm> = emptyList(),
     override val proofTypesSupported: ProofTypesSupported = ProofTypesSupported.Empty,
     override val credentialMetadata: CredentialMetadata?,
     val credentialDefinition: CredentialDefinition,

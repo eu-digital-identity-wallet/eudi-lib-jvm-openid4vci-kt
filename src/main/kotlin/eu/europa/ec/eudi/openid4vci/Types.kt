@@ -343,40 +343,6 @@ val CIAuthorizationServerMetadata.clientAttestationPOPJWSAlgs: List<JWSAlgorithm
     )
         ?.mapNotNull { JWSAlgorithm.parse(it) }
 
-@JvmInline
-value class CoseAlgorithm(val value: Int) {
-
-    companion object {
-
-        val ES256 = CoseAlgorithm(-7)
-        val ES384 = CoseAlgorithm(-35)
-        val ES512 = CoseAlgorithm(-36)
-
-        internal val Names: Map<CoseAlgorithm, String> = mapOf(
-            ES256 to "ES256",
-            ES384 to "ES384",
-            ES512 to "ES512",
-        )
-
-        internal fun byName(name: String): CoseAlgorithm? =
-            Names.firstNotNullOfOrNull { (alg, knownName) ->
-                alg.takeIf { knownName == name }
-            }
-    }
-}
-
-internal fun CoseAlgorithm.name(): String? = CoseAlgorithm.Names[this]
-
-@JvmInline
-value class CoseCurve(val value: Int) {
-
-    companion object {
-        val P_256 = CoseCurve(1)
-        val P_384 = CoseCurve(2)
-        val P_521 = CoseCurve(3)
-    }
-}
-
 /**
  * Nonce (single use) value provided either by the Authorization or Resource server.
  */
