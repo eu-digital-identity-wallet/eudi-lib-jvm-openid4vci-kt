@@ -45,6 +45,7 @@ dependencies {
     testImplementation(libs.logback.classic)
     testImplementation(libs.cbor)
     testImplementation(libs.tink)
+    testImplementation(libs.bouncycastle.pkix)
 }
 
 java {
