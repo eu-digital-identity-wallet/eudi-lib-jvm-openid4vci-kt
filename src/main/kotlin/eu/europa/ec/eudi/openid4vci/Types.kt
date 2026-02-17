@@ -367,6 +367,7 @@ fun interface CertificateChainTrust {
  */
 sealed interface IssuerTrust {
 
+    @Deprecated("Use IssuerTrust.ByCertificateChain instead")
     data class ByPublicKey(val jwk: JWK) : IssuerTrust {
         init {
             require(!jwk.isPrivate) { "Only public JWKs are supported" }
