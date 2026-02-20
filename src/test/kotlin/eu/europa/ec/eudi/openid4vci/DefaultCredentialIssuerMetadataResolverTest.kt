@@ -347,6 +347,20 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         id = CredentialIssuerId("https://issuer.example.com/tenant").getOrThrow()
         assertEquals("https://issuer.example.com/.well-known/openid-credential-issuer/tenant", id.wellKnown().toString())
     }
+
+    @Test
+    internal fun `resolution succeeds for signed metadata that use x5c`() = runTest {
+        val credentialIssuerId = CredentialIssuerId("https://dev.issuer-backend.eudiw.dev").getOrThrow()
+        val resolver = resolver(
+            credentialIssuerMetaDataHandler(
+                credentialIssuerId,
+                "eu/europa/ec/eudi/openid4vci/internal/openid-credential-issuer-signed-metadata-x5c.jwt",
+                listOf("application/jwt"),
+            ),
+        )
+        val policy = IssuerMetadataPolicy.RequireSigned(IssuerTrust.ByCertificateChain { true })
+        assertDoesNotThrow { resolver.resolve(credentialIssuerId, policy).getOrThrow() }
+    }
 }
 
 private fun Map<CredentialConfigurationIdentifier, CredentialConfiguration>.jwtProofTypeSupported(

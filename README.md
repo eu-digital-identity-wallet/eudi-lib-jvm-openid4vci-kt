@@ -9,6 +9,7 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
 
 * [Overview](#overview)
 * [Disclaimer](#disclaimer)
+* [Installation](#installation)
 * [Use cases supported](#use-cases-supported)
 * [Configuration options](#configuration-options)
 * [Other features](#other-features)
@@ -59,6 +60,27 @@ The released software is an initial development release version:
 -  Users of the software must perform sufficient engineering and additional testing in order to properly evaluate their application and determine whether any of the open-sourced components is suitable for use in that application.
 -  We strongly recommend to not put this version of the software into production use.
 -  Only the latest version of the software will be supported
+
+## Installation
+
+To include the library in your project, add the following dependency in `build.gradle.kts` :
+
+```kotlin
+dependencies {
+    implementation("eu.europa.ec.eudi:eudi-lib-jvm-openid4vci-kt:${version}")
+}
+```
+
+> [!IMPORTANT]  
+> In case you require support for `X509Certificates`, the Bouncy Castle Java Security Provider must be present in the classpath of your project.
+> 
+> You are advised to include the following dependency in `build.gradle.kts`:
+> 
+> ```kotlin
+> dependencies {
+>     implementation("org.bouncycastle:bcpkix-jdk18on:${bouncyCastleVersion}")
+> }
+> ```
 
 ## Use cases supported
 
