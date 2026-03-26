@@ -48,7 +48,7 @@ typealias ClientAttestation = Pair<ClientAttestationJWT, ClientAttestationPoPJWT
 @ConsistentCopyVisibility
 data class ClientAttestationJWT private constructor(val jwt: SignedJWT) {
     val claimsSet: ClientAttestationJWTClaims by lazy { jwt.jwtClaimsSet.decodeAs<ClientAttestationJWTClaims>().getOrThrow() }
-    val clientId: ClientId get() = claimsSet.subject
+    val clientId: ClientId get() = claimsSet.subject.value
     val cnf: Confirmation get() = claimsSet.confirmation
     val publicKey: JWK get() = cnf.jwk
 
@@ -64,17 +64,22 @@ data class ClientAttestationJWT private constructor(val jwt: SignedJWT) {
 
 @Serializable
 data class ClientAttestationJWTClaims(
-    @Required @SerialName(RFC7519.ISSUER) val issuer: String,
-    @Required @SerialName(RFC7519.SUBJECT) val subject: String,
+    @Required @SerialName(RFC7519.ISSUER) val issuer: NonBlankString,
+    @Required @SerialName(RFC7519.SUBJECT) val subject: NonBlankString,
     @Required @SerialName(RFC7519.EXPIRATION_TIME) @Serializable(with = NumericInstantSerializer::class) val expirationTime: Instant,
     @Required @SerialName(RFC7800.CONFIRMATION) val confirmation: Confirmation,
     @SerialName(RFC7519.ISSUED_AT) @Serializable(with = NumericInstantSerializer::class) val issuedAt: Instant? = null,
     @SerialName(RFC7519.NOT_BEFORE) @Serializable(with = NumericInstantSerializer::class) val notBefore: Instant? = null,
-) {
+)
+
+@Serializable
+@JvmInline
+value class NonBlankString(val value: String) {
     init {
-        require(issuer.isNotBlank()) { "issuer must not be be blank" }
-        require(subject.isNotBlank()) { "subject must not be blank" }
+        require(value.isNotBlank()) { "value must not be blank" }
     }
+
+    override fun toString(): String = value
 }
 
 @Serializable
