@@ -26,6 +26,9 @@ import eu.europa.ec.eudi.openid4vci.internal.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.net.URL
 import java.time.Clock
 import java.time.Instant
@@ -70,6 +73,7 @@ data class ClientAttestationJWTClaims(
     @Required @SerialName(RFC7800.CONFIRMATION) val confirmation: Confirmation,
     @SerialName(RFC7519.ISSUED_AT) @Serializable(with = NumericInstantSerializer::class) val issuedAt: Instant? = null,
     @SerialName(RFC7519.NOT_BEFORE) @Serializable(with = NumericInstantSerializer::class) val notBefore: Instant? = null,
+    @Required @SerialName(TS3.EUDI_WALLET_INFO) val eudiWalletInfo: EudiWalletInfo,
 )
 
 @Serializable
@@ -89,6 +93,32 @@ data class Confirmation(
     init {
         require(!jwk.isPrivate) { "jwk must be public" }
     }
+}
+
+@Serializable
+data class EudiWalletInfo(
+    @Required @SerialName(TS3.GENERAL_INFO) val generalInfo: GeneralInfo,
+)
+
+@Serializable
+data class GeneralInfo(
+    @Required @SerialName(TS3.WALLET_PROVIDER_NAME) val walletProviderName: NonBlankString,
+    @Required @SerialName(TS3.WALLET_SOLUTION_ID) val walletSolutionId: NonBlankString,
+    @Required @SerialName(TS3.WALLET_SOLUTION_VERSION) val walletSolutionVersion: NonBlankString,
+    @Required @SerialName(TS3.WALLET_SOLUTION_CERTIFICATION_INFORMATION) val walletSolutionCertificationInformation:
+        WalletSolutionCertificationInformation,
+)
+
+@Serializable
+@JvmInline
+value class WalletSolutionCertificationInformation(val value: JsonElement) {
+    init {
+        require(value is JsonObject || (value is JsonPrimitive && value.isString && value.content.isNotBlank())) {
+            "value must be a JsonObject or a JsonPrimitive with a non-blank string value"
+        }
+    }
+
+    override fun toString(): String = value.toString()
 }
 
 /**
