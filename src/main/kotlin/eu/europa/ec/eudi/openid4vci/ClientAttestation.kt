@@ -56,6 +56,9 @@ value class ClientAttestationJWT(val jwt: SignedJWT) {
         val cnf = requireNotNull(jwt.jwtClaimsSet.cnf()) { "Invalid Attestation JWT. Misses `cnf` claim" }
         requireNotNull(cnf.cnfJwk()) { "Invalid Attestation JWT. Misses `jwk` claim from `cnf`" }
         jwt.ensureSignedOrVerified()
+        require(jwt.header.algorithm in TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS) {
+            "Invalid Attestation JWT. Signature algorithm must be one of ${TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS}"
+        }
     }
 
     val clientId: ClientId get() = checkNotNull(jwt.jwtClaimsSet.subject)
