@@ -116,3 +116,11 @@ object TS3 {
     val WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS: Set<JWSAlgorithm> =
         setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
 }
+
+/**
+ * [Proof-of-Possession Key Semantics for JSON Web Tokens (JWTs)](https://www.rfc-editor.org/rfc/rfc7800)
+ */
+object RFC7800 {
+    const val CONFIRMATION: String = "cnf"
+    const val JWK: String = "jwk"
+}

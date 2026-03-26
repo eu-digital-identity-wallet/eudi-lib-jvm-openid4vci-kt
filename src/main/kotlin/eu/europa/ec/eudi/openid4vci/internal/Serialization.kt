@@ -226,3 +226,24 @@ object URLSerializer : KSerializer<URL> {
 
     override fun deserialize(decoder: Decoder): URL = URI.create(decoder.decodeString()).toURL()
 }
+
+object JWKJsonObjectSerializer : KSerializer<JWK> {
+    private val serializer = JsonObject.serializer()
+
+    override val descriptor: SerialDescriptor = SerialDescriptor("JWKJsonObjectSerializer", serializer.descriptor)
+
+    override fun serialize(encoder: Encoder, value: JWK) {
+        val serialized = JsonSupport.decodeFromString<JsonObject>(value.toJSONString())
+        encoder.encodeSerializableValue(serializer, serialized)
+    }
+
+    override fun deserialize(decoder: Decoder): JWK {
+        val serialized = decoder.decodeSerializableValue(serializer)
+        return JWK.parse(JsonSupport.encodeToString(serialized))
+    }
+}
+
+internal inline fun <reified T : Any> JWTClaimsSet.decodeAs(deserializationStrategy: DeserializationStrategy<T> = serializer()): Result<T> =
+    runCatching {
+        JsonSupport.decodeFromString(deserializationStrategy, JSONObjectUtils.toJSONString(toJSONObject()))
+    }
