@@ -26,7 +26,9 @@ import eu.europa.ec.eudi.openid4vci.internal.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.net.URL
 import java.time.Clock
 import java.time.Instant
@@ -46,25 +48,87 @@ typealias ClientAttestation = Pair<ClientAttestationJWT, ClientAttestationPoPJWT
  * which is bound to a key managed by a Client Instance which can then
  * be used by the instance for client authentication
  */
+@ConsistentCopyVisibility
+data class ClientAttestationJWT private constructor(val jwt: SignedJWT, val claimsSet: ClientAttestationJWTClaims) {
+    val clientId: ClientId get() = claimsSet.subject.value
+    val cnf: ConfirmationClaim get() = claimsSet.confirmation
+    val publicKey: JWK get() = cnf.jwk
+
+    companion object {
+        operator fun invoke(jwt: SignedJWT): ClientAttestationJWT {
+            jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
+            jwt.ensureSignedOrVerified()
+            jwt.ensureSignedWithAllowedAlgorithm()
+            val claimsSet = jwt.ensureValidClaimsSet<ClientAttestationJWTClaims>()
+            return ClientAttestationJWT(jwt, claimsSet)
+        }
+    }
+}
+
+@Serializable
+data class ClientAttestationJWTClaims(
+    @Required @SerialName(RFC7519.ISSUER) val issuer: NonBlankString,
+    @Required @SerialName(RFC7519.SUBJECT) val subject: NonBlankString,
+    @Required @SerialName(RFC7519.EXPIRATION_TIME) @Serializable(with = NumericInstantSerializer::class) val expirationTime: Instant,
+    @Required @SerialName(RFC7800.CONFIRMATION) val confirmation: ConfirmationClaim,
+    @SerialName(RFC7519.ISSUED_AT) @Serializable(with = NumericInstantSerializer::class) val issuedAt: Instant? = null,
+    @SerialName(RFC7519.NOT_BEFORE) @Serializable(with = NumericInstantSerializer::class) val notBefore: Instant? = null,
+    @Required @SerialName(OpenId4VCISpec.WALLET_ATTESTATION_WALLET_NAME) val walletName: NonBlankString,
+    @SerialName(OpenId4VCISpec.WALLET_ATTESTATION_WALLET_LINK) val walletLink: NonBlankString? = null,
+    @SerialName(TokenStatusListSpec.STATUS) val status: StatusClaim? = null,
+    @Required @SerialName(TS3.WALLET_VERSION) val walletVersion: NonBlankString,
+    @Required @SerialName(TS3.WALLET_SOLUTION_CERTIFICATION_INFORMATION) val walletSolutionCertificationInformation:
+        WalletSolutionCertificationInformation,
+    @Required @SerialName(TS3.CLIENT_STATUS) val clientStatus: ClientStatusClaim,
+)
+
+@Serializable
 @JvmInline
-value class ClientAttestationJWT(val jwt: SignedJWT) {
+value class NonBlankString(val value: String) {
     init {
-        jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
-        requireNotNull(jwt.jwtClaimsSet.issuer) { "Invalid Attestation JWT. Misses `iss` claim" }
-        requireNotNull(jwt.jwtClaimsSet.subject) { "Invalid Attestation JWT. Misses `sub` claim" }
-        requireNotNull(jwt.jwtClaimsSet.expirationTime) { "Invalid Attestation JWT. Misses `exp` claim" }
-        val cnf = requireNotNull(jwt.jwtClaimsSet.cnf()) { "Invalid Attestation JWT. Misses `cnf` claim" }
-        requireNotNull(cnf.cnfJwk()) { "Invalid Attestation JWT. Misses `jwk` claim from `cnf`" }
-        jwt.ensureSignedOrVerified()
-        require(jwt.header.algorithm in TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS) {
-            "Invalid Attestation JWT. Signature algorithm must be one of ${TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS}"
+        require(value.isNotBlank()) { "value must not be blank" }
+    }
+
+    override fun toString(): String = value
+}
+
+@Serializable
+data class ConfirmationClaim(
+    @Required @SerialName(RFC7800.JWK) @Serializable(with = JWKJsonObjectSerializer::class) val jwk: JWK,
+) {
+    init {
+        require(!jwk.isPrivate) { "jwk must be public" }
+    }
+}
+
+@Serializable
+data class StatusClaim(
+    @Required @SerialName(TokenStatusListSpec.STATUS_LIST) val statusList: StatusListTokenClaim,
+)
+
+@Serializable
+data class StatusListTokenClaim(
+    @Required @SerialName(TokenStatusListSpec.INDEX) val index: UInt,
+    @Required @SerialName(TokenStatusListSpec.URI) val uri: NonBlankString,
+)
+
+@Serializable
+@JvmInline
+value class WalletSolutionCertificationInformation(val value: JsonElement) {
+    init {
+        require(value is JsonObject || (value is JsonPrimitive && value.isString && value.content.isNotBlank())) {
+            "value must be a JsonObject or a JsonPrimitive with a non-blank string value"
         }
     }
 
-    val clientId: ClientId get() = checkNotNull(jwt.jwtClaimsSet.subject)
-    val cnf: JsonObject get() = checkNotNull(jwt.jwtClaimsSet.cnf())
-    val publicKey: JWK get() = checkNotNull(cnf.cnfJwk())
+    override fun toString(): String = value.toString()
 }
+
+@Serializable
+data class ClientStatusClaim(
+    @Required @SerialName(TokenStatusListSpec.STATUS) val status: StatusClaim,
+    @Required @SerialName(RFC7519.EXPIRATION_TIME) @Serializable(with = NumericInstantSerializer::class) val expiresAt: Instant,
+)
 
 /**
  * Qualification of a JWT that adheres to client attestation PoP JWT
@@ -147,6 +211,15 @@ internal fun SignedJWT.ensureSignedOrVerified() {
         "Provided JWT is not signed"
     }
 }
+
+private fun SignedJWT.ensureSignedWithAllowedAlgorithm() {
+    require(header.algorithm in TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS) {
+        "Invalid Attestation JWT. Signature algorithm must be one of ${TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS}"
+    }
+}
+
+private inline fun <reified T : Any> SignedJWT.ensureValidClaimsSet(): T =
+    jwtClaimsSet.decodeAs<T>().getOrElse { throw IllegalArgumentException("Invalid Attestation JWT. Invalid Claims Set.", it) }
 
 internal fun SignedJWT.ensureSignedNotMAC() {
     ensureSignedOrVerified()

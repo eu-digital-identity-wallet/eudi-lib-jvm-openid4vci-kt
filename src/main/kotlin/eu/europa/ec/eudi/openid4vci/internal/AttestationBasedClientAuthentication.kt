@@ -16,14 +16,10 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.util.JSONObjectUtils
-import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.JWTID
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.client.request.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.put
 import java.net.URL
 import java.time.Clock
@@ -60,22 +56,6 @@ internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder
         }
         return ClientAttestationPoPJWT(SignedJWT.parse(signedJwt))
     }
-}
-
-internal fun JsonObject.cnfJwk(): JWK? {
-    return this["jwk"]?.let {
-        val jsonString = Json.encodeToString(it)
-        JWK.parse(jsonString)
-    }
-}
-
-internal fun Map<String, Any?>.toJsonObject(): JsonObject {
-    val jsonString = JSONObjectUtils.toJSONString(this)
-    return Json.decodeFromString(jsonString)
-}
-
-internal fun JWTClaimsSet.cnf(): JsonObject? {
-    return getJSONObjectClaim("cnf")?.toJsonObject()
 }
 
 internal fun HttpRequestBuilder.clientAttestationHeaders(

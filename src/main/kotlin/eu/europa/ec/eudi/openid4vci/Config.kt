@@ -50,11 +50,6 @@ sealed interface ClientAuthentication : java.io.Serializable {
         val attestationJWT: ClientAttestationJWT,
         val popJwtSpec: ClientAttestationPoPJWTSpec,
     ) : ClientAuthentication {
-        init {
-            require(attestationJWT.clientId.isNotBlank())
-            require(!attestationJWT.publicKey.isPrivate) { "InstanceKey should be public" }
-        }
-
         override val id: ClientId get() = attestationJWT.clientId
     }
 }
