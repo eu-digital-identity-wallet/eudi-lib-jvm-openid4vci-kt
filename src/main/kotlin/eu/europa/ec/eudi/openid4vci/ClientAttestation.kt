@@ -60,6 +60,7 @@ data class ClientAttestationJWT private constructor(val jwt: SignedJWT) {
             jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
             jwt.ensureSignedOrVerified()
             jwt.ensureSignedWithAllowedAlgorithm()
+            jwt.ensureValidClaimsSet<ClientAttestationJWTClaims>()
             return ClientAttestationJWT(jwt)
         }
     }
@@ -208,6 +209,9 @@ private fun SignedJWT.ensureSignedWithAllowedAlgorithm() {
         "Invalid Attestation JWT. Signature algorithm must be one of ${TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS}"
     }
 }
+
+private inline fun <reified T : Any> SignedJWT.ensureValidClaimsSet(): T =
+    jwtClaimsSet.decodeAs<T>().getOrElse { throw IllegalArgumentException("Invalid Attestation JWT. Invalid Claims Set.", it) }
 
 internal fun SignedJWT.ensureSignedNotMAC() {
     ensureSignedOrVerified()
