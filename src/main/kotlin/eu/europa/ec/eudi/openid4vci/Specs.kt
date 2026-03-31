@@ -115,6 +115,13 @@ object RFC7519 {
 object TS3 {
     val WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS: Set<JWSAlgorithm> =
         setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
+
+    const val EUDI_WALLET_INFO: String = "eudi_wallet_info"
+    const val GENERAL_INFO: String = "general_info"
+    const val WALLET_PROVIDER_NAME: String = "wallet_provider_name"
+    const val WALLET_SOLUTION_ID: String = "wallet_solution_id"
+    const val WALLET_SOLUTION_VERSION: String = "wallet_solution_version"
+    const val WALLET_SOLUTION_CERTIFICATION_INFORMATION: String = "wallet_solution_certification_information"
 }
 
 /**
@@ -123,16 +130,4 @@ object TS3 {
 object RFC7800 {
     const val CONFIRMATION: String = "cnf"
     const val JWK: String = "jwk"
-}
-
-/**
- * [Specification of Wallet Unit Attestations (WUA) used in issuance of PID and Attestations](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/main/docs/technical-specifications/ts3-wallet-unit-attestation.md)
- */
-object TS3 {
-    const val EUDI_WALLET_INFO: String = "eudi_wallet_info"
-    const val GENERAL_INFO: String = "general_info"
-    const val WALLET_PROVIDER_NAME: String = "wallet_provider_name"
-    const val WALLET_SOLUTION_ID: String = "wallet_solution_id"
-    const val WALLET_SOLUTION_VERSION: String = "wallet_solution_version"
-    const val WALLET_SOLUTION_CERTIFICATION_INFORMATION: String = "wallet_solution_certification_information"
 }
