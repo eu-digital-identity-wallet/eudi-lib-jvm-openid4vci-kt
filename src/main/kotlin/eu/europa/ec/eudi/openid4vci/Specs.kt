@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
+
 /**
  * [OpenID for Verifiable Credential Issuance](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
  */
@@ -105,4 +107,12 @@ object RFC7519 {
     const val NOT_BEFORE: String = "nbf"
     const val ISSUED_AT: String = "iat"
     const val JWT_ID: String = "jti"
+}
+
+/**
+ * [Specification of Wallet Unit Attestations (WUA) used in issuance of PID and Attestations](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/main/docs/technical-specifications/ts3-wallet-unit-attestation.md)
+ */
+object TS3 {
+    val WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS: Set<JWSAlgorithm> =
+        setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
 }
