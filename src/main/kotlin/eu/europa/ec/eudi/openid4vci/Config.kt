@@ -23,7 +23,6 @@ import com.nimbusds.jose.crypto.RSAEncrypter
 import com.nimbusds.jose.crypto.impl.ContentCryptoProvider
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
-import eu.europa.ec.eudi.openid4vci.ParUsage.*
 import java.net.URI
 import java.time.Clock
 
@@ -69,7 +68,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
  * @param authorizeIssuanceConfig Instruction on how to assemble the authorization request. If scopes are supported
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
- * @param dPoPSigner a signer that if provided will enable the use of DPoP JWT
+ * @param dPoPUsage whether to use DPoP or not
  * @param clientAttestationPoPBuilder a way to build a [ClientAttestationPoPJWT]
  * @param parUsage whether to use PAR in case of authorization code grant
  * @param clock Wallet's clock
@@ -80,7 +79,7 @@ data class OpenId4VCIConfig(
     val authFlowRedirectionURI: URI,
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-    val dPoPSigner: Signer<JWK>? = null,
+    val dPoPUsage: DPoPUsage = DPoPUsage.Never,
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
@@ -95,7 +94,7 @@ data class OpenId4VCIConfig(
         authFlowRedirectionURI: URI,
         encryptionSupportConfig: EncryptionSupportConfig,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-        dPoPSigner: Signer<JWK>? = null,
+        dPoPUsage: DPoPUsage = DPoPUsage.Never,
         clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
@@ -105,7 +104,7 @@ data class OpenId4VCIConfig(
         authFlowRedirectionURI,
         encryptionSupportConfig,
         authorizeIssuanceConfig,
-        dPoPSigner,
+        dPoPUsage,
         clientAttestationPoPBuilder,
         parUsage,
         clock,
@@ -118,6 +117,30 @@ data class OpenId4VCIConfig(
     )
     val clientId: ClientId
         get() = clientAuthentication.id
+}
+
+/**
+ * Wallet's policy regarding DPoP usage.
+ */
+sealed interface DPoPUsage {
+    /**
+     * DPoP is never used.
+     */
+    data object Never : DPoPUsage
+
+    /**
+     * DPoP is used if supported by the Authorization Server.
+     *
+     * @property dPoPSigner a signer that will be used to sign the DPoP Proof JWT
+     */
+    data class IfSupported(val dPoPSigner: Signer<JWK>) : DPoPUsage
+
+    /**
+     * DPoP usage is required. If the Authorization Server doesn't support DPoP, issuance does not proceed.
+     *
+     * @property dPoPSigner a signer that will be used to sign the DPoP Proof JWT
+     */
+    data class Required(val dPoPSigner: Signer<JWK>) : DPoPUsage
 }
 
 /**

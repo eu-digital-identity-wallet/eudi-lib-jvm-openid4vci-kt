@@ -573,7 +573,7 @@ data class OpenId4VCIConfig(
     val authFlowRedirectionURI: URI,
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-    val dPoPSigner: Signer<JWK>? = null,
+    val dPoPUsage: DPoPUsage = DPoPUsage.Never,
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
@@ -588,8 +588,8 @@ Options available:
   - [Attestation-Based Client Authentication](#oauth-20-attestation-based-client-authentication)
 - authFlowRedirectionURI: It is the `redirect_uri` parameter that will be included in a PAR or simple authorization request.
 - encryptionSupportConfig: Wallet supported encryption parameters to be used for Credential Request and Credential Response encryption.
-- authorizeIssuanceConfig: Preference on using `scope` or `authorization_details` during authorization code flow
-- dPoPSigner: An optional way of singing DPoP JWTs. If not provided DPoP is off. If provided, it will be used only if Credential Issuer advertises this feature.
+- authorizeIssuanceConfig: Preference on using `scope` or `authorization_details` during authorization code flow.
+- dPoPUsage: An indication about whether DPoP is never to be used, supported, or required. If Wallet requires DPoP but Credential Issuer doesn't advertise this feature, issuance does not proceed.
 - clientAttestationPoPBuilder: Wallet supported mechanism for creating Client Attestation POP JWTs when using [Attestation-Based Client Authentication](#oauth-20-attestation-based-client-authentication). 
 - parUsage: An indication to not use PAR endpoint or use it if advertised by the credential issuer
 - clock: Wallet/Caller clock.
@@ -643,9 +643,8 @@ Library supports [RFC9449](https://datatracker.ietf.org/doc/html/rfc9449). In ad
 bearer authentication scheme, library can be configured to use DPoP authentication provided
 that the authorization server, that protects the credential issuer, supports this feature as well.
 
-If wallet [configuration](#configuration-options) provides a DPoP Signer and if the credential issuer advertises DPoP with
-algorithms supported by wallet's DPoP Signer, then library will transparently request
-for a DPoP `access_token` instead of the default Bearer token.
+If wallet [configuration](#configuration-options) supports or requires, and if the credential issuer advertises DPoP with
+algorithms supported by wallet's DPoP Signer, then library will transparently request for a DPoP `access_token` instead of the default Bearer token.
 
 Furthermore, all further interactions will use the correct token type (Bearer or DPoP)
 
