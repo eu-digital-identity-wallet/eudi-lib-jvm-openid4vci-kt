@@ -22,6 +22,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.*
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
+import eu.europa.ec.eudi.openid4vci.CredentialReusePolicy.Companion.ARF_ANNEX_II_POLICY_ID
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
@@ -61,15 +62,75 @@ private sealed interface CredentialSupportedTO {
 }
 
 @Serializable
+private data class CredentialReusePolicyOptionTO(
+    @SerialName("details") val details: List<String>,
+    @SerialName("batch_size") val batchSize: Int? = null,
+    @SerialName("reissue_trigger_unused") val reissueTriggerUnused: Int? = null,
+    @SerialName("reissue_trigger_lifetime_left") val reissueTriggerLifetimeLeft: Long? = null,
+) {
+    fun toDomain(): ReusePolicyOption {
+        val methods = details.mapNotNull { ReuseMethod.fromJsonValue(it) }
+        return ReusePolicyOption(
+            details = methods,
+            batchSize = batchSize,
+            reissueTriggerUnused = reissueTriggerUnused,
+            reissueTriggerLifetimeLeft = reissueTriggerLifetimeLeft,
+        )
+    }
+}
+
+@Serializable
+private data class CredentialReusePolicyTO(
+    @SerialName("id") val id: String?,
+    @SerialName("options") val options: List<CredentialReusePolicyOptionTO>? = null,
+) {
+    fun toDomain(): CredentialReusePolicy? = id?.let {
+        CredentialReusePolicy(
+            id = it,
+            options = options?.map { it.toDomain() },
+        )
+    }
+}
+
+@Serializable
 private data class CredentialMetadataTO(
     @SerialName("display") val display: List<CredentialSupportedDisplayTO>? = null,
     @SerialName("claims") val claims: List<ClaimTO>? = null,
+    @Serializable(with = KeepKnownReusePolicies::class)
+    @SerialName("credential_reuse_policy") val credentialReusePolicy: CredentialReusePolicyTO? = null,
 ) {
     fun toDomain(): CredentialMetadata {
         val display = display?.map { it.toDomain() }.orEmpty()
         val claims = claims?.map { it.toDomain() }.orEmpty()
-        return CredentialMetadata(display, claims)
+        return CredentialMetadata(display, claims, credentialReusePolicy?.toDomain())
     }
+}
+
+private object KeepKnownReusePolicies : JsonTransformingSerializer<CredentialReusePolicyTO>(CredentialReusePolicyTO.serializer()) {
+
+    override fun transformDeserialize(element: JsonElement): JsonElement {
+        return if (element.isKnown()) element
+        else {
+            // we return a json object with a null id to satisfy the serializer
+            // while signaling that the policy is unknown
+            buildJsonObject { put("id", JsonNull) }
+        }
+    }
+
+    private val knownPolicies =
+        setOf(
+            ARF_ANNEX_II_POLICY_ID,
+        )
+
+    private fun JsonElement.isKnown(): Boolean =
+        when (this) {
+            is JsonObject -> {
+                val policyId = get("id")?.takeIf { it is JsonPrimitive }?.jsonPrimitive?.contentOrNull
+                policyId != null && policyId in knownPolicies
+            }
+
+            else -> false
+        }
 }
 
 @Serializable

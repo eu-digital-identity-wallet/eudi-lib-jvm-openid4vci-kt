@@ -149,6 +149,7 @@ internal class RequestIssuanceImpl(
 
     private fun ProofsSpecification.ensureCompatibleWith(credentialConfigId: CredentialConfigurationIdentifier) {
         val credentialConfiguration = credentialSupportedById(credentialConfigId)
+        validateReusePolicySupported(credentialConfiguration)
         val proofTypesSupported = credentialConfiguration.proofTypesSupported
 
         when (this) {
@@ -185,6 +186,16 @@ internal class RequestIssuanceImpl(
                     "Credential configuration doesn't support attestation proofs."
                 }
             }
+        }
+    }
+
+    private fun validateReusePolicySupported(credentialConfiguration: CredentialConfiguration) {
+        val reusePolicy = credentialConfiguration.credentialMetadata?.credentialReusePolicy ?: return
+        if (reusePolicy.id != CredentialReusePolicy.ARF_ANNEX_II_POLICY_ID) return
+        val options = reusePolicy.options ?: return
+        val hasSupported = options.any { it.isSupported(config.supportedReuseMethods) }
+        require(hasSupported) {
+            "The configured reuse policy methoods cannot support any of the issuer's supported methods"
         }
     }
 
@@ -242,7 +253,7 @@ internal class RequestIssuanceImpl(
             javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
         }
         return proofsSpecification.proofsSigner.use { operation ->
-            operation.assertMatchesBatchIssuanceBatchSize()
+            operation.assertMatchesBatchIssuanceBatchSize(credentialConfigId)
             val proofsSigner = JwtProofsSigner(joseAlg, operation)
             val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
             proofsSigner.sign(claims).map {
@@ -261,11 +272,19 @@ internal class RequestIssuanceImpl(
         return Proof.Attestation(keyAttestationJwt)
     }
 
-    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize() =
-        when (val popSignersNo = operations.size) {
-            0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
-            1 -> Unit
-            else -> {
+    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize(
+        credentialConfigId: CredentialConfigurationIdentifier,
+    ) = when (val popSignersNo = operations.size) {
+        0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
+        1 -> Unit
+        else -> {
+            val reusePolicyBatchSize = credentialSupportedById(credentialConfigId)
+                .credentialMetadata?.credentialReusePolicy?.effectiveBatchSize(config.supportedReuseMethods)
+            if (reusePolicyBatchSize != null) {
+                ensure(popSignersNo <= reusePolicyBatchSize) {
+                    CredentialIssuanceError.IssuerBatchSizeLimitExceeded(reusePolicyBatchSize)
+                }
+            } else {
                 when (batchCredentialIssuance) {
                     BatchCredentialIssuance.NotSupported -> CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
                     is BatchCredentialIssuance.Supported -> {
@@ -277,6 +296,7 @@ internal class RequestIssuanceImpl(
                 }
             }
         }
+    }
 
     private fun String.toSupportedJoseAlgorithm(credentialConfigId: CredentialConfigurationIdentifier): JWSAlgorithm {
         val proofTypesSupported = credentialSupportedById(credentialConfigId).proofTypesSupported

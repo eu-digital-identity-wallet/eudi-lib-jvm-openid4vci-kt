@@ -26,6 +26,7 @@ import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.assertDoesNotThrow
+import org.junit.jupiter.api.assertNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -346,6 +347,56 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         id = CredentialIssuerId("https://issuer.example.com/tenant").getOrThrow()
         assertEquals("https://issuer.example.com/.well-known/openid-credential-issuer/tenant", id.wellKnown().toString())
+    }
+
+    @Test
+    internal fun `resolution succeeds with credential reuse policy`() = runTest {
+        val credentialIssuerId = SampleIssuer.Id
+
+        val resolver = resolver(
+            credentialIssuerMetaDataHandler(
+                credentialIssuerId,
+                "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy.json",
+            ),
+        )
+        val metaData =
+            assertDoesNotThrow { resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow() }
+
+        val pidMsoMdoc = metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_msoMdoc")]
+        val msoMdocPolicy = pidMsoMdoc?.credentialMetadata?.credentialReusePolicy
+        assertEquals("arf_annex_ii", msoMdocPolicy?.id)
+        assertEquals(1, msoMdocPolicy?.options?.size)
+        assertEquals(
+            listOf(ReuseMethod.LIMITED_TIME, ReuseMethod.ROTATING_BATCH, ReuseMethod.PER_RELYING_PARTY),
+            msoMdocPolicy?.options?.first()?.details,
+        )
+        assertEquals(5, msoMdocPolicy?.options?.first()?.batchSize)
+        assertEquals(655433L, msoMdocPolicy?.options?.first()?.reissueTriggerLifetimeLeft)
+        assertEquals(5, msoMdocPolicy?.effectiveBatchSize(ReuseMethod.entries.toSet()))
+
+        val pidSdJwt = metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_SdJwtVc")]
+        val sdJwtPolicy = pidSdJwt?.credentialMetadata?.credentialReusePolicy
+        assertEquals("arf_annex_ii", sdJwtPolicy?.id)
+        assertEquals(3, sdJwtPolicy?.options?.size)
+        assertEquals(40, sdJwtPolicy?.effectiveBatchSize(ReuseMethod.entries.toSet()))
+    }
+
+    @Test
+    internal fun `resolution succeeds with unknown credential reuse policy`() = runTest {
+        val credentialIssuerId = SampleIssuer.Id
+
+        val resolver = resolver(
+            credentialIssuerMetaDataHandler(
+                credentialIssuerId,
+                "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_unknown_reuse_policy.json",
+            ),
+        )
+        val metaData =
+            assertDoesNotThrow { resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow() }
+
+        val pidMsoMdoc = metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_msoMdoc")]
+        val msoMdocPolicy = pidMsoMdoc?.credentialMetadata?.credentialReusePolicy
+        assertNull(msoMdocPolicy)
     }
 
     @Test
