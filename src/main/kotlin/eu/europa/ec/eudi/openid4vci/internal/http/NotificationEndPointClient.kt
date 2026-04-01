@@ -44,13 +44,13 @@ internal class NotificationEndPointClient(
         retried: Boolean,
     ): Nonce? {
         val url = notificationEndpoint.value
-        val jwt = if (accessToken is AccessToken.DPoP && dPoPJwtFactory != null) {
-            dPoPJwtFactory.createDPoPJwt(Htm.POST, url, accessToken, resourceServerDpopNonce).getOrThrow()
-                .serialize()
+        val dPoPProof = if (accessToken is AccessToken.DPoP) {
+            checkNotNull(dPoPJwtFactory) { "dPoPJwtFactory is required when using DPoP access tokens" }
+            dPoPJwtFactory.createDPoPJwt(Htm.POST, url, accessToken, resourceServerDpopNonce).getOrThrow().serialize()
         } else null
 
         val response = httpClient.post(url) {
-            bearerOrDPoPAuth(accessToken, jwt)
+            bearerOrDPoPAuth(accessToken, dPoPProof)
             contentType(ContentType.Application.Json)
             setBody(NotificationTO.from(event))
         }

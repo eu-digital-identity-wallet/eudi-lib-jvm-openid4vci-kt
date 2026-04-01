@@ -667,9 +667,13 @@ class IssuanceSingleRequestTest {
         val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(AuthServerMetadataVersion.NO_DPOP),
-            parPostMocker(),
+            parPostMocker {
+                assertNull(it.headers["DPoP"])
+            },
             nonceEndpointMocker(),
-            tokenPostMocker(dpopAccessToken = true),
+            tokenPostMocker(dpopAccessToken = false) {
+                assertNull(it.headers["DPoP"])
+            },
             singleIssuanceRequestMocker(
                 requestValidator = {
                     val headers = it.headers

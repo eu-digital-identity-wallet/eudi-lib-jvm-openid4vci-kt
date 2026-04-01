@@ -165,7 +165,7 @@ class DPoPJwtFactory(
  * Utility method to be used to set properly the DPoP header on the request under construction, targeted on the URL passed as [htu].
  * Based on the passed [accessToken] DPoP header will be added if it is of type DPoP.
  */
-fun HttpRequestBuilder.bearerOrDPoPAuth(
+internal fun HttpRequestBuilder.bearerOrDPoPAuth(
     accessToken: AccessToken,
     dpopJwt: String?,
 ) {
@@ -173,13 +173,11 @@ fun HttpRequestBuilder.bearerOrDPoPAuth(
         is AccessToken.Bearer -> {
             bearerAuth(accessToken)
         }
+
         is AccessToken.DPoP -> {
-            if (dpopJwt != null) {
-                header(DPoP, dpopJwt)
-                dpopAuth(accessToken)
-            } else {
-                bearerAuth(AccessToken.Bearer(accessToken.accessToken, accessToken.expiresIn))
-            }
+            checkNotNull(dpopJwt) { "dpopJwt must be provided when using DPoP access tokens" }
+            dpopAuth(accessToken)
+            header(DPoP, dpopJwt)
         }
     }
 }
