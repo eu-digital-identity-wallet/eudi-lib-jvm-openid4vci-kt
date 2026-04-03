@@ -26,7 +26,6 @@ import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.assertDoesNotThrow
-import org.junit.jupiter.api.assertNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -364,21 +363,27 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         val pidMsoMdoc = metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_msoMdoc")]
         val msoMdocPolicy = pidMsoMdoc?.credentialMetadata?.credentialReusePolicy
-        assertEquals("arf_annex_ii", msoMdocPolicy?.id)
-        assertEquals(1, msoMdocPolicy?.options?.size)
+        assertTrue(msoMdocPolicy is CredentialReusePolicy.ArfAnnex2ReusePolicy)
+        assertEquals(1, msoMdocPolicy.options.size)
         assertEquals(
-            listOf(ReuseMethod.LIMITED_TIME, ReuseMethod.ROTATING_BATCH, ReuseMethod.PER_RELYING_PARTY),
-            msoMdocPolicy?.options?.first()?.details,
+            listOf(ArfAnnex2ReuseMethod.LIMITED_TIME, ArfAnnex2ReuseMethod.ROTATING_BATCH, ArfAnnex2ReuseMethod.PER_RELYING_PARTY),
+            msoMdocPolicy.options.first().details,
         )
-        assertEquals(5, msoMdocPolicy?.options?.first()?.batchSize)
-        assertEquals(655433L, msoMdocPolicy?.options?.first()?.reissueTriggerLifetimeLeft)
-        assertEquals(5, msoMdocPolicy?.effectiveBatchSize(ReuseMethod.entries.toSet()))
+        assertEquals(5, msoMdocPolicy.options.first().batchSize)
+        assertEquals(655433L, msoMdocPolicy.options.first().reissueTriggerLifetimeLeft)
+        assertEquals(
+            5,
+            msoMdocPolicy.effectiveBatchSize(setOf(SupportedReusePolicy.ArfAnnex2ReusePolicy(ArfAnnex2ReuseMethod.entries.toSet()))),
+        )
 
         val pidSdJwt = metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_SdJwtVc")]
         val sdJwtPolicy = pidSdJwt?.credentialMetadata?.credentialReusePolicy
-        assertEquals("arf_annex_ii", sdJwtPolicy?.id)
-        assertEquals(3, sdJwtPolicy?.options?.size)
-        assertEquals(40, sdJwtPolicy?.effectiveBatchSize(ReuseMethod.entries.toSet()))
+        assertTrue(sdJwtPolicy is CredentialReusePolicy.ArfAnnex2ReusePolicy)
+        assertEquals(3, sdJwtPolicy.options.size)
+        assertEquals(
+            40,
+            sdJwtPolicy.effectiveBatchSize(setOf(SupportedReusePolicy.ArfAnnex2ReusePolicy(ArfAnnex2ReuseMethod.entries.toSet()))),
+        )
     }
 
     @Test
@@ -396,7 +401,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         val pidMsoMdoc = metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_msoMdoc")]
         val msoMdocPolicy = pidMsoMdoc?.credentialMetadata?.credentialReusePolicy
-        assertNull(msoMdocPolicy)
+        assertEquals(CredentialReusePolicy.None, msoMdocPolicy)
     }
 
     @Test

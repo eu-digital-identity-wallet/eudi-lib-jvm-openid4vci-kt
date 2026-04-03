@@ -191,11 +191,18 @@ internal class RequestIssuanceImpl(
 
     private fun validateReusePolicySupported(credentialConfiguration: CredentialConfiguration) {
         val reusePolicy = credentialConfiguration.credentialMetadata?.credentialReusePolicy ?: return
-        if (reusePolicy.id != CredentialReusePolicy.ARF_ANNEX_II_POLICY_ID) return
-        val options = reusePolicy.options ?: return
-        val hasSupported = options.any { it.isSupported(config.supportedReuseMethods) }
-        require(hasSupported) {
-            "The configured reuse policy methoods cannot support any of the issuer's supported methods"
+        when (reusePolicy) {
+            is CredentialReusePolicy.ArfAnnex2ReusePolicy -> {
+                val supportedMethods = config.supportedCredentialReusePolicies
+                    .filterIsInstance<SupportedReusePolicy.ArfAnnex2ReusePolicy>()
+                    .flatMap { it.supportedReuseMethods }
+                    .toSet()
+                val hasSupported = reusePolicy.options.any { it.isSupported(supportedMethods) }
+                require(hasSupported) {
+                    "The configured reuse policy methods cannot support any of the issuer's supported methods"
+                }
+            }
+            else -> Unit
         }
     }
 
@@ -279,7 +286,7 @@ internal class RequestIssuanceImpl(
         1 -> Unit
         else -> {
             val reusePolicyBatchSize = credentialSupportedById(credentialConfigId)
-                .credentialMetadata?.credentialReusePolicy?.effectiveBatchSize(config.supportedReuseMethods)
+                .credentialMetadata?.credentialReusePolicy?.effectiveBatchSize(config.supportedCredentialReusePolicies)
             if (reusePolicyBatchSize != null) {
                 ensure(popSignersNo <= reusePolicyBatchSize) {
                     CredentialIssuanceError.IssuerBatchSizeLimitExceeded(reusePolicyBatchSize)

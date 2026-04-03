@@ -24,8 +24,8 @@ internal class CredentialReusePolicyTest {
 
     @Test
     fun `once_only option is valid with batch_size and reissue_trigger_unused`() {
-        val option = ReusePolicyOption(
-            details = listOf(ReuseMethod.ONCE_ONLY),
+        val option = ArfAnnex2ReusePolicyOption(
+            details = listOf(ArfAnnex2ReuseMethod.ONCE_ONLY),
             batchSize = 10,
             reissueTriggerUnused = 4,
         )
@@ -36,8 +36,8 @@ internal class CredentialReusePolicyTest {
 
     @Test
     fun `limited_time option is valid with reissue_trigger_lifetime_left`() {
-        val option = ReusePolicyOption(
-            details = listOf(ReuseMethod.LIMITED_TIME),
+        val option = ArfAnnex2ReusePolicyOption(
+            details = listOf(ArfAnnex2ReuseMethod.LIMITED_TIME),
             reissueTriggerLifetimeLeft = 885433,
         )
         assertNull(option.batchSize)
@@ -47,8 +47,12 @@ internal class CredentialReusePolicyTest {
 
     @Test
     fun `limited_time with rotating-batch and per-relying-party is valid`() {
-        val option = ReusePolicyOption(
-            details = listOf(ReuseMethod.LIMITED_TIME, ReuseMethod.ROTATING_BATCH, ReuseMethod.PER_RELYING_PARTY),
+        val option = ArfAnnex2ReusePolicyOption(
+            details = listOf(
+                ArfAnnex2ReuseMethod.LIMITED_TIME,
+                ArfAnnex2ReuseMethod.ROTATING_BATCH,
+                ArfAnnex2ReuseMethod.PER_RELYING_PARTY,
+            ),
             batchSize = 5,
             reissueTriggerLifetimeLeft = 655433,
         )
@@ -58,8 +62,8 @@ internal class CredentialReusePolicyTest {
 
     @Test
     fun `once_only with rotating-batch is valid`() {
-        val option = ReusePolicyOption(
-            details = listOf(ReuseMethod.ONCE_ONLY, ReuseMethod.ROTATING_BATCH),
+        val option = ArfAnnex2ReusePolicyOption(
+            details = listOf(ArfAnnex2ReuseMethod.ONCE_ONLY, ArfAnnex2ReuseMethod.ROTATING_BATCH),
             batchSize = 20,
             reissueTriggerUnused = 5,
             reissueTriggerLifetimeLeft = 100000,
@@ -72,15 +76,15 @@ internal class CredentialReusePolicyTest {
     @Test
     fun `fails when details is empty`() {
         assertFailsWith<IllegalArgumentException> {
-            ReusePolicyOption(details = emptyList())
+            ArfAnnex2ReusePolicyOption(details = emptyList())
         }
     }
 
     @Test
     fun `fails when details has neither once_only nor limited_time`() {
         assertFailsWith<IllegalArgumentException> {
-            ReusePolicyOption(
-                details = listOf(ReuseMethod.ROTATING_BATCH),
+            ArfAnnex2ReusePolicyOption(
+                details = listOf(ArfAnnex2ReuseMethod.ROTATING_BATCH),
                 batchSize = 10,
                 reissueTriggerLifetimeLeft = 100,
             )
@@ -90,8 +94,8 @@ internal class CredentialReusePolicyTest {
     @Test
     fun `fails when details has both once_only and limited_time`() {
         assertFailsWith<IllegalArgumentException> {
-            ReusePolicyOption(
-                details = listOf(ReuseMethod.ONCE_ONLY, ReuseMethod.LIMITED_TIME),
+            ArfAnnex2ReusePolicyOption(
+                details = listOf(ArfAnnex2ReuseMethod.ONCE_ONLY, ArfAnnex2ReuseMethod.LIMITED_TIME),
                 batchSize = 10,
                 reissueTriggerUnused = 2,
                 reissueTriggerLifetimeLeft = 100,
@@ -102,8 +106,8 @@ internal class CredentialReusePolicyTest {
     @Test
     fun `fails when once_only is missing batch_size`() {
         assertFailsWith<IllegalArgumentException> {
-            ReusePolicyOption(
-                details = listOf(ReuseMethod.ONCE_ONLY),
+            ArfAnnex2ReusePolicyOption(
+                details = listOf(ArfAnnex2ReuseMethod.ONCE_ONLY),
                 reissueTriggerUnused = 2,
             )
         }
@@ -112,8 +116,8 @@ internal class CredentialReusePolicyTest {
     @Test
     fun `fails when once_only is missing reissue_trigger_unused`() {
         assertFailsWith<IllegalArgumentException> {
-            ReusePolicyOption(
-                details = listOf(ReuseMethod.ONCE_ONLY),
+            ArfAnnex2ReusePolicyOption(
+                details = listOf(ArfAnnex2ReuseMethod.ONCE_ONLY),
                 batchSize = 10,
             )
         }
@@ -122,8 +126,8 @@ internal class CredentialReusePolicyTest {
     @Test
     fun `fails when reissue_trigger_unused is not lower than batch_size`() {
         assertFailsWith<IllegalArgumentException> {
-            ReusePolicyOption(
-                details = listOf(ReuseMethod.ONCE_ONLY),
+            ArfAnnex2ReusePolicyOption(
+                details = listOf(ArfAnnex2ReuseMethod.ONCE_ONLY),
                 batchSize = 10,
                 reissueTriggerUnused = 10,
             )
@@ -133,8 +137,8 @@ internal class CredentialReusePolicyTest {
     @Test
     fun `fails when limited_time is missing reissue_trigger_lifetime_left`() {
         assertFailsWith<IllegalArgumentException> {
-            ReusePolicyOption(
-                details = listOf(ReuseMethod.LIMITED_TIME),
+            ArfAnnex2ReusePolicyOption(
+                details = listOf(ArfAnnex2ReuseMethod.LIMITED_TIME),
             )
         }
     }
@@ -142,48 +146,39 @@ internal class CredentialReusePolicyTest {
     @Test
     fun `fails when rotating-batch is missing batch_size`() {
         assertFailsWith<IllegalArgumentException> {
-            ReusePolicyOption(
-                details = listOf(ReuseMethod.LIMITED_TIME, ReuseMethod.ROTATING_BATCH),
+            ArfAnnex2ReusePolicyOption(
+                details = listOf(ArfAnnex2ReuseMethod.LIMITED_TIME, ArfAnnex2ReuseMethod.ROTATING_BATCH),
                 reissueTriggerLifetimeLeft = 100,
             )
         }
     }
 
     @Test
-    fun `CredentialReusePolicy with arf_annex_ii requires non-empty options`() {
+    fun `ArfAnnex2ReusePolicy requires non-empty options`() {
         assertFailsWith<IllegalArgumentException> {
-            CredentialReusePolicy(id = "arf_annex_ii", options = emptyList())
+            CredentialReusePolicy.ArfAnnex2ReusePolicy(options = emptyList())
         }
     }
 
     @Test
-    fun `CredentialReusePolicy with arf_annex_ii requires options present`() {
-        assertFailsWith<IllegalArgumentException> {
-            CredentialReusePolicy(id = "arf_annex_ii", options = null)
-        }
+    fun `CredentialReusePolicy None has no effective batch size`() {
+        val policy = CredentialReusePolicy.None
+        assertNull(policy.effectiveBatchSize(setOf(SupportedReusePolicy.ArfAnnex2ReusePolicy(ArfAnnex2ReuseMethod.entries.toSet()))))
     }
 
     @Test
-    fun `CredentialReusePolicy with non-arf id allows no options`() {
-        val policy = CredentialReusePolicy(id = "custom_policy")
-        assertEquals("custom_policy", policy.id)
-        assertNull(policy.options)
-    }
-
-    @Test
-    fun `CredentialReusePolicy fails with overlapping details across options`() {
+    fun `ArfAnnex2ReusePolicy fails with overlapping details across options`() {
         assertFailsWith<IllegalArgumentException> {
-            CredentialReusePolicy(
-                id = "arf_annex_ii",
+            CredentialReusePolicy.ArfAnnex2ReusePolicy(
                 options = listOf(
-                    ReusePolicyOption(
-                        details = listOf(ReuseMethod.ONCE_ONLY, ReuseMethod.ROTATING_BATCH),
+                    ArfAnnex2ReusePolicyOption(
+                        details = listOf(ArfAnnex2ReuseMethod.ONCE_ONLY, ArfAnnex2ReuseMethod.ROTATING_BATCH),
                         batchSize = 10,
                         reissueTriggerUnused = 4,
                         reissueTriggerLifetimeLeft = 100,
                     ),
-                    ReusePolicyOption(
-                        details = listOf(ReuseMethod.ROTATING_BATCH, ReuseMethod.ONCE_ONLY),
+                    ArfAnnex2ReusePolicyOption(
+                        details = listOf(ArfAnnex2ReuseMethod.ROTATING_BATCH, ArfAnnex2ReuseMethod.ONCE_ONLY),
                         batchSize = 20,
                         reissueTriggerUnused = 5,
                         reissueTriggerLifetimeLeft = 200,
@@ -194,79 +189,85 @@ internal class CredentialReusePolicyTest {
     }
 
     @Test
-    fun `CredentialReusePolicy with multiple non-overlapping options is valid`() {
-        val policy = CredentialReusePolicy(
-            id = "arf_annex_ii",
+    fun `ArfAnnex2ReusePolicy with multiple non-overlapping options is valid`() {
+        val policy = CredentialReusePolicy.ArfAnnex2ReusePolicy(
             options = listOf(
-                ReusePolicyOption(
-                    details = listOf(ReuseMethod.ONCE_ONLY),
+                ArfAnnex2ReusePolicyOption(
+                    details = listOf(ArfAnnex2ReuseMethod.ONCE_ONLY),
                     batchSize = 10,
                     reissueTriggerUnused = 4,
                 ),
-                ReusePolicyOption(
-                    details = listOf(ReuseMethod.ONCE_ONLY, ReuseMethod.ROTATING_BATCH),
+                ArfAnnex2ReusePolicyOption(
+                    details = listOf(ArfAnnex2ReuseMethod.ONCE_ONLY, ArfAnnex2ReuseMethod.ROTATING_BATCH),
                     batchSize = 20,
                     reissueTriggerUnused = 5,
                     reissueTriggerLifetimeLeft = 100,
                 ),
             ),
         )
-        assertEquals(2, policy.options!!.size)
+        assertEquals(2, policy.options.size)
     }
 
     @Test
     fun `effectiveBatchSize returns first batch_size from supported options`() {
-        val policy = CredentialReusePolicy(
-            id = "arf_annex_ii",
+        val policy = CredentialReusePolicy.ArfAnnex2ReusePolicy(
             options = listOf(
-                ReusePolicyOption(
-                    details = listOf(ReuseMethod.LIMITED_TIME, ReuseMethod.ROTATING_BATCH),
+                ArfAnnex2ReusePolicyOption(
+                    details = listOf(ArfAnnex2ReuseMethod.LIMITED_TIME, ArfAnnex2ReuseMethod.ROTATING_BATCH),
                     batchSize = 5,
                     reissueTriggerLifetimeLeft = 885433,
                 ),
-                ReusePolicyOption(
-                    details = listOf(ReuseMethod.ONCE_ONLY),
+                ArfAnnex2ReusePolicyOption(
+                    details = listOf(ArfAnnex2ReuseMethod.ONCE_ONLY),
                     batchSize = 10,
                     reissueTriggerUnused = 4,
                 ),
             ),
         )
         // If ROTATING_BATCH is not supported, it should pick the second one
-        assertEquals(10, policy.effectiveBatchSize(setOf(ReuseMethod.ONCE_ONLY)))
+        assertEquals(10, policy.effectiveBatchSize(setOf(SupportedReusePolicy.ArfAnnex2ReusePolicy(setOf(ArfAnnex2ReuseMethod.ONCE_ONLY)))))
 
         // If ROTATING_BATCH is supported, it should pick the first one
-        assertEquals(5, policy.effectiveBatchSize(setOf(ReuseMethod.LIMITED_TIME, ReuseMethod.ROTATING_BATCH)))
+        assertEquals(
+            5,
+            policy.effectiveBatchSize(
+                setOf(
+                    SupportedReusePolicy.ArfAnnex2ReusePolicy(
+                        setOf(ArfAnnex2ReuseMethod.LIMITED_TIME, ArfAnnex2ReuseMethod.ROTATING_BATCH),
+                    ),
+                ),
+            ),
+        )
     }
 
     @Test
     fun `effectiveBatchSize returns null when no batch_size present in supported options`() {
-        val policy = CredentialReusePolicy(
-            id = "arf_annex_ii",
+        val policy = CredentialReusePolicy.ArfAnnex2ReusePolicy(
             options = listOf(
-                ReusePolicyOption(
-                    details = listOf(ReuseMethod.LIMITED_TIME),
+                ArfAnnex2ReusePolicyOption(
+                    details = listOf(ArfAnnex2ReuseMethod.LIMITED_TIME),
                     reissueTriggerLifetimeLeft = 885433,
                 ),
-                ReusePolicyOption(
-                    details = listOf(ReuseMethod.ONCE_ONLY),
+                ArfAnnex2ReusePolicyOption(
+                    details = listOf(ArfAnnex2ReuseMethod.ONCE_ONLY),
                     batchSize = 10,
                     reissueTriggerUnused = 4,
                 ),
             ),
         )
         // Only LIMITED_TIME is supported, which doesn't have batch_size
-        assertNull(policy.effectiveBatchSize(setOf(ReuseMethod.LIMITED_TIME)))
+        assertNull(policy.effectiveBatchSize(setOf(SupportedReusePolicy.ArfAnnex2ReusePolicy(setOf(ArfAnnex2ReuseMethod.LIMITED_TIME)))))
     }
 
     @Test
     fun `ArfReuseMethod jsonValue round-trip`() {
-        for (method in ReuseMethod.entries) {
-            assertEquals(method, ReuseMethod.fromJsonValue(method.jsonValue))
+        for (method in ArfAnnex2ReuseMethod.entries) {
+            assertEquals(method, ArfAnnex2ReuseMethod.fromJsonValue(method.jsonValue))
         }
     }
 
     @Test
     fun `ArfReuseMethod fromJsonValue returns null for unknown`() {
-        assertNull(ReuseMethod.fromJsonValue("unknown_method"))
+        assertNull(ArfAnnex2ReuseMethod.fromJsonValue("unknown_method"))
     }
 }

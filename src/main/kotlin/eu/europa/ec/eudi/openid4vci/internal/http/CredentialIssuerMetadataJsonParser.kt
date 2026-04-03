@@ -22,7 +22,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.*
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
-import eu.europa.ec.eudi.openid4vci.CredentialReusePolicy.Companion.ARF_ANNEX_II_POLICY_ID
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
@@ -62,34 +61,36 @@ private sealed interface CredentialSupportedTO {
 }
 
 @Serializable
-private data class CredentialReusePolicyOptionTO(
-    @SerialName("details") val details: List<String>,
+private data class ArfAnnex2CredentialReusePolicyOptionTO(
+    @SerialName("details") @Required val details: List<String>,
     @SerialName("batch_size") val batchSize: Int? = null,
     @SerialName("reissue_trigger_unused") val reissueTriggerUnused: Int? = null,
     @SerialName("reissue_trigger_lifetime_left") val reissueTriggerLifetimeLeft: Long? = null,
 ) {
-    fun toDomain(): ReusePolicyOption {
-        val methods = details.mapNotNull { ReuseMethod.fromJsonValue(it) }
-        return ReusePolicyOption(
-            details = methods,
+    fun toDomain(): ArfAnnex2ReusePolicyOption =
+        ArfAnnex2ReusePolicyOption(
+            details = details.mapNotNull { ArfAnnex2ReuseMethod.fromJsonValue(it) },
             batchSize = batchSize,
             reissueTriggerUnused = reissueTriggerUnused,
             reissueTriggerLifetimeLeft = reissueTriggerLifetimeLeft,
         )
-    }
 }
 
 @Serializable
 private data class CredentialReusePolicyTO(
-    @SerialName("id") val id: String?,
-    @SerialName("options") val options: List<CredentialReusePolicyOptionTO>? = null,
+    @SerialName("id") @Required val id: String,
+    @SerialName("options") val options: List<JsonElement>? = null,
 ) {
-    fun toDomain(): CredentialReusePolicy? = id?.let {
-        CredentialReusePolicy(
-            id = it,
-            options = options?.map { it.toDomain() },
-        )
-    }
+    fun toDomain(): CredentialReusePolicy =
+        when (id) {
+            CredentialReusePolicy.ArfAnnex2ReusePolicy.ID -> {
+                val parsed = options?.map {
+                    JsonSupport.decodeFromJsonElement<ArfAnnex2CredentialReusePolicyOptionTO>(it).toDomain()
+                }.orEmpty()
+                CredentialReusePolicy.ArfAnnex2ReusePolicy(parsed)
+            }
+            else -> CredentialReusePolicy.None
+        }
 }
 
 @Serializable
@@ -102,24 +103,23 @@ private data class CredentialMetadataTO(
     fun toDomain(): CredentialMetadata {
         val display = display?.map { it.toDomain() }.orEmpty()
         val claims = claims?.map { it.toDomain() }.orEmpty()
-        return CredentialMetadata(display, claims, credentialReusePolicy?.toDomain())
+        val reusePolicy = credentialReusePolicy?.toDomain() ?: CredentialReusePolicy.None
+        return CredentialMetadata(display, claims, reusePolicy)
     }
 }
 
 private object KeepKnownReusePolicies : JsonTransformingSerializer<CredentialReusePolicyTO>(CredentialReusePolicyTO.serializer()) {
 
     override fun transformDeserialize(element: JsonElement): JsonElement {
+        // For unknown policies, replace with a JSON object whose id won't match
+        // any known policy, so toDomain() will map it to CredentialReusePolicy.None
         return if (element.isKnown()) element
-        else {
-            // we return a json object with a null id to satisfy the serializer
-            // while signaling that the policy is unknown
-            buildJsonObject { put("id", JsonNull) }
-        }
+        else buildJsonObject { put("id", "unknown") }
     }
 
     private val knownPolicies =
         setOf(
-            ARF_ANNEX_II_POLICY_ID,
+            CredentialReusePolicy.ArfAnnex2ReusePolicy.ID,
         )
 
     private fun JsonElement.isKnown(): Boolean =
