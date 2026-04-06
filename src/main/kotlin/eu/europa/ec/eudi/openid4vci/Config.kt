@@ -111,6 +111,58 @@ data class OpenId4VCIConfig(
         issuerMetadataPolicy,
     )
 
+    /**
+     * Creates a new [OpenId4VCIConfig] instance for a Wallet.
+     */
+    @Deprecated(message = "Replace with the constructor that uses DPoPUsage.")
+    constructor (
+        clientAuthentication: ClientAuthentication,
+        authFlowRedirectionURI: URI,
+        encryptionSupportConfig: EncryptionSupportConfig,
+        authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+        dPoPSigner: Signer<JWK>? = null,
+        clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
+        parUsage: ParUsage = ParUsage.IfSupported,
+        clock: Clock = Clock.systemDefaultZone(),
+        issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+    ) : this (
+        clientAuthentication,
+        authFlowRedirectionURI,
+        encryptionSupportConfig,
+        authorizeIssuanceConfig,
+        dPoPSigner?.let { DPoPUsage.IfSupported(it) } ?: DPoPUsage.Never,
+        clientAttestationPoPBuilder,
+        parUsage,
+        clock,
+        issuerMetadataPolicy,
+    )
+
+    /**
+     * Creates a new [OpenId4VCIConfig] instance for a Wallet that uses [a Public OAuth 2.0 Client][ClientAuthentication.None].
+     */
+    @Deprecated(message = "Replace with the constructor that uses DPoPUsage.")
+    constructor(
+        clientId: ClientId,
+        authFlowRedirectionURI: URI,
+        encryptionSupportConfig: EncryptionSupportConfig,
+        authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+        dPoPSigner: Signer<JWK>? = null,
+        clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
+        parUsage: ParUsage = ParUsage.IfSupported,
+        clock: Clock = Clock.systemDefaultZone(),
+        issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+    ) : this(
+        ClientAuthentication.None(clientId),
+        authFlowRedirectionURI,
+        encryptionSupportConfig,
+        authorizeIssuanceConfig,
+        dPoPSigner?.let { DPoPUsage.IfSupported(it) } ?: DPoPUsage.Never,
+        clientAttestationPoPBuilder,
+        parUsage,
+        clock,
+        issuerMetadataPolicy,
+    )
+
     @Deprecated(
         message = "Deprecated in favor of openId4VCIConfig clientAuthentication.id",
         replaceWith = ReplaceWith("clientAuthentication.id"),
