@@ -29,6 +29,7 @@ import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 internal class DefaultCredentialIssuerMetadataResolverTest {
@@ -364,13 +365,14 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         val pidMsoMdoc = metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_msoMdoc")]
         val msoMdocPolicy = pidMsoMdoc?.credentialMetadata?.credentialReusePolicy
         assertTrue(msoMdocPolicy is CredentialReusePolicy.ArfAnnex2ReusePolicy)
-        assertEquals(1, msoMdocPolicy.options.size)
-        assertEquals(
-            listOf(ArfAnnex2ReuseMethod.LIMITED_TIME, ArfAnnex2ReuseMethod.ROTATING_BATCH, ArfAnnex2ReuseMethod.PER_RELYING_PARTY),
-            msoMdocPolicy.options.first().details,
-        )
-        assertEquals(5, msoMdocPolicy.options.first().batchSize)
-        assertEquals(655433L, msoMdocPolicy.options.first().reissueTriggerLifetimeLeft)
+        assertEquals(3, msoMdocPolicy.options.size)
+        assertIs<ArfAnnex2ReusePolicyOption.LimitedTime>(msoMdocPolicy.options[0])
+        val msoMdocRotatingBatch = assertIs<ArfAnnex2ReusePolicyOption.RotatingBatch>(msoMdocPolicy.options[1])
+        assertEquals(5, msoMdocRotatingBatch.batchSize)
+        assertEquals(655433L, msoMdocRotatingBatch.reissueTriggerLifetimeLeft)
+        val msoMdocOption = assertIs<ArfAnnex2ReusePolicyOption.PerRelyingParty>(msoMdocPolicy.options[2])
+        assertEquals(5, msoMdocOption.batchSize)
+        assertEquals(655433L, msoMdocOption.reissueTriggerLifetimeLeft)
         assertEquals(
             5,
             msoMdocPolicy.effectiveBatchSize(setOf(SupportedReusePolicy.ArfAnnex2ReusePolicy(ArfAnnex2ReuseMethod.entries.toSet()))),
@@ -379,7 +381,18 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         val pidSdJwt = metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_SdJwtVc")]
         val sdJwtPolicy = pidSdJwt?.credentialMetadata?.credentialReusePolicy
         assertTrue(sdJwtPolicy is CredentialReusePolicy.ArfAnnex2ReusePolicy)
-        assertEquals(3, sdJwtPolicy.options.size)
+        assertEquals(4, sdJwtPolicy.options.size)
+        assertIs<ArfAnnex2ReusePolicyOption.LimitedTime>(sdJwtPolicy.options[0])
+        val sdJwtRotatingBatch = assertIs<ArfAnnex2ReusePolicyOption.RotatingBatch>(sdJwtPolicy.options[1])
+        assertEquals(40, sdJwtRotatingBatch.batchSize)
+        assertEquals(655433L, sdJwtRotatingBatch.reissueTriggerLifetimeLeft)
+        val sdJwtOnceOnly = assertIs<ArfAnnex2ReusePolicyOption.OnceOnly>(sdJwtPolicy.options[2])
+        assertEquals(60, sdJwtOnceOnly.batchSize)
+        assertEquals(10, sdJwtOnceOnly.reissueTriggerUnused)
+        val sdJwtPerRelyingParty = assertIs<ArfAnnex2ReusePolicyOption.PerRelyingParty>(sdJwtPolicy.options[3])
+        assertEquals(60, sdJwtPerRelyingParty.batchSize)
+        assertEquals(10, sdJwtPerRelyingParty.reissueTriggerUnused)
+        assertEquals(777543L, sdJwtPerRelyingParty.reissueTriggerLifetimeLeft)
         assertEquals(
             40,
             sdJwtPolicy.effectiveBatchSize(setOf(SupportedReusePolicy.ArfAnnex2ReusePolicy(ArfAnnex2ReuseMethod.entries.toSet()))),

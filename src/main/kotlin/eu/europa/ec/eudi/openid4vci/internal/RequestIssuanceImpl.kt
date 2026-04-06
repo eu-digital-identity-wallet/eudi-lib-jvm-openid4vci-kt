@@ -199,7 +199,7 @@ internal class RequestIssuanceImpl(
                     .toSet()
                 val hasSupported = reusePolicy.options.any { it.isSupported(supportedMethods) }
                 require(hasSupported) {
-                    "The configured reuse policy methods cannot support any of the issuer's supported methods"
+                    "The configured credential reuse policies cannot support the credential's reuse policy."
                 }
             }
             else -> Unit

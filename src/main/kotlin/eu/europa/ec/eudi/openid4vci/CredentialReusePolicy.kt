@@ -33,67 +33,171 @@ enum class ArfAnnex2ReuseMethod {
         }
 
     companion object {
-        fun fromJsonValue(value: String): ArfAnnex2ReuseMethod? = entries.firstOrNull { it.jsonValue == value }
+        fun fromJsonValue(value: String): ArfAnnex2ReuseMethod =
+            entries.firstOrNull { it.jsonValue == value }
+                ?: throw IllegalArgumentException("Unsupported arf_annex_ii reuse method: $value")
     }
 }
 
 /**
  * A single option in the reuse policy.
- *
- * @param details the reuse methods for this option; must contain either [ArfAnnex2ReuseMethod.ONCE_ONLY] or [ArfAnnex2ReuseMethod.LIMITED_TIME] (but not both)
- * @param batchSize the size of the batch during issuance (required if details contains once_only, rotating-batch, or per-relying-party)
- * @param reissueTriggerUnused lower limit of unused attestations that triggers re-issuance (required if details contains once_only)
- * @param reissueTriggerLifetimeLeft seconds before expiration that triggers re-issuance (required if details contains limited_time, rotating-batch, or per-relying-party)
  */
-data class ArfAnnex2ReusePolicyOption(
-    val details: List<ArfAnnex2ReuseMethod>,
-    val batchSize: Int? = null,
-    val reissueTriggerUnused: Int? = null,
-    val reissueTriggerLifetimeLeft: Long? = null,
-) : Serializable {
+sealed interface ArfAnnex2ReusePolicyOption : Serializable {
 
-    init {
-        val hasOnceOnly = ArfAnnex2ReuseMethod.ONCE_ONLY in details
-        val hasLimitedTime = ArfAnnex2ReuseMethod.LIMITED_TIME in details
-        val hasRotatingBatch = ArfAnnex2ReuseMethod.ROTATING_BATCH in details
-        val hasPerRelyingParty = ArfAnnex2ReuseMethod.PER_RELYING_PARTY in details
+    val batchSize: Int?
+    val reissueTriggerUnused: Int?
+    val reissueTriggerLifetimeLeft: Long?
 
-        require(details.isNotEmpty()) { "details must not be empty" }
-        require(hasOnceOnly || hasLimitedTime) {
-            "details must contain either once_only or limited_time"
-        }
-        require(!(hasOnceOnly && hasLimitedTime)) {
-            "details must not contain both once_only and limited_time"
-        }
+    /**
+     * Checks if the client supports this reuse policy option.
+     */
+    fun isSupported(supportedReuseMethods: Set<ArfAnnex2ReuseMethod>): Boolean
 
-        val requiresBatchSize = hasOnceOnly || hasRotatingBatch || hasPerRelyingParty
-        if (requiresBatchSize) {
-            requireNotNull(batchSize) { "batch_size is required when details contains once_only, rotating-batch, or per-relying-party" }
-            require(batchSize > 0) { "batch_size must be greater than 0" }
+    data class OnceOnly(
+        override val batchSize: Int,
+        override val reissueTriggerUnused: Int,
+    ) : ArfAnnex2ReusePolicyOption {
+
+        init {
+            validateBatchSize(batchSize)
+            validateReissueTriggerUnused(reissueTriggerUnused, batchSize)
         }
 
-        if (hasOnceOnly) {
-            requireNotNull(reissueTriggerUnused) { "reissue_trigger_unused is required when details contains once_only" }
+        override fun isSupported(supportedReuseMethods: Set<ArfAnnex2ReuseMethod>): Boolean =
+            supportedReuseMethods.contains(ArfAnnex2ReuseMethod.ONCE_ONLY)
+
+        override val reissueTriggerLifetimeLeft: Long? = null
+    }
+
+    data class LimitedTime(
+        override val reissueTriggerLifetimeLeft: Long,
+    ) : ArfAnnex2ReusePolicyOption {
+
+        init {
+            validateReissueTriggerLifetimeLeft(reissueTriggerLifetimeLeft)
+        }
+
+        override fun isSupported(supportedReuseMethods: Set<ArfAnnex2ReuseMethod>): Boolean =
+            supportedReuseMethods.contains(ArfAnnex2ReuseMethod.LIMITED_TIME)
+
+        override val reissueTriggerUnused: Int? = null
+        override val batchSize: Int? = null
+    }
+
+    data class RotatingBatch(
+        override val batchSize: Int,
+        override val reissueTriggerLifetimeLeft: Long,
+    ) : ArfAnnex2ReusePolicyOption {
+
+        init {
+            validateBatchSize(batchSize)
+            validateReissueTriggerLifetimeLeft(reissueTriggerLifetimeLeft)
+        }
+
+        override val reissueTriggerUnused: Int? = null
+
+        override fun isSupported(supportedReuseMethods: Set<ArfAnnex2ReuseMethod>): Boolean =
+            supportedReuseMethods.contains(ArfAnnex2ReuseMethod.ROTATING_BATCH)
+    }
+
+    data class PerRelyingParty(
+        override val batchSize: Int,
+        override val reissueTriggerLifetimeLeft: Long,
+        override val reissueTriggerUnused: Int,
+    ) : ArfAnnex2ReusePolicyOption {
+
+        init {
+            validateBatchSize(batchSize)
+            validateReissueTriggerLifetimeLeft(reissueTriggerLifetimeLeft)
+            validateReissueTriggerUnused(reissueTriggerUnused, batchSize)
+        }
+
+        override fun isSupported(supportedReuseMethods: Set<ArfAnnex2ReuseMethod>): Boolean =
+            supportedReuseMethods.contains(ArfAnnex2ReuseMethod.PER_RELYING_PARTY)
+    }
+
+    companion object {
+        fun fromDetails(
+            details: List<ArfAnnex2ReuseMethod>,
+            batchSize: Int? = null,
+            reissueTriggerUnused: Int? = null,
+            reissueTriggerLifetimeLeft: Long? = null,
+        ): List<ArfAnnex2ReusePolicyOption> {
+            val normalizedDetails = details.distinct()
+
+            require(normalizedDetails.isNotEmpty()) { "details must not be empty" }
+            require(normalizedDetails.size == details.size) {
+                "details must not contain duplicate values"
+            }
+            validateBaseMethodCombination(normalizedDetails)
+
+            return normalizedDetails.map { detail ->
+                when (detail) {
+                    ArfAnnex2ReuseMethod.ONCE_ONLY -> OnceOnly(
+                        batchSize = requireNotNull(batchSize) {
+                            "batch_size is required when details contains once_only, rotating-batch, or per-relying-party"
+                        },
+                        reissueTriggerUnused = requireNotNull(reissueTriggerUnused) {
+                            "reissue_trigger_unused is required when details contains once_only"
+                        },
+                    )
+
+                    ArfAnnex2ReuseMethod.LIMITED_TIME -> LimitedTime(
+                        reissueTriggerLifetimeLeft = requireNotNull(reissueTriggerLifetimeLeft) {
+                            "reissue_trigger_lifetime_left is required when details contains limited_time, " +
+                                "rotating-batch, or per-relying-party"
+                        },
+                    )
+
+                    ArfAnnex2ReuseMethod.ROTATING_BATCH -> RotatingBatch(
+                        batchSize = requireNotNull(batchSize) {
+                            "batch_size is required when details contains once_only, rotating-batch, or per-relying-party"
+                        },
+                        reissueTriggerLifetimeLeft = requireNotNull(reissueTriggerLifetimeLeft) {
+                            "reissue_trigger_lifetime_left is required when details contains limited_time, " +
+                                "rotating-batch, or per-relying-party"
+                        },
+                    )
+
+                    ArfAnnex2ReuseMethod.PER_RELYING_PARTY -> PerRelyingParty(
+                        batchSize = requireNotNull(batchSize) {
+                            "batch_size is required when details contains once_only, " +
+                                "rotating-batch, or per-relying-party"
+                        },
+                        reissueTriggerLifetimeLeft = requireNotNull(reissueTriggerLifetimeLeft) {
+                            "reissue_trigger_lifetime_left is required when details contains limited_time, " +
+                                "rotating-batch, or per-relying-party"
+                        },
+                        reissueTriggerUnused = requireNotNull(reissueTriggerUnused) {
+                            "reissue_trigger_unused is required when details contains once_only or per-relying-party"
+                        },
+                    )
+                }
+            }
+        }
+
+        private fun validateBaseMethodCombination(details: List<ArfAnnex2ReuseMethod>) {
+            val hasOnceOnly = ArfAnnex2ReuseMethod.ONCE_ONLY in details
+            val hasLimitedTime = ArfAnnex2ReuseMethod.LIMITED_TIME in details
+
+            require(hasOnceOnly.xor(hasLimitedTime)) {
+                "details must contain exactly one base method: once_only or limited_time"
+            }
+        }
+
+        private fun validateBatchSize(batchSize: Int) {
+            require(batchSize > 1) { "batch_size must be greater than 1" }
+        }
+
+        private fun validateReissueTriggerUnused(reissueTriggerUnused: Int, batchSize: Int) {
             require(reissueTriggerUnused >= 0) { "reissue_trigger_unused must be non-negative" }
-            if (batchSize != null) {
-                require(reissueTriggerUnused < batchSize) { "reissue_trigger_unused must be lower than batch_size" }
-            }
+            require(reissueTriggerUnused < batchSize) { "reissue_trigger_unused must be lower than batch_size" }
         }
 
-        val requiresLifetimeLeft = hasLimitedTime || hasRotatingBatch || hasPerRelyingParty
-        if (requiresLifetimeLeft) {
-            requireNotNull(reissueTriggerLifetimeLeft) {
-                "reissue_trigger_lifetime_left is required when details contains limited_time, rotating-batch, or per-relying-party"
-            }
+        private fun validateReissueTriggerLifetimeLeft(reissueTriggerLifetimeLeft: Long) {
             require(reissueTriggerLifetimeLeft > 0) { "reissue_trigger_lifetime_left must be greater than 0" }
         }
     }
-
-    /**
-     * Checks if this reuse policy option is supported by the client.
-     */
-    fun isSupported(supportedReuseMethods: Set<ArfAnnex2ReuseMethod>): Boolean =
-        details.all { it in supportedReuseMethods }
 }
 
 /**
@@ -166,13 +270,9 @@ sealed interface CredentialReusePolicy : Serializable {
 
             private fun validateNoOverlappingDetails(options: List<ArfAnnex2ReusePolicyOption>) {
                 if (options.size <= 1) return
-                val normalizedDetailsCombinations = options.map { option ->
-                    option.details
-                        .sortedBy(ArfAnnex2ReuseMethod::name)
-                        .joinToString(separator = "|") { it.name }
-                }
-                require(normalizedDetailsCombinations.size == normalizedDetailsCombinations.toSet().size) {
-                    "When multiple policy options are defined, the values in the respective details attribute must be unique"
+                val optionTypes = options.map { it::class }
+                require(optionTypes.size == optionTypes.toSet().size) {
+                    "When multiple policy options are defined, each ArfAnnex2ReusePolicyOption type must be unique"
                 }
             }
         }

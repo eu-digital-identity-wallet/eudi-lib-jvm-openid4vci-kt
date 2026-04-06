@@ -67,9 +67,9 @@ private data class ArfAnnex2CredentialReusePolicyOptionTO(
     @SerialName("reissue_trigger_unused") val reissueTriggerUnused: Int? = null,
     @SerialName("reissue_trigger_lifetime_left") val reissueTriggerLifetimeLeft: Long? = null,
 ) {
-    fun toDomain(): ArfAnnex2ReusePolicyOption =
-        ArfAnnex2ReusePolicyOption(
-            details = details.mapNotNull { ArfAnnex2ReuseMethod.fromJsonValue(it) },
+    fun toDomain(): List<ArfAnnex2ReusePolicyOption> =
+        ArfAnnex2ReusePolicyOption.fromDetails(
+            details = details.map { ArfAnnex2ReuseMethod.fromJsonValue(it) },
             batchSize = batchSize,
             reissueTriggerUnused = reissueTriggerUnused,
             reissueTriggerLifetimeLeft = reissueTriggerLifetimeLeft,
@@ -84,7 +84,7 @@ private data class CredentialReusePolicyTO(
     fun toDomain(): CredentialReusePolicy =
         when (id) {
             CredentialReusePolicy.ArfAnnex2ReusePolicy.ID -> {
-                val parsed = options?.map {
+                val parsed = options?.flatMap {
                     JsonSupport.decodeFromJsonElement<ArfAnnex2CredentialReusePolicyOptionTO>(it).toDomain()
                 }.orEmpty()
                 CredentialReusePolicy.ArfAnnex2ReusePolicy(parsed)
