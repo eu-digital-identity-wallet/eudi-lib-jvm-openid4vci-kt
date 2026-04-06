@@ -76,7 +76,15 @@ data class AuthorizedTransaction(
 data class DeferredIssuanceContext(
     val config: DeferredIssuerConfig,
     val authorizedTransaction: AuthorizedTransaction,
-)
+) {
+    init {
+        if (authorizedTransaction.authorizedRequest.accessToken !is AccessToken.DPoP) {
+            requireNotNull(config.dPoPSigner) {
+                "config.dPoPSigner is required when DPoP access tokens are used"
+            }
+        }
+    }
+}
 
 /**
  * A specialized issuer with the capability to [QueryForDeferredCredential]
