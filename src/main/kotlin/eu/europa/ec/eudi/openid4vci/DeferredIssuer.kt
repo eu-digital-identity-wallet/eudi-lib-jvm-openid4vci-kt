@@ -78,8 +78,10 @@ data class DeferredIssuanceContext(
     val authorizedTransaction: AuthorizedTransaction,
 ) {
     init {
-        require(authorizedTransaction.authorizedRequest.accessToken !is AccessToken.DPoP || null != config.dPoPSigner) {
-            "config.dPoPSigner is required when DPoP access tokens are used"
+        if (authorizedTransaction.authorizedRequest.accessToken !is AccessToken.DPoP) {
+            requireNotNull(config.dPoPSigner) {
+                "config.dPoPSigner is required when DPoP access tokens are used"
+            }
         }
     }
 }
