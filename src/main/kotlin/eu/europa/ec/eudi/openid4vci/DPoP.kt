@@ -94,52 +94,69 @@ class DPoPJwtFactory(
     companion object {
 
         /**
-         * Tries to create a [DPoPJwtFactory] given a [signer] and the [oauthServerMetadata]
+         * Tries to create a [DPoPJwtFactory] given a [dPoPUsage] and the [oauthServerMetadata]
          * of the OAuth 2.0 authorization server.
          *
-         * The factory will be created in case the server supports DPoP (this is indicated by a not empty array
-         * ` dpop_signing_alg_values_supported` and in addition if the [signer] uses a supported algorithm
+         * If the Wallet doesn't support DPoP, no factory is created.
          *
-         * @return
-         * if the OAUTH2 server doesn't support DPoP result would be `Result.Success(null)`
-         * if the OAUTH2 server supports DPoP and Signer uses a supported algorithm result would be success
-         * Otherwise a failure will be returned
+         * If the Wallet supports or requires DPoP, a factory is created when:
+         *   1. The Authorization Server supports DPoP (indicated by a non-empty array `dpop_signing_alg_values_supported`)
+         *   2. The DPoP signer provided by the Wallet uses a signing algorithm supported by the Authorization Server
          *
+         * If the Wallet requires DPoP, but the Authorization Server doesn't support it, an error is raised.
          */
         fun createForServer(
-            signer: Signer<JWK>,
+            dPoPUsage: DPoPUsage,
             jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
             clock: Clock,
             oauthServerMetadata: CIAuthorizationServerMetadata,
         ): Result<DPoPJwtFactory?> =
-            create(signer, jtiByteLength, clock, oauthServerMetadata.dPoPJWSAlgs.orEmpty())
+            create(dPoPUsage, jtiByteLength, clock, oauthServerMetadata.dPoPJWSAlgs.orEmpty())
 
         /**
-         * Tries to create a [DPoPJwtFactory] given a [signer] and the
+         * Tries to create a [DPoPJwtFactory] given a [dPoPUsage] and the
          * [supportedDPopAlgorithms] of the OAuth 2.0 Authorization Server.
          *
-         * The factory will be created in case the server supports DPoP (this is indicated by a not empty array
-         * ` dpop_signing_alg_values_supported` and in addition if the [signer] uses a supported algorithm
+         * If the Wallet doesn't support DPoP, no factory is created.
          *
-         * @return
-         * if the OAUTH2 server doesn't support DPoP result would be `Result.Success(null)`
-         * if the OAUTH2 server supports DPoP and Signer uses a supported algorithm result would be success
-         * Otherwise a failure will be returned
+         * If the Wallet supports or requires DPoP, a factory is created when:
+         *   1. The Authorization Server supports DPoP (indicated by a non-empty [supportedDPopAlgorithms])
+         *   2. The DPoP signer provided by the Wallet uses a signing algorithm supported by the Authorization Server
          *
+         * If the Wallet requires DPoP, but the Authorization Server doesn't support it, an error is raised.
          */
         fun create(
-            signer: Signer<JWK>,
+            dPoPUsage: DPoPUsage,
             jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
             clock: Clock,
             supportedDPopAlgorithms: List<JWSAlgorithm>,
         ): Result<DPoPJwtFactory?> = runCatching {
-            val signerAlg = signer.javaAlgorithm.toJoseAlg()
-            if (supportedDPopAlgorithms.isNotEmpty()) {
-                require(signerAlg in supportedDPopAlgorithms) {
-                    "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportedDPopAlgorithms"
+            when (dPoPUsage) {
+                DPoPUsage.Never -> null
+
+                is DPoPUsage.IfSupported -> {
+                    val signer = dPoPUsage.dPoPSigner
+                    val signerAlg = signer.javaAlgorithm.toJoseAlg()
+                    if (supportedDPopAlgorithms.isNotEmpty()) {
+                        require(signerAlg in supportedDPopAlgorithms) {
+                            "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportedDPopAlgorithms"
+                        }
+                        DPoPJwtFactory(signer, jtiByteLength, clock)
+                    } else null
                 }
-                DPoPJwtFactory(signer, jtiByteLength, clock)
-            } else null
+
+                is DPoPUsage.Required -> {
+                    require(supportedDPopAlgorithms.isNotEmpty()) {
+                        "Wallet requires DPoP but the Authorization Server doesn't support it"
+                    }
+                    val signer = dPoPUsage.dPoPSigner
+                    val signerAlg = signer.javaAlgorithm.toJoseAlg()
+                    require(signerAlg in supportedDPopAlgorithms) {
+                        "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportedDPopAlgorithms"
+                    }
+                    DPoPJwtFactory(signer, jtiByteLength, clock)
+                }
+            }
         }
     }
 }

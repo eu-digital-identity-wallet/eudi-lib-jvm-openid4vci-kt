@@ -88,15 +88,18 @@ val OpenId4VCIConfiguration = OpenId4VCIConfig(
     clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+    dPoPUsage = DPoPUsage.Never,
 )
 
 val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
     clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    dPoPSigner = ecSigner(
-        curve = Curve.P_256,
-        alg = JWSAlgorithm.ES256,
+    dPoPUsage = DPoPUsage.IfSupported(
+        ecSigner(
+            curve = Curve.P_256,
+            alg = JWSAlgorithm.ES256,
+        ),
     ),
 )
 

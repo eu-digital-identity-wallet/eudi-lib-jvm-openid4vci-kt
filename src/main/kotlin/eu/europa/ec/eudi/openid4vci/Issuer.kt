@@ -117,13 +117,11 @@ interface Issuer :
                 credentialOffer.authorizationServerMetadata,
             )
 
-            val dPoPJwtFactory = config.dPoPSigner?.let { signer ->
-                DPoPJwtFactory.createForServer(
-                    signer = signer,
-                    clock = config.clock,
-                    oauthServerMetadata = credentialOffer.authorizationServerMetadata,
-                ).getOrThrow()
-            }
+            val dPoPJwtFactory = DPoPJwtFactory.createForServer(
+                dPoPUsage = config.dPoPUsage,
+                clock = config.clock,
+                oauthServerMetadata = credentialOffer.authorizationServerMetadata,
+            ).getOrThrow()
 
             val authorizationEndpointClient =
                 credentialOffer.authorizationServerMetadata
