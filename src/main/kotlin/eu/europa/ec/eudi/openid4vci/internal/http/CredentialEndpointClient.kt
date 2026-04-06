@@ -70,20 +70,19 @@ internal class CredentialEndpointClient(
         request: CredentialIssuanceRequest,
         retried: Boolean,
     ): Pair<SubmissionOutcomeInternal, Nonce?> {
-        val url = credentialEndpoint.value
-        val dPoPProof = if (accessToken is AccessToken.DPoP) {
-            checkNotNull(dPoPJwtFactory) { "dPoPJwtFactory is required when using DPoP access tokens" }
-            dPoPJwtFactory.createDPoPJwt(Htm.POST, url, accessToken, resourceServerDpopNonce).getOrThrow().serialize()
-        } else null
-
-        val response = httpClient.post(url) {
-            bearerOrDPoPAuth(accessToken, dPoPProof)
-            encryptRequest(
-                requestTO = CredentialRequestTO.from(request),
-                requestEncryptionSpec = request.encryptionSpecs.requestEncryptionSpec,
-                transferObjectToJwtClaims = { CredentialRequestTO.toJwtClaimsSet(it) },
-            )
-        }
+        val response = httpClient.request(
+            HttpRequestBuilder()
+                .apply {
+                    method = HttpMethod.Post
+                    url.takeFrom(credentialEndpoint.value)
+                    bearerOrDPoPAuth(accessToken, dPoPJwtFactory, resourceServerDpopNonce)
+                    encryptRequest(
+                        requestTO = CredentialRequestTO.from(request),
+                        requestEncryptionSpec = request.encryptionSpecs.requestEncryptionSpec,
+                        transferObjectToJwtClaims = { CredentialRequestTO.toJwtClaimsSet(it) },
+                    )
+                },
+        )
 
         return if (response.status.isSuccess()) {
             val submissionOutcome = responsePossiblyEncrypted(
@@ -146,12 +145,6 @@ internal class DeferredEndPointClient(
         exchangeEncryptionSpecification: ExchangeEncryptionSpecification,
         retried: Boolean,
     ): Pair<DeferredCredentialQueryOutcome, Nonce?> {
-        val url = deferredCredentialEndpoint.value
-        val dPoPProof = if (accessToken is AccessToken.DPoP) {
-            checkNotNull(dPoPJwtFactory) { "dPoPJwtFactory is required when using DPoP access tokens" }
-            dPoPJwtFactory.createDPoPJwt(Htm.POST, url, accessToken, resourceServerDpopNonce).getOrThrow().serialize()
-        } else null
-
         val deferredRequestTO = DeferredRequestTO(
             transactionId = transactionId.value,
             credentialResponseEncryption = exchangeEncryptionSpecification.responseEncryptionSpec?.let {
@@ -159,14 +152,19 @@ internal class DeferredEndPointClient(
             },
         )
 
-        val response = httpClient.post(url) {
-            bearerOrDPoPAuth(accessToken, dPoPProof)
-            encryptRequest(
-                requestTO = deferredRequestTO,
-                requestEncryptionSpec = exchangeEncryptionSpecification.requestEncryptionSpec,
-                transferObjectToJwtClaims = { DeferredRequestTO.toJwtClaimsSet(it) },
-            )
-        }
+        val response = httpClient.request(
+            HttpRequestBuilder()
+                .apply {
+                    method = HttpMethod.Post
+                    url.takeFrom(deferredCredentialEndpoint.value)
+                    bearerOrDPoPAuth(accessToken, dPoPJwtFactory, resourceServerDpopNonce)
+                    encryptRequest(
+                        requestTO = deferredRequestTO,
+                        requestEncryptionSpec = exchangeEncryptionSpecification.requestEncryptionSpec,
+                        transferObjectToJwtClaims = { DeferredRequestTO.toJwtClaimsSet(it) },
+                    )
+                },
+        )
 
         return if (response.status.isSuccess()) {
             val outcome =

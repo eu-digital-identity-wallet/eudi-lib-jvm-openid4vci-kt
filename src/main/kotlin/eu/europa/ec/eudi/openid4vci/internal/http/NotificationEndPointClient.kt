@@ -43,17 +43,16 @@ internal class NotificationEndPointClient(
         event: CredentialIssuanceEvent,
         retried: Boolean,
     ): Nonce? {
-        val url = notificationEndpoint.value
-        val dPoPProof = if (accessToken is AccessToken.DPoP) {
-            checkNotNull(dPoPJwtFactory) { "dPoPJwtFactory is required when using DPoP access tokens" }
-            dPoPJwtFactory.createDPoPJwt(Htm.POST, url, accessToken, resourceServerDpopNonce).getOrThrow().serialize()
-        } else null
-
-        val response = httpClient.post(url) {
-            bearerOrDPoPAuth(accessToken, dPoPProof)
-            contentType(ContentType.Application.Json)
-            setBody(NotificationTO.from(event))
-        }
+        val response = httpClient.request(
+            HttpRequestBuilder()
+                .apply {
+                    method = HttpMethod.Post
+                    url.takeFrom(notificationEndpoint.value)
+                    bearerOrDPoPAuth(accessToken, dPoPJwtFactory, resourceServerDpopNonce)
+                    contentType(ContentType.Application.Json)
+                    setBody(NotificationTO.from(event))
+                },
+        )
 
         return if (response.status.isSuccess()) {
             response.dpopNonce() ?: resourceServerDpopNonce

@@ -162,25 +162,38 @@ class DPoPJwtFactory(
 }
 
 /**
- * Utility method to be used to set properly the DPoP header on the request under construction, targeted on the URL passed as [htu].
+ * Utility method to be used to set properly the DPoP header on the request under construction, targeted on the URL passed as.
  * Based on the passed [accessToken] DPoP header will be added if it is of type DPoP.
  */
-internal fun HttpRequestBuilder.bearerOrDPoPAuth(
-    accessToken: AccessToken,
-    dpopJwt: String?,
-) {
+internal suspend fun HttpRequestBuilder.bearerOrDPoPAuth(accessToken: AccessToken, dPoPJwtFactory: DPoPJwtFactory?, dPoPNonce: Nonce?) {
     when (accessToken) {
         is AccessToken.Bearer -> {
             bearerAuth(accessToken)
         }
 
         is AccessToken.DPoP -> {
-            checkNotNull(dpopJwt) { "dpopJwt must be provided when using DPoP access tokens" }
+            checkNotNull(dPoPJwtFactory) { "dPoPJwtFactory is required when using DPoP access tokens" }
+            val dPoPProof = dPoPJwtFactory.createDPoPJwt(method.htm, url.build().toURI().toURL(), accessToken, dPoPNonce)
+                .getOrThrow()
+                .serialize()
             dpopAuth(accessToken)
-            header(DPoP, dpopJwt)
+            header(DPoP, dPoPProof)
         }
     }
 }
+
+private val HttpMethod.htm: Htm
+    get() = when (this) {
+        HttpMethod.Get -> Htm.GET
+        HttpMethod.Head -> Htm.HEAD
+        HttpMethod.Post -> Htm.POST
+        HttpMethod.Put -> Htm.PUT
+        HttpMethod.Delete -> Htm.DELETE
+        HttpMethod("CONNECT") -> Htm.CONNECT
+        HttpMethod.Options -> Htm.OPTIONS
+        HttpMethod("TRACE") -> Htm.TRACE
+        else -> throw IllegalArgumentException("Unsupported HTTP method: $this")
+    }
 
 private fun HttpRequestBuilder.dpopAuth(accessToken: AccessToken.DPoP) {
     header(HttpHeaders.Authorization, "$DPoP ${accessToken.accessToken}")
