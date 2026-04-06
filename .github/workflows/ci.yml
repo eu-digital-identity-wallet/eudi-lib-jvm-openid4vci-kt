@@ -17,10 +17,10 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Validate Gradle Wrapper
-        uses: gradle/actions/wrapper-validation@v6
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
       - name: Build with Gradle Wrapper
         run: ./gradlew build
         env:
@@ -44,10 +44,10 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Validate Gradle Wrapper
-        uses: gradle/actions/wrapper-validation@v6
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
       - name: Publish with Gradle Wrapper
         run: ./gradlew publishAllPublicationsToMavenCentral --full-stacktrace
         env:
