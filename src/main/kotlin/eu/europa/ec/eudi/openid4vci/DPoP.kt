@@ -131,24 +131,31 @@ class DPoPJwtFactory(
             clock: Clock,
             supportedDPopAlgorithms: List<JWSAlgorithm>,
         ): Result<DPoPJwtFactory?> = runCatching {
-            require(dPoPUsage !is DPoPUsage.Required || supportedDPopAlgorithms.isNotEmpty()) {
-                "Wallet requires DPoP but the Authorization Server doesn't support it"
-            }
-
-            val dPoPSigner = when (dPoPUsage) {
+            when (dPoPUsage) {
                 DPoPUsage.Never -> null
-                is DPoPUsage.IfSupported -> dPoPUsage.dPoPSigner
-                is DPoPUsage.Required -> dPoPUsage.dPoPSigner
-            }
 
-            dPoPSigner?.let { signer ->
-                val signerAlg = signer.javaAlgorithm.toJoseAlg()
-                if (supportedDPopAlgorithms.isNotEmpty()) {
+                is DPoPUsage.IfSupported -> {
+                    val signer = dPoPUsage.dPoPSigner
+                    val signerAlg = signer.javaAlgorithm.toJoseAlg()
+                    if (supportedDPopAlgorithms.isNotEmpty()) {
+                        require(signerAlg in supportedDPopAlgorithms) {
+                            "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportedDPopAlgorithms"
+                        }
+                        DPoPJwtFactory(signer, jtiByteLength, clock)
+                    } else null
+                }
+
+                is DPoPUsage.Required -> {
+                    require(supportedDPopAlgorithms.isNotEmpty()) {
+                        "Wallet requires DPoP but the Authorization Server doesn't support it"
+                    }
+                    val signer = dPoPUsage.dPoPSigner
+                    val signerAlg = signer.javaAlgorithm.toJoseAlg()
                     require(signerAlg in supportedDPopAlgorithms) {
                         "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportedDPopAlgorithms"
                     }
                     DPoPJwtFactory(signer, jtiByteLength, clock)
-                } else null
+                }
             }
         }
     }
