@@ -244,6 +244,7 @@ internal class RequestIssuanceImpl(
         val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
         val jwtProof = proofSigner.use { operation ->
             operation.publicMaterial.ensureKeyAttestationJwtAlgIsSupported(credentialConfigId, ProofType.JWT)
+            operation.publicMaterial.attestedKeys.assertMatchesBatchIssuanceBatchSize(credentialConfigId)
             val signer = KeyAttestationJwtProofSigner(joseAlg, operation, keyIndex)
             val signedJwt = signer.sign(claims)
             SignedJWT.parse(signedJwt)
@@ -291,19 +292,28 @@ internal class RequestIssuanceImpl(
     ): Proof.Attestation {
         val keyAttestationJwt = proofsSpecification.attestationProvider(cNonce)
         keyAttestationJwt.ensureKeyAttestationJwtAlgIsSupported(credentialConfigId, ProofType.ATTESTATION)
+        keyAttestationJwt.attestedKeys.assertMatchesBatchIssuanceBatchSize(credentialConfigId)
         return Proof.Attestation(keyAttestationJwt)
     }
 
     private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize(
         credentialConfigId: CredentialConfigurationIdentifier,
-    ) = when (val popSignersNo = operations.size) {
+    ) = operations.size.assertMatchesBatchIssuanceBatchSize(credentialConfigId)
+
+    private fun List<JWK>.assertMatchesBatchIssuanceBatchSize(
+        credentialConfigId: CredentialConfigurationIdentifier,
+    ) = size.assertMatchesBatchIssuanceBatchSize(credentialConfigId)
+
+    private fun Int.assertMatchesBatchIssuanceBatchSize(
+        credentialConfigId: CredentialConfigurationIdentifier,
+    ) = when (this) {
         0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
         1 -> Unit
         else -> {
             val reusePolicyBatchSize = credentialSupportedById(credentialConfigId)
                 .credentialMetadata?.credentialReusePolicy?.effectiveBatchSize(config.supportedCredentialReusePolicies)
             if (reusePolicyBatchSize != null) {
-                ensure(popSignersNo <= reusePolicyBatchSize) {
+                ensure(this <= reusePolicyBatchSize) {
                     CredentialIssuanceError.IssuerBatchSizeLimitExceeded(reusePolicyBatchSize)
                 }
             } else {
@@ -311,7 +321,7 @@ internal class RequestIssuanceImpl(
                     BatchCredentialIssuance.NotSupported -> CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
                     is BatchCredentialIssuance.Supported -> {
                         val maxBatchSize = batchCredentialIssuance.batchSize
-                        ensure(popSignersNo <= maxBatchSize) {
+                        ensure(this <= maxBatchSize) {
                             CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
                         }
                     }
