@@ -22,7 +22,6 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.*
 import eu.europa.ec.eudi.openid4vci.internal.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
@@ -124,7 +123,6 @@ internal data class CredentialRequestTO(
             if (this.isNullOrEmpty()) null
             else ProofsTO(
                 jwtProofs = filterIsInstance<Proof.Jwt>().map { it.jwt.serialize() }.takeIf { it.isNotEmpty() },
-                diVpProofs = filterIsInstance<Proof.DiVp>().map { it.diVp }.takeIf { it.isNotEmpty() },
                 attestationProofs = filterIsInstance<Proof.Attestation>().map { it.keyAttestation.value }.takeIf { it.isNotEmpty() },
             )
     }

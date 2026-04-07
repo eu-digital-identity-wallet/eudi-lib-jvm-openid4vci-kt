@@ -136,25 +136,37 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         assertTrue("Expected ") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_JWT")
-            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.NotRequired }
+            proofs != null && proofs.all { it.keyAttestationConstraints == KeyAttestationConstraints.None }
         }
 
         assertTrue("Expected ") {
             val proofs = credentialConfigs.jwtProofTypeSupported("MobileDrivingLicense_msoMdoc")
             proofs != null && proofs.all {
-                val proof = it.keyAttestationRequirement
-                proof == KeyAttestationRequirement.RequiredNoConstraints
+                val proof = it.keyAttestationConstraints
+                proof == KeyAttestationConstraints.None
             }
         }
 
         assertTrue("Expected ") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_LDP_VC")
-            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.Required }
+            proofs != null && proofs.all {
+                val proof = it.keyAttestationConstraints
+                proof == KeyAttestationConstraints(
+                    keyStorage = listOf("iso_18045_high"),
+                    userAuthentication = listOf("iso_18045_enhanced-basic"),
+                )
+            }
         }
 
         assertTrue("Expected ") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_JWT_VC_JSON-LD")
-            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.Required }
+            proofs != null && proofs.all {
+                val proof = it.keyAttestationConstraints
+                proof == KeyAttestationConstraints(
+                    keyStorage = listOf("iso_18045_high", "iso_18045_enhanced-basic"),
+                    userAuthentication = listOf("iso_18045_high", "iso_18045_enhanced-basic"),
+                )
+            }
         }
     }
 

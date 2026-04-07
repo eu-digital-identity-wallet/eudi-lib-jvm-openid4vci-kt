@@ -28,7 +28,6 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
-import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
 import java.security.KeyFactory
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
@@ -56,20 +55,7 @@ object CryptoGenerator {
         )
     }
 
-    fun noKeyAttestationJwtProofsSpec(
-        curve: Curve = Curve.P_256,
-        keysNo: Int = 1,
-    ): ProofsSpecification {
-        val ecKeys = List(keysNo) { randomECSigningKey(curve) }
-        val batchSigner = BatchSigner.fromNimbusEcKeys(
-            ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
-            secureRandom = null,
-            provider = null,
-        )
-        return ProofsSpecification.JwtProofs.NoKeyAttestation(batchSigner)
-    }
-
-    fun keyAttestationJwtProofsSpec(
+    fun jwtProofSpec(
         curve: Curve = Curve.P_256,
         attestedKeysCount: Int = 3,
     ): ProofsSpecification {
@@ -86,7 +72,7 @@ object CryptoGenerator {
                 provider = null,
             )
         }
-        return ProofsSpecification.JwtProofs.WithKeyAttestation(signerProvider, 1)
+        return ProofsSpecification.JwtProofs(signerProvider, 1)
     }
 
     fun attestationProofSpec(

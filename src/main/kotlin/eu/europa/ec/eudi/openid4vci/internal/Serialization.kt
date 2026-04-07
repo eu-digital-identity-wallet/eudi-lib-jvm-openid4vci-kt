@@ -57,7 +57,6 @@ internal object ProofSerializer : KSerializer<Proof> {
     data class ProofJson(
         @SerialName("proof_type") val proofType: String,
         @SerialName("jwt") val jwt: String? = null,
-        @SerialName("di_vp") val diVp: String? = null,
         @SerialName("attestation") val attestation: String? = null,
     )
 
@@ -67,11 +66,15 @@ internal object ProofSerializer : KSerializer<Proof> {
     override fun deserialize(decoder: Decoder): Proof {
         val deserialized = internal.deserialize(decoder)
         return when (deserialized.proofType) {
-            ProofType.JWT.toString().lowercase() -> {
+            ProofType.JWT.toString().lowercase() ->
                 deserialized.jwt?.let {
                     Proof.Jwt(SignedJWT.parse(deserialized.jwt))
                 } ?: error("Invalid JWT proof: missing 'jwt' attribute.")
-            }
+
+            ProofType.ATTESTATION.toString().lowercase() ->
+                deserialized.attestation?.let {
+                    Proof.Attestation(KeyAttestationJWT(it))
+                } ?: error("Invalid Attestation proof: missing 'attestation' attribute.")
 
             else -> error("Unsupported proof type: ${deserialized.proofType}")
         }
@@ -84,14 +87,6 @@ internal object ProofSerializer : KSerializer<Proof> {
                 ProofJson(
                     proofType = ProofType.JWT.toString().lowercase(),
                     jwt = value.jwt.serialize(),
-                ),
-            )
-
-            is Proof.DiVp -> internal.serialize(
-                encoder,
-                ProofJson(
-                    proofType = ProofType.DI_VP.toString().lowercase(),
-                    jwt = value.diVp,
                 ),
             )
 

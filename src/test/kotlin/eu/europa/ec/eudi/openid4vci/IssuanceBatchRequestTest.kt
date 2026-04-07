@@ -16,11 +16,10 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.noKeyAttestationJwtProofsSpec
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofSpec
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialResponseSuccessTO
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -65,14 +64,10 @@ class IssuanceBatchRequestTest {
                         )
                         val jwtProofs = it.proofs.jwtProofs
                         assertNotNull(jwtProofs, "Jwt Proofs expected")
-                        val distinctNonces = jwtProofs
-                            .map { SignedJWT.parse(it) }
-                            .map { it.jwtClaimsSet.getStringClaim("nonce") }
-                            .distinct()
-
-                        assertTrue("In the context of an issuance request all proofs must contain the same nonce, but they don't") {
-                            distinctNonces.size == 1
-                        }
+                        assertEquals(1, jwtProofs.size, "Exactly one Jwt Proof expected")
+                        val keyAttestation =
+                            KeyAttestationJWT(SignedJWT.parse(jwtProofs.first()).header.getCustomParam("attestation") as String)
+                        assertEquals(3, keyAttestation.attestedKeys.size, "Exactly three attested keys expected")
                     }
                 },
             ),
@@ -87,7 +82,7 @@ class IssuanceBatchRequestTest {
             CredentialConfigurationIdentifier(PID_MsoMdoc),
         )
         val (_, outcome) = with(issuer) {
-            authorizedRequest.request(request, noKeyAttestationJwtProofsSpec(keysNo = 3)).getOrThrow()
+            authorizedRequest.request(request, jwtProofSpec(attestedKeysCount = 3)).getOrThrow()
         }
         when (outcome) {
             is SubmissionOutcome.Failed -> {

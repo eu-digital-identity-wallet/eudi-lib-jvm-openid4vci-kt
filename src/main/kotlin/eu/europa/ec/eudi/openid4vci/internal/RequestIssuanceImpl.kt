@@ -35,7 +35,6 @@ internal class RequestIssuanceImpl(
     private val config: OpenId4VCIConfig,
     private val credentialEndpointClient: CredentialEndpointClient,
     private val nonceEndpointClient: NonceEndpointClient?,
-    private val batchCredentialIssuance: BatchCredentialIssuance,
     private val exchangeEncryptionSpecification: ExchangeEncryptionSpecification,
 ) : RequestIssuance {
 
@@ -109,26 +108,15 @@ internal class RequestIssuanceImpl(
         return when (proofsSpecification) {
             is ProofsSpecification.NoProofs -> emptyList<Proof>() to null
 
-            is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
+            is ProofsSpecification.JwtProofs -> {
                 val cNonceAndDPoPNonce = cNonce()
                 val proofs = listOf(
-                    jwtProofWithKeyAttestation(
+                    jwtProof(
                         proofsSpecification,
                         credentialConfigId,
                         grant,
                         cNonceAndDPoPNonce?.cnonce,
                     ),
-                )
-                proofs to cNonceAndDPoPNonce?.dpopNonce
-            }
-
-            is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
-                val cNonceAndDPoPNonce = cNonce()
-                val proofs = jwtProofsWithoutKeyAttestation(
-                    proofsSpecification,
-                    credentialConfigId,
-                    grant,
-                    cNonceAndDPoPNonce?.cnonce,
                 )
                 proofs to cNonceAndDPoPNonce?.dpopNonce
             }
@@ -164,26 +152,14 @@ internal class RequestIssuanceImpl(
                     "Credential configuration doesn't support JWT proofs."
                 }
                 check(proofRequirement is ProofTypeMeta.Jwt)
-                val keyAttestationRequirement = proofRequirement.keyAttestationRequirement
-                when (this) {
-                    is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
-                        require(keyAttestationRequirement is KeyAttestationRequirement.NotRequired) {
-                            "Credential configuration requires key attestation."
-                        }
-                    }
-
-                    is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
-                        require(keyAttestationRequirement !is KeyAttestationRequirement.NotRequired) {
-                            "Credential configuration does not support key attestation."
-                        }
-                    }
-                }
             }
 
             is ProofsSpecification.AttestationProof -> {
-                requireNotNull(proofTypesSupported[ProofType.ATTESTATION]) {
-                    "Credential configuration doesn't support attestation proofs."
+                val proofRequirement = proofTypesSupported[ProofType.ATTESTATION]
+                requireNotNull(proofRequirement) {
+                    "Credential configuration doesn't support Attestation proofs."
                 }
+                check(proofRequirement is ProofTypeMeta.Attestation)
             }
         }
     }
@@ -196,8 +172,8 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private suspend fun jwtProofWithKeyAttestation(
-        proofsSpecification: ProofsSpecification.JwtProofs.WithKeyAttestation,
+    private suspend fun jwtProof(
+        proofsSpecification: ProofsSpecification.JwtProofs,
         credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
         cNonce: Nonce?,
@@ -225,29 +201,9 @@ internal class RequestIssuanceImpl(
     ) {
         val attestationJwtAlg = SignedJWT.parse(value).header.algorithm
         val proofTypesSupported = credentialSupportedById(credentialConfigId).proofTypesSupported
-        val spec = proofTypesSupported.values.firstOrNull { it.type() == proofType }
-        ensure(spec != null && attestationJwtAlg in spec.algorithms()) {
+        val spec = proofTypesSupported.values.firstOrNull { it.type == proofType }
+        ensure(spec != null && attestationJwtAlg in spec.algorithms) {
             CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported()
-        }
-    }
-
-    private suspend fun jwtProofsWithoutKeyAttestation(
-        proofsSpecification: ProofsSpecification.JwtProofs.NoKeyAttestation,
-        credentialConfigId: CredentialConfigurationIdentifier,
-        grant: Grant,
-        cNonce: Nonce?,
-    ): List<Proof.Jwt> {
-        val joseAlg = run {
-            val javaSigningAlgorithm = proofsSpecification.proofsSigner.javaAlgorithm
-            javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
-        }
-        return proofsSpecification.proofsSigner.use { operation ->
-            operation.assertMatchesBatchIssuanceBatchSize()
-            val proofsSigner = JwtProofsSigner(joseAlg, operation)
-            val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
-            proofsSigner.sign(claims).map {
-                Proof.Jwt(SignedJWT.parse(it.second))
-            }
         }
     }
 
@@ -260,23 +216,6 @@ internal class RequestIssuanceImpl(
         keyAttestationJwt.ensureKeyAttestationJwtAlgIsSupported(credentialConfigId, ProofType.ATTESTATION)
         return Proof.Attestation(keyAttestationJwt)
     }
-
-    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize() =
-        when (val popSignersNo = operations.size) {
-            0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
-            1 -> Unit
-            else -> {
-                when (batchCredentialIssuance) {
-                    BatchCredentialIssuance.NotSupported -> CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
-                    is BatchCredentialIssuance.Supported -> {
-                        val maxBatchSize = batchCredentialIssuance.batchSize
-                        ensure(popSignersNo <= maxBatchSize) {
-                            CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
-                        }
-                    }
-                }
-            }
-        }
 
     private fun String.toSupportedJoseAlgorithm(credentialConfigId: CredentialConfigurationIdentifier): JWSAlgorithm {
         val proofTypesSupported = credentialSupportedById(credentialConfigId).proofTypesSupported

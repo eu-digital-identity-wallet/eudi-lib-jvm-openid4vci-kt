@@ -178,7 +178,6 @@ interface Issuer :
                     config,
                     credentialEndpointClient,
                     nonceEndpointClient,
-                    credentialOffer.credentialIssuerMetadata.batchCredentialIssuance,
                     issuanceEncryptionSpecs,
                 )
             }
