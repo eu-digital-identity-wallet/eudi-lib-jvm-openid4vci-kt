@@ -71,7 +71,7 @@ internal fun universityDegreeJwt() = W3CSignedJwtCredential(
         setOf(
             ProofTypeMeta.Jwt(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
-                KeyAttestationRequirement.NotRequired,
+                KeyAttestationConstraints.None,
             ),
         ),
     ),
@@ -128,7 +128,7 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
         setOf(
             ProofTypeMeta.Jwt(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
-                KeyAttestationRequirement.Required(
+                KeyAttestationConstraints(
                     listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
                     null,
                     null,
@@ -190,7 +190,7 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
         setOf(
             ProofTypeMeta.Jwt(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
-                KeyAttestationRequirement.Required(
+                KeyAttestationConstraints(
                     listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
                     listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
                     null,

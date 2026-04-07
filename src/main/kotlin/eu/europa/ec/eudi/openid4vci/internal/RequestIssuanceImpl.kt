@@ -114,28 +114,16 @@ internal class RequestIssuanceImpl(
         return when (proofsSpecification) {
             is ProofsSpecification.NoProofs -> emptyList<Proof>() to null
 
-            is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
+            is ProofsSpecification.JwtProofs -> {
                 val cNonceAndDPoPNonce = cNonce()
                 val proofs = listOf(
-                    jwtProofWithKeyAttestation(
+                    jwtProof(
                         proofRequirement as ProofTypeMeta.Jwt,
                         proofsSpecification,
                         selectedReusePolicy,
                         grant,
                         cNonceAndDPoPNonce?.cnonce,
                     ),
-                )
-                proofs to cNonceAndDPoPNonce?.dpopNonce
-            }
-
-            is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
-                val cNonceAndDPoPNonce = cNonce()
-                val proofs = jwtProofsWithoutKeyAttestation(
-                    proofRequirement as ProofTypeMeta.Jwt,
-                    proofsSpecification,
-                    selectedReusePolicy,
-                    grant,
-                    cNonceAndDPoPNonce?.cnonce,
                 )
                 proofs to cNonceAndDPoPNonce?.dpopNonce
             }
@@ -174,20 +162,6 @@ internal class RequestIssuanceImpl(
                     "Credential configuration doesn't support JWT proofs."
                 }
                 check(proofRequirement is ProofTypeMeta.Jwt)
-                val keyAttestationRequirement = proofRequirement.keyAttestationRequirement
-                when (this) {
-                    is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
-                        require(keyAttestationRequirement is KeyAttestationRequirement.NotRequired) {
-                            "Credential configuration requires key attestation."
-                        }
-                    }
-
-                    is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
-                        require(keyAttestationRequirement !is KeyAttestationRequirement.NotRequired) {
-                            "Credential configuration does not support key attestation."
-                        }
-                    }
-                }
                 proofRequirement
             }
 
@@ -251,18 +225,16 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private suspend fun jwtProofWithKeyAttestation(
+    private suspend fun jwtProof(
         proofRequirement: ProofTypeMeta.Jwt,
-        proofsSpecification: ProofsSpecification.JwtProofs.WithKeyAttestation,
+        proofsSpecification: ProofsSpecification.JwtProofs,
         selectedReusePolicy: EudiReusePolicy?,
         grant: Grant,
         cNonce: Nonce?,
     ): Proof.Jwt {
-        check(proofRequirement.keyAttestationRequirement is KeyAttestationRequirement.Required)
-
         val proofSigner = proofsSpecification.proofSignerProvider(
             cNonce,
-            proofRequirement.keyAttestationRequirement.preferredKeyStorageStatusPeriod,
+            proofRequirement.keyAttestationConstraints.preferredKeyStorageStatusPeriod,
         )
         val joseAlg = run {
             val javaSigningAlgorithm = proofSigner.javaAlgorithm
@@ -284,31 +256,8 @@ internal class RequestIssuanceImpl(
         spec: ProofTypeMeta,
     ) {
         val attestationJwtAlg = header.algorithm
-        ensure(attestationJwtAlg in spec.algorithms()) {
+        ensure(attestationJwtAlg in spec.algorithms) {
             CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported()
-        }
-    }
-
-    private suspend fun jwtProofsWithoutKeyAttestation(
-        proofRequirement: ProofTypeMeta.Jwt,
-        proofsSpecification: ProofsSpecification.JwtProofs.NoKeyAttestation,
-        selectedReusePolicy: EudiReusePolicy?,
-        grant: Grant,
-        cNonce: Nonce?,
-    ): List<Proof.Jwt> {
-        check(proofRequirement.keyAttestationRequirement is KeyAttestationRequirement.NotRequired)
-
-        val joseAlg = run {
-            val javaSigningAlgorithm = proofsSpecification.proofsSigner.javaAlgorithm
-            javaSigningAlgorithm.toSupportedJoseAlgorithm(proofRequirement)
-        }
-        return proofsSpecification.proofsSigner.use { operation ->
-            operation.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
-            val proofsSigner = JwtProofsSigner(joseAlg, operation)
-            val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
-            proofsSigner.sign(claims).map {
-                Proof.Jwt(SignedJWT.parse(it.second))
-            }
         }
     }
 
@@ -320,16 +269,12 @@ internal class RequestIssuanceImpl(
     ): Proof.Attestation {
         val keyAttestationJwt = proofsSpecification.attestationProvider(
             cNonce,
-            proofRequirement.keyAttestationRequirement.preferredKeyStorageStatusPeriod,
+            proofRequirement.keyAttestationConstraints.preferredKeyStorageStatusPeriod,
         )
         keyAttestationJwt.ensureKeyAttestationJwtAlgIsSupported(proofRequirement)
         keyAttestationJwt.attestedKeys.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
         return Proof.Attestation(keyAttestationJwt)
     }
-
-    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize(
-        selectedReusePolicy: EudiReusePolicy?,
-    ) = operations.size.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
 
     private fun List<JWK>.assertMatchesBatchIssuanceBatchSize(
         selectedReusePolicy: EudiReusePolicy?,
@@ -337,31 +282,33 @@ internal class RequestIssuanceImpl(
 
     private fun Int.assertMatchesBatchIssuanceBatchSize(
         selectedReusePolicy: EudiReusePolicy?,
-    ) = when (this) {
-        0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
-        1 -> Unit
-        else -> {
-            if (selectedReusePolicy != null) {
-                when (selectedReusePolicy) {
-                    is EudiReusePolicy.LimitedTime ->
-                        throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+    ) {
+        when (this) {
+            0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
+            1 -> Unit
+            else -> {
+                if (selectedReusePolicy != null) {
+                    when (selectedReusePolicy) {
+                        is EudiReusePolicy.LimitedTime ->
+                            throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
 
-                    else -> {
-                        val policyBatchSize = checkNotNull(selectedReusePolicy.batchSize) {
-                            "Batch reuse policy ${selectedReusePolicy::class} with null batch size"
-                        }
-                        ensure(this <= policyBatchSize) {
-                            CredentialIssuanceError.IssuerBatchSizeLimitExceeded(policyBatchSize)
+                        else -> {
+                            val policyBatchSize = checkNotNull(selectedReusePolicy.batchSize) {
+                                "Batch reuse policy ${selectedReusePolicy::class} with null batch size"
+                            }
+                            ensure(this <= policyBatchSize) {
+                                CredentialIssuanceError.IssuerBatchSizeLimitExceeded(policyBatchSize)
+                            }
                         }
                     }
-                }
-            } else {
-                when (batchCredentialIssuance) {
-                    BatchCredentialIssuance.NotSupported -> throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
-                    is BatchCredentialIssuance.Supported -> {
-                        val maxBatchSize = batchCredentialIssuance.batchSize
-                        ensure(this <= maxBatchSize) {
-                            CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
+                } else {
+                    when (batchCredentialIssuance) {
+                        BatchCredentialIssuance.NotSupported -> throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+                        is BatchCredentialIssuance.Supported -> {
+                            val maxBatchSize = batchCredentialIssuance.batchSize
+                            ensure(this <= maxBatchSize) {
+                                CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
+                            }
                         }
                     }
                 }

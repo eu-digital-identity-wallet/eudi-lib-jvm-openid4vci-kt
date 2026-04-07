@@ -18,8 +18,7 @@ package eu.europa.ec.eudi.openid4vci.examples
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.attestationProofSpec
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.keyAttestationJwtProofsSpec
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.noKeyAttestationJwtProofsSpec
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofSpec
 import io.ktor.client.*
 import io.ktor.client.engine.apache.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -83,10 +82,7 @@ sealed interface ProofsType {
     val batchOption: BatchOption
 
     @JvmInline
-    value class JwtProofsNoKeyAttestation(override val batchOption: BatchOption) : ProofsType
-
-    @JvmInline
-    value class JwtProofWithKeyAttestation(override val batchOption: BatchOption) : ProofsType
+    value class JwtProof(override val batchOption: BatchOption) : ProofsType
 
     @JvmInline
     value class AttestationProof(override val batchOption: BatchOption) : ProofsType
@@ -115,8 +111,7 @@ suspend fun Issuer.submitCredentialRequest(
         }
 
     val proofSpec: ProofsSpecification = when (proofsType) {
-        is ProofsType.JwtProofsNoKeyAttestation -> noKeyAttestationJwtProofsSpec(Curve.P_256, proofsNo)
-        is ProofsType.JwtProofWithKeyAttestation -> keyAttestationJwtProofsSpec(Curve.P_256, proofsNo)
+        is ProofsType.JwtProof -> jwtProofSpec(Curve.P_256, proofsNo)
         is ProofsType.AttestationProof -> attestationProofSpec(keysNo = proofsNo)
     }
     return authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
@@ -234,7 +229,7 @@ suspend fun handleDeferred(
  */
 suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
     credCfgId: CredentialConfigurationIdentifier,
-    proofsType: ProofsType = ProofsType.JwtProofsNoKeyAttestation(batchOption = BatchOption.DontUse),
+    proofsType: ProofsType = ProofsType.JwtProof(batchOption = BatchOption.DontUse),
     httpClient: HttpClient,
 ) where
       ENV : HasTestUser<USER>,

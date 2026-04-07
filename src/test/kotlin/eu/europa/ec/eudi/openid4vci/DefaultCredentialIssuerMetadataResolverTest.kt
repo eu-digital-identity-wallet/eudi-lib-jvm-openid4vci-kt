@@ -21,7 +21,6 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
-import eu.europa.ec.eudi.openid4vci.KeyAttestationRequirement.Required
 import eu.europa.ec.eudi.openid4vci.internal.wellKnown
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -135,25 +134,39 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         assertTrue("Expected ") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_JWT")
-            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.NotRequired }
+            proofs != null && proofs.all { it.keyAttestationConstraints == KeyAttestationConstraints.None }
         }
 
         assertTrue("Expected ") {
             val proofs = credentialConfigs.jwtProofTypeSupported("MobileDrivingLicense_msoMdoc")
             proofs != null && proofs.all {
-                val proof = it.keyAttestationRequirement
-                proof == Required(null, null, null)
+                val proof = it.keyAttestationConstraints
+                proof == KeyAttestationConstraints.None
             }
         }
 
         assertTrue("Expected ") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_LDP_VC")
-            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.Required }
+            proofs != null && proofs.all {
+                val proof = it.keyAttestationConstraints
+                proof == KeyAttestationConstraints(
+                    keyStorage = listOf(AttackPotentialResistance.Iso18045High),
+                    userAuthentication = listOf(AttackPotentialResistance.Iso18045EnhancedBasic),
+                    preferredKeyStorageStatusPeriod = null,
+                )
+            }
         }
 
         assertTrue("Expected ") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_JWT_VC_JSON-LD")
-            proofs != null && proofs.all { it.keyAttestationRequirement is KeyAttestationRequirement.Required }
+            proofs != null && proofs.all {
+                val proof = it.keyAttestationConstraints
+                proof == KeyAttestationConstraints(
+                    keyStorage = listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
+                    userAuthentication = listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
+                    preferredKeyStorageStatusPeriod = null,
+                )
+            }
         }
     }
 

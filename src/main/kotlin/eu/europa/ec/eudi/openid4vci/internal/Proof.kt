@@ -36,14 +36,6 @@ internal sealed interface Proof {
     value class Jwt(val jwt: JWT) : Proof
 
     /**
-     * Proof of possession is structured as a DI_VP
-     *
-     * @param diVp The proof DI_VP
-     */
-    @JvmInline
-    value class DiVp(val diVp: String) : Proof
-
-    /**
      * Proof of possession is structured as a Key Attestation JWT
      *
      * @param keyAttestation The proof Key Attestation JWT

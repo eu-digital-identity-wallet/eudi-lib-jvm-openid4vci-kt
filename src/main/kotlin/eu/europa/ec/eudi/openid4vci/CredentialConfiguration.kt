@@ -58,97 +58,86 @@ sealed interface CryptographicBindingMethod : Serializable {
  */
 enum class ProofType : Serializable {
     JWT,
-    DI_VP,
     ATTESTATION,
 }
 
 sealed interface ProofTypeMeta : Serializable {
     data class Jwt(
         val algorithms: List<JWSAlgorithm>,
-        override val keyAttestationRequirement: KeyAttestationRequirement,
-    ) : ProofTypeMeta, HasKeyAttestationRequirement {
+        val keyAttestationConstraints: KeyAttestationConstraints,
+    ) : ProofTypeMeta {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of JWT cannot be empty" }
         }
     }
 
-    data object DiVp : ProofTypeMeta {
-        private fun readResolve(): Any = DiVp
-    }
-
     data class Attestation(
         val algorithms: List<JWSAlgorithm>,
-        override val keyAttestationRequirement: KeyAttestationRequirement.Required,
-    ) : ProofTypeMeta, HasKeyAttestationRequirement {
+        val keyAttestationConstraints: KeyAttestationConstraints,
+    ) : ProofTypeMeta {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of Attestation cannot be empty" }
         }
     }
-
-    data class Unsupported(val type: String) : ProofTypeMeta
 }
 
-interface HasKeyAttestationRequirement {
-    val keyAttestationRequirement: KeyAttestationRequirement
-}
-
-sealed interface KeyAttestationRequirement {
-
-    data object NotRequired : KeyAttestationRequirement {
-        private fun readResolve(): Any = NotRequired
-    }
-
-    data class Required(
-        val keyStorageConstraints: List<AttackPotentialResistance>?,
-        val userAuthenticationConstraints: List<AttackPotentialResistance>?,
-        val preferredKeyStorageStatusPeriod: PositiveDuration?,
-    ) : KeyAttestationRequirement {
-        init {
-
-            if (keyStorageConstraints != null) {
-                require(keyStorageConstraints.isNotEmpty()) {
-                    "Key storage constraints, if provided, should be non-empty"
-                }
-            }
-            if (userAuthenticationConstraints != null) {
-                require(userAuthenticationConstraints.isNotEmpty()) {
-                    "User authentication constraints, if provided, should be non-empty"
-                }
+/**
+ * The constraints of the Key Attestation of a JWT Proof, or Attestation Proof.
+ */
+data class KeyAttestationConstraints(
+    val keyStorage: List<AttackPotentialResistance>?,
+    val userAuthentication: List<AttackPotentialResistance>?,
+    val preferredKeyStorageStatusPeriod: PositiveDuration?,
+) : Serializable {
+    init {
+        if (keyStorage != null) {
+            require(keyStorage.isNotEmpty()) {
+                "Key storage constraints, if provided, should be non-empty"
             }
         }
-
-        val hasConstrains: Boolean
-            get() = keyStorageConstraints != null || userAuthenticationConstraints != null
-
-        companion object
+        if (userAuthentication != null) {
+            require(userAuthentication.isNotEmpty()) {
+                "User authentication constraints, if provided, should be non-empty"
+            }
+        }
     }
 
-    companion object
+    val hasConstrains: Boolean
+        get() = userAuthentication != null || keyStorage != null
+
+    companion object {
+        val None: KeyAttestationConstraints get() = KeyAttestationConstraints(null, null, null)
+    }
 }
 
-fun ProofTypeMeta.type(): ProofType? = when (this) {
-    is ProofTypeMeta.Jwt -> ProofType.JWT
-    is ProofTypeMeta.DiVp -> ProofType.DI_VP
-    is ProofTypeMeta.Attestation -> ProofType.ATTESTATION
-    is ProofTypeMeta.Unsupported -> null
-}
+val KeyAttestationConstraints.keyStorageOrDefault: List<AttackPotentialResistance>
+    get() = keyStorage.orEmpty()
 
-fun ProofTypeMeta.algorithms(): List<JWSAlgorithm> = when (this) {
-    is ProofTypeMeta.Jwt -> algorithms
-    is ProofTypeMeta.Attestation -> algorithms
-    is ProofTypeMeta.DiVp -> emptyList()
-    is ProofTypeMeta.Unsupported -> emptyList()
-}
+val KeyAttestationConstraints.userAuthenticationOrDefault: List<AttackPotentialResistance>
+    get() = userAuthentication.orEmpty()
+
+val ProofTypeMeta.type: ProofType
+    get() = when (this) {
+        is ProofTypeMeta.Jwt -> ProofType.JWT
+        is ProofTypeMeta.Attestation -> ProofType.ATTESTATION
+    }
+
+val ProofTypeMeta.algorithms: List<JWSAlgorithm>
+    get() = when (this) {
+        is ProofTypeMeta.Jwt -> algorithms
+        is ProofTypeMeta.Attestation -> algorithms
+    }
 
 @JvmInline
 value class ProofTypesSupported private constructor(val values: Set<ProofTypeMeta>) {
 
-    operator fun get(type: ProofType): ProofTypeMeta? = values.firstOrNull { it.type() == type }
+    operator fun get(type: ProofType): ProofTypeMeta? = values.firstOrNull { it.type == type }
 
     companion object {
         val Empty: ProofTypesSupported = ProofTypesSupported(emptySet())
+
         operator fun invoke(values: Set<ProofTypeMeta>): ProofTypesSupported {
-            require(values.groupBy(ProofTypeMeta::type).all { (_, instances) -> instances.size == 1 }) {
+            require(values.groupBy { it.type }.all { (_, instances) -> instances.size == 1 }) {
                 "Multiple instance of the same proof type are not allowed"
             }
             return ProofTypesSupported(values)
