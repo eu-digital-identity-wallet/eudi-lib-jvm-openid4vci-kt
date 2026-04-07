@@ -274,7 +274,8 @@ class IssuanceSingleRequestTest {
         val (_, outcome) = with(issuer) {
             authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
         }
-        assertIs<SubmissionOutcome.Success>(outcome)
+        val success = assertIs<SubmissionOutcome.Success>(outcome)
+        assertNull(success.selectedCredentialReusePolicy)
     }
 
     @Test

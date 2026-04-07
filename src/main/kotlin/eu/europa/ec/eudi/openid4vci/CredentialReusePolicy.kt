@@ -42,7 +42,12 @@ enum class ArfAnnex2ReuseMethod {
 /**
  * A single option in the reuse policy.
  */
-sealed interface ArfAnnex2ReusePolicyOption : Serializable {
+sealed interface ReusePolicyOption : Serializable
+
+/**
+ * A single ARF Annex II option in the reuse policy.
+ */
+sealed interface ArfAnnex2ReusePolicyOption : ReusePolicyOption {
 
     val batchSize: Int?
     val reissueTriggerUnused: Int?

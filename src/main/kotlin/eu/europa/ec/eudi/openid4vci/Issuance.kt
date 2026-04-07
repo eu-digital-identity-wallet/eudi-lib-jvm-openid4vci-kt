@@ -69,10 +69,13 @@ sealed interface SubmissionOutcome : java.io.Serializable {
      *
      * @param credentials The credentials issued
      * @param notificationId The identifier to be used in issuer's notification endpoint.
+     * @param selectedCredentialReusePolicy The supported credential reuse policy option selected by the wallet
+     * for this issuance, if any.
      */
     data class Success(
         val credentials: List<IssuedCredential>,
         val notificationId: NotificationId?,
+        val selectedCredentialReusePolicy: ReusePolicyOption? = null,
     ) : SubmissionOutcome {
         init {
             require(credentials.isNotEmpty()) { "credentials must not be empty" }

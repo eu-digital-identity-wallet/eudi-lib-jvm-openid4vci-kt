@@ -58,6 +58,8 @@ internal class RequestIssuanceImpl(
         proofsSpecification: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatchingCancellable {
         validateRequestPayload(requestPayload, credentialIdentifiers.orEmpty())
+        val credentialConfiguration = credentialSupportedById(requestPayload.credentialConfigurationIdentifier)
+        val selectedCredentialReusePolicy = selectedCredentialReusePolicy(credentialConfiguration)
 
         val (proofs, proofsDpopNonce) = buildProofs(proofsSpecification, requestPayload.credentialConfigurationIdentifier, grant)
         val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
@@ -74,7 +76,7 @@ internal class RequestIssuanceImpl(
         // Update state (maybe) with new Dpop Nonce from resource server
         val updatedAuthorizedRequest =
             this.withResourceServerDpopNonce(newResourceServerDpopNonce ?: proofsOrAuthRequestDpopNonce)
-        updatedAuthorizedRequest to outcome.toPub()
+        updatedAuthorizedRequest to outcome.withSelectedCredentialReusePolicy(selectedCredentialReusePolicy).toPub()
     }
 
     private fun validateRequestPayload(
@@ -193,18 +195,31 @@ internal class RequestIssuanceImpl(
         val reusePolicy = credentialConfiguration.credentialMetadata?.credentialReusePolicy ?: return
         when (reusePolicy) {
             is CredentialReusePolicy.ArfAnnex2ReusePolicy -> {
-                val supportedMethods = config.supportedCredentialReusePolicies
-                    .filterIsInstance<SupportedReusePolicy.ArfAnnex2ReusePolicy>()
-                    .flatMap { it.supportedReuseMethods }
-                    .toSet()
-                val hasSupported = reusePolicy.options.any { it.isSupported(supportedMethods) }
-                require(hasSupported) {
+                requireNotNull(selectedCredentialReusePolicy(credentialConfiguration)) {
                     "The configured credential reuse policies cannot support the credential's reuse policy."
                 }
             }
             else -> Unit
         }
     }
+
+    private fun selectedCredentialReusePolicy(
+        credentialConfiguration: CredentialConfiguration,
+    ): ReusePolicyOption? {
+        val reusePolicy = credentialConfiguration.credentialMetadata?.credentialReusePolicy ?: return null
+        return when (reusePolicy) {
+            is CredentialReusePolicy.ArfAnnex2ReusePolicy -> reusePolicy.options.firstOrNull {
+                it.isSupported(supportedArfAnnex2ReuseMethods())
+            }
+
+            else -> null
+        }
+    }
+
+    private fun supportedArfAnnex2ReuseMethods(): Set<ArfAnnex2ReuseMethod> = config.supportedCredentialReusePolicies
+        .filterIsInstance<SupportedReusePolicy.ArfAnnex2ReusePolicy>()
+        .flatMap { it.supportedReuseMethods }
+        .toSet()
 
     private fun credentialSupportedById(credentialId: CredentialConfigurationIdentifier): CredentialConfiguration {
         val credentialSupported =
@@ -409,6 +424,7 @@ internal sealed interface SubmissionOutcomeInternal {
     data class Success(
         val credentials: List<IssuedCredential>,
         val notificationId: NotificationId?,
+        val selectedCredentialReusePolicy: ReusePolicyOption? = null,
     ) : SubmissionOutcomeInternal
 
     data class Deferred(
@@ -426,8 +442,16 @@ internal sealed interface SubmissionOutcomeInternal {
 
     fun toPub(): SubmissionOutcome =
         when (this) {
-            is Success -> SubmissionOutcome.Success(credentials, notificationId)
+            is Success -> SubmissionOutcome.Success(credentials, notificationId, selectedCredentialReusePolicy)
             is Deferred -> SubmissionOutcome.Deferred(transactionId, interval)
             is Failed -> SubmissionOutcome.Failed(error)
+        }
+
+    fun withSelectedCredentialReusePolicy(
+        selectedCredentialReusePolicy: ReusePolicyOption?,
+    ): SubmissionOutcomeInternal =
+        when (this) {
+            is Success -> copy(selectedCredentialReusePolicy = selectedCredentialReusePolicy)
+            is Deferred, is Failed -> this
         }
 }
