@@ -249,9 +249,20 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
  */
 internal fun mobileDrivingLicense() = MsoMdocCredential(
     "MobileDrivingLicense_msoMdoc",
-    emptyList(),
+    listOf(CryptographicBindingMethod.JWK),
     listOf(CoseAlgorithm(-7), CoseAlgorithm(-35), CoseAlgorithm(-36)),
-    ProofTypesSupported.Empty,
+    ProofTypesSupported(
+        setOf(
+            ProofTypeMeta.Jwt(
+                listOf(JWSAlgorithm.ES256),
+                KeyAttestationConstraints(
+                    keyStorage = listOf(AttackPotentialResistance.Iso18045High),
+                    userAuthentication = listOf(AttackPotentialResistance.Iso18045High),
+                    null,
+                ),
+            ),
+        ),
+    ),
     CredentialMetadata(
         listOf(
             Display(

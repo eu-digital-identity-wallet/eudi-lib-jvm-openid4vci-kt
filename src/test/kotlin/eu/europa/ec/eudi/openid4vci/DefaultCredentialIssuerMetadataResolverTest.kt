@@ -132,32 +132,36 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow()
         }.credentialConfigurationsSupported
 
-        assertTrue("Expected ") {
+        assertTrue("Unexpected proofs for UniversityDegree_JWT") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_JWT")
             proofs != null && proofs.all { it.keyAttestationConstraints == KeyAttestationConstraints.None }
         }
 
-        assertTrue("Expected ") {
+        assertTrue("Unexpected proofs for MobileDrivingLicense_msoMdoc") {
             val proofs = credentialConfigs.jwtProofTypeSupported("MobileDrivingLicense_msoMdoc")
             proofs != null && proofs.all {
                 val proof = it.keyAttestationConstraints
-                proof == KeyAttestationConstraints.None
+                proof == KeyAttestationConstraints(
+                    keyStorage = listOf(AttackPotentialResistance.Iso18045High),
+                    userAuthentication = listOf(AttackPotentialResistance.Iso18045High),
+                    null,
+                )
             }
         }
 
-        assertTrue("Expected ") {
+        assertTrue("Unexpected proofs for UniversityDegree_LDP_VC") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_LDP_VC")
             proofs != null && proofs.all {
                 val proof = it.keyAttestationConstraints
                 proof == KeyAttestationConstraints(
                     keyStorage = listOf(AttackPotentialResistance.Iso18045High),
-                    userAuthentication = listOf(AttackPotentialResistance.Iso18045EnhancedBasic),
-                    preferredKeyStorageStatusPeriod = null,
+                    userAuthentication = listOf(AttackPotentialResistance.Iso18045High),
+                    null,
                 )
             }
         }
 
-        assertTrue("Expected ") {
+        assertTrue("Unexpected proofs for UniversityDegree_JWT_VC_JSON-LD") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_JWT_VC_JSON-LD")
             proofs != null && proofs.all {
                 val proof = it.keyAttestationConstraints
@@ -423,7 +427,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
     @Test
     internal fun `resolution succeeds for signed metadata that use x5c`() = runTest {
-        val credentialIssuerId = CredentialIssuerId("https://dev.issuer-backend.eudiw.dev").getOrThrow()
+        val credentialIssuerId = SampleIssuer.Id
         val resolver = resolver(
             credentialIssuerMetaDataHandler(
                 credentialIssuerId,
