@@ -138,7 +138,7 @@ sealed interface ProofsSpecification {
 
     data object NoProofs : ProofsSpecification
 
-    data class JwtProofs(
+    data class JwtProof(
         val proofSignerProvider: suspend (Nonce?, PositiveDuration?) -> Signer<KeyAttestationJWT>,
     ) : ProofsSpecification
 
