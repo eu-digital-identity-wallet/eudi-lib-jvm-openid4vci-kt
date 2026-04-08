@@ -58,6 +58,7 @@ object CryptoGenerator {
     fun jwtProofSpec(
         curve: Curve = Curve.P_256,
         attestedKeysCount: Int = 3,
+        keyAttestationJwt: suspend (List<JWK>, Nonce?) -> KeyAttestationJWT = CryptoGenerator::keyAttestationJwt,
     ): ProofsSpecification {
         val ecKeys = List(attestedKeysCount) { randomECSigningKey(curve) }
         val signerProvider: suspend (Nonce?) -> Signer<KeyAttestationJWT> = { cNonce ->
@@ -65,7 +66,7 @@ object CryptoGenerator {
                 ecPrivateKey = ecKeys[0],
                 keyInfo =
                     keyAttestationJwt(
-                        attestedKeys = ecKeys.map { it.toPublicJWK() },
+                        ecKeys.map { it.toPublicJWK() },
                         cNonce,
                     ),
                 secureRandom = null,
@@ -78,6 +79,7 @@ object CryptoGenerator {
     fun attestationProofSpec(
         curve: Curve = Curve.P_256,
         keysNo: Int = 3,
+        keyAttestationJwt: suspend (List<JWK>, Nonce?) -> KeyAttestationJWT = CryptoGenerator::keyAttestationJwt,
     ) =
         ProofsSpecification.AttestationProof { nonce ->
             keyAttestationJwt(
