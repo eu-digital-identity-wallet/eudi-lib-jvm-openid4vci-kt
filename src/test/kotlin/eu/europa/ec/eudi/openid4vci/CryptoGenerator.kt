@@ -72,7 +72,7 @@ object CryptoGenerator {
                 provider = null,
             )
         }
-        return ProofsSpecification.JwtProofs(signerProvider, 1)
+        return ProofsSpecification.JwtProofs(signerProvider, 0)
     }
 
     fun attestationProofSpec(

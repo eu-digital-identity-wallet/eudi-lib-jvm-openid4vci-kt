@@ -318,18 +318,6 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
     class InvalidEncryptionParameters : CredentialIssuanceError("InvalidEncryptionParameters")
 
     /**
-     * Issuance server does not support batch credential requests
-     */
-    class IssuerDoesNotSupportBatchIssuance : CredentialIssuanceError("IssuerDoesNotSupportBatchIssuance")
-
-    /**
-     * Issuance server provides supports batch_size which is
-     * smaller than the number of proofs the caller provided.
-     */
-    class IssuerBatchSizeLimitExceeded(val batchSize: Int) :
-        CredentialIssuanceError("IssuerBatchSizeLimitExceeded $batchSize")
-
-    /**
      * Issuance server does not support deferred credential issuance
      */
     class IssuerDoesNotSupportDeferredIssuance : CredentialIssuanceError("IssuerDoesNotSupportDeferredIssuance")

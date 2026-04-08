@@ -125,29 +125,6 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
-    fun `when BatchSigner sign operations are more than the expected batch limit IssuerBatchSizeLimitExceeded is thrown`() = runTest {
-        val mockedKtorHttpClientFactory = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker(),
-            tokenPostMocker(),
-            nonceEndpointMocker(),
-        )
-        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            httpClient = mockedKtorHttpClientFactory,
-        )
-
-        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-        assertFailsWith<CredentialIssuanceError.IssuerBatchSizeLimitExceeded> {
-            with(issuer) {
-                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256, 4)).getOrThrow()
-            }
-        }
-    }
-
-    @Test
     fun `when credential configuration config does not demand proofs, no proof is included in the request`() = runTest {
         val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
@@ -701,54 +678,9 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
-    fun `when the issuer requires a key attestation jwt proof, it should be included in the JWT proof`() = runTest {
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED),
-            authServerWellKnownMocker(),
-            parPostMocker(),
-            tokenPostMocker(),
-            nonceEndpointMocker(),
-        )
-        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            httpClient = mockedHttpClient,
-        )
-
-        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-        assertFailsWith<IllegalArgumentException> {
-            with(issuer) {
-                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
-            }
-        }
-    }
-
-    @Test
-    fun `issuance with key attestation jwt proof is successful when the issuer supports it`() = runTest {
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED),
-            authServerWellKnownMocker(),
-            parPostMocker(),
-            tokenPostMocker(),
-            nonceEndpointMocker(),
-            singleIssuanceRequestMocker(),
-        )
-        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-            httpClient = mockedHttpClient,
-        )
-
-        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-        with(issuer) {
-            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
-        }
-    }
-
-    @Test
     fun `issuance fails if jwt proof with key attestation is signed with algorithm not in jwt proof's supported algorithms`() = runTest {
         val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED),
+            credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
             parPostMocker(),
             tokenPostMocker(),

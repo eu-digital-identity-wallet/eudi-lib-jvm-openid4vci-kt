@@ -66,7 +66,7 @@ class IssuanceBatchRequestTest {
                         assertNotNull(jwtProofs, "Jwt Proofs expected")
                         assertEquals(1, jwtProofs.size, "Exactly one Jwt Proof expected")
                         val keyAttestation =
-                            KeyAttestationJWT(SignedJWT.parse(jwtProofs.first()).header.getCustomParam("attestation") as String)
+                            KeyAttestationJWT(SignedJWT.parse(jwtProofs.first()).header.getCustomParam("key_attestation") as String)
                         assertEquals(3, keyAttestation.attestedKeys.size, "Exactly three attested keys expected")
                     }
                 },
