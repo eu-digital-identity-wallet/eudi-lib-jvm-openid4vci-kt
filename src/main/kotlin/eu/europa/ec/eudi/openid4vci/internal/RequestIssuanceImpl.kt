@@ -244,7 +244,7 @@ internal class RequestIssuanceImpl(
         val jwtProof = proofSigner.use { operation ->
             operation.publicMaterial.ensureKeyAttestationJwtAlgIsSupported(proofRequirement)
             operation.publicMaterial.attestedKeys.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
-            val signer = KeyAttestationJwtProofSigner(joseAlg, operation, ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX)
+            val signer = JwtProofSigner(joseAlg, operation, ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX)
             val signedJwt = signer.sign(claims)
             SignedJWT.parse(signedJwt)
         }
