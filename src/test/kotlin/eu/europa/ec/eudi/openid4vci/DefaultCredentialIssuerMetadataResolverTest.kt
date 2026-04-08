@@ -154,8 +154,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             proofs != null && proofs.all {
                 val proof = it.keyAttestationConstraints
                 proof == KeyAttestationConstraints(
-                    keyStorage = listOf(AttackPotentialResistance.Iso18045High),
-                    userAuthentication = listOf(AttackPotentialResistance.Iso18045High),
+                    keyStorage = listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
+                    userAuthentication = null,
                     null,
                 )
             }
