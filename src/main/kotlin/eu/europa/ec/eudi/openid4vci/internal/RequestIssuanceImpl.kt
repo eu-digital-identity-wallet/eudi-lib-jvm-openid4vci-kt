@@ -187,7 +187,7 @@ internal class RequestIssuanceImpl(
         val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
         val jwtProof = proofSigner.use { operation ->
             operation.publicMaterial.ensureKeyAttestationJwtAlgIsSupported(credentialConfigId, ProofType.JWT)
-            val signer = KeyAttestationJwtProofSigner(joseAlg, operation, keyIndex)
+            val signer = JwtProofSigner(joseAlg, operation, keyIndex)
             val signedJwt = signer.sign(claims)
             SignedJWT.parse(signedJwt)
         }
