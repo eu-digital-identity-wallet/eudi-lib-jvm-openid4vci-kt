@@ -108,7 +108,7 @@ internal class RequestIssuanceImpl(
         return when (proofsSpecification) {
             is ProofsSpecification.NoProofs -> emptyList<Proof>() to null
 
-            is ProofsSpecification.JwtProofs -> {
+            is ProofsSpecification.JwtProof -> {
                 val cNonceAndDPoPNonce = cNonce()
                 val proofs = listOf(
                     jwtProof(
@@ -146,7 +146,7 @@ internal class RequestIssuanceImpl(
                 }
             }
 
-            is ProofsSpecification.JwtProofs -> {
+            is ProofsSpecification.JwtProof -> {
                 val proofRequirement = proofTypesSupported[ProofType.JWT]
                 requireNotNull(proofRequirement) {
                     "Credential configuration doesn't support JWT proofs."
@@ -173,7 +173,7 @@ internal class RequestIssuanceImpl(
     }
 
     private suspend fun jwtProof(
-        proofsSpecification: ProofsSpecification.JwtProofs,
+        proofsSpecification: ProofsSpecification.JwtProof,
         credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
         cNonce: Nonce?,
