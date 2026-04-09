@@ -33,6 +33,7 @@ dependencies {
     api(libs.ktor.client.core)
     api(libs.ktor.client.content.negotiation)
     api(libs.ktor.client.serialization)
+    api(libs.kotlinx.serialization.json)
     api(libs.ktor.serialization.kotlinx.json)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.jsoup)

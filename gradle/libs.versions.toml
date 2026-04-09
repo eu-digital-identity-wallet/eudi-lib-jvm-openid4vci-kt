@@ -15,6 +15,7 @@ logback = "1.5.18"
 kover = "0.9.1"
 tink = "1.17.0"
 bouncycastle = "1.83"
+serialization = "1.9.0"
 
 [libraries]
 nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
@@ -33,6 +34,7 @@ cbor = { module = "co.nstant.in:cbor", version.ref = "cbor" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 
 [plugins]
 dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependency-check" }
