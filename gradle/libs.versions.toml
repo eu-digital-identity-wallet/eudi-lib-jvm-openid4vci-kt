@@ -2,7 +2,7 @@
 java = "17"
 kotlin = "2.2.21"
 coroutines = "1.10.2"
-dependency-check = "12.1.1"
+dependency-check = "12.2.0"
 spotless = "7.0.2"
 nimbus-sdk = "11.37"
 ktor = "3.3.3"
