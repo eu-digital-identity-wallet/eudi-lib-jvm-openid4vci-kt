@@ -28,7 +28,6 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
-import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
 import java.security.KeyFactory
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
@@ -56,22 +55,10 @@ object CryptoGenerator {
         )
     }
 
-    fun noKeyAttestationJwtProofsSpec(
-        curve: Curve = Curve.P_256,
-        keysNo: Int = 1,
-    ): ProofsSpecification {
-        val ecKeys = List(keysNo) { randomECSigningKey(curve) }
-        val batchSigner = BatchSigner.fromNimbusEcKeys(
-            ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
-            secureRandom = null,
-            provider = null,
-        )
-        return ProofsSpecification.JwtProofs.NoKeyAttestation(batchSigner)
-    }
-
-    fun keyAttestationJwtProofsSpec(
+    fun jwtProofSpec(
         curve: Curve = Curve.P_256,
         attestedKeysCount: Int = 3,
+        keyAttestationJwt: suspend (List<JWK>, Nonce?) -> KeyAttestationJWT = CryptoGenerator::keyAttestationJwt,
     ): ProofsSpecification {
         val ecKeys = List(attestedKeysCount) { randomECSigningKey(curve) }
         val signerProvider: suspend (Nonce?) -> Signer<KeyAttestationJWT> = { cNonce ->
@@ -79,19 +66,20 @@ object CryptoGenerator {
                 ecPrivateKey = ecKeys[0],
                 keyInfo =
                     keyAttestationJwt(
-                        attestedKeys = ecKeys.map { it.toPublicJWK() },
+                        ecKeys.map { it.toPublicJWK() },
                         cNonce,
                     ),
                 secureRandom = null,
                 provider = null,
             )
         }
-        return ProofsSpecification.JwtProofs.WithKeyAttestation(signerProvider, 1)
+        return ProofsSpecification.JwtProof(signerProvider, 0)
     }
 
     fun attestationProofSpec(
         curve: Curve = Curve.P_256,
         keysNo: Int = 3,
+        keyAttestationJwt: suspend (List<JWK>, Nonce?) -> KeyAttestationJWT = CryptoGenerator::keyAttestationJwt,
     ) =
         ProofsSpecification.AttestationProof { nonce ->
             keyAttestationJwt(

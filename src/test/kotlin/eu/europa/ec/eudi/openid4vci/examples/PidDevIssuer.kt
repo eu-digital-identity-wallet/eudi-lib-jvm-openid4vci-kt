@@ -17,16 +17,19 @@ package eu.europa.ec.eudi.openid4vci.examples
 
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
+import io.ktor.http.Url
 
 private const val BASE_URL = "https://dev.issuer-backend.eudiw.dev"
 private val IssuerId = CredentialIssuerId(BASE_URL).getOrThrow()
+private val KeyAttestationServiceUrl = Url("https://dev.wallet-provider.eudiw.dev/wallet-unit-attestation/jwk-set")
 
 internal object PidDevIssuer :
     HasIssuerId,
     HasTestUser<KeycloakUser>,
     CanAuthorizeIssuance<KeycloakUser> by Keycloak,
     CanBeUsedWithVciLib,
-    CanRequestForCredentialOffer<KeycloakUser> by CanRequestForCredentialOffer.onlyStatelessAuthorizationCode(IssuerId) {
+    CanRequestForCredentialOffer<KeycloakUser> by CanRequestForCredentialOffer.onlyStatelessAuthorizationCode(IssuerId),
+    CanRequestKeyAttestation by CanRequestKeyAttestation.usingWalletProviderService(KeyAttestationServiceUrl) {
 
     private const val WALLET_CLIENT_ID = "wallet-dev"
 

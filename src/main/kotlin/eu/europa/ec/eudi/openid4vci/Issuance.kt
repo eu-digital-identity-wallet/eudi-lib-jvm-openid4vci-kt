@@ -135,17 +135,10 @@ sealed interface ProofsSpecification {
 
     data object NoProofs : ProofsSpecification
 
-    sealed interface JwtProofs : ProofsSpecification {
-
-        data class NoKeyAttestation(
-            val proofsSigner: BatchSigner<JwtBindingKey>,
-        ) : JwtProofs
-
-        data class WithKeyAttestation(
-            val proofSignerProvider: suspend (Nonce?) -> Signer<KeyAttestationJWT>,
-            val keyIndex: Int,
-        ) : JwtProofs
-    }
+    data class JwtProof(
+        val proofSignerProvider: suspend (Nonce?) -> Signer<KeyAttestationJWT>,
+        val keyIndex: Int,
+    ) : ProofsSpecification
 
     data class AttestationProof(
         val attestationProvider: suspend (Nonce?) -> KeyAttestationJWT,
@@ -323,18 +316,6 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
      * Invalid encryption parameters passed to issuance server
      */
     class InvalidEncryptionParameters : CredentialIssuanceError("InvalidEncryptionParameters")
-
-    /**
-     * Issuance server does not support batch credential requests
-     */
-    class IssuerDoesNotSupportBatchIssuance : CredentialIssuanceError("IssuerDoesNotSupportBatchIssuance")
-
-    /**
-     * Issuance server provides supports batch_size which is
-     * smaller than the number of proofs the caller provided.
-     */
-    class IssuerBatchSizeLimitExceeded(val batchSize: Int) :
-        CredentialIssuanceError("IssuerBatchSizeLimitExceeded $batchSize")
 
     /**
      * Issuance server does not support deferred credential issuance

@@ -31,7 +31,7 @@ internal data class JwtProofClaims(
     @SerialName("nonce") val nonce: String? = null,
 )
 
-internal class KeyAttestationJwtProofSigner(
+internal class JwtProofSigner(
     private val algorithm: JWSAlgorithm,
     private val signOperation: SignOperation<KeyAttestationJWT>,
     private val keyIndex: Int,
@@ -40,38 +40,11 @@ internal class KeyAttestationJwtProofSigner(
         JwtSigner<JwtProofClaims, KeyAttestationJWT>(
             signOperation = signOperation,
             algorithm = algorithm,
-            customizeHeader = { key -> keyAttestationJwtProofHeader(key, keyIndex) },
+            customizeHeader = { key -> keyAttestationHeader(key, keyIndex) },
         ).sign(claims)
 }
 
-internal class JwtProofsSigner(
-    private val algorithm: JWSAlgorithm,
-    private val batchSignOperation: BatchSignOperation<JwtBindingKey>,
-) {
-    suspend fun sign(claims: JwtProofClaims): List<Pair<JwtBindingKey, String>> =
-        JwtBatchSigner<JwtProofClaims, JwtBindingKey>(
-            algorithm = algorithm,
-            batchSignOperation = batchSignOperation,
-            customizeHeader = { pubKey -> jwtProofHeader(pubKey) },
-        ).sign(claims)
-}
-
-internal fun JsonObjectBuilder.jwtProofHeader(key: JwtBindingKey) {
-    put("typ", OpenId4VCISpec.JWT_PROOF_TYPE)
-    when (key) {
-        is JwtBindingKey.Did -> {
-            put(OpenId4VCISpec.JOSE_HEADER_KEY_ID, key.identity)
-        }
-        is JwtBindingKey.Jwk -> {
-            put(OpenId4VCISpec.JOSE_HEADER_JWK, key.jwk.asJsonElement())
-        }
-        is JwtBindingKey.X509 -> {
-            put(OpenId4VCISpec.JOSE_HEADER_X5C, key.chain.asJsonElement())
-        }
-    }
-}
-
-internal fun JsonObjectBuilder.keyAttestationJwtProofHeader(keyAttestation: KeyAttestationJWT, keyIndex: Int) {
+private fun JsonObjectBuilder.keyAttestationHeader(keyAttestation: KeyAttestationJWT, keyIndex: Int) {
     check(keyIndex in keyAttestation.attestedKeys.indices) {
         "Key index $keyIndex is out of bounds for attested keys: $keyAttestation.attestedKeys.size"
     }

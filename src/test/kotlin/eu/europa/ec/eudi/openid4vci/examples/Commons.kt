@@ -18,8 +18,7 @@ package eu.europa.ec.eudi.openid4vci.examples
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.attestationProofSpec
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.keyAttestationJwtProofsSpec
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.noKeyAttestationJwtProofsSpec
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofSpec
 import io.ktor.client.*
 import io.ktor.client.engine.apache.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -83,25 +82,23 @@ sealed interface ProofsType {
     val batchOption: BatchOption
 
     @JvmInline
-    value class JwtProofsNoKeyAttestation(override val batchOption: BatchOption) : ProofsType
-
-    @JvmInline
-    value class JwtProofWithKeyAttestation(override val batchOption: BatchOption) : ProofsType
+    value class JwtProof(override val batchOption: BatchOption) : ProofsType
 
     @JvmInline
     value class AttestationProof(override val batchOption: BatchOption) : ProofsType
 }
 
-suspend fun Issuer.submitCredentialRequest(
+suspend fun <ENV> Issuer.submitCredentialRequest(
+    env: ENV,
     authorizedRequest: AuthorizedRequest,
     credentialConfigurationId: CredentialConfigurationIdentifier =
         credentialOffer.credentialConfigurationIdentifiers.first(),
     proofsType: ProofsType,
-): AuthorizedRequestAnd<SubmissionOutcome> {
+): AuthorizedRequestAnd<SubmissionOutcome>
+    where ENV : CanRequestKeyAttestation {
     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-    val batchOption = proofsType.batchOption
     val proofsNo =
-        when (batchOption) {
+        when (val batchOption = proofsType.batchOption) {
             BatchOption.DontUse -> 1
             BatchOption.MaxProofs -> when (val batchIssuance = credentialOffer.credentialIssuerMetadata.batchCredentialIssuance) {
                 BatchCredentialIssuance.NotSupported -> 1
@@ -115,9 +112,14 @@ suspend fun Issuer.submitCredentialRequest(
         }
 
     val proofSpec: ProofsSpecification = when (proofsType) {
-        is ProofsType.JwtProofsNoKeyAttestation -> noKeyAttestationJwtProofsSpec(Curve.P_256, proofsNo)
-        is ProofsType.JwtProofWithKeyAttestation -> keyAttestationJwtProofsSpec(Curve.P_256, proofsNo)
-        is ProofsType.AttestationProof -> attestationProofSpec(keysNo = proofsNo)
+        is ProofsType.JwtProof -> jwtProofSpec(
+            Curve.P_256,
+            proofsNo,
+        ) { attestedKeys, cNonce -> env.requestKeyAttestation(attestedKeys, cNonce) }
+
+        is ProofsType.AttestationProof -> attestationProofSpec(
+            keysNo = proofsNo,
+        ) { attestedKeys, cNonce -> env.requestKeyAttestation(attestedKeys, cNonce) }
     }
     return authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
 }
@@ -152,24 +154,27 @@ suspend fun <ENV, USER> Issuer.testIssuanceWithAuthorizationCodeFlow(
     httpClient: HttpClient,
 ) where
       ENV : HasTestUser<USER>,
-      ENV : CanAuthorizeIssuance<USER> =
+      ENV : CanAuthorizeIssuance<USER>,
+      ENV : CanRequestKeyAttestation =
     coroutineScope {
         val authorizedReq = authorizeUsingAuthorizationCodeFlow(env, httpClient)
         val (updatedAuthorizedReq, outcome) =
-            submitCredentialRequest(authorizedReq, credCfgId, proofsType)
+            submitCredentialRequest(env, authorizedReq, credCfgId, proofsType)
 
         ensureIssued(updatedAuthorizedReq, outcome, httpClient)
     }
 
-suspend fun Issuer.testIssuanceWithPreAuthorizedCodeFlow(
+suspend fun <ENV> Issuer.testIssuanceWithPreAuthorizedCodeFlow(
+    env: ENV,
     txCode: String?,
     credCfgId: CredentialConfigurationIdentifier,
     proofsType: ProofsType,
     httpClient: HttpClient,
-) = coroutineScope {
+) where
+      ENV : CanRequestKeyAttestation = coroutineScope {
     val (authorized, outcome) = run {
         val authorizedRequest = authorizeWithPreAuthorizationCode(txCode).getOrThrow()
-        submitCredentialRequest(authorizedRequest, credCfgId, proofsType)
+        submitCredentialRequest(env, authorizedRequest, credCfgId, proofsType)
     }
     ensureIssued(authorized, outcome, httpClient)
 }
@@ -234,13 +239,14 @@ suspend fun handleDeferred(
  */
 suspend fun <ENV, USER> ENV.testIssuanceWithAuthorizationCodeFlow(
     credCfgId: CredentialConfigurationIdentifier,
-    proofsType: ProofsType = ProofsType.JwtProofsNoKeyAttestation(batchOption = BatchOption.DontUse),
+    proofsType: ProofsType = ProofsType.JwtProof(batchOption = BatchOption.DontUse),
     httpClient: HttpClient,
 ) where
       ENV : HasTestUser<USER>,
       ENV : CanAuthorizeIssuance<USER>,
       ENV : CanBeUsedWithVciLib,
-      ENV : CanRequestForCredentialOffer<USER> {
+      ENV : CanRequestForCredentialOffer<USER>,
+      ENV : CanRequestKeyAttestation {
     val credentialOfferUri = requestAuthorizationCodeGrantOffer(credCfgIds = setOf(credCfgId))
     val issuer = assertDoesNotThrow {
         createIssuer(credentialOfferUri.toString(), httpClient)
@@ -263,7 +269,11 @@ suspend fun <ENV, USER> ENV.testIssuanceWithPreAuthorizedCodeFlow(
     credentialOfferEndpoint: String? = null,
     proofsOptions: ProofsType,
     httpClient: HttpClient,
-) where ENV : CanBeUsedWithVciLib, ENV : HasTestUser<USER>, ENV : CanRequestForCredentialOffer<USER> {
+) where
+      ENV : CanBeUsedWithVciLib,
+      ENV : HasTestUser<USER>,
+      ENV : CanRequestForCredentialOffer<USER>,
+      ENV : CanRequestKeyAttestation {
     val credentialOfferUri = requestPreAuthorizedCodeGrantOffer(
         setOf(credCfgId),
         txCode = txCode,
@@ -276,6 +286,7 @@ suspend fun <ENV, USER> ENV.testIssuanceWithPreAuthorizedCodeFlow(
         val credCfg = credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credCfgId]
         assertNotNull(credCfg)
         testIssuanceWithPreAuthorizedCodeFlow(
+            env = this@testIssuanceWithPreAuthorizedCodeFlow,
             txCode = txCode,
             credCfgId = credCfgId,
             proofsType = proofsOptions,
