@@ -36,6 +36,7 @@ import java.time.Clock
  * Sealed hierarchy of possible responses to an Access Token request.
  */
 internal sealed interface TokenResponseTO {
+
     /**
      * Successful request submission.
      *
@@ -70,21 +71,18 @@ internal sealed interface TokenResponseTO {
         when (this) {
             is Success -> {
                 TokenResponse(
-                    accessToken =
-                        AccessToken(
-                            accessToken = accessToken,
-                            expiresInSec = expiresIn,
-                            useDPoP = DPoP.equals(other = tokenType, ignoreCase = true),
-                        ),
+                    accessToken = AccessToken(
+                        accessToken = accessToken,
+                        expiresInSec = expiresIn,
+                        useDPoP = DPoP.equals(other = tokenType, ignoreCase = true),
+                    ),
                     refreshToken = refreshToken?.let { RefreshToken(it) },
                     authorizationDetails = authorizationDetails ?: emptyMap(),
                     timestamp = clock.instant(),
                 )
             }
 
-            is Failure -> {
-                throw AccessTokenRequestFailed(error, errorDescription)
-            }
+            is Failure -> throw AccessTokenRequestFailed(error, errorDescription)
         }
 }
 
@@ -100,6 +98,7 @@ internal class TokenEndpointClient(
     private val clientAttestationPoPBuilder: ClientAttestationPoPBuilder,
     private val httpClient: HttpClient,
 ) {
+
     private val isCredentialIssuerAuthorizationServer: Boolean
         get() = credentialIssuerId.toString() == authServerId.toString()
 
@@ -141,23 +140,21 @@ internal class TokenEndpointClient(
         pkceVerifier: PKCEVerifier,
         credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
         dpopNonce: Nonce?,
-    ): Result<Pair<TokenResponse, Nonce?>> =
-        runCatchingCancellable {
-            // Append authorization_details form param if needed
-            val authDetails =
-                credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
-                    authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
-                }
-            val params =
-                TokenEndpointForm.authCodeFlow(
-                    clientId = clientAuthentication.id,
-                    authorizationCode = authorizationCode,
-                    redirectionURI = authFlowRedirectionURI,
-                    pkceVerifier = pkceVerifier,
-                    authorizationDetails = authDetails,
-                )
-            placeTokenRequest(params, dpopNonce)
+    ): Result<Pair<TokenResponse, Nonce?>> = runCatchingCancellable {
+        // Append authorization_details form param if needed
+        val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
+            authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
         }
+        val params =
+            TokenEndpointForm.authCodeFlow(
+                clientId = clientAuthentication.id,
+                authorizationCode = authorizationCode,
+                redirectionURI = authFlowRedirectionURI,
+                pkceVerifier = pkceVerifier,
+                authorizationDetails = authDetails,
+            )
+        placeTokenRequest(params, dpopNonce)
+    }
 
     /**
      * Submits a request for access token in authorization server's token endpoint passing parameters specific to the
@@ -174,22 +171,20 @@ internal class TokenEndpointClient(
         txCode: String?,
         credConfigIdsAsAuthDetails: List<CredentialConfigurationIdentifier> = emptyList(),
         dpopNonce: Nonce?,
-    ): Result<Pair<TokenResponse, Nonce?>> =
-        runCatchingCancellable {
-            // Append authorization_details form param if needed
-            val authDetails =
-                credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
-                    authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
-                }
-            val params =
-                TokenEndpointForm.preAuthCodeFlow(
-                    clientId = clientAuthentication.id,
-                    preAuthorizedCode = preAuthorizedCode,
-                    txCode = txCode,
-                    authorizationDetails = authDetails,
-                )
-            placeTokenRequest(params, dpopNonce)
+    ): Result<Pair<TokenResponse, Nonce?>> = runCatchingCancellable {
+        // Append authorization_details form param if needed
+        val authDetails = credConfigIdsAsAuthDetails.takeIf { it.isNotEmpty() }?.let {
+            authorizationDetailsFormParam(credConfigIdsAsAuthDetails)
         }
+        val params =
+            TokenEndpointForm.preAuthCodeFlow(
+                clientId = clientAuthentication.id,
+                preAuthorizedCode = preAuthorizedCode,
+                txCode = txCode,
+                authorizationDetails = authDetails,
+            )
+        placeTokenRequest(params, dpopNonce)
+    }
 
     /**
      * Submits a request for refreshing an access token in authorization server's token endpoint passing
@@ -202,11 +197,10 @@ internal class TokenEndpointClient(
     suspend fun refreshAccessToken(
         refreshToken: RefreshToken,
         dpopNonce: Nonce?,
-    ): Result<Pair<TokenResponse, Nonce?>> =
-        runCatchingCancellable {
-            val params = TokenEndpointForm.refreshAccessToken(clientAuthentication.id, refreshToken)
-            placeTokenRequest(params, dpopNonce)
-        }
+    ): Result<Pair<TokenResponse, Nonce?>> = runCatchingCancellable {
+        val params = TokenEndpointForm.refreshAccessToken(clientAuthentication.id, refreshToken)
+        placeTokenRequest(params, dpopNonce)
+    }
 
     private suspend fun placeTokenRequest(
         params: Map<String, String>,
@@ -218,35 +212,26 @@ internal class TokenEndpointClient(
             retriedAbcaChallenge: Boolean,
             retriedDPoPNonce: Boolean,
         ): Pair<TokenResponseTO, Nonce?> {
-            val abcaChallenge =
-                when (clientAuthentication) {
-                    is ClientAuthentication.AttestationBased -> {
-                        existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
-                    }
+            val abcaChallenge = when (clientAuthentication) {
+                is ClientAuthentication.AttestationBased ->
+                    existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
+                else -> null
+            }
 
-                    else -> {
-                        null
-                    }
+            val response = run {
+                val formParameters = Parameters.build {
+                    params.entries.forEach { (k, v) -> append(k, v) }
                 }
+                val dpopProof =
+                    dPoPJwtFactory?.createDPoPJwt(Htm.POST, tokenEndpoint, null, existingDpopNonce)
+                        ?.getOrThrow()?.serialize()
+                val clientAttestation = generateClientAttestationIfNeeded(abcaChallenge)
 
-            val response =
-                run {
-                    val formParameters =
-                        Parameters.build {
-                            params.entries.forEach { (k, v) -> append(k, v) }
-                        }
-                    val dpopProof =
-                        dPoPJwtFactory
-                            ?.createDPoPJwt(Htm.POST, tokenEndpoint, null, existingDpopNonce)
-                            ?.getOrThrow()
-                            ?.serialize()
-                    val clientAttestation = generateClientAttestationIfNeeded(abcaChallenge)
-
-                    httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
-                        dpopProof?.let { header(DPoP, it) }
-                        clientAttestation?.let(::clientAttestationHeaders)
-                    }
+                httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
+                    dpopProof?.let { header(DPoP, it) }
+                    clientAttestation?.let(::clientAttestationHeaders)
                 }
+            }
 
             return when {
                 response.status.isSuccess() -> {
@@ -286,51 +271,45 @@ internal class TokenEndpointClient(
                             )
                         }
 
-                        else -> {
-                            errorTO to (newDopNonce ?: existingDpopNonce)
-                        }
+                        else -> errorTO to (newDopNonce ?: existingDpopNonce)
                     }
                 }
 
-                else -> {
-                    throw AccessTokenRequestFailed("Token request failed with ${response.status}", "N/A")
-                }
+                else -> throw AccessTokenRequestFailed("Token request failed with ${response.status}", "N/A")
             }
         }
 
-        val (responseTO, newDopNonce) =
-            requestInternal(
-                existingAbcaChallenge = null,
-                existingDpopNonce = dpopNonce,
-                retriedAbcaChallenge = false,
-                retriedDPoPNonce = false,
-            )
+        val (responseTO, newDopNonce) = requestInternal(
+            existingAbcaChallenge = null,
+            existingDpopNonce = dpopNonce,
+            retriedAbcaChallenge = false,
+            retriedDPoPNonce = false,
+        )
         return responseTO.tokensOrFail(clock) to newDopNonce
     }
 
-    private fun authorizationDetailsFormParam(credentialConfigurationIds: List<CredentialConfigurationIdentifier>): String {
+    private fun authorizationDetailsFormParam(
+        credentialConfigurationIds: List<CredentialConfigurationIdentifier>,
+    ): String {
         require(credentialConfigurationIds.isNotEmpty())
-        return credentialConfigurationIds
-            .map {
-                it.toNimbusAuthDetail(
-                    includeLocations = isCredentialIssuerAuthorizationServer,
-                    credentialIssuerId = credentialIssuerId,
-                )
-            }.toFormParamString()
+        return credentialConfigurationIds.map {
+            it.toNimbusAuthDetail(
+                includeLocations = isCredentialIssuerAuthorizationServer,
+                credentialIssuerId = credentialIssuerId,
+            )
+        }
+            .toFormParamString()
     }
 
     private suspend fun generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
         when (clientAuthentication) {
-            is ClientAuthentication.AttestationBased -> {
+            is ClientAuthentication.AttestationBased ->
                 with(clientAttestationPoPBuilder) {
                     val popJWT = clientAuthentication.attestationPoPJWT(clock, authServerId, challenge)
                     clientAuthentication.attestationJWT to popJWT
                 }
-            }
 
-            else -> {
-                null
-            }
+            else -> null
         }
 }
 

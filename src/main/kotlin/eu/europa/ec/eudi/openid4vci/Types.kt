@@ -43,45 +43,38 @@ const val FORMAT_W3C_SIGNED_JWT = "jwt_vc_json"
  * A [URI] that strictly uses the 'https' protocol.
  */
 @JvmInline
-value class HttpsUrl private constructor(
-    val value: URL,
-) {
+value class HttpsUrl private constructor(val value: URL) {
+
     override fun toString(): String = value.toString()
 
     companion object {
+
         /**
          * Parses the provided [value] as a [URI] and tries creates a new [HttpsUrl].
          */
-        operator fun invoke(value: String): Result<HttpsUrl> =
-            runCatching {
-                val uri = URI.create(value)
-                require(uri.scheme.contentEquals("https", true)) { "URL must use https protocol" }
-                HttpsUrl(uri.toURL())
-            }
+        operator fun invoke(value: String): Result<HttpsUrl> = runCatching {
+            val uri = URI.create(value)
+            require(uri.scheme.contentEquals("https", true)) { "URL must use https protocol" }
+            HttpsUrl(uri.toURL())
+        }
     }
 }
 
 @JvmInline
 @Serializable
-value class CredentialConfigurationIdentifier(
-    val value: String,
-) {
+value class CredentialConfigurationIdentifier(val value: String) {
     init {
         require(value.isNotEmpty()) { "value cannot be empty" }
     }
-
     override fun toString(): String = value
 }
 
 @JvmInline
 @Serializable
-value class CredentialIdentifier(
-    val value: String,
-) {
+value class CredentialIdentifier(val value: String) {
     init {
         require(value.isNotEmpty()) { "value cannot be empty" }
     }
-
     override fun toString(): String = value
 }
 
@@ -101,18 +94,13 @@ data class PKCEVerifier(
 interface CanExpire {
     val expiresIn: Duration?
 
-    fun isExpired(
-        issued: Instant,
-        at: Instant,
-    ): Boolean {
+    fun isExpired(issued: Instant, at: Instant): Boolean {
         require(issued.isBefore(at) || issued == at) { "At should be after or equal to $issued" }
         val expiresIn = expiresIn
         return if (expiresIn != null) {
             val expiration = issued.plusSeconds(expiresIn.toSeconds())
             !expiration.isAfter(at)
-        } else {
-            false
-        }
+        } else false
     }
 }
 
@@ -122,15 +110,11 @@ interface CanExpire {
  * [Bearer] is the usual bearer access token
  * [DPoP] is an access token that must be used with a DPoP JWT
  */
-sealed interface AccessToken :
-    CanExpire,
-    java.io.Serializable {
+sealed interface AccessToken : CanExpire, java.io.Serializable {
+
     val accessToken: String
 
-    data class Bearer(
-        override val accessToken: String,
-        override val expiresIn: Duration?,
-    ) : AccessToken {
+    data class Bearer(override val accessToken: String, override val expiresIn: Duration?) : AccessToken {
         init {
             requireNotEmpty(accessToken)
             if (expiresIn != null) {
@@ -139,10 +123,7 @@ sealed interface AccessToken :
         }
     }
 
-    data class DPoP(
-        override val accessToken: String,
-        override val expiresIn: Duration?,
-    ) : AccessToken {
+    data class DPoP(override val accessToken: String, override val expiresIn: Duration?) : AccessToken {
         init {
             requireNotEmpty(accessToken)
             if (expiresIn != null) {
@@ -152,17 +133,11 @@ sealed interface AccessToken :
     }
 
     companion object {
-        operator fun invoke(
-            accessToken: String,
-            expiresInSec: Long?,
-            useDPoP: Boolean,
-        ): AccessToken {
+        operator fun invoke(accessToken: String, expiresInSec: Long?, useDPoP: Boolean): AccessToken {
             requireNotEmpty(accessToken)
             val expiresIn = expiresInSec?.let { Duration.ofSeconds(it) }
-            return if (useDPoP)
-                DPoP(accessToken, expiresIn)
-            else
-                Bearer(accessToken, expiresIn)
+            return if (useDPoP) DPoP(accessToken, expiresIn)
+            else Bearer(accessToken, expiresIn)
         }
 
         private fun requireNotEmpty(accessToken: String) {
@@ -172,13 +147,10 @@ sealed interface AccessToken :
 }
 
 @JvmInline
-value class RefreshToken(
-    val refreshToken: String,
-) : java.io.Serializable {
+value class RefreshToken(val refreshToken: String) : java.io.Serializable {
     init {
         require(refreshToken.isNotEmpty()) { "Refresh Token must not be empty" }
     }
-
     override fun toString(): String = refreshToken
 }
 
@@ -186,13 +158,10 @@ value class RefreshToken(
  * Authorization code to be exchanged with an access token
  */
 @JvmInline
-value class AuthorizationCode(
-    val code: String,
-) {
+value class AuthorizationCode(val code: String) {
     init {
         require(code.isNotEmpty()) { "Authorization code must not be empty" }
     }
-
     override fun toString(): String = code
 }
 
@@ -202,13 +171,10 @@ value class AuthorizationCode(
  * @param value The identifier's value
  */
 @JvmInline
-value class TransactionId(
-    val value: String,
-) {
+value class TransactionId(val value: String) {
     init {
         value.requireNotEmpty()
     }
-
     override fun toString(): String = value
 }
 
@@ -218,13 +184,10 @@ value class TransactionId(
  * @param value The identifier's value
  */
 @JvmInline
-value class NotificationId(
-    val value: String,
-) {
+value class NotificationId(val value: String) {
     init {
         value.requireNotEmpty()
     }
-
     override fun toString(): String = value
 }
 
@@ -233,6 +196,7 @@ value class NotificationId(
  * in a JWT Proof
  */
 sealed interface JwtBindingKey {
+
     /**
      * A JWK biding key
      */
@@ -289,6 +253,7 @@ data class EncryptionSpec(
     val encryptionMethod: EncryptionMethod,
     val compressionAlgorithm: CompressionAlgorithm? = null,
 ) : java.io.Serializable {
+
     val algorithm: JWEAlgorithm
         get() = JWEAlgorithm.parse(recipientKey.algorithm.name)
 
@@ -352,13 +317,10 @@ data class ExchangeEncryptionSpecification(
  * A credential identified as a scope
  */
 @JvmInline
-value class Scope(
-    val value: String,
-) {
+value class Scope(val value: String) {
     init {
         require(value.isNotEmpty()) { "Scope value cannot be empty" }
     }
-
     override fun toString(): String = value
 }
 
@@ -368,33 +330,28 @@ val CIAuthorizationServerMetadata.challengeEndpointURI: URI?
     get() = JSONObjectUtils.getURI(customParameters, AttestationBasedClientAuthenticationSpec.CHALLENGE_ENDPOINT)
 
 val CIAuthorizationServerMetadata.clientAttestationJWSAlgs: List<JWSAlgorithm>?
-    get() =
-        JSONObjectUtils
-            .getStringList(
-                customParameters,
-                AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_SIGNING_ALGORITHMS_SUPPORTED,
-            )?.mapNotNull { JWSAlgorithm.parse(it) }
+    get() = JSONObjectUtils.getStringList(
+        customParameters,
+        AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_SIGNING_ALGORITHMS_SUPPORTED,
+    )
+        ?.mapNotNull { JWSAlgorithm.parse(it) }
 
 val CIAuthorizationServerMetadata.clientAttestationPOPJWSAlgs: List<JWSAlgorithm>?
-    get() =
-        JSONObjectUtils
-            .getStringList(
-                customParameters,
-                AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_SIGNING_ALGORITHMS_SUPPORTED,
-            )?.mapNotNull { JWSAlgorithm.parse(it) }
+    get() = JSONObjectUtils.getStringList(
+        customParameters,
+        AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_SIGNING_ALGORITHMS_SUPPORTED,
+    )
+        ?.mapNotNull { JWSAlgorithm.parse(it) }
 
 /**
  * Nonce (single use) value provided either by the Authorization or Resource server.
  */
 @JvmInline
 @Serializable
-value class Nonce(
-    val value: String,
-) {
+value class Nonce(val value: String) {
     init {
         require(value.isNotEmpty()) { "Nonce value cannot be empty" }
     }
-
     override fun toString(): String = value
 }
 
@@ -409,18 +366,15 @@ fun interface CertificateChainTrust {
  * Mechanism a Wallet can establish trust with a JWT Issuer.
  */
 sealed interface IssuerTrust {
+
     @Deprecated("Use IssuerTrust.ByCertificateChain instead")
-    data class ByPublicKey(
-        val jwk: JWK,
-    ) : IssuerTrust {
+    data class ByPublicKey(val jwk: JWK) : IssuerTrust {
         init {
             require(!jwk.isPrivate) { "Only public JWKs are supported" }
         }
     }
 
-    data class ByCertificateChain(
-        val certificateChainTrust: CertificateChainTrust,
-    ) : IssuerTrust
+    data class ByCertificateChain(val certificateChainTrust: CertificateChainTrust) : IssuerTrust
 }
 
 private fun String.requireNotEmpty() {
@@ -432,12 +386,9 @@ private fun String.requireNotEmpty() {
  */
 @JvmInline
 @Serializable
-value class JwtId(
-    val value: String,
-) {
+value class JwtId(val value: String) {
     init {
         require(value.isNotBlank()) { "value cannot be blank" }
     }
-
     override fun toString(): String = value
 }

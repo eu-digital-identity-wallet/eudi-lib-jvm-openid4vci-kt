@@ -43,10 +43,9 @@ interface HasIssuerId {
 interface CanBeUsedWithVciLib {
     val cfg: OpenId4VCIConfig
 
-    suspend fun createIssuer(
-        credentialOfferUri: String,
-        httpClient: HttpClient,
-    ): Issuer = Issuer.make(cfg, credentialOfferUri, httpClient).getOrThrow()
+    suspend fun createIssuer(credentialOfferUri: String, httpClient: HttpClient): Issuer {
+        return Issuer.make(cfg, credentialOfferUri, httpClient).getOrThrow()
+    }
 }
 
 data class CredentialOfferForm<out USER>(
@@ -62,28 +61,26 @@ data class CredentialOfferForm<out USER>(
             credentialConfigurationIds: Set<CredentialConfigurationIdentifier>,
             issuerStateIncluded: Boolean = true,
             credentialOfferEndpoint: String? = null,
-        ): CredentialOfferForm<USER> =
-            CredentialOfferForm(
-                user,
-                credentialConfigurationIds,
-                AuthorizationCodeGrant(issuerStateIncluded),
-                null,
-                credentialOfferEndpoint,
-            )
+        ): CredentialOfferForm<USER> = CredentialOfferForm(
+            user,
+            credentialConfigurationIds,
+            AuthorizationCodeGrant(issuerStateIncluded),
+            null,
+            credentialOfferEndpoint,
+        )
 
         fun <USER> preAuthorizedCodeGrant(
             user: USER?,
             credentialConfigurationIds: Set<CredentialConfigurationIdentifier>,
             txCode: String?,
             credentialOfferEndpoint: String? = null,
-        ): CredentialOfferForm<USER> =
-            CredentialOfferForm(
-                user,
-                credentialConfigurationIds,
-                null,
-                PreAuthorizedCodeGrant(txCode, "text", null),
-                credentialOfferEndpoint,
-            )
+        ): CredentialOfferForm<USER> = CredentialOfferForm(
+            user,
+            credentialConfigurationIds,
+            null,
+            PreAuthorizedCodeGrant(txCode, "text", null),
+            credentialOfferEndpoint,
+        )
     }
 
     data class AuthorizationCodeGrant(
@@ -101,32 +98,29 @@ interface CanRequestForCredentialOffer<in USER> {
     suspend fun requestCredentialOffer(form: CredentialOfferForm<USER>): URI =
         createHttpClient(enableLogging = false).use { requestCredentialOffer(it, form) }
 
-    suspend fun requestCredentialOffer(
-        httpClient: HttpClient,
-        form: CredentialOfferForm<USER>,
-    ): URI
+    suspend fun requestCredentialOffer(httpClient: HttpClient, form: CredentialOfferForm<USER>): URI
 
     companion object {
         @OptIn(ExperimentalSerializationApi::class)
-        fun <USER> onlyStatelessAuthorizationCode(credentialIssuerId: CredentialIssuerId): CanRequestForCredentialOffer<USER> =
-            object : CanRequestForCredentialOffer<USER> {
-                override suspend fun requestCredentialOffer(
-                    httpClient: HttpClient,
-                    form: CredentialOfferForm<USER>,
-                ): URI {
-                    val offerJson =
-                        buildJsonObject {
-                            put("credential_issuer", credentialIssuerId.toString())
-                            putJsonArray("credential_configuration_ids") {
-                                addAll(form.credentialConfigurationIds.map { it.value })
-                            }
-                        }.let { URLEncoder.encode(it.toString(), "UTF-8") }
+        fun <USER> onlyStatelessAuthorizationCode(
+            credentialIssuerId: CredentialIssuerId,
+        ): CanRequestForCredentialOffer<USER> = object : CanRequestForCredentialOffer<USER> {
+            override suspend fun requestCredentialOffer(
+                httpClient: HttpClient,
+                form: CredentialOfferForm<USER>,
+            ): URI {
+                val offerJson = buildJsonObject {
+                    put("credential_issuer", credentialIssuerId.toString())
+                    putJsonArray("credential_configuration_ids") {
+                        addAll(form.credentialConfigurationIds.map { it.value })
+                    }
+                }.let { URLEncoder.encode(it.toString(), "UTF-8") }
 
-                    val endPoint = form.credentialOfferEndpoint ?: "openid-credential-offer://"
+                val endPoint = form.credentialOfferEndpoint ?: "openid-credential-offer://"
 
-                    return URI.create("$endPoint?credential_offer=$offerJson")
-                }
+                return URI.create("$endPoint?credential_offer=$offerJson")
             }
+        }
     }
 }
 
@@ -135,16 +129,14 @@ interface CanRequestForCredentialOffer<in USER> {
  * that can issue credentials
  */
 data object NoUser
-
 interface HasTestUser<out USER> {
     val testUser: USER
 
     companion object {
         @Suppress("unused")
-        val HasNoTestUser: HasTestUser<NoUser> =
-            object : HasTestUser<NoUser> {
-                override val testUser: NoUser = NoUser
-            }
+        val HasNoTestUser: HasTestUser<NoUser> = object : HasTestUser<NoUser> {
+            override val testUser: NoUser = NoUser
+        }
     }
 }
 
@@ -153,26 +145,24 @@ interface HasTestUser<out USER> {
  * to authorize credential issuance
  */
 interface CanAuthorizeIssuance<in USER> {
+
     suspend fun loginUserAndGetAuthCode(
         authorizationRequestPrepared: AuthorizationRequestPrepared,
         user: USER,
         httpClient: HttpClient,
-    ): Pair<String, String> =
-        coroutineScope {
-            val response =
-                run {
-                    val loginPageResponse = httpClient.visitAuthorizationPage(authorizationRequestPrepared)
-                    httpClient.authorizeIssuance(loginPageResponse, user)
-                }
-            response.parseCodeAndStatus()
+    ): Pair<String, String> = coroutineScope {
+        val response = run {
+            val loginPageResponse = httpClient.visitAuthorizationPage(authorizationRequestPrepared)
+            httpClient.authorizeIssuance(loginPageResponse, user)
         }
+        response.parseCodeAndStatus()
+    }
 
     fun HttpResponse.parseCodeAndStatus(): Pair<String, String> {
-        fun <A, B> Pair<A?, B?>.toNullable(): Pair<A, B>? =
-            if (first != null && second != null)
-                first!! to second!!
-            else
-                null
+        fun <A, B> Pair<A?, B?>.toNullable(): Pair<A, B>? {
+            return if (first != null && second != null) first!! to second!!
+            else null
+        }
 
         val redirectLocation = headers["Location"].toString()
         return with(URLBuilder(redirectLocation)) {
@@ -180,7 +170,9 @@ interface CanAuthorizeIssuance<in USER> {
         }.toNullable() ?: error("Failed to get authorization code & state")
     }
 
-    suspend fun HttpClient.visitAuthorizationPage(authorizationRequestPrepared: AuthorizationRequestPrepared): HttpResponse {
+    suspend fun HttpClient.visitAuthorizationPage(
+        authorizationRequestPrepared: AuthorizationRequestPrepared,
+    ): HttpResponse {
         val url = authorizationRequestPrepared.authorizationCodeURL.toString()
         return get(url) {
             headers {
@@ -189,38 +181,27 @@ interface CanAuthorizeIssuance<in USER> {
         }
     }
 
-    suspend fun HttpClient.authorizeIssuance(
-        loginResponse: HttpResponse,
-        user: USER,
-    ): HttpResponse
+    suspend fun HttpClient.authorizeIssuance(loginResponse: HttpResponse, user: USER): HttpResponse
 }
 
 //
 // Keycloak Support
 //
-data class KeycloakUser(
-    val username: String,
-    val password: String,
-)
+data class KeycloakUser(val username: String, val password: String)
 
 object Keycloak : CanAuthorizeIssuance<KeycloakUser> {
-    override suspend fun HttpClient.authorizeIssuance(
-        loginResponse: HttpResponse,
-        user: KeycloakUser,
-    ): HttpResponse {
-        suspend fun extractASLoginUrl(): URL =
-            withContext(Dispatchers.IO) {
-                val loginHtml = loginResponse.body<String>()
-                val form = Jsoup.parse(loginHtml).body().getElementById("kc-form-login") as FormElement
-                val action = form.attr("action")
-                URI(action).toURL()
-            }
+    override suspend fun HttpClient.authorizeIssuance(loginResponse: HttpResponse, user: KeycloakUser): HttpResponse {
+        suspend fun extractASLoginUrl(): URL = withContext(Dispatchers.IO) {
+            val loginHtml = loginResponse.body<String>()
+            val form = Jsoup.parse(loginHtml).body().getElementById("kc-form-login") as FormElement
+            val action = form.attr("action")
+            URI(action).toURL()
+        }
 
-        fun formParameters() =
-            Parameters.build {
-                append("username", user.username)
-                append("password", user.password)
-            }
+        fun formParameters() = Parameters.build {
+            append("username", user.username)
+            append("password", user.password)
+        }
         return coroutineScope {
             val loginUrl = extractASLoginUrl()
             submitForm(url = loginUrl.toString(), formParameters = formParameters())

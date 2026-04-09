@@ -38,17 +38,14 @@ import java.time.Instant.now
 import java.util.*
 
 object CryptoGenerator {
-    fun randomECSigningKey(curve: Curve): ECKey =
-        ECKeyGenerator(curve)
-            .keyUse(KeyUse.SIGNATURE)
-            .keyID(UUID.randomUUID().toString())
-            .issueTime(Date(System.currentTimeMillis()))
-            .generate()
 
-    fun ecSigner(
-        curve: Curve = Curve.P_256,
-        alg: JWSAlgorithm = JWSAlgorithm.ES256,
-    ): Signer<JWK> {
+    fun randomECSigningKey(curve: Curve): ECKey = ECKeyGenerator(curve)
+        .keyUse(KeyUse.SIGNATURE)
+        .keyID(UUID.randomUUID().toString())
+        .issueTime(Date(System.currentTimeMillis()))
+        .generate()
+
+    fun ecSigner(curve: Curve = Curve.P_256, alg: JWSAlgorithm = JWSAlgorithm.ES256): Signer<JWK> {
         require(alg in JWSAlgorithm.Family.EC)
         val keyPair = randomECSigningKey(curve)
         return Signer.fromNimbusEcKey(
@@ -64,12 +61,11 @@ object CryptoGenerator {
         keysNo: Int = 1,
     ): ProofsSpecification {
         val ecKeys = List(keysNo) { randomECSigningKey(curve) }
-        val batchSigner =
-            BatchSigner.fromNimbusEcKeys(
-                ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
-                secureRandom = null,
-                provider = null,
-            )
+        val batchSigner = BatchSigner.fromNimbusEcKeys(
+            ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
+            secureRandom = null,
+            provider = null,
+        )
         return ProofsSpecification.JwtProofs.NoKeyAttestation(batchSigner)
     }
 
@@ -96,29 +92,26 @@ object CryptoGenerator {
     fun attestationProofSpec(
         curve: Curve = Curve.P_256,
         keysNo: Int = 3,
-    ) = ProofsSpecification.AttestationProof { nonce ->
-        keyAttestationJwt(
-            List(keysNo) {
-                randomECSigningKey(curve)
-            },
-            nonce,
-        )
-    }
+    ) =
+        ProofsSpecification.AttestationProof { nonce ->
+            keyAttestationJwt(
+                List(keysNo) {
+                    randomECSigningKey(curve)
+                },
+                nonce,
+            )
+        }
 
     // Helper to load an EC private key from PEM file
     private fun loadECPrivateKeyFromFile(resourcePath: String): ECPrivateKey {
-        val pem =
-            CryptoGenerator::class.java.classLoader
-                .getResource(resourcePath)
-                ?.readText()
-                ?: error("Private key file not found: $resourcePath")
-        val base64 =
-            pem
-                .replace("-----BEGIN PRIVATE KEY-----", "")
-                .replace("-----END PRIVATE KEY-----", "")
-                .replace("\r", "")
-                .replace("\n", "")
-                .trim()
+        val pem = CryptoGenerator::class.java.classLoader.getResource(resourcePath)?.readText()
+            ?: error("Private key file not found: $resourcePath")
+        val base64 = pem
+            .replace("-----BEGIN PRIVATE KEY-----", "")
+            .replace("-----END PRIVATE KEY-----", "")
+            .replace("\r", "")
+            .replace("\n", "")
+            .trim()
         val keyBytes = Base64.getDecoder().decode(base64)
         val keySpec = PKCS8EncodedKeySpec(keyBytes)
         val kf = KeyFactory.getInstance("EC")
@@ -127,9 +120,8 @@ object CryptoGenerator {
 
     // Helper to load X.509 certificate from PEM file
     private fun loadCertificateFromFile(resourcePath: String): X509Certificate {
-        val certStream =
-            CryptoGenerator::class.java.classLoader.getResourceAsStream(resourcePath)
-                ?: error("Certificate file not found: $resourcePath")
+        val certStream = CryptoGenerator::class.java.classLoader.getResourceAsStream(resourcePath)
+            ?: error("Certificate file not found: $resourcePath")
         val cf = CertificateFactory.getInstance("X.509")
         return cf.generateCertificate(certStream) as X509Certificate
     }
@@ -140,13 +132,12 @@ object CryptoGenerator {
     ) = run {
         val privateKey = loadECPrivateKeyFromFile("eu/europa/ec/eudi/openid4vci/internal/key_attestation_jwt.key")
         val certificate = loadCertificateFromFile("eu/europa/ec/eudi/openid4vci/internal/key_attestation_jwt.cert")
-        val jwt =
-            keyAttestationJwt(
-                attestedKeys = attestedKeys ?: List(3) { randomECSigningKey(Curve.P_256) },
-                certificate = certificate,
-                signer = ECDSASigner(privateKey),
-                nonce,
-            )
+        val jwt = keyAttestationJwt(
+            attestedKeys = attestedKeys ?: List(3) { randomECSigningKey(Curve.P_256) },
+            certificate = certificate,
+            signer = ECDSASigner(privateKey),
+            nonce,
+        )
         KeyAttestationJWT(jwt.serialize())
     }
 
@@ -155,26 +146,18 @@ object CryptoGenerator {
         certificate: X509Certificate,
         signer: JWSSigner,
         nonce: Nonce? = null,
-    ): SignedJWT =
-        SignedJWT(
-            JWSHeader
-                .Builder(JWSAlgorithm.ES256)
-                .type(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
-                .x509CertChain(
-                    listOf(
-                        com.nimbusds.jose.util.Base64
-                            .encode(certificate.encoded),
-                    ),
-                ).build(),
-            JWTClaimsSet
-                .Builder()
-                .apply {
-                    claim(OpenId4VCISpec.KEY_ATTESTATION_ATTESTED_KEYS, attestedKeys.map { it.toPublicJWK().toJSONObject() })
-                    claim(OpenId4VCISpec.KEY_ATTESTATION_KEY_STORAGE, listOf("iso_18045_moderate"))
-                    claim(OpenId4VCISpec.KEY_ATTESTATION_USER_AUTHENTICATION, listOf("iso_18045_moderate"))
-                    nonce?.let { claim("nonce", nonce.value) }
-                    issueTime(Date.from(now()))
-                    expirationTime(Date.from(now().plusSeconds(3600)))
-                }.build(),
-        ).apply { sign(signer) }
+    ): SignedJWT = SignedJWT(
+        JWSHeader.Builder(JWSAlgorithm.ES256)
+            .type(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
+            .x509CertChain(listOf(com.nimbusds.jose.util.Base64.encode(certificate.encoded)))
+            .build(),
+        JWTClaimsSet.Builder().apply {
+            claim(OpenId4VCISpec.KEY_ATTESTATION_ATTESTED_KEYS, attestedKeys.map { it.toPublicJWK().toJSONObject() })
+            claim(OpenId4VCISpec.KEY_ATTESTATION_KEY_STORAGE, listOf("iso_18045_moderate"))
+            claim(OpenId4VCISpec.KEY_ATTESTATION_USER_AUTHENTICATION, listOf("iso_18045_moderate"))
+            nonce?.let { claim("nonce", nonce.value) }
+            issueTime(Date.from(now()))
+            expirationTime(Date.from(now().plusSeconds(3600)))
+        }.build(),
+    ).apply { sign(signer) }
 }

@@ -37,14 +37,13 @@ suspend fun DeferredIssuer.Companion.queryForDeferredCredential(
     recreateClientAttestationPodSigner: ((String) -> Signer<JWK>)? = null,
     httpClient: HttpClient,
     responseEncryptionKey: JWK? = null,
-): Result<Pair<DeferredIssuanceStoredContextTO?, DeferredCredentialQueryOutcome>> =
-    runCatchingCancellable {
-        val ctx = ctxTO.toDeferredIssuanceStoredContext(clock, recreatePopSigner, recreateClientAttestationPodSigner)
-        val (newCtx, outcome) = queryForDeferredCredential(ctx, httpClient, responseEncryptionKey).getOrThrow()
-        val newCtxTO =
-            newCtx?.let { DeferredIssuanceStoredContextTO.from(it, ctxTO.dPoPSignerKid, ctxTO.clientAttestationPopKeyId) }
-        newCtxTO to outcome
-    }
+): Result<Pair<DeferredIssuanceStoredContextTO?, DeferredCredentialQueryOutcome>> = runCatchingCancellable {
+    val ctx = ctxTO.toDeferredIssuanceStoredContext(clock, recreatePopSigner, recreateClientAttestationPodSigner)
+    val (newCtx, outcome) = queryForDeferredCredential(ctx, httpClient, responseEncryptionKey).getOrThrow()
+    val newCtxTO =
+        newCtx?.let { DeferredIssuanceStoredContextTO.from(it, ctxTO.dPoPSignerKid, ctxTO.clientAttestationPopKeyId) }
+    newCtxTO to outcome
+}
 
 //
 // Serialization
@@ -54,17 +53,21 @@ suspend fun DeferredIssuer.Companion.queryForDeferredCredential(
 data class RefreshTokenTO(
     @Required @SerialName("refresh_token") val refreshToken: String,
 ) {
-    fun toRefreshToken(): RefreshToken = RefreshToken(refreshToken)
+
+    fun toRefreshToken(): RefreshToken {
+        return RefreshToken(refreshToken)
+    }
 
     companion object {
-        fun from(refreshToken: RefreshToken): RefreshTokenTO = RefreshTokenTO(refreshToken.refreshToken)
+
+        fun from(refreshToken: RefreshToken): RefreshTokenTO =
+            RefreshTokenTO(refreshToken.refreshToken)
     }
 }
 
 @Serializable
 enum class AccessTokenTypeTO {
-    DPoP,
-    Bearer,
+    DPoP, Bearer
 }
 
 @Serializable
@@ -73,6 +76,7 @@ data class AccessTokenTO(
     @Required @SerialName("access_token") val accessToken: String,
     @SerialName("expires_in") val expiresIn: Long? = null,
 ) {
+
     fun toAccessToken(): AccessToken {
         val exp = expiresIn?.let { Duration.ofSeconds(it) }
         return when (type) {
@@ -82,16 +86,17 @@ data class AccessTokenTO(
     }
 
     companion object {
-        fun from(accessToken: AccessToken): AccessTokenTO =
-            AccessTokenTO(
-                type =
-                    when (accessToken) {
-                        is AccessToken.DPoP -> AccessTokenTypeTO.DPoP
-                        is AccessToken.Bearer -> AccessTokenTypeTO.Bearer
-                    },
+
+        fun from(accessToken: AccessToken): AccessTokenTO {
+            return AccessTokenTO(
+                type = when (accessToken) {
+                    is AccessToken.DPoP -> AccessTokenTypeTO.DPoP
+                    is AccessToken.Bearer -> AccessTokenTypeTO.Bearer
+                },
                 accessToken = accessToken.accessToken,
                 expiresIn = accessToken.expiresIn?.toSeconds(),
             )
+        }
     }
 }
 
@@ -139,56 +144,55 @@ data class DeferredIssuanceStoredContextTO(
     @SerialName("authorization_timestamp") val authorizationTimestamp: Long,
     @SerialName("grant") val grant: GrantTO,
 ) {
+
     fun toDeferredIssuanceStoredContext(
         clock: Clock,
         recreatePopSigner: ((String) -> Signer<JWK>)?,
         recreateClientAttestationPodSigner: ((String) -> Signer<JWK>)?,
-    ): DeferredIssuanceContext =
-        DeferredIssuanceContext(
-            config =
-                DeferredIssuerConfig(
-                    credentialIssuerId = CredentialIssuerId(credentialIssuerId).getOrThrow(),
-                    clock = clock,
-                    clientAuthentication =
-                        if (clientAttestationJwt == null) {
-                            ClientAuthentication.None(clientId)
-                        } else {
-                            val jwt =
-                                runCatching {
-                                    ClientAttestationJWT(SignedJWT.parse(clientAttestationJwt))
-                                }.getOrNull() ?: error("Invalid client attestation JWT")
-                            val signer =
-                                clientAttestationPopKeyId?.let { keyId ->
-                                    recreateClientAttestationPodSigner?.let { recreate -> recreate(keyId) }
-                                }
-                            val poPJWTSpec = ClientAttestationPoPJWTSpec(checkNotNull(signer))
-                            ClientAuthentication.AttestationBased(jwt, poPJWTSpec)
-                        },
-                    deferredEndpoint = URI(deferredEndpoint).toURL(),
-                    authorizationServerId = URI(authServerId).toURL(),
-                    challengeEndpoint = challengeEndpoint?.let { URI.create(it).toURL() },
-                    tokenEndpoint = URI(tokenEndpoint).toURL(),
-                    requestEncryptionSpec = requestEncryptionSpec?.let { requestEncryption(it) },
-                    responseEncryptionParams = responseEncryptionParams?.let { responseEncryptionParams(it) },
-                    dPoPSigner = dPoPSignerKid?.let { requireNotNull(recreatePopSigner).invoke(it) },
+    ): DeferredIssuanceContext {
+        return DeferredIssuanceContext(
+            config = DeferredIssuerConfig(
+                credentialIssuerId = CredentialIssuerId(credentialIssuerId).getOrThrow(),
+                clock = clock,
+                clientAuthentication =
+                    if (clientAttestationJwt == null) ClientAuthentication.None(clientId)
+                    else {
+                        val jwt = runCatching {
+                            ClientAttestationJWT(SignedJWT.parse(clientAttestationJwt))
+                        }.getOrNull() ?: error("Invalid client attestation JWT")
+                        val signer = clientAttestationPopKeyId?.let {
+                                keyId ->
+                            recreateClientAttestationPodSigner?.let { recreate -> recreate(keyId) }
+                        }
+                        val poPJWTSpec = ClientAttestationPoPJWTSpec(checkNotNull(signer))
+                        ClientAuthentication.AttestationBased(jwt, poPJWTSpec)
+                    },
+                deferredEndpoint = URI(deferredEndpoint).toURL(),
+                authorizationServerId = URI(authServerId).toURL(),
+                challengeEndpoint = challengeEndpoint?.let { URI.create(it).toURL() },
+                tokenEndpoint = URI(tokenEndpoint).toURL(),
+                requestEncryptionSpec = requestEncryptionSpec?.let { requestEncryption(it) },
+                responseEncryptionParams = responseEncryptionParams?.let { responseEncryptionParams(it) },
+                dPoPSigner = dPoPSignerKid?.let { requireNotNull(recreatePopSigner).invoke(it) },
+            ),
+            authorizedTransaction = AuthorizedTransaction(
+                authorizedRequest = AuthorizedRequest(
+                    accessToken = accessToken.toAccessToken(),
+                    refreshToken = refreshToken?.toRefreshToken(),
+                    credentialIdentifiers = emptyMap(),
+                    timestamp = Instant.ofEpochSecond(authorizationTimestamp),
+                    authorizationServerDpopNonce = null,
+                    resourceServerDpopNonce = null,
+                    grant = grant.toGrant(),
                 ),
-            authorizedTransaction =
-                AuthorizedTransaction(
-                    authorizedRequest =
-                        AuthorizedRequest(
-                            accessToken = accessToken.toAccessToken(),
-                            refreshToken = refreshToken?.toRefreshToken(),
-                            credentialIdentifiers = emptyMap(),
-                            timestamp = Instant.ofEpochSecond(authorizationTimestamp),
-                            authorizationServerDpopNonce = null,
-                            resourceServerDpopNonce = null,
-                            grant = grant.toGrant(),
-                        ),
-                    transactionId = TransactionId(transactionId),
-                ),
+                transactionId = TransactionId(transactionId),
+            ),
+
         )
+    }
 
     companion object {
+
         fun <A> ClientAuthentication.ifAttested(getter: ClientAuthentication.AttestationBased.() -> A?): A? =
             when (this) {
                 is ClientAuthentication.AttestationBased -> getter()
@@ -233,26 +237,23 @@ private fun requestEncryptionSpecTO(spec: EncryptionSpec): JsonObject {
 
 private fun requestEncryption(specTO: JsonObject): EncryptionSpec =
     EncryptionSpec(
-        recipientKey =
-            run {
-                val element = specTO["recipient_key"]
-                require(element is JsonObject)
-                JWK.parse(element.toString())
-            },
-        encryptionMethod =
-            run {
-                val element = specTO["encryption_method"]
-                require(element is JsonPrimitive)
-                EncryptionMethod.parse(requireNotNull(element.contentOrNull))
-            },
-        compressionAlgorithm =
-            run {
-                val element = specTO["compression_algorithm"]
-                element?.let {
-                    require(it is JsonPrimitive)
-                    CompressionAlgorithm(requireNotNull(it.contentOrNull))
-                }
-            },
+        recipientKey = run {
+            val element = specTO["recipient_key"]
+            require(element is JsonObject)
+            JWK.parse(element.toString())
+        },
+        encryptionMethod = run {
+            val element = specTO["encryption_method"]
+            require(element is JsonPrimitive)
+            EncryptionMethod.parse(requireNotNull(element.contentOrNull))
+        },
+        compressionAlgorithm = run {
+            val element = specTO["compression_algorithm"]
+            element?.let {
+                require(it is JsonPrimitive)
+                CompressionAlgorithm(requireNotNull(it.contentOrNull))
+            }
+        },
     )
 
 private fun responseEncryptionParamsTO(params: Pair<EncryptionMethod, CompressionAlgorithm?>): JsonObject =
@@ -262,19 +263,17 @@ private fun responseEncryptionParamsTO(params: Pair<EncryptionMethod, Compressio
     }
 
 private fun responseEncryptionParams(specTO: JsonObject): Pair<EncryptionMethod, CompressionAlgorithm?> {
-    val encryptionMethod =
-        run {
-            val element = specTO["encryption_method"]
-            require(element is JsonPrimitive)
-            EncryptionMethod.parse(requireNotNull(element.contentOrNull))
+    val encryptionMethod = run {
+        val element = specTO["encryption_method"]
+        require(element is JsonPrimitive)
+        EncryptionMethod.parse(requireNotNull(element.contentOrNull))
+    }
+    val compressionAlgorithm = run {
+        val element = specTO["compression_algorithm"]
+        element?.let {
+            require(it is JsonPrimitive)
+            CompressionAlgorithm(requireNotNull(it.contentOrNull))
         }
-    val compressionAlgorithm =
-        run {
-            val element = specTO["compression_algorithm"]
-            element?.let {
-                require(it is JsonPrimitive)
-                CompressionAlgorithm(requireNotNull(it.contentOrNull))
-            }
-        }
+    }
     return encryptionMethod to compressionAlgorithm
 }

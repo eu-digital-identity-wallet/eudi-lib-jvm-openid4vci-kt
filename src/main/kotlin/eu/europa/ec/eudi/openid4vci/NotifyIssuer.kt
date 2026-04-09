@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import eu.europa.ec.eudi.openid4vci.internal.http.NotificationEndPointClient
 
 sealed interface CredentialIssuanceEvent {
+
     val id: NotificationId
     val description: String?
 
@@ -42,9 +43,13 @@ sealed interface CredentialIssuanceEvent {
  * about a [CredentialIssuanceEvent]
  */
 fun interface NotifyIssuer {
-    suspend fun AuthorizedRequest.notify(event: CredentialIssuanceEvent): Result<AuthorizedRequest>
+
+    suspend fun AuthorizedRequest.notify(
+        event: CredentialIssuanceEvent,
+    ): Result<AuthorizedRequest>
 
     companion object {
+
         /**
          * No operation notifier (does nothing)
          * Used in case credential issuer doesn't advertise a notification endpoint
@@ -59,8 +64,7 @@ fun interface NotifyIssuer {
          */
         internal operator fun invoke(notificationEndPointClient: NotificationEndPointClient): NotifyIssuer =
             NotifyIssuer { event ->
-                notificationEndPointClient
-                    .notifyIssuer(accessToken, resourceServerDpopNonce, event)
+                notificationEndPointClient.notifyIssuer(accessToken, resourceServerDpopNonce, event)
                     .map { newResourceServerDpopNonce -> withResourceServerDpopNonce(newResourceServerDpopNonce) }
             }
     }

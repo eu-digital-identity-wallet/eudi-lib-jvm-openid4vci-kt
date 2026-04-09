@@ -37,10 +37,10 @@ import java.util.Base64
  */
 internal interface JwtSigner<in Claims, out PUB> {
     val publicMaterial: PUB
-
     suspend fun sign(claims: Claims): String
 
     companion object {
+
         operator fun <Claims, PUB> invoke(
             serializer: KSerializer<Claims>,
             signOperation: SignOperation<PUB>,
@@ -67,19 +67,19 @@ internal fun interface JwtBatchSigner<in Claims, out PUB> {
     suspend fun sign(claims: Claims): List<Pair<PUB, String>>
 
     companion object {
+
         operator fun <Claims, PUB> invoke(
             serializer: KSerializer<Claims>,
             batchSignOperation: BatchSignOperation<PUB>,
             algorithm: JWSAlgorithm,
             customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-        ): JwtBatchSigner<Claims, PUB> =
-            JwtBatchSigner { claims ->
-                batchSignOperation.operations.map { signOperation ->
-                    val jwtSigner = JwtSigner(serializer, signOperation, algorithm, customizeHeader)
-                    val jwt = jwtSigner.sign(claims)
-                    jwtSigner.publicMaterial to jwt
-                }
+        ): JwtBatchSigner<Claims, PUB> = JwtBatchSigner { claims ->
+            batchSignOperation.operations.map { signOperation ->
+                val jwtSigner = JwtSigner(serializer, signOperation, algorithm, customizeHeader)
+                val jwt = jwtSigner.sign(claims)
+                jwtSigner.publicMaterial to jwt
             }
+        }
 
         inline operator fun <reified Claims, PUB> invoke(
             batchSignOperation: BatchSignOperation<PUB>,
@@ -95,24 +95,25 @@ private class DefaultJwtSigner<in Claims, out PUB>(
     private val algorithm: JWSAlgorithm,
     private val customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
 ) : JwtSigner<Claims, PUB> {
+
     override val publicMaterial: PUB get() = signOperation.publicMaterial
 
-    override suspend fun sign(claims: Claims): String {
+    override suspend fun sign(
+        claims: Claims,
+    ): String {
         val header = signOperation.header(customizeHeader)
         val payload = Json.encodeToJsonElement(serializer, claims).jsonObject
         return signOperation.signJwt(header, payload)
     }
 
-    fun <PUB> SignOperation<PUB>.header(customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {}): JsonObject =
-        buildJsonObject {
-            put("alg", algorithm.name)
-            customizeHeader(this@header.publicMaterial)
-        }
+    fun <PUB> SignOperation<PUB>.header(
+        customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
+    ): JsonObject = buildJsonObject {
+        put("alg", algorithm.name)
+        customizeHeader(this@header.publicMaterial)
+    }
 
-    private suspend fun <PUB> SignOperation<PUB>.signJwt(
-        header: JsonObject,
-        claims: JsonObject,
-    ): String {
+    private suspend fun <PUB> SignOperation<PUB>.signJwt(header: JsonObject, claims: JsonObject): String {
         // Base64Url encode header and claims
         val base64UrlEncoder = Base64.getUrlEncoder().withoutPadding()
         val headerB64 = base64UrlEncoder.encodeToString(header.toString().toByteArray(Charsets.UTF_8))

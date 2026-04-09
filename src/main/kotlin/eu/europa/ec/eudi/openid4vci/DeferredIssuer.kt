@@ -108,7 +108,9 @@ data class DeferredIssuanceContext(
  * Finally, [DeferredIssuer] supports transparent refresh of access token
  */
 interface DeferredIssuer : QueryForDeferredCredential {
+
     companion object {
+
         /**
          * A convenient method for querying the deferred endpoint given a [ctx].
          * Creates a [DeferredIssuer] using the [ctx] and then queries the endpoint.
@@ -127,33 +129,28 @@ interface DeferredIssuer : QueryForDeferredCredential {
             ctx: DeferredIssuanceContext,
             httpClient: HttpClient,
             responseEncryptionKey: JWK?,
-        ): Result<Pair<DeferredIssuanceContext?, DeferredCredentialQueryOutcome>> =
-            runCatchingCancellable {
-                val deferredIssuer = make(ctx.config, responseEncryptionKey, httpClient).getOrThrow()
-                val (newAuthorized, outcome) =
-                    with(deferredIssuer) {
-                        with(ctx.authorizedTransaction.authorizedRequest) {
-                            val transactionId = ctx.authorizedTransaction.transactionId
-                            queryForDeferredCredential(transactionId).getOrThrow()
-                        }
-                    }
-                val newCtx =
-                    when (outcome) {
-                        is DeferredCredentialQueryOutcome.IssuancePending, is DeferredCredentialQueryOutcome.Errored -> {
-                            if (newAuthorized != ctx.authorizedTransaction.authorizedRequest) {
-                                val newAuthorizedTransaction = ctx.authorizedTransaction.copy(authorizedRequest = newAuthorized)
-                                ctx.copy(authorizedTransaction = newAuthorizedTransaction)
-                            } else {
-                                ctx
-                            }
-                        }
-
-                        is DeferredCredentialQueryOutcome.Issued -> {
-                            null
-                        } // will not be needed
-                    }
-                newCtx to outcome
+        ): Result<Pair<DeferredIssuanceContext?, DeferredCredentialQueryOutcome>> = runCatchingCancellable {
+            val deferredIssuer = make(ctx.config, responseEncryptionKey, httpClient).getOrThrow()
+            val (newAuthorized, outcome) = with(deferredIssuer) {
+                with(ctx.authorizedTransaction.authorizedRequest) {
+                    val transactionId = ctx.authorizedTransaction.transactionId
+                    queryForDeferredCredential(transactionId).getOrThrow()
+                }
             }
+            val newCtx = when (outcome) {
+                is DeferredCredentialQueryOutcome.IssuancePending, is DeferredCredentialQueryOutcome.Errored -> {
+                    if (newAuthorized != ctx.authorizedTransaction.authorizedRequest) {
+                        val newAuthorizedTransaction = ctx.authorizedTransaction.copy(authorizedRequest = newAuthorized)
+                        ctx.copy(authorizedTransaction = newAuthorizedTransaction)
+                    } else {
+                        ctx
+                    }
+                }
+
+                is DeferredCredentialQueryOutcome.Issued -> null // will not be needed
+            }
+            newCtx to outcome
+        }
 
         /**
          * Factory method for getting an instance of [DeferredIssuer]
@@ -168,61 +165,55 @@ interface DeferredIssuer : QueryForDeferredCredential {
             config: DeferredIssuerConfig,
             responseEncryptionKey: JWK?,
             httpClient: HttpClient,
-        ): Result<DeferredIssuer> =
-            runCatching {
-                val dPoPJwtFactory =
-                    config.dPoPSigner?.let { signer ->
-                        DPoPJwtFactory(signer = signer, clock = config.clock)
-                    }
-
-                val tokenEndpointClient =
-                    TokenEndpointClient(
-                        config.credentialIssuerId,
-                        config.clock,
-                        config.clientAuthentication,
-                        URI.create("https://willNotBeUsed"), // this will not be used
-                        config.authorizationServerId,
-                        challengeEndpoint = config.challengeEndpoint,
-                        tokenEndpoint = config.tokenEndpoint,
-                        dPoPJwtFactory,
-                        config.clientAttestationPoPBuilder,
-                        httpClient,
-                    )
-
-                val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
-
-                val deferredEndPointClient =
-                    DeferredEndPointClient(
-                        CredentialIssuerEndpoint.invoke(config.deferredEndpoint.toString()).getOrThrow(),
-                        dPoPJwtFactory,
-                        httpClient,
-                    )
-
-                val issuanceEncryptionSpecs =
-                    ExchangeEncryptionSpecification(
-                        requestEncryptionSpec = config.requestEncryptionSpec,
-                        responseEncryptionSpec =
-                            responseEncryptionKey?.let { recipientKey ->
-                                config.responseEncryptionParams?.let {
-                                    val (encryptionMethod, compressionAlgorithm) = it
-                                    EncryptionSpec(
-                                        recipientKey = recipientKey,
-                                        encryptionMethod = encryptionMethod,
-                                        compressionAlgorithm = compressionAlgorithm,
-                                    )
-                                }
-                            },
-                    )
-
-                val queryForDeferredCredential =
-                    QueryForDeferredCredential(
-                        refreshAccessToken,
-                        deferredEndPointClient,
-                        issuanceEncryptionSpecs,
-                    )
-                object :
-                    DeferredIssuer,
-                    QueryForDeferredCredential by queryForDeferredCredential {}
+        ): Result<DeferredIssuer> = runCatching {
+            val dPoPJwtFactory = config.dPoPSigner?.let { signer ->
+                DPoPJwtFactory(signer = signer, clock = config.clock)
             }
+
+            val tokenEndpointClient = TokenEndpointClient(
+                config.credentialIssuerId,
+                config.clock,
+                config.clientAuthentication,
+                URI.create("https://willNotBeUsed"), // this will not be used
+                config.authorizationServerId,
+                challengeEndpoint = config.challengeEndpoint,
+                tokenEndpoint = config.tokenEndpoint,
+                dPoPJwtFactory,
+                config.clientAttestationPoPBuilder,
+                httpClient,
+            )
+
+            val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
+
+            val deferredEndPointClient = DeferredEndPointClient(
+                CredentialIssuerEndpoint.invoke(config.deferredEndpoint.toString()).getOrThrow(),
+                dPoPJwtFactory,
+                httpClient,
+            )
+
+            val issuanceEncryptionSpecs = ExchangeEncryptionSpecification(
+                requestEncryptionSpec = config.requestEncryptionSpec,
+                responseEncryptionSpec = responseEncryptionKey?.let { recipientKey ->
+                    config.responseEncryptionParams?.let {
+                        val (encryptionMethod, compressionAlgorithm) = it
+                        EncryptionSpec(
+                            recipientKey = recipientKey,
+                            encryptionMethod = encryptionMethod,
+                            compressionAlgorithm = compressionAlgorithm,
+                        )
+                    }
+                },
+            )
+
+            val queryForDeferredCredential =
+                QueryForDeferredCredential(
+                    refreshAccessToken,
+                    deferredEndPointClient,
+                    issuanceEncryptionSpecs,
+                )
+            object :
+                DeferredIssuer,
+                QueryForDeferredCredential by queryForDeferredCredential {}
+        }
     }
 }

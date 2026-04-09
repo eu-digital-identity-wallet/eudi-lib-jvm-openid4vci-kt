@@ -32,6 +32,7 @@ typealias ClientId = String
  * The Client Authentication Method used by the Wallet.
  */
 sealed interface ClientAuthentication : java.io.Serializable {
+
     /**
      * The client_id of the Wallet, issued when interacting with a credential issuer
      */
@@ -40,9 +41,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
     /**
      * None, i.e. a Public Client.
      */
-    data class None(
-        override val id: ClientId,
-    ) : ClientAuthentication
+    data class None(override val id: ClientId) : ClientAuthentication
 
     /**
      * Attestation-Based Client Authentication.
@@ -86,6 +85,7 @@ data class OpenId4VCIConfig(
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
 ) {
+
     /**
      * Creates a new [OpenId4VCIConfig] instance for a Wallet that uses [a Public OAuth 2.0 Client][ClientAuthentication.None].
      */
@@ -185,18 +185,14 @@ sealed interface DPoPUsage {
      *
      * @property dPoPSigner a signer that will be used to sign the DPoP Proof JWT
      */
-    data class IfSupported(
-        val dPoPSigner: Signer<JWK>,
-    ) : DPoPUsage
+    data class IfSupported(val dPoPSigner: Signer<JWK>) : DPoPUsage
 
     /**
      * DPoP usage is required. If the Authorization Server doesn't support DPoP, issuance does not proceed.
      *
      * @property dPoPSigner a signer that will be used to sign the DPoP Proof JWT
      */
-    data class Required(
-        val dPoPSigner: Signer<JWK>,
-    ) : DPoPUsage
+    data class Required(val dPoPSigner: Signer<JWK>) : DPoPUsage
 }
 
 /**
@@ -217,6 +213,7 @@ enum class ParUsage {
  * Wallet's policy concerning Credential Response encryption.
  */
 enum class CredentialResponseEncryptionPolicy {
+
     /**
      * The Wallet requires Credential Responses to be encrypted.
      */
@@ -247,23 +244,21 @@ data class EncryptionSupportConfig(
         }
     }
 
-    val supportedEncryptionAlgorithms: List<JWEAlgorithm> get() =
-        buildList {
-            ecConfig?.supportedJWEAlgorithms?.let { addAll(it) }
-            rsaConfig?.supportedJWEAlgorithms?.let { addAll(it) }
-        }
+    val supportedEncryptionAlgorithms: List<JWEAlgorithm> get() = buildList {
+        ecConfig?.supportedJWEAlgorithms?.let { addAll(it) }
+        rsaConfig?.supportedJWEAlgorithms?.let { addAll(it) }
+    }
 
     companion object {
         operator fun invoke(
             ecKeyCurve: Curve,
             rcaKeySize: Int,
             credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
-        ): EncryptionSupportConfig =
-            EncryptionSupportConfig(
-                ecConfig = EcConfig(ecKeyCurve),
-                rsaConfig = RsaConfig(rcaKeySize),
-                credentialResponseEncryptionPolicy = credentialResponseEncryptionPolicy,
-            )
+        ): EncryptionSupportConfig = EncryptionSupportConfig(
+            ecConfig = EcConfig(ecKeyCurve),
+            rsaConfig = RsaConfig(rcaKeySize),
+            credentialResponseEncryptionPolicy = credentialResponseEncryptionPolicy,
+        )
     }
 }
 
@@ -308,20 +303,17 @@ enum class AuthorizeIssuanceConfig {
  * Wallet's policy concerning the metadata of the Credential Issuer.
  */
 sealed interface IssuerMetadataPolicy {
+
     /**
      * Credential Issuer **must** provide signed metadata. Only values from signed metadata are used.
      */
-    data class RequireSigned(
-        val issuerTrust: IssuerTrust,
-    ) : IssuerMetadataPolicy
+    data class RequireSigned(val issuerTrust: IssuerTrust) : IssuerMetadataPolicy
 
     /**
      * Credential Issuer **may** provide signed metadata. If signed metadata are provided, values conveyed in the singed
      * metadata take precedence over their corresponding unsigned counterparts.
      */
-    data class PreferSigned(
-        val issuerTrust: IssuerTrust,
-    ) : IssuerMetadataPolicy
+    data class PreferSigned(val issuerTrust: IssuerTrust) : IssuerMetadataPolicy
 
     /**
      * Signed metadata are ignored. Only values conveyed using plain json elements are used.

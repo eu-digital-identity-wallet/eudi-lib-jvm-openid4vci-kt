@@ -27,18 +27,18 @@ import kotlin.test.assertNull
  * Test cases for [DefaultCredentialOfferRequestResolver].
  */
 internal class DefaultCredentialOfferRequestResolverTest {
+
     @Test
-    fun `resolve a credential offer passed by value that contains a pre-authorized code grant without transaction code`() =
-        runTest {
-            suspend fun test(credentialIssuerMetadataContentType: ContentType) {
-                val httpClient =
-                    mockedHttpClient(
-                        credentialIssuerMetadataWellKnownMocker(contentType = credentialIssuerMetadataContentType),
-                        authServerWellKnownMocker(),
-                    )
-                val resolver = DefaultCredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.IgnoreSigned)
-                val credentialOfferJson =
-                    """
+    fun `resolve a credential offer passed by value that contains a pre-authorized code grant without transaction code`() = runTest {
+        suspend fun test(credentialIssuerMetadataContentType: ContentType) {
+            val httpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(contentType = credentialIssuerMetadataContentType),
+                    authServerWellKnownMocker(),
+                )
+            val resolver = DefaultCredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.IgnoreSigned)
+            val credentialOfferJson =
+                """
                     {
                         "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_vc_sd_jwt"],
                         "credential_issuer": "https://credential-issuer.example.com",
@@ -48,49 +48,48 @@ internal class DefaultCredentialOfferRequestResolverTest {
                             }
                         }
                     }
-                    """.trimIndent()
-                val credentialOfferUri =
-                    URLBuilder()
-                        .apply {
-                            path("/credential_offer")
-                            parameters.append("credential_offer", credentialOfferJson)
-                        }.buildString()
-                val credentialOfferRequest = CredentialOfferRequest(credentialOfferUri).getOrThrow()
+                """.trimIndent()
+            val credentialOfferUri = URLBuilder()
+                .apply {
+                    path("/credential_offer")
+                    parameters.append("credential_offer", credentialOfferJson)
+                }
+                .buildString()
+            val credentialOfferRequest = CredentialOfferRequest(credentialOfferUri).getOrThrow()
 
-                val credentialOffer = resolver.resolve(credentialOfferRequest).getOrThrow()
+            val credentialOffer = resolver.resolve(credentialOfferRequest).getOrThrow()
 
-                assertEquals(
-                    "https://credential-issuer.example.com",
-                    credentialOffer.credentialIssuerIdentifier.value.toString(),
-                )
-                assertEquals(1, credentialOffer.credentialConfigurationIdentifiers.size)
-                assertEquals(
-                    "eu.europa.ec.eudiw.pid_vc_sd_jwt",
-                    credentialOffer.credentialConfigurationIdentifiers.first().value,
-                )
-                val grants = assertNotNull(credentialOffer.grants)
-                assertNull(grants.authorizationCode())
-                val preAuthorizedCode = assertNotNull(grants.preAuthorizedCode())
-                assertEquals("code", preAuthorizedCode.preAuthorizedCode)
-                assertNull(preAuthorizedCode.txCode)
-            }
-
-            test(ContentType.Application.Json)
-            test(ContentType.Application.Json.withCharset(Charsets.UTF_8))
+            assertEquals(
+                "https://credential-issuer.example.com",
+                credentialOffer.credentialIssuerIdentifier.value.toString(),
+            )
+            assertEquals(1, credentialOffer.credentialConfigurationIdentifiers.size)
+            assertEquals(
+                "eu.europa.ec.eudiw.pid_vc_sd_jwt",
+                credentialOffer.credentialConfigurationIdentifiers.first().value,
+            )
+            val grants = assertNotNull(credentialOffer.grants)
+            assertNull(grants.authorizationCode())
+            val preAuthorizedCode = assertNotNull(grants.preAuthorizedCode())
+            assertEquals("code", preAuthorizedCode.preAuthorizedCode)
+            assertNull(preAuthorizedCode.txCode)
         }
 
+        test(ContentType.Application.Json)
+        test(ContentType.Application.Json.withCharset(Charsets.UTF_8))
+    }
+
     @Test
-    fun `resolve a credential offer passed by value that contains a pre-authorized code grant with transaction code`() =
-        runTest {
-            suspend fun test(credentialIssuerMetadataContentType: ContentType) {
-                val httpClient =
-                    mockedHttpClient(
-                        credentialIssuerMetadataWellKnownMocker(contentType = credentialIssuerMetadataContentType),
-                        authServerWellKnownMocker(),
-                    )
-                val resolver = DefaultCredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.IgnoreSigned)
-                val credentialOfferJson =
-                    """
+    fun `resolve a credential offer passed by value that contains a pre-authorized code grant with transaction code`() = runTest {
+        suspend fun test(credentialIssuerMetadataContentType: ContentType) {
+            val httpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(contentType = credentialIssuerMetadataContentType),
+                    authServerWellKnownMocker(),
+                )
+            val resolver = DefaultCredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.IgnoreSigned)
+            val credentialOfferJson =
+                """
                     {
                         "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_vc_sd_jwt"],
                         "credential_issuer": "https://credential-issuer.example.com",
@@ -105,37 +104,37 @@ internal class DefaultCredentialOfferRequestResolverTest {
                             }
                         }
                     }
-                    """.trimIndent()
-                val credentialOfferUri =
-                    URLBuilder()
-                        .apply {
-                            path("/credential_offer")
-                            parameters.append("credential_offer", credentialOfferJson)
-                        }.buildString()
-                val credentialOfferRequest = CredentialOfferRequest(credentialOfferUri).getOrThrow()
+                """.trimIndent()
+            val credentialOfferUri = URLBuilder()
+                .apply {
+                    path("/credential_offer")
+                    parameters.append("credential_offer", credentialOfferJson)
+                }
+                .buildString()
+            val credentialOfferRequest = CredentialOfferRequest(credentialOfferUri).getOrThrow()
 
-                val credentialOffer = resolver.resolve(credentialOfferRequest).getOrThrow()
+            val credentialOffer = resolver.resolve(credentialOfferRequest).getOrThrow()
 
-                assertEquals(
-                    "https://credential-issuer.example.com",
-                    credentialOffer.credentialIssuerIdentifier.value.toString(),
-                )
-                assertEquals(1, credentialOffer.credentialConfigurationIdentifiers.size)
-                assertEquals(
-                    "eu.europa.ec.eudiw.pid_vc_sd_jwt",
-                    credentialOffer.credentialConfigurationIdentifiers.first().value,
-                )
-                val grants = assertNotNull(credentialOffer.grants)
-                assertNull(grants.authorizationCode())
-                val preAuthorizedCode = assertNotNull(grants.preAuthorizedCode())
-                assertEquals("code", preAuthorizedCode.preAuthorizedCode)
-                val txCode = assertNotNull(preAuthorizedCode.txCode)
-                assertEquals("Please provide the one-time code.", txCode.description)
-                assertEquals(TxCodeInputMode.NUMERIC, txCode.inputMode)
-                assertEquals(5, txCode.length)
-            }
-
-            test(ContentType.Application.Json)
-            test(ContentType.Application.Json.withCharset(Charsets.UTF_8))
+            assertEquals(
+                "https://credential-issuer.example.com",
+                credentialOffer.credentialIssuerIdentifier.value.toString(),
+            )
+            assertEquals(1, credentialOffer.credentialConfigurationIdentifiers.size)
+            assertEquals(
+                "eu.europa.ec.eudiw.pid_vc_sd_jwt",
+                credentialOffer.credentialConfigurationIdentifiers.first().value,
+            )
+            val grants = assertNotNull(credentialOffer.grants)
+            assertNull(grants.authorizationCode())
+            val preAuthorizedCode = assertNotNull(grants.preAuthorizedCode())
+            assertEquals("code", preAuthorizedCode.preAuthorizedCode)
+            val txCode = assertNotNull(preAuthorizedCode.txCode)
+            assertEquals("Please provide the one-time code.", txCode.description)
+            assertEquals(TxCodeInputMode.NUMERIC, txCode.inputMode)
+            assertEquals(5, txCode.length)
         }
+
+        test(ContentType.Application.Json)
+        test(ContentType.Application.Json.withCharset(Charsets.UTF_8))
+    }
 }

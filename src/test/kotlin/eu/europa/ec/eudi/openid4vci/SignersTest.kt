@@ -28,109 +28,99 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SignersTest {
+
     @Nested
     inner class JwtSigners {
-        @Test
-        fun `sign single jwt proof`() =
-            runTest {
-                val ecKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
-
-                val signer =
-                    Signer.fromNimbusEcKey(
-                        ecKey,
-                        JwtBindingKey.Jwk(ecKey.toPublicJWK()),
-                        secureRandom = null,
-                        provider = null,
-                    )
-
-                val jwtSigner =
-                    JwtSigner<JwtProofClaims, JwtBindingKey>(
-                        algorithm = Curve.P_256.toJavaSigningAlg().toJoseAlg(),
-                        signOperation = signer.acquire(),
-                    )
-
-                val signResult =
-                    jwtSigner.sign(
-                        JwtProofClaims(
-                            issuer = "https://eudiw.dev",
-                            audience = "audience",
-                            issuedAt = Instant.now(),
-                            nonce = null,
-                        ),
-                    )
-
-                val signedJwt = SignedJWT.parse(signResult)
-
-                assertEquals(JWSObject.State.SIGNED, signedJwt.state)
-            }
 
         @Test
-        fun `sign batch jwt proofs and verify`() =
-            runTest {
-                val ecKeys = List(5) { CryptoGenerator.randomECSigningKey(Curve.P_256) }
+        fun `sign single jwt proof`() = runTest {
+            val ecKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
 
-                val batchSigner =
-                    BatchSigner.fromNimbusEcKeys(
-                        ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
-                        secureRandom = null,
-                        provider = null,
-                    )
+            val signer = Signer.fromNimbusEcKey(
+                ecKey,
+                JwtBindingKey.Jwk(ecKey.toPublicJWK()),
+                secureRandom = null,
+                provider = null,
+            )
 
-                val batchJwtSigner =
-                    JwtBatchSigner<JwtProofClaims, JwtBindingKey>(
-                        algorithm = Curve.P_256.toJavaSigningAlg().toJoseAlg(),
-                        batchSignOperation = batchSigner.authenticate(),
-                    )
+            val jwtSigner = JwtSigner<JwtProofClaims, JwtBindingKey>(
+                algorithm = Curve.P_256.toJavaSigningAlg().toJoseAlg(),
+                signOperation = signer.acquire(),
+            )
 
-                val signResult =
-                    batchJwtSigner.sign(
-                        JwtProofClaims(
-                            issuer = "https://eudiw.dev",
-                            audience = "audience",
-                            issuedAt = Instant.now(),
-                            nonce = null,
-                        ),
-                    )
+            val signResult = jwtSigner.sign(
+                JwtProofClaims(
+                    issuer = "https://eudiw.dev",
+                    audience = "audience",
+                    issuedAt = Instant.now(),
+                    nonce = null,
+                ),
+            )
 
-                assertEquals(5, signResult.size)
-            }
+            val signedJwt = SignedJWT.parse(signResult)
+
+            assertEquals(JWSObject.State.SIGNED, signedJwt.state)
+        }
+
+        @Test
+        fun `sign batch jwt proofs and verify`() = runTest {
+            val ecKeys = List(5) { CryptoGenerator.randomECSigningKey(Curve.P_256) }
+
+            val batchSigner = BatchSigner.fromNimbusEcKeys(
+                ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
+                secureRandom = null,
+                provider = null,
+            )
+
+            val batchJwtSigner = JwtBatchSigner<JwtProofClaims, JwtBindingKey>(
+                algorithm = Curve.P_256.toJavaSigningAlg().toJoseAlg(),
+                batchSignOperation = batchSigner.authenticate(),
+            )
+
+            val signResult = batchJwtSigner.sign(
+                JwtProofClaims(
+                    issuer = "https://eudiw.dev",
+                    audience = "audience",
+                    issuedAt = Instant.now(),
+                    nonce = null,
+                ),
+            )
+
+            assertEquals(5, signResult.size)
+        }
     }
 
     @Nested
     inner class JwtProofSigners {
         @Test
-        fun `sign EC key attestation jwt proof`() =
-            runTest {
-                val ecKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
+        fun `sign EC key attestation jwt proof`() = runTest {
+            val ecKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
 
-                val signer =
-                    Signer.fromNimbusEcKey(
-                        ecKey,
-                        keyAttestationJwt(
-                            attestedKeys = listOf(ecKey.toPublicJWK()),
-                        ),
-                        secureRandom = null,
-                        provider = null,
-                    )
+            val signer = Signer.fromNimbusEcKey(
+                ecKey,
+                keyAttestationJwt(
+                    attestedKeys = listOf(ecKey.toPublicJWK()),
+                ),
+                secureRandom = null,
+                provider = null,
+            )
 
-                val keyAttestationJwtProofSigner =
-                    KeyAttestationJwtProofSigner(
-                        algorithm = Curve.P_256.toJavaSigningAlg().toJoseAlg(),
-                        signOperation = signer.acquire(),
-                        keyIndex = 0,
-                    )
+            val keyAttestationJwtProofSigner = KeyAttestationJwtProofSigner(
+                algorithm = Curve.P_256.toJavaSigningAlg().toJoseAlg(),
+                signOperation = signer.acquire(),
+                keyIndex = 0,
+            )
 
-                val claims =
-                    JwtProofClaims(
-                        issuer = "https://eudiw.dev",
-                        audience = "audience",
-                        issuedAt = Instant.now(),
-                        nonce = "nonce",
-                    )
-                val jwt = keyAttestationJwtProofSigner.sign(claims)
-                val signedJwt = SignedJWT.parse(jwt)
-                assertEquals(JWSObject.State.SIGNED, signedJwt.state)
-                assertTrue(signedJwt.header.getCustomParam("key_attestation") is String)
-            }
+            val claims = JwtProofClaims(
+                issuer = "https://eudiw.dev",
+                audience = "audience",
+                issuedAt = Instant.now(),
+                nonce = "nonce",
+            )
+            val jwt = keyAttestationJwtProofSigner.sign(claims)
+            val signedJwt = SignedJWT.parse(jwt)
+            assertEquals(JWSObject.State.SIGNED, signedJwt.state)
+            assertTrue(signedJwt.header.getCustomParam("key_attestation") is String)
+        }
     }
 }

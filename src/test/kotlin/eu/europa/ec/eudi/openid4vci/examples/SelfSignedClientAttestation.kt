@@ -46,13 +46,12 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 internal val ECKey.jwsAlgorithm: JWSAlgorithm
-    get() =
-        when (curve) {
-            Curve.P_256 -> JWSAlgorithm.ES256
-            Curve.P_384 -> JWSAlgorithm.ES384
-            Curve.P_521 -> JWSAlgorithm.ES512
-            else -> error("Unsupported curve ${curve.name}")
-        }
+    get() = when (curve) {
+        Curve.P_256 -> JWSAlgorithm.ES256
+        Curve.P_384 -> JWSAlgorithm.ES384
+        Curve.P_521 -> JWSAlgorithm.ES512
+        else -> error("Unsupported curve ${curve.name}")
+    }
 
 @Suppress("UNUSED")
 internal fun selfSignedClient(
@@ -66,22 +65,19 @@ internal fun selfSignedClient(
 ): ClientAuthentication.AttestationBased {
     val algorithm = walletInstanceKey.jwsAlgorithm
     val signer = DefaultJWSSignerFactory().createJWSSigner(walletInstanceKey, algorithm)
-    val clientAttestationJWT =
-        run {
-            val claims =
-                ClientAttestationClaims(
-                    issuer = clientId,
-                    clientId = clientId,
-                    cnf =
-                        Cnf(
-                            walletInstancePubKey = walletInstanceKey.toPublicJWK(),
-                            keyType = keyType,
-                            userAuthentication = userAuthentication,
-                        ),
-                )
-            val builder = ClientAttestationJwtBuilder(clock, duration, algorithm, signer, claims, headerCustomization)
-            builder.build()
-        }
+    val clientAttestationJWT = run {
+        val claims = ClientAttestationClaims(
+            issuer = clientId,
+            clientId = clientId,
+            cnf = Cnf(
+                walletInstancePubKey = walletInstanceKey.toPublicJWK(),
+                keyType = keyType,
+                userAuthentication = userAuthentication,
+            ),
+        )
+        val builder = ClientAttestationJwtBuilder(clock, duration, algorithm, signer, claims, headerCustomization)
+        builder.build()
+    }
     val popJwtSpec = ClientAttestationPoPJWTSpec(Signer.fromNimbusEcKey(walletInstanceKey, walletInstanceKey.toPublicJWK(), null, null))
     return ClientAuthentication.AttestationBased(clientAttestationJWT, popJwtSpec)
 }
@@ -194,6 +190,7 @@ data class ClientAttestationClaims(
     val clientId: ClientId,
     val cnf: Cnf,
 ) {
+
     init {
         require(clientId.isNotBlank() && clientId.isNotEmpty()) { "clientId cannot be blank" }
     }
@@ -224,26 +221,22 @@ private class ClientAttestationJwtBuilder(
     }
 
     private fun jwsHeader(): JWSHeader =
-        JWSHeader
-            .Builder(algorithm)
-            .apply {
-                headerCustomization()
-                type(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
-            }.build()
+        JWSHeader.Builder(algorithm).apply {
+            headerCustomization()
+            type(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
+        }.build()
 
     private fun claimSetForm(claims: ClientAttestationClaims): JWTClaimsSet =
-        JWTClaimsSet
-            .Builder()
-            .apply {
-                val now = clock.instant()
-                val exp = now.plusSeconds(duration.inWholeSeconds)
-                issuer(claims.issuer)
-                subject(claims.clientId)
-                expirationTime(Date.from(exp))
-                claim("cnf", cnf(claims.cnf))
-                issueTime(Date.from(now))
-                notBeforeTime(Date.from(now))
-            }.build()
+        JWTClaimsSet.Builder().apply {
+            val now = clock.instant()
+            val exp = now.plusSeconds(duration.inWholeSeconds)
+            issuer(claims.issuer)
+            subject(claims.clientId)
+            expirationTime(Date.from(exp))
+            claim("cnf", cnf(claims.cnf))
+            issueTime(Date.from(now))
+            notBeforeTime(Date.from(now))
+        }.build()
 
     companion object {
         fun ecKey256(
@@ -270,39 +263,29 @@ private fun cnf(cnf: Cnf): Map<String, Any> =
     }
 
 internal val JWK.publicKey: Key
-    get() =
-        when (this) {
-            is ECKey -> toECPublicKey()
-            is RSAKey -> toRSAPublicKey()
-            else -> error("Unsupported JWK type")
-        }
+    get() = when (this) {
+        is ECKey -> toECPublicKey()
+        is RSAKey -> toRSAPublicKey()
+        else -> error("Unsupported JWK type")
+    }
 
-internal fun HttpRequestData.verifySelfSignedClientAttestation(
-    walletInstanceKey: ECKey,
-    challenge: Nonce?,
-) {
-    val clientAttestation =
-        run {
-            val jwt =
-                SignedJWT
-                    .parse(assertNotNull(headers[AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_HEADER]))
-                    .apply {
-                        assertTrue(verify(ECDSAVerifier(walletInstanceKey)))
-                    }
-            ClientAttestationJWT(jwt)
-        }
+internal fun HttpRequestData.verifySelfSignedClientAttestation(walletInstanceKey: ECKey, challenge: Nonce?) {
+    val clientAttestation = run {
+        val jwt = SignedJWT.parse(assertNotNull(headers[AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_HEADER]))
+            .apply {
+                assertTrue(verify(ECDSAVerifier(walletInstanceKey)))
+            }
+        ClientAttestationJWT(jwt)
+    }
 
-    val clientAttestationPOP =
-        run {
-            val jwt =
-                SignedJWT
-                    .parse(assertNotNull(headers[AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_POP_HEADER]))
-                    .apply {
-                        assertTrue(verify(ECDSAVerifier(walletInstanceKey)))
-                        assertTrue(verify(DefaultJWSVerifierFactory().createJWSVerifier(header, clientAttestation.publicKey.publicKey)))
-                    }
-            ClientAttestationPoPJWT(jwt)
-        }
+    val clientAttestationPOP = run {
+        val jwt = SignedJWT.parse(assertNotNull(headers[AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_POP_HEADER]))
+            .apply {
+                assertTrue(verify(ECDSAVerifier(walletInstanceKey)))
+                assertTrue(verify(DefaultJWSVerifierFactory().createJWSVerifier(header, clientAttestation.publicKey.publicKey)))
+            }
+        ClientAttestationPoPJWT(jwt)
+    }
     assertEquals(clientAttestation.clientId, clientAttestationPOP.clientId)
     if (null != challenge) {
         assertEquals(

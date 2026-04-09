@@ -31,15 +31,13 @@ data class CNonceResponse(
     @SerialName("c_nonce") val cNonce: String,
 )
 
-internal data class CNonceAndDPoPNonce(
-    val cnonce: Nonce,
-    val dpopNonce: Nonce?,
-)
+internal data class CNonceAndDPoPNonce(val cnonce: Nonce, val dpopNonce: Nonce?)
 
 internal class NonceEndpointClient(
     private val nonceEndpoint: CredentialIssuerEndpoint,
     private val httpClient: HttpClient,
 ) {
+
     suspend fun getNonce(): Result<CNonceAndDPoPNonce> =
         runCatchingCancellable {
             requestNonce()

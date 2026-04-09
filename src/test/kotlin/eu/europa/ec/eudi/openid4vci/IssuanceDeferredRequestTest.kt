@@ -30,190 +30,177 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class IssuanceDeferredRequestTest {
-    @Test
-    fun `when issuer responds with invalid_transaction_id, response should be of type Errored`() =
-        runTest {
-            val mockedKtorHttpClientFactory =
-                mockedHttpClient(
-                    credentialIssuerMetadataWellKnownMocker(),
-                    authServerWellKnownMocker(),
-                    parPostMocker(),
-                    tokenPostMocker(),
-                    nonceEndpointMocker(),
-                    singleIssuanceRequestMocker(
-                        responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it) },
-                    ),
-                    deferredIssuanceRequestMocker(
-                        responseBuilder = { defaultIssuanceResponseDataBuilder(credentialIsReady = true, transactionIdIsValid = false) },
-                    ),
-                )
-            val (authorizedRequest, issuer) =
-                authorizeRequestForCredentialOffer(
-                    credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-                    httpClient = mockedKtorHttpClientFactory,
-                )
-
-            with(issuer) {
-                val requestPayload =
-                    IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(PID_SdJwtVC),
-                    )
-                val (newAuthorizedRequest, outcome) =
-                    authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
-                assertIs<SubmissionOutcome.Deferred>(outcome)
-
-                val (_, requestDeferredIssuance) =
-                    newAuthorizedRequest
-                        .queryForDeferredCredential(outcome.transactionId)
-                        .getOrThrow()
-
-                assertIs<DeferredCredentialQueryOutcome.Errored>(requestDeferredIssuance)
-                assertTrue("Expected error response invalid_transaction_id but was not") {
-                    requestDeferredIssuance.error == "invalid_transaction_id"
-                }
-            }
-        }
 
     @Test
-    fun `when issuer needs more time to prepare credential, issuance outcome is IssuancePending`() =
-        runTest {
-            val transactionId = TransactionId(UUID.randomUUID().toString())
-            val mockedKtorHttpClientFactory =
-                mockedHttpClient(
-                    credentialIssuerMetadataWellKnownMocker(),
-                    authServerWellKnownMocker(),
-                    parPostMocker(),
-                    tokenPostMocker(),
-                    nonceEndpointMocker(),
-                    singleIssuanceRequestMocker(
-                        responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it, transactionId) },
-                    ),
-                    deferredIssuanceRequestMocker(
-                        responseBuilder = { defaultIssuanceResponseDataBuilder(false, transactionId) },
-                    ),
-                )
+    fun `when issuer responds with invalid_transaction_id, response should be of type Errored`() = runTest {
+        val mockedKtorHttpClientFactory = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(
+                responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it) },
+            ),
+            deferredIssuanceRequestMocker(
+                responseBuilder = { defaultIssuanceResponseDataBuilder(credentialIsReady = true, transactionIdIsValid = false) },
+            ),
+        )
+        val (authorizedRequest, issuer) =
+            authorizeRequestForCredentialOffer(
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                httpClient = mockedKtorHttpClientFactory,
+            )
 
-            val (authorizedRequest, issuer) =
-                authorizeRequestForCredentialOffer(
-                    credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-                    httpClient = mockedKtorHttpClientFactory,
-                )
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_SdJwtVC),
+            )
+            val (newAuthorizedRequest, outcome) =
+                authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
+            assertIs<SubmissionOutcome.Deferred>(outcome)
 
-            with(issuer) {
-                val requestPayload =
-                    IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(PID_SdJwtVC),
-                    )
-                val (newAuthorizedRequest, outcome) =
-                    authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
-                assertIs<SubmissionOutcome.Deferred>(outcome)
+            val (_, requestDeferredIssuance) =
+                newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId)
+                    .getOrThrow()
 
-                val (_, requestDeferredIssuance) =
-                    newAuthorizedRequest
-                        .queryForDeferredCredential(outcome.transactionId)
-                        .getOrThrow()
-
-                val issuancePending = assertIs<DeferredCredentialQueryOutcome.IssuancePending>(requestDeferredIssuance)
-                assertEquals(transactionId, issuancePending.transactionId)
+            assertIs<DeferredCredentialQueryOutcome.Errored>(requestDeferredIssuance)
+            assertTrue("Expected error response invalid_transaction_id but was not") {
+                requestDeferredIssuance.error == "invalid_transaction_id"
             }
         }
+    }
 
     @Test
-    fun `when issuer needs more time to prepare credential and responds with unexpected transaction id, request fails`() =
-        runTest {
-            val mockedKtorHttpClientFactory =
-                mockedHttpClient(
-                    credentialIssuerMetadataWellKnownMocker(),
-                    authServerWellKnownMocker(),
-                    parPostMocker(),
-                    tokenPostMocker(),
-                    nonceEndpointMocker(),
-                    singleIssuanceRequestMocker(
-                        responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it) },
-                    ),
-                    deferredIssuanceRequestMocker(
-                        responseBuilder = { defaultIssuanceResponseDataBuilder(false) },
-                    ),
-                )
+    fun `when issuer needs more time to prepare credential, issuance outcome is IssuancePending`() = runTest {
+        val transactionId = TransactionId(UUID.randomUUID().toString())
+        val mockedKtorHttpClientFactory = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(
+                responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it, transactionId) },
+            ),
+            deferredIssuanceRequestMocker(
+                responseBuilder = { defaultIssuanceResponseDataBuilder(false, transactionId) },
+            ),
+        )
 
-            val (authorizedRequest, issuer) =
-                authorizeRequestForCredentialOffer(
-                    credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-                    httpClient = mockedKtorHttpClientFactory,
-                )
+        val (authorizedRequest, issuer) =
+            authorizeRequestForCredentialOffer(
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                httpClient = mockedKtorHttpClientFactory,
+            )
 
-            with(issuer) {
-                val requestPayload =
-                    IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(PID_SdJwtVC),
-                    )
-                val (newAuthorizedRequest, outcome) =
-                    authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
-                assertIs<SubmissionOutcome.Deferred>(outcome)
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_SdJwtVC),
+            )
+            val (newAuthorizedRequest, outcome) =
+                authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
+            assertIs<SubmissionOutcome.Deferred>(outcome)
 
-                assertFailsWith<CredentialIssuanceError.UnexpectedTransactionId> {
-                    newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId).getOrThrow()
-                }
-            }
+            val (_, requestDeferredIssuance) =
+                newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId)
+                    .getOrThrow()
+
+            val issuancePending = assertIs<DeferredCredentialQueryOutcome.IssuancePending>(requestDeferredIssuance)
+            assertEquals(transactionId, issuancePending.transactionId)
         }
+    }
 
     @Test
-    fun `when deferred request is valid, credential must be issued`() =
-        runTest {
-            val mockedKtorHttpClientFactory =
-                mockedHttpClient(
-                    credentialIssuerMetadataWellKnownMocker(),
-                    authServerWellKnownMocker(),
-                    parPostMocker(),
-                    tokenPostMocker(),
-                    nonceEndpointMocker(),
-                    singleIssuanceRequestMocker(
-                        responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it) },
-                    ),
-                    deferredIssuanceRequestMocker(
-                        responseBuilder = { defaultIssuanceResponseDataBuilder(true) },
-                        requestValidator = {
-                            assertTrue("No Authorization header passed.") {
-                                it.headers.contains("Authorization")
-                            }
+    fun `when issuer needs more time to prepare credential and responds with unexpected transaction id, request fails`() = runTest {
+        val mockedKtorHttpClientFactory = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(
+                responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it) },
+            ),
+            deferredIssuanceRequestMocker(
+                responseBuilder = { defaultIssuanceResponseDataBuilder(false) },
+            ),
+        )
 
-                            assertTrue("Authorization header malformed.") {
-                                it.headers["Authorization"]?.contains("Bearer") ?: false
-                            }
-                            assertTrue("Content Type must be application/json") {
-                                it.body.contentType == ContentType.parse("application/json")
-                            }
-                            val textContent = it.body as TextContent
-                            val deferredIssuanceRequest = asDeferredIssuanceRequest(textContent.text)
-                            deferredIssuanceRequest?.let {
-                                assertTrue("No transaction id passed") {
-                                    deferredIssuanceRequest.transactionId.isNotBlank()
-                                }
-                            }
-                        },
-                    ),
-                )
+        val (authorizedRequest, issuer) =
+            authorizeRequestForCredentialOffer(
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                httpClient = mockedKtorHttpClientFactory,
+            )
 
-            val (authorizedRequest, issuer) =
-                authorizeRequestForCredentialOffer(
-                    credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-                    httpClient = mockedKtorHttpClientFactory,
-                )
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_SdJwtVC),
+            )
+            val (newAuthorizedRequest, outcome) =
+                authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
+            assertIs<SubmissionOutcome.Deferred>(outcome)
 
-            with(issuer) {
-                val requestPayload =
-                    IssuanceRequestPayload.ConfigurationBased(
-                        CredentialConfigurationIdentifier(PID_SdJwtVC),
-                    )
-                val (newAuthorized, outcome) =
-                    authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
-
-                assertIs<SubmissionOutcome.Deferred>(outcome)
-
-                val (_, requestDeferredIssuance) = newAuthorized.queryForDeferredCredential(outcome.transactionId).getOrThrow()
-                assertIs<DeferredCredentialQueryOutcome.Issued>(requestDeferredIssuance)
+            assertFailsWith<CredentialIssuanceError.UnexpectedTransactionId> {
+                newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId).getOrThrow()
             }
         }
+    }
+
+    @Test
+    fun `when deferred request is valid, credential must be issued`() = runTest {
+        val mockedKtorHttpClientFactory = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(
+                responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it) },
+            ),
+            deferredIssuanceRequestMocker(
+                responseBuilder = { defaultIssuanceResponseDataBuilder(true) },
+                requestValidator = {
+                    assertTrue("No Authorization header passed.") {
+                        it.headers.contains("Authorization")
+                    }
+
+                    assertTrue("Authorization header malformed.") {
+                        it.headers["Authorization"]?.contains("Bearer") ?: false
+                    }
+                    assertTrue("Content Type must be application/json") {
+                        it.body.contentType == ContentType.parse("application/json")
+                    }
+                    val textContent = it.body as TextContent
+                    val deferredIssuanceRequest = asDeferredIssuanceRequest(textContent.text)
+                    deferredIssuanceRequest?.let {
+                        assertTrue("No transaction id passed") {
+                            deferredIssuanceRequest.transactionId.isNotBlank()
+                        }
+                    }
+                },
+            ),
+        )
+
+        val (authorizedRequest, issuer) =
+            authorizeRequestForCredentialOffer(
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                httpClient = mockedKtorHttpClientFactory,
+            )
+
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_SdJwtVC),
+            )
+            val (newAuthorized, outcome) =
+                authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
+
+            assertIs<SubmissionOutcome.Deferred>(outcome)
+
+            val (_, requestDeferredIssuance) = newAuthorized.queryForDeferredCredential(outcome.transactionId).getOrThrow()
+            assertIs<DeferredCredentialQueryOutcome.Issued>(requestDeferredIssuance)
+        }
+    }
 
     private fun asDeferredIssuanceRequest(bodyStr: String): DeferredRequestTO? =
         try {

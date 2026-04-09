@@ -32,15 +32,11 @@ internal typealias HttpResponseDataBuilder = MockRequestHandleScope.(request: Ht
 /**
  * Gets a [HttpRequestDataMatcher] that matches the provided [url] and [method].
  */
-internal fun match(
-    url: URI,
-    method: HttpMethod = HttpMethod.Get,
-): HttpRequestDataMatcher = { request -> request.url.toURI() == url && request.method == method }
+internal fun match(url: URI, method: HttpMethod = HttpMethod.Get): HttpRequestDataMatcher =
+    { request -> request.url.toURI() == url && request.method == method }
 
-internal fun endsWith(
-    endsWith: String,
-    method: HttpMethod = HttpMethod.Get,
-): HttpRequestDataMatcher = { request -> request.url.encodedPath.endsWith(endsWith) && request.method == method }
+internal fun endsWith(endsWith: String, method: HttpMethod = HttpMethod.Get): HttpRequestDataMatcher =
+    { request -> request.url.encodedPath.endsWith(endsWith) && request.method == method }
 
 /**
  * Gets a [HttpResponseDataBuilder] that returns the provided [resource]
@@ -50,17 +46,15 @@ internal fun jsonResponse(
     resource: String,
     acceptContentTypes: List<String> = listOf("application/json"),
     status: HttpStatusCode = HttpStatusCode.OK,
-): HttpResponseDataBuilder =
-    {
-        respond(
-            content = getResourceAsText(resource),
-            status = status,
-            headers =
-                headersOf(
-                    *acceptContentTypes.map { HttpHeaders.ContentType to listOf(it) }.toTypedArray(),
-                ),
-        )
-    }
+): HttpResponseDataBuilder = {
+    respond(
+        content = getResourceAsText(resource),
+        status = status,
+        headers = headersOf(
+            *acceptContentTypes.map { HttpHeaders.ContentType to listOf(it) }.toTypedArray(),
+        ),
+    )
+}
 
 /**
  * A [requestMatcher] alongside the [responseBuilder] that must be invoked when it matches.

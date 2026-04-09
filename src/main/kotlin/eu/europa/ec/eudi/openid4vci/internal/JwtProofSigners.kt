@@ -62,21 +62,16 @@ internal fun JsonObjectBuilder.jwtProofHeader(key: JwtBindingKey) {
         is JwtBindingKey.Did -> {
             put(OpenId4VCISpec.JOSE_HEADER_KEY_ID, key.identity)
         }
-
         is JwtBindingKey.Jwk -> {
             put(OpenId4VCISpec.JOSE_HEADER_JWK, key.jwk.asJsonElement())
         }
-
         is JwtBindingKey.X509 -> {
             put(OpenId4VCISpec.JOSE_HEADER_X5C, key.chain.asJsonElement())
         }
     }
 }
 
-internal fun JsonObjectBuilder.keyAttestationJwtProofHeader(
-    keyAttestation: KeyAttestationJWT,
-    keyIndex: Int,
-) {
+internal fun JsonObjectBuilder.keyAttestationJwtProofHeader(keyAttestation: KeyAttestationJWT, keyIndex: Int) {
     check(keyIndex in keyAttestation.attestedKeys.indices) {
         "Key index $keyIndex is out of bounds for attested keys: $keyAttestation.attestedKeys.size"
     }

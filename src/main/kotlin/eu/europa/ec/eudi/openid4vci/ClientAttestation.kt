@@ -47,9 +47,7 @@ typealias ClientAttestation = Pair<ClientAttestationJWT, ClientAttestationPoPJWT
  * be used by the instance for client authentication
  */
 @JvmInline
-value class ClientAttestationJWT(
-    val jwt: SignedJWT,
-) {
+value class ClientAttestationJWT(val jwt: SignedJWT) {
     init {
         jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
         requireNotNull(jwt.jwtClaimsSet.issuer) { "Invalid Attestation JWT. Misses `iss` claim" }
@@ -73,9 +71,7 @@ value class ClientAttestationJWT(
  * using the key that the Client Attestation JWT is bound to.
  */
 @JvmInline
-value class ClientAttestationPoPJWT(
-    val jwt: SignedJWT,
-) {
+value class ClientAttestationPoPJWT(val jwt: SignedJWT) {
     init {
         jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE))
         requireNotNull(jwt.jwtClaimsSet.issuer) { "Invalid PoP JWT. Misses `iss` claim" }
@@ -121,6 +117,7 @@ data class ClientAttestationPoPJWTSpec(
  * in the context of a [ClientAuthentication.AttestationBased] client
  */
 fun interface ClientAttestationPoPBuilder {
+
     /**
      * Builds a PoP JWT
      *
@@ -154,7 +151,8 @@ internal fun SignedJWT.ensureSignedNotMAC() {
     requireIsNotMAC(alg)
 }
 
-internal fun requireIsNotMAC(alg: JWSAlgorithm) = require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
+internal fun requireIsNotMAC(alg: JWSAlgorithm) =
+    require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
 
 internal fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
 

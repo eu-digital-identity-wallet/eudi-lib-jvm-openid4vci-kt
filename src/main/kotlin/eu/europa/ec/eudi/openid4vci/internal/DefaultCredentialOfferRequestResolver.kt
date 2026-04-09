@@ -84,62 +84,55 @@ internal class DefaultCredentialOfferRequestResolver(
     private val httpClient: HttpClient,
     private val issuerMetadataPolicy: IssuerMetadataPolicy,
 ) : CredentialOfferRequestResolver {
-    override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> =
-        runCatchingCancellable {
-            val credentialOffer = fetchOffer(request)
-            val credentialIssuerId =
-                CredentialIssuerId(credentialOffer.credentialIssuerIdentifier)
-                    .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).raise() }
+    override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> = runCatchingCancellable {
+        val credentialOffer = fetchOffer(request)
+        val credentialIssuerId = CredentialIssuerId(credentialOffer.credentialIssuerIdentifier)
+            .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).raise() }
 
-            ensure(credentialOffer.credentialConfigurationIds.isNotEmpty()) {
-                val er = IllegalArgumentException("credentials are required")
-                CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
-            }
-
-            val credentialIssuerMetadata = fetchIssuerMetaData(credentialIssuerId)
-            val credentials = credentialOffer.credentialConfigurationIds.map { CredentialConfigurationIdentifier(it) }
-            ensure(credentialIssuerMetadata.credentialConfigurationsSupported.keys.containsAll(credentials)) {
-                val er = IllegalArgumentException("Credential offer contains unknown credential ids")
-                CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
-            }
-
-            val grants = credentialOffer.grants?.toGrants(credentialIssuerMetadata)
-            val authorizationServer = grants?.authServer() ?: credentialIssuerMetadata.authorizationServers[0]
-            val authorizationServerMetadata = fetchAuthServerMetaData(authorizationServer)
-            if (grants is Grants.AuthorizationCode) {
-                ensureNotNull(authorizationServerMetadata.authorizationEndpointURI) {
-                    val error =
-                        IllegalArgumentException(
-                            "Credential Offer requires Authorization Code Grant, but the Authorization Server does not support it",
-                        )
-                    CredentialOfferRequestValidationError.InvalidGrants(error).toException()
-                }
-            }
-
-            CredentialOffer(
-                credentialIssuerId,
-                credentialIssuerMetadata,
-                authorizationServerMetadata,
-                credentials,
-                grants,
-            )
+        ensure(credentialOffer.credentialConfigurationIds.isNotEmpty()) {
+            val er = IllegalArgumentException("credentials are required")
+            CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
         }
 
-    private suspend fun fetchOffer(request: CredentialOfferRequest): CredentialOfferRequestTO {
-        val credentialOfferRequestObjectString: String =
-            when (request) {
-                is CredentialOfferRequest.PassByValue -> {
-                    request.value
-                }
+        val credentialIssuerMetadata = fetchIssuerMetaData(credentialIssuerId)
+        val credentials = credentialOffer.credentialConfigurationIds.map { CredentialConfigurationIdentifier(it) }
+        ensure(credentialIssuerMetadata.credentialConfigurationsSupported.keys.containsAll(credentials)) {
+            val er = IllegalArgumentException("Credential offer contains unknown credential ids")
+            CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
+        }
 
-                is CredentialOfferRequest.PassByReference -> {
-                    try {
-                        httpClient.get(request.value.value).body()
-                    } catch (t: Throwable) {
-                        throw CredentialOfferRequestError.UnableToFetchCredentialOffer(t).toException()
-                    }
-                }
+        val grants = credentialOffer.grants?.toGrants(credentialIssuerMetadata)
+        val authorizationServer = grants?.authServer() ?: credentialIssuerMetadata.authorizationServers[0]
+        val authorizationServerMetadata = fetchAuthServerMetaData(authorizationServer)
+        if (grants is Grants.AuthorizationCode) {
+            ensureNotNull(authorizationServerMetadata.authorizationEndpointURI) {
+                val error =
+                    IllegalArgumentException(
+                        "Credential Offer requires Authorization Code Grant, but the Authorization Server does not support it",
+                    )
+                CredentialOfferRequestValidationError.InvalidGrants(error).toException()
             }
+        }
+
+        CredentialOffer(
+            credentialIssuerId,
+            credentialIssuerMetadata,
+            authorizationServerMetadata,
+            credentials,
+            grants,
+        )
+    }
+
+    private suspend fun fetchOffer(request: CredentialOfferRequest): CredentialOfferRequestTO {
+        val credentialOfferRequestObjectString: String = when (request) {
+            is CredentialOfferRequest.PassByValue -> request.value
+            is CredentialOfferRequest.PassByReference ->
+                try {
+                    httpClient.get(request.value.value).body()
+                } catch (t: Throwable) {
+                    throw CredentialOfferRequestError.UnableToFetchCredentialOffer(t).toException()
+                }
+        }
         return try {
             JsonSupport.decodeFromString<CredentialOfferRequestTO>(credentialOfferRequestObjectString)
         } catch (t: Throwable) {
@@ -160,80 +153,65 @@ internal class DefaultCredentialOfferRequestResolver(
         }
 }
 
-private fun Grants.authServer(): HttpsUrl? =
-    when (this) {
-        is Grants.AuthorizationCode -> authorizationServer
-        is Grants.PreAuthorizedCode -> authorizationServer
-        is Grants.Both -> authorizationCode.authorizationServer ?: preAuthorizedCode.authorizationServer
-    }
+private fun Grants.authServer(): HttpsUrl? = when (this) {
+    is Grants.AuthorizationCode -> authorizationServer
+    is Grants.PreAuthorizedCode -> authorizationServer
+    is Grants.Both -> authorizationCode.authorizationServer ?: preAuthorizedCode.authorizationServer
+}
 
 /**
  * Tries to parse a [GrantsTO] to a [Grants] instance.
  */
-private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata): Grants? =
-    runCatching {
-        fun TxCodeTO.toTxCode(): TxCode =
-            when (inputMode) {
-                InputModeTO.TEXT -> {
-                    TxCode(
-                        inputMode = TxCodeInputMode.TEXT,
-                        length = length,
-                        description = description,
-                    )
-                }
-
-                else -> {
-                    TxCode(
-                        inputMode = TxCodeInputMode.NUMERIC,
-                        length = length,
-                        description = description,
-                    )
-                }
-            }
-
-        val maybeAuthorizationCodeGrant =
-            authorizationCode?.let {
-                val authorizationServer =
-                    it.authorizationServer?.let { url ->
-                        val authServer = HttpsUrl(url).getOrThrow()
-                        require(authServer in credentialIssuerMetadata.authorizationServers)
-                        authServer
-                    }
-                Grants.AuthorizationCode(it.issuerState, authorizationServer)
-            }
-        val maybePreAuthorizedCodeGrant =
-            preAuthorizedCode?.let {
-                val authorizationServer =
-                    it.authorizationServer?.let { url ->
-                        val authServer = HttpsUrl(url).getOrThrow()
-                        require(authServer in credentialIssuerMetadata.authorizationServers)
-                        authServer
-                    }
-                Grants.PreAuthorizedCode(
-                    it.preAuthorizedCode,
-                    it.txCode?.toTxCode(),
-                    authorizationServer,
+private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata): Grants? = runCatching {
+    fun TxCodeTO.toTxCode(): TxCode {
+        return when (inputMode) {
+            InputModeTO.TEXT ->
+                TxCode(
+                    inputMode = TxCodeInputMode.TEXT,
+                    length = length,
+                    description = description,
                 )
-            }
 
-        return when {
-            maybeAuthorizationCodeGrant != null && maybePreAuthorizedCodeGrant != null -> {
-                Grants.Both(
-                    maybeAuthorizationCodeGrant,
-                    maybePreAuthorizedCodeGrant,
+            else ->
+                TxCode(
+                    inputMode = TxCodeInputMode.NUMERIC,
+                    length = length,
+                    description = description,
                 )
-            }
-
-            maybeAuthorizationCodeGrant == null && maybePreAuthorizedCodeGrant == null -> {
-                null
-            }
-
-            maybeAuthorizationCodeGrant != null -> {
-                maybeAuthorizationCodeGrant
-            }
-
-            else -> {
-                maybePreAuthorizedCodeGrant
-            }
         }
-    }.getOrElse { throw InvalidGrants(it).toException() }
+    }
+
+    val maybeAuthorizationCodeGrant =
+        authorizationCode?.let {
+            val authorizationServer = it.authorizationServer?.let { url ->
+                val authServer = HttpsUrl(url).getOrThrow()
+                require(authServer in credentialIssuerMetadata.authorizationServers)
+                authServer
+            }
+            Grants.AuthorizationCode(it.issuerState, authorizationServer)
+        }
+    val maybePreAuthorizedCodeGrant =
+        preAuthorizedCode?.let {
+            val authorizationServer = it.authorizationServer?.let { url ->
+                val authServer = HttpsUrl(url).getOrThrow()
+                require(authServer in credentialIssuerMetadata.authorizationServers)
+                authServer
+            }
+            Grants.PreAuthorizedCode(
+                it.preAuthorizedCode,
+                it.txCode?.toTxCode(),
+                authorizationServer,
+            )
+        }
+
+    return when {
+        maybeAuthorizationCodeGrant != null && maybePreAuthorizedCodeGrant != null -> Grants.Both(
+            maybeAuthorizationCodeGrant,
+            maybePreAuthorizedCodeGrant,
+        )
+
+        maybeAuthorizationCodeGrant == null && maybePreAuthorizedCodeGrant == null -> null
+        maybeAuthorizationCodeGrant != null -> maybeAuthorizationCodeGrant
+        else -> maybePreAuthorizedCodeGrant
+    }
+}.getOrElse { throw InvalidGrants(it).toException() }

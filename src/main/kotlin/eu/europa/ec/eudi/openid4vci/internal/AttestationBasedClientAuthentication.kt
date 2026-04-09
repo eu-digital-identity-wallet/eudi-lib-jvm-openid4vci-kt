@@ -34,49 +34,53 @@ import java.time.Clock
  * In regard to JOSE header, only `alg` claim is being populated
  */
 internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder {
+
     override suspend fun ClientAuthentication.AttestationBased.attestationPoPJWT(
         clock: Clock,
         authorizationServerId: URL,
         challenge: Nonce?,
     ): ClientAttestationPoPJWT {
         val now = clock.instant()
-        val claimSet =
-            ClientAttestationPOPClaims(
-                issuer = id,
-                audience = authorizationServerId,
-                jwtId = JwtId(JWTID().value),
-                issuedAt = now,
-                challenge = challenge,
-                notBefore = now,
-            )
-        val signedJwt =
-            popJwtSpec.signer.use { signOperation ->
-                JwtSigner<ClientAttestationPOPClaims, JWK>(
-                    signOperation = signOperation,
-                    algorithm = popJwtSpec.signer.javaAlgorithm.toJoseAlg(),
-                    customizeHeader = {
-                        put(RFC7519.TYPE, AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE)
-                    },
-                ).sign(claimSet)
-            }
+        val claimSet = ClientAttestationPOPClaims(
+            issuer = id,
+            audience = authorizationServerId,
+            jwtId = JwtId(JWTID().value),
+            issuedAt = now,
+            challenge = challenge,
+            notBefore = now,
+        )
+        val signedJwt = popJwtSpec.signer.use { signOperation ->
+            JwtSigner<ClientAttestationPOPClaims, JWK>(
+                signOperation = signOperation,
+                algorithm = popJwtSpec.signer.javaAlgorithm.toJoseAlg(),
+                customizeHeader = {
+                    put(RFC7519.TYPE, AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE)
+                },
+            ).sign(claimSet)
+        }
         return ClientAttestationPoPJWT(SignedJWT.parse(signedJwt))
     }
 }
 
-internal fun JsonObject.cnfJwk(): JWK? =
-    this["jwk"]?.let {
+internal fun JsonObject.cnfJwk(): JWK? {
+    return this["jwk"]?.let {
         val jsonString = Json.encodeToString(it)
         JWK.parse(jsonString)
     }
+}
 
 internal fun Map<String, Any?>.toJsonObject(): JsonObject {
     val jsonString = JSONObjectUtils.toJSONString(this)
     return Json.decodeFromString(jsonString)
 }
 
-internal fun JWTClaimsSet.cnf(): JsonObject? = getJSONObjectClaim("cnf")?.toJsonObject()
+internal fun JWTClaimsSet.cnf(): JsonObject? {
+    return getJSONObjectClaim("cnf")?.toJsonObject()
+}
 
-internal fun HttpRequestBuilder.clientAttestationHeaders(clientAttestation: ClientAttestation) {
+internal fun HttpRequestBuilder.clientAttestationHeaders(
+    clientAttestation: ClientAttestation,
+) {
     val (attestation, pop) = clientAttestation
     header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_HEADER, attestation.jwt.serialize())
     header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_POP_HEADER, pop.jwt.serialize())
@@ -107,8 +111,5 @@ private suspend fun ClientAttestationPoPBuilder.generateClientAttestationIfNeede
             val clientAttestationPoPJwt = clientAuthentication.attestationPoPJWT(clock, authorizationServerId, challenge)
             clientAuthentication.attestationJWT to clientAttestationPoPJwt
         }
-
-        else -> {
-            null
-        }
+        else -> null
     }

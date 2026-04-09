@@ -21,24 +21,25 @@ import io.ktor.client.*
 /**
  * Indicates an error during the resolution of an Authorization Server's metadata.
  */
-class AuthorizationServerMetadataResolutionException(
-    reason: Throwable,
-) : Exception(reason)
+class AuthorizationServerMetadataResolutionException(reason: Throwable) : Exception(reason)
 
 /**
  * Service for resolving the metadata of an Authorization Server.
  */
 fun interface AuthorizationServerMetadataResolver {
+
     /**
      * Resolves the metadata of an [authServerUrl].
      */
     suspend fun resolve(authServerUrl: HttpsUrl): Result<CIAuthorizationServerMetadata>
 
     companion object {
+
         /**
          * Creates a new [AuthorizationServerMetadataResolver] instance.
          */
-        operator fun invoke(httpClient: HttpClient): AuthorizationServerMetadataResolver =
-            DefaultAuthorizationServerMetadataResolver(httpClient)
+        operator fun invoke(
+            httpClient: HttpClient,
+        ): AuthorizationServerMetadataResolver = DefaultAuthorizationServerMetadataResolver(httpClient)
     }
 }
