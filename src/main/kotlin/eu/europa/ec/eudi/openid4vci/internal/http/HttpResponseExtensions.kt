@@ -44,5 +44,7 @@ internal fun HttpResponse.isResourceServerDpopNonceRequired(): Boolean =
             } ?: false
         }
 
-        else -> false
+        else -> {
+            false
+        }
     }

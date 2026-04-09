@@ -19,7 +19,6 @@ package eu.europa.ec.eudi.openid4vci
  * [OpenID for Verifiable Credential Issuance](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
  */
 object OpenId4VCISpec {
-
     const val JWT_PROOF_TYPE = "openid4vci-proof+jwt"
 
     const val JOSE_HEADER_KEY_ID = "kid"

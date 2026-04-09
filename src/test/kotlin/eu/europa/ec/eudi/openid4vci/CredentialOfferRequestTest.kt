@@ -22,7 +22,6 @@ import org.apache.http.client.utils.URIBuilder
 import kotlin.test.*
 
 internal class CredentialOfferRequestTest {
-
     @Test
     internal fun `Fails with non parsable Credential Offer Endpoint URL`() {
         CredentialOfferRequest("file:").assertFailsWithNestedError<NonParsableCredentialOfferEndpointUrl>()
@@ -36,17 +35,19 @@ internal class CredentialOfferRequestTest {
 
     @Test
     internal fun `Fails when both 'credential_offer' and 'credential_offer_uri' are provided `() {
-        val uri = URIBuilder("wallet://credential_offer")
-            .addParameter("credential_offer", "{}")
-            .addParameter("credential_offer_uri", "https://credential.offer/1")
-            .build()
-            .toString()
+        val uri =
+            URIBuilder("wallet://credential_offer")
+                .addParameter("credential_offer", "{}")
+                .addParameter("credential_offer_uri", "https://credential.offer/1")
+                .build()
+                .toString()
         CredentialOfferRequest(uri).assertFailsWithNestedError<OneOfCredentialOfferOrCredentialOfferUri>()
     }
 
     @Test
     internal fun `PassByValue is created when 'credential_offer' parameter is provided`() {
-        val credentialOffer = """
+        val credentialOffer =
+            """
             {
                "credential_issuer": "https://credential-issuer.example.com",
                "credentials": [
@@ -66,12 +67,13 @@ internal class CredentialOfferRequestTest {
                   }
                }
             }
-        """.trimIndent()
+            """.trimIndent()
 
-        val credentialOfferEndpointUri = URIBuilder("wallet://credential_offer")
-            .addParameter("credential_offer", credentialOffer)
-            .build()
-            .toString()
+        val credentialOfferEndpointUri =
+            URIBuilder("wallet://credential_offer")
+                .addParameter("credential_offer", credentialOffer)
+                .build()
+                .toString()
         val offer = CredentialOfferRequest(credentialOfferEndpointUri).getOrThrow()
         val passByValue = assertIs<CredentialOfferRequest.PassByValue>(offer)
         assertEquals(credentialOffer, passByValue.value)
@@ -80,19 +82,21 @@ internal class CredentialOfferRequestTest {
     @Test
     internal fun `PassByReference cannot be created when 'credential_offer_uri' is not an HTTPS URL`() {
         val credentialOfferUri = "http://credential.offer/1"
-        val credentialOfferEndpointUri = URIBuilder("wallet://credential_offer")
-            .addParameter("credential_offer_uri", credentialOfferUri)
-            .build()
-            .toString()
+        val credentialOfferEndpointUri =
+            URIBuilder("wallet://credential_offer")
+                .addParameter("credential_offer_uri", credentialOfferUri)
+                .build()
+                .toString()
         CredentialOfferRequest(credentialOfferEndpointUri).assertFailsWithNestedError<InvalidCredentialOfferUri>()
     }
 
     @Test
     internal fun `PassByReference is be created when 'credential_offer_uri' is an HTTPS URL`() {
         val credentialOfferUri = "https://credential.offer/1"
-        val credentialOfferEndpointUri = URIBuilder("wallet://credential_offer")
-            .addParameter("credential_offer_uri", credentialOfferUri)
-            .build()
+        val credentialOfferEndpointUri =
+            URIBuilder("wallet://credential_offer")
+                .addParameter("credential_offer_uri", credentialOfferUri)
+                .build()
         val request = CredentialOfferRequest(credentialOfferEndpointUri.toString()).getOrThrow()
         val passByReference = assertIs<CredentialOfferRequest.PassByReference>(request)
         assertEquals(credentialOfferUri, passByReference.value.toString())

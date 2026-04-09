@@ -27,19 +27,19 @@ internal object PidDevIssuer :
     CanAuthorizeIssuance<KeycloakUser> by Keycloak,
     CanBeUsedWithVciLib,
     CanRequestForCredentialOffer<KeycloakUser> by CanRequestForCredentialOffer.onlyStatelessAuthorizationCode(IssuerId) {
-
     private const val WALLET_CLIENT_ID = "wallet-dev"
 
     override val issuerId = IssuerId
     override val testUser = KeycloakUser("tneal", "password")
-    override val cfg = OpenId4VCIConfig(
-        clientAuthentication = ClientAuthentication.None(WALLET_CLIENT_ID),
-        authFlowRedirectionURI = Keycloak.DebugRedirectUri,
-        encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-        authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-        dPoPUsage = DPoPUsage.Required(CryptoGenerator.ecSigner()),
-        parUsage = ParUsage.Required,
-    )
+    override val cfg =
+        OpenId4VCIConfig(
+            clientAuthentication = ClientAuthentication.None(WALLET_CLIENT_ID),
+            authFlowRedirectionURI = Keycloak.DebugRedirectUri,
+            encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+            authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+            dPoPUsage = DPoPUsage.Required(CryptoGenerator.ecSigner()),
+            parUsage = ParUsage.Required,
+        )
 
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_vc_sd_jwt")
     val PID_MsoMdoc_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_mso_mdoc")
@@ -49,12 +49,13 @@ internal object PidDevIssuer :
     val LearningCredential_SdJwtVcCompact_Config_Id =
         CredentialConfigurationIdentifier("urn:eu.europa.ec.eudi:learning:credential:1:dc+sd-jwt-compact")
 
-    val AllCredentialConfigurationIds = listOf(
-        PID_SdJwtVC_config_id,
-        PID_MsoMdoc_config_id,
-        MDL_config_id,
-        EHIC_JwsJson_config_id,
-        EHIC_Compact_config_id,
-        LearningCredential_SdJwtVcCompact_Config_Id,
-    )
+    val AllCredentialConfigurationIds =
+        listOf(
+            PID_SdJwtVC_config_id,
+            PID_MsoMdoc_config_id,
+            MDL_config_id,
+            EHIC_JwsJson_config_id,
+            EHIC_Compact_config_id,
+            LearningCredential_SdJwtVcCompact_Config_Id,
+        )
 }

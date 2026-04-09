@@ -27,114 +27,122 @@ import kotlinx.serialization.json.Json
 import kotlin.test.*
 
 class IssuanceNotificationTest {
-
     @Test
-    fun `when issuance response contains notification_id, it is present in and can be used for notifications`() = runTest {
-        val credential = "issued_credential_content_sd_jwt_vc"
-        val mockedKtorHttpClientFactory = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker(),
-            tokenPostMocker(),
-            nonceEndpointMocker(),
-            singleIssuanceRequestMocker(credential),
-            RequestMocker(
-                requestMatcher = endsWith("/notification", HttpMethod.Post),
-                responseBuilder = {
-                    respond(
-                        content = "",
-                        status = HttpStatusCode.NoContent,
-                    )
-                },
-                requestValidator = {
-                    assertTrue("No Authorization header passed.") {
-                        it.headers.contains("Authorization")
-                    }
-                    assertTrue("Authorization header malformed.") {
-                        it.headers["Authorization"]?.contains("Bearer") ?: false
-                    }
-                    assertTrue("Content Type must be application/json") {
-                        it.body.contentType == ContentType.parse("application/json")
-                    }
-
-                    val textContent = it.body as TextContent
-                    val notificationTO = Json.decodeFromString<NotificationTO>(textContent.text)
-                    assertTrue("Not expected event type") {
-                        notificationTO.event == NotificationEventTO.CREDENTIAL_ACCEPTED
-                    }
-                },
-            ),
-        )
-        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-            httpClient = mockedKtorHttpClientFactory,
-        )
-        with(issuer) {
-            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
-            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            val (newAuthorizedRequest, outcome) =
-                authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
-            assertIs<SubmissionOutcome.Success>(outcome)
-
-            val issuedCredential = outcome.credentials.firstOrNull()
-            assertIs<IssuedCredential>(issuedCredential)
-            val notId = outcome.notificationId
-            assertNotNull(notId)
-
-            newAuthorizedRequest.notify(
-                CredentialIssuanceEvent.Accepted(
-                    id = notId,
-                    description = "Credential received and validated",
-                ),
-            )
-        }
-    }
-
-    @Test
-    fun `when notification request failed, a Result failure is returned`() = runTest {
-        val mockedKtorHttpClientFactory = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker(),
-            tokenPostMocker(),
-            RequestMocker(
-                requestMatcher = endsWith("/notification", HttpMethod.Post),
-                responseBuilder = {
-                    respond(
-                        content = """
-                            {
-                                "error": "invalid_notification_id"
+    fun `when issuance response contains notification_id, it is present in and can be used for notifications`() =
+        runTest {
+            val credential = "issued_credential_content_sd_jwt_vc"
+            val mockedKtorHttpClientFactory =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                    parPostMocker(),
+                    tokenPostMocker(),
+                    nonceEndpointMocker(),
+                    singleIssuanceRequestMocker(credential),
+                    RequestMocker(
+                        requestMatcher = endsWith("/notification", HttpMethod.Post),
+                        responseBuilder = {
+                            respond(
+                                content = "",
+                                status = HttpStatusCode.NoContent,
+                            )
+                        },
+                        requestValidator = {
+                            assertTrue("No Authorization header passed.") {
+                                it.headers.contains("Authorization")
                             }
-                        """.trimIndent(),
-                        status = HttpStatusCode.BadRequest,
-                        headers = headersOf(
-                            HttpHeaders.ContentType to listOf("application/json"),
+                            assertTrue("Authorization header malformed.") {
+                                it.headers["Authorization"]?.contains("Bearer") ?: false
+                            }
+                            assertTrue("Content Type must be application/json") {
+                                it.body.contentType == ContentType.parse("application/json")
+                            }
+
+                            val textContent = it.body as TextContent
+                            val notificationTO = Json.decodeFromString<NotificationTO>(textContent.text)
+                            assertTrue("Not expected event type") {
+                                notificationTO.event == NotificationEventTO.CREDENTIAL_ACCEPTED
+                            }
+                        },
+                    ),
+                )
+            val (authorizedRequest, issuer) =
+                authorizeRequestForCredentialOffer(
+                    credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                    httpClient = mockedKtorHttpClientFactory,
+                )
+            with(issuer) {
+                val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val (newAuthorizedRequest, outcome) =
+                    authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
+                assertIs<SubmissionOutcome.Success>(outcome)
+
+                val issuedCredential = outcome.credentials.firstOrNull()
+                assertIs<IssuedCredential>(issuedCredential)
+                val notId = outcome.notificationId
+                assertNotNull(notId)
+
+                newAuthorizedRequest.notify(
+                    CredentialIssuanceEvent.Accepted(
+                        id = notId,
+                        description = "Credential received and validated",
+                    ),
+                )
+            }
+        }
+
+    @Test
+    fun `when notification request failed, a Result failure is returned`() =
+        runTest {
+            val mockedKtorHttpClientFactory =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                    parPostMocker(),
+                    tokenPostMocker(),
+                    RequestMocker(
+                        requestMatcher = endsWith("/notification", HttpMethod.Post),
+                        responseBuilder = {
+                            respond(
+                                content =
+                                    """
+                                    {
+                                        "error": "invalid_notification_id"
+                                    }
+                                    """.trimIndent(),
+                                status = HttpStatusCode.BadRequest,
+                                headers =
+                                    headersOf(
+                                        HttpHeaders.ContentType to listOf("application/json"),
+                                    ),
+                            )
+                        },
+                    ),
+                )
+            val (authorizedRequest, issuer) =
+                authorizeRequestForCredentialOffer(
+                    credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                    httpClient = mockedKtorHttpClientFactory,
+                )
+            with(issuer) {
+                val result =
+                    authorizedRequest.notify(
+                        CredentialIssuanceEvent.Accepted(
+                            id = NotificationId("123456"),
+                            description = "Credential received and validated",
                         ),
                     )
-                },
-            ),
-        )
-        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
-            httpClient = mockedKtorHttpClientFactory,
-        )
-        with(issuer) {
-            val result = authorizedRequest.notify(
-                CredentialIssuanceEvent.Accepted(
-                    id = NotificationId("123456"),
-                    description = "Credential received and validated",
-                ),
-            )
 
-            result.fold(
-                onSuccess = { fail("Expected failure but was not") },
-                onFailure = {
-                    assertIs<CredentialIssuanceError.NotificationFailed>(it)
-                    assertTrue() {
-                        it.error == "invalid_notification_id"
-                    }
-                },
-            )
+                result.fold(
+                    onSuccess = { fail("Expected failure but was not") },
+                    onFailure = {
+                        assertIs<CredentialIssuanceError.NotificationFailed>(it)
+                        assertTrue {
+                            it.error == "invalid_notification_id"
+                        }
+                    },
+                )
+            }
         }
-    }
 }

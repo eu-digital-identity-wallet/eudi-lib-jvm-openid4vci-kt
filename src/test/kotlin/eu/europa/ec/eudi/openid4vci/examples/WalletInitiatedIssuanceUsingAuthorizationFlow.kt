@@ -21,52 +21,58 @@ import eu.europa.ec.eudi.openid4vci.CryptoGenerator.noKeyAttestationJwtProofsSpe
 import io.ktor.client.*
 import kotlinx.coroutines.runBlocking
 
-fun main(): Unit = runBlocking {
-    runUseCase(PidDevIssuer.cfg, PidDevIssuer.issuerId, PidDevIssuer.AllCredentialConfigurationIds)
-}
+fun main(): Unit =
+    runBlocking {
+        runUseCase(PidDevIssuer.cfg, PidDevIssuer.issuerId, PidDevIssuer.AllCredentialConfigurationIds)
+    }
 
 fun runUseCase(
     config: OpenId4VCIConfig,
     credentialIssuerId: CredentialIssuerId,
     credentialConfigurationIds: List<CredentialConfigurationIdentifier>,
-): Unit = runBlocking {
-    createHttpClient(enableLogging = false).use { httpClient ->
-        println("[[Scenario: Issuance based on credential configuration ids: $credentialConfigurationIds]] ")
+): Unit =
+    runBlocking {
+        createHttpClient(enableLogging = false).use { httpClient ->
+            println("[[Scenario: Issuance based on credential configuration ids: $credentialConfigurationIds]] ")
 
-        val issuer = Issuer.makeWalletInitiated(
-            config,
-            credentialIssuerId,
-            credentialConfigurationIds,
-            httpClient,
-        ).getOrThrow()
+            val issuer =
+                Issuer
+                    .makeWalletInitiated(
+                        config,
+                        credentialIssuerId,
+                        credentialConfigurationIds,
+                        httpClient,
+                    ).getOrThrow()
 
-        with(issuer) {
-            authorizationLog("Using authorized code flow to authorize")
-            var authorizedRequest = authorizeRequestWithAuthCodeUseCase(PidDevIssuer.testUser).also {
-                authorizationLog("Authorization retrieved: $it")
-            }
+            with(issuer) {
+                authorizationLog("Using authorized code flow to authorize")
+                var authorizedRequest =
+                    authorizeRequestWithAuthCodeUseCase(PidDevIssuer.testUser).also {
+                        authorizationLog("Authorization retrieved: $it")
+                    }
 
-            credentialOffer.credentialConfigurationIdentifiers.forEach { credentialIdentifier ->
+                credentialOffer.credentialConfigurationIdentifiers.forEach { credentialIdentifier ->
 
-                submitCredentialRequest(
-                    authorizedRequest,
-                    credentialIdentifier,
-                    httpClient,
-                ).also { (newAuthorizedRequest, credential) ->
-                    println("--> Issued credential: $credential \n")
-                    authorizedRequest = newAuthorizedRequest
+                    submitCredentialRequest(
+                        authorizedRequest,
+                        credentialIdentifier,
+                        httpClient,
+                    ).also { (newAuthorizedRequest, credential) ->
+                        println("--> Issued credential: $credential \n")
+                        authorizedRequest = newAuthorizedRequest
+                    }
                 }
             }
         }
     }
-}
 
 private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: KeycloakUser): AuthorizedRequest {
     authorizationLog("Preparing authorization code request")
 
-    val prepareAuthorizationCodeRequest = prepareAuthorizationRequest().getOrThrow().also {
-        authorizationLog("Get authorization code URL is: ${it.authorizationCodeURL.value}")
-    }
+    val prepareAuthorizationCodeRequest =
+        prepareAuthorizationRequest().getOrThrow().also {
+            authorizationLog("Get authorization code URL is: ${it.authorizationCodeURL.value}")
+        }
 
     return with(prepareAuthorizationCodeRequest) {
         val (authorizationCode, serverState) =
@@ -97,21 +103,28 @@ private suspend fun Issuer.submitCredentialRequest(
         authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
 
     return when (outcome) {
-        is SubmissionOutcome.Success -> newAuthorized to outcome.credentials
+        is SubmissionOutcome.Success -> {
+            newAuthorized to outcome.credentials
+        }
+
         is SubmissionOutcome.Deferred -> {
             println("Hm we got a deferred issuance case with ${outcome.transactionId.value}")
-            val vcs = run {
-                val ctx = newAuthorized.deferredContext(outcome)
-                queryDeferredEndpoint(ctx, httpClient)
-            }
+            val vcs =
+                run {
+                    val ctx = newAuthorized.deferredContext(outcome)
+                    queryDeferredEndpoint(ctx, httpClient)
+                }
 
             newAuthorized to vcs
         }
 
-        is SubmissionOutcome.Failed ->
+        is SubmissionOutcome.Failed -> {
             throw if (outcome.error is CredentialIssuanceError.InvalidProof) {
                 IllegalStateException("Although providing a proof with c_nonce the proof is still invalid")
-            } else outcome.error
+            } else {
+                outcome.error
+            }
+        }
     }
 }
 
@@ -122,17 +135,20 @@ private suspend fun queryDeferredEndpoint(
     var ctx = deferredContext
     var cred: List<IssuedCredential>
     do {
-        val (newCtx, outcome) = DeferredIssuer.queryForDeferredCredential(
-            ctx = ctx,
-            httpClient = httpClient,
-            responseEncryptionKey = null,
-        ).getOrThrow()
+        val (newCtx, outcome) =
+            DeferredIssuer
+                .queryForDeferredCredential(
+                    ctx = ctx,
+                    httpClient = httpClient,
+                    responseEncryptionKey = null,
+                ).getOrThrow()
         ctx = newCtx ?: ctx
-        cred = when (outcome) {
-            is DeferredCredentialQueryOutcome.Errored -> error(outcome.error)
-            is DeferredCredentialQueryOutcome.IssuancePending -> emptyList()
-            is DeferredCredentialQueryOutcome.Issued -> outcome.credentials
-        }
+        cred =
+            when (outcome) {
+                is DeferredCredentialQueryOutcome.Errored -> error(outcome.error)
+                is DeferredCredentialQueryOutcome.IssuancePending -> emptyList()
+                is DeferredCredentialQueryOutcome.Issued -> outcome.credentials
+            }
     } while (cred.isEmpty())
     return cred
 }

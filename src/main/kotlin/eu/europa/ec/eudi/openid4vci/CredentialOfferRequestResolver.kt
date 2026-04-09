@@ -45,20 +45,24 @@ data class CredentialOffer(
  * The Id of a Credential Issuer. An [HttpsUrl] that has no fragment or query parameters.
  */
 @JvmInline
-value class CredentialIssuerId private constructor(val value: HttpsUrl) {
-
-    override fun toString(): String =
-        value.value.toString()
+value class CredentialIssuerId private constructor(
+    val value: HttpsUrl,
+) {
+    override fun toString(): String = value.value.toString()
 
     companion object {
-
         /**
          * Parses the provided [value] as an [HttpsUrl] and tries to create a [CredentialIssuerId].
          */
         operator fun invoke(value: String): Result<CredentialIssuerId> =
             HttpsUrl(value)
                 .mapCatching {
-                    require(it.value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerId must not have a fragment" }
+                    require(
+                        it.value
+                            .toURI()
+                            .fragment
+                            .isNullOrBlank(),
+                    ) { "CredentialIssuerId must not have a fragment" }
                     require(it.value.query.isNullOrBlank()) { "CredentialIssuerId must not have query parameters " }
                     CredentialIssuerId(it)
                 }
@@ -69,7 +73,6 @@ value class CredentialIssuerId private constructor(val value: HttpsUrl) {
  * The Grant Types a Credential Issuer can process for a Credential Offer.
  */
 sealed interface Grants : Serializable {
-
     /**
      * Data for an Authorization Code Grant. [issuerState], if provided, must not be blank.
      */
@@ -105,17 +108,19 @@ sealed interface Grants : Serializable {
         val preAuthorizedCode: PreAuthorizedCode,
     ) : Grants
 
-    fun authorizationCode(): AuthorizationCode? = when (this) {
-        is PreAuthorizedCode -> null
-        is Both -> authorizationCode
-        is AuthorizationCode -> this
-    }
+    fun authorizationCode(): AuthorizationCode? =
+        when (this) {
+            is PreAuthorizedCode -> null
+            is Both -> authorizationCode
+            is AuthorizationCode -> this
+        }
 
-    fun preAuthorizedCode(): PreAuthorizedCode? = when (this) {
-        is PreAuthorizedCode -> this
-        is Both -> preAuthorizedCode
-        is AuthorizationCode -> null
-    }
+    fun preAuthorizedCode(): PreAuthorizedCode? =
+        when (this) {
+            is PreAuthorizedCode -> this
+            is Both -> preAuthorizedCode
+            is AuthorizationCode -> null
+        }
 }
 
 data class TxCode(
@@ -138,55 +143,67 @@ data class TxCode(
 }
 
 enum class TxCodeInputMode {
-    NUMERIC, TEXT
+    NUMERIC,
+    TEXT,
 }
 
 /**
  * Credential Offer request.
  */
 sealed interface CredentialOfferRequest : Serializable {
-
     /**
      * A Credential Offer request that was passed using the 'credential_offer' query parameter.
      */
     @JvmInline
-    value class PassByValue(val value: String) : CredentialOfferRequest
+    value class PassByValue(
+        val value: String,
+    ) : CredentialOfferRequest
 
     /**
      * A Credential Offer request that must be resolved using the 'credential_offer_uri' parameter.
      */
     @JvmInline
-    value class PassByReference(val value: HttpsUrl) : CredentialOfferRequest
+    value class PassByReference(
+        val value: HttpsUrl,
+    ) : CredentialOfferRequest
 
     companion object {
-
         /**
          * Parses a URL to a [CredentialOfferRequest].
          *
          * In case of [Result.Failure] a [CredentialOfferRequestException] is thrown.
          */
-        operator fun invoke(url: String): Result<CredentialOfferRequest> = runCatching {
-            val builder = runCatching {
-                URLBuilder(url)
-            }.getOrElse { CredentialOfferRequestError.NonParsableCredentialOfferEndpointUrl(it).raise() }
+        operator fun invoke(url: String): Result<CredentialOfferRequest> =
+            runCatching {
+                val builder =
+                    runCatching {
+                        URLBuilder(url)
+                    }.getOrElse { CredentialOfferRequestError.NonParsableCredentialOfferEndpointUrl(it).raise() }
 
-            val parameters = builder.parameters
-            val maybeByValue = parameters["credential_offer"]
-            val maybeByReference = parameters["credential_offer_uri"]
+                val parameters = builder.parameters
+                val maybeByValue = parameters["credential_offer"]
+                val maybeByReference = parameters["credential_offer_uri"]
 
-            when {
-                !maybeByValue.isNullOrBlank() && !maybeByReference.isNullOrBlank() ->
-                    CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri.raise()
+                when {
+                    !maybeByValue.isNullOrBlank() && !maybeByReference.isNullOrBlank() -> {
+                        CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri.raise()
+                    }
 
-                !maybeByValue.isNullOrBlank() -> PassByValue(maybeByValue)
+                    !maybeByValue.isNullOrBlank() -> {
+                        PassByValue(maybeByValue)
+                    }
 
-                !maybeByReference.isNullOrBlank() -> HttpsUrl(maybeByReference)
-                    .map { PassByReference(it) }
-                    .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialOfferUri(it).raise() }
+                    !maybeByReference.isNullOrBlank() -> {
+                        HttpsUrl(maybeByReference)
+                            .map { PassByReference(it) }
+                            .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialOfferUri(it).raise() }
+                    }
 
-                else -> CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri.raise()
+                    else -> {
+                        CredentialOfferRequestValidationError.OneOfCredentialOfferOrCredentialOfferUri.raise()
+                    }
+                }
             }
-        }
     }
 }
 
@@ -194,31 +211,40 @@ sealed interface CredentialOfferRequest : Serializable {
  * Errors that can occur while trying to validate and resolve a [CredentialOfferRequest].
  */
 sealed interface CredentialOfferRequestError : Serializable {
-
     /**
      * The Credential Offer Endpoint URL could not be parsed.
      */
-    data class NonParsableCredentialOfferEndpointUrl(val reason: Throwable) : CredentialOfferRequestError
+    data class NonParsableCredentialOfferEndpointUrl(
+        val reason: Throwable,
+    ) : CredentialOfferRequestError
 
     /**
      * The Credential Offer object could not be fetched.
      */
-    data class UnableToFetchCredentialOffer(val reason: Throwable) : CredentialOfferRequestError
+    data class UnableToFetchCredentialOffer(
+        val reason: Throwable,
+    ) : CredentialOfferRequestError
 
     /**
      * The Credential Offer object could not be parsed.
      */
-    data class NonParseableCredentialOffer(val reason: Throwable) : CredentialOfferRequestError
+    data class NonParseableCredentialOffer(
+        val reason: Throwable,
+    ) : CredentialOfferRequestError
 
     /**
      * The metadata of the Credential Issuer could not be resolved.
      */
-    data class UnableToResolveCredentialIssuerMetadata(val reason: Throwable) : CredentialOfferRequestError
+    data class UnableToResolveCredentialIssuerMetadata(
+        val reason: Throwable,
+    ) : CredentialOfferRequestError
 
     /**
      * The metadata of the Authorization Server could not be resolved.
      */
-    data class UnableToResolveAuthorizationServerMetadata(val reason: Throwable) : CredentialOfferRequestError
+    data class UnableToResolveAuthorizationServerMetadata(
+        val reason: Throwable,
+    ) : CredentialOfferRequestError
 
     /**
      * Wraps this [CredentialOfferRequestError] to a [CredentialOfferRequestException].
@@ -235,7 +261,6 @@ sealed interface CredentialOfferRequestError : Serializable {
  * Validation error that can occur while trying to validate a [CredentialOfferRequest].
  */
 sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestError {
-
     /**
      * The Credential Offer Endpoint URL either contained neither the 'credential_offer' nor the 'credential_offer_uri'
      * parameter or contained both of them.
@@ -248,41 +273,51 @@ sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestE
     /**
      * The 'credentials_offer_uri' parameter contained in the Credential Offer Endpoint URL was not a valid [HttpsUrl].
      */
-    data class InvalidCredentialOfferUri(val reason: Throwable) : CredentialOfferRequestValidationError
+    data class InvalidCredentialOfferUri(
+        val reason: Throwable,
+    ) : CredentialOfferRequestValidationError
 
     /**
      * The Id of the Credential Issuer is not valid.
      */
-    data class InvalidCredentialIssuerId(val reason: Throwable) : CredentialOfferRequestValidationError
+    data class InvalidCredentialIssuerId(
+        val reason: Throwable,
+    ) : CredentialOfferRequestValidationError
 
     /**
      * The Credentials of a Credential Offer are not valid.
      */
-    data class InvalidCredentials(val reason: Throwable) : CredentialOfferRequestValidationError
+    data class InvalidCredentials(
+        val reason: Throwable,
+    ) : CredentialOfferRequestValidationError
 
     /**
      * The Grants of a Credential Offer are not valid.
      */
-    data class InvalidGrants(val reason: Throwable) : CredentialOfferRequestValidationError
+    data class InvalidGrants(
+        val reason: Throwable,
+    ) : CredentialOfferRequestValidationError
 }
 
 /**
  * An exception indicating a [CredentialOfferRequestError] occurred while trying to validate or resolve a [CredentialOfferRequest].
  */
-data class CredentialOfferRequestException(val error: CredentialOfferRequestError) : Exception()
+data class CredentialOfferRequestException(
+    val error: CredentialOfferRequestError,
+) : Exception()
 
 /**
  * Service for parsing, extracting and validating a [CredentialOfferRequest].
  */
 fun interface CredentialOfferRequestResolver {
-
     /**
      * Tries to parse a Credential Offer Endpoint [URL][uri], extract and validate a Credential Offer Request.
      */
-    suspend fun resolve(uri: String): Result<CredentialOffer> = runCatchingCancellable {
-        val request = CredentialOfferRequest(uri).getOrThrow()
-        resolve(request).getOrThrow()
-    }
+    suspend fun resolve(uri: String): Result<CredentialOffer> =
+        runCatchingCancellable {
+            val request = CredentialOfferRequest(uri).getOrThrow()
+            resolve(request).getOrThrow()
+        }
 
     /**
      * Tries to validate and resolve a [Credential Offer Request][request].
@@ -290,16 +325,16 @@ fun interface CredentialOfferRequestResolver {
     suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer>
 
     companion object {
-
         /**
          * Creates a new [CredentialOfferRequestResolver].
          */
         operator fun invoke(
             httpClient: HttpClient,
             issuerMetadataPolicy: IssuerMetadataPolicy,
-        ): CredentialOfferRequestResolver = CredentialOfferRequestResolver { request ->
-            val resolver = DefaultCredentialOfferRequestResolver(httpClient, issuerMetadataPolicy)
-            resolver.resolve(request)
-        }
+        ): CredentialOfferRequestResolver =
+            CredentialOfferRequestResolver { request ->
+                val resolver = DefaultCredentialOfferRequestResolver(httpClient, issuerMetadataPolicy)
+                resolver.resolve(request)
+            }
     }
 }

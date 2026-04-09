@@ -27,78 +27,85 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.*
 
 class IssuanceBatchRequestTest {
-
     @Test
-    fun `successful batch issuance`() = runTest {
-        val issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_REQUIRED
-        val mockedKtorHttpClientFactory = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion = issuerMetadataVersion),
-            authServerWellKnownMocker(),
-            parPostMocker(),
-            tokenPostMocker(),
-            nonceEndpointMocker(),
-            singleIssuanceRequestMocker(
-                responseBuilder = {
-                    encryptionAwareResponseDataBuilder(it, issuerMetadataVersion) {
-                        Json.encodeToString(
-                            CredentialResponseSuccessTO(
-                                credentials = listOf(
-                                    buildJsonObject {
-                                        put("credential", JsonPrimitive("issued_credential_content_mso_mdoc0"))
-                                    },
-                                    buildJsonObject {
-                                        put("credential", JsonPrimitive("issued_credential_content_mso_mdoc1"))
-                                    },
-                                    buildJsonObject {
-                                        put("credential", JsonPrimitive("issued_credential_content_mso_mdoc2"))
-                                    },
-                                ),
-                            ),
-                        )
-                    }
-                },
-                requestValidator = { request ->
-                    encryptionAwareRequestValidator<CredentialRequestTO>(request, issuerMetadataVersion) {
-                        assertNotNull(
-                            it.proofs,
-                            "Proofs expected but received none",
-                        )
-                        val jwtProofs = it.proofs.jwtProofs
-                        assertNotNull(jwtProofs, "Jwt Proofs expected")
-                        val distinctNonces = jwtProofs
-                            .map { SignedJWT.parse(it) }
-                            .map { it.jwtClaimsSet.getStringClaim("nonce") }
-                            .distinct()
+    fun `successful batch issuance`() =
+        runTest {
+            val issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_REQUIRED
+            val mockedKtorHttpClientFactory =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion = issuerMetadataVersion),
+                    authServerWellKnownMocker(),
+                    parPostMocker(),
+                    tokenPostMocker(),
+                    nonceEndpointMocker(),
+                    singleIssuanceRequestMocker(
+                        responseBuilder = {
+                            encryptionAwareResponseDataBuilder(it, issuerMetadataVersion) {
+                                Json.encodeToString(
+                                    CredentialResponseSuccessTO(
+                                        credentials =
+                                            listOf(
+                                                buildJsonObject {
+                                                    put("credential", JsonPrimitive("issued_credential_content_mso_mdoc0"))
+                                                },
+                                                buildJsonObject {
+                                                    put("credential", JsonPrimitive("issued_credential_content_mso_mdoc1"))
+                                                },
+                                                buildJsonObject {
+                                                    put("credential", JsonPrimitive("issued_credential_content_mso_mdoc2"))
+                                                },
+                                            ),
+                                    ),
+                                )
+                            }
+                        },
+                        requestValidator = { request ->
+                            encryptionAwareRequestValidator<CredentialRequestTO>(request, issuerMetadataVersion) {
+                                assertNotNull(
+                                    it.proofs,
+                                    "Proofs expected but received none",
+                                )
+                                val jwtProofs = it.proofs.jwtProofs
+                                assertNotNull(jwtProofs, "Jwt Proofs expected")
+                                val distinctNonces =
+                                    jwtProofs
+                                        .map { SignedJWT.parse(it) }
+                                        .map { it.jwtClaimsSet.getStringClaim("nonce") }
+                                        .distinct()
 
-                        assertTrue("In the context of an issuance request all proofs must contain the same nonce, but they don't") {
-                            distinctNonces.size == 1
-                        }
-                    }
-                },
-            ),
-        )
-        val (authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(
-                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-                httpClient = mockedKtorHttpClientFactory,
-            )
+                                assertTrue("In the context of an issuance request all proofs must contain the same nonce, but they don't") {
+                                    distinctNonces.size == 1
+                                }
+                            }
+                        },
+                    ),
+                )
+            val (authorizedRequest, issuer) =
+                authorizeRequestForCredentialOffer(
+                    credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+                    httpClient = mockedKtorHttpClientFactory,
+                )
 
-        val request = IssuanceRequestPayload.ConfigurationBased(
-            CredentialConfigurationIdentifier(PID_MsoMdoc),
-        )
-        val (_, outcome) = with(issuer) {
-            authorizedRequest.request(request, noKeyAttestationJwtProofsSpec(keysNo = 3)).getOrThrow()
+            val request =
+                IssuanceRequestPayload.ConfigurationBased(
+                    CredentialConfigurationIdentifier(PID_MsoMdoc),
+                )
+            val (_, outcome) =
+                with(issuer) {
+                    authorizedRequest.request(request, noKeyAttestationJwtProofsSpec(keysNo = 3)).getOrThrow()
+                }
+            when (outcome) {
+                is SubmissionOutcome.Failed -> {
+                    fail(outcome.error.message)
+                }
+
+                is SubmissionOutcome.Deferred -> {
+                    fail("Got deferred")
+                }
+
+                is SubmissionOutcome.Success -> {
+                    outcome.credentials.forEach { assertIs<IssuedCredential>(it) }
+                }
+            }
         }
-        when (outcome) {
-            is SubmissionOutcome.Failed -> {
-                fail(outcome.error.message)
-            }
-            is SubmissionOutcome.Deferred -> {
-                fail("Got deferred")
-            }
-            is SubmissionOutcome.Success -> {
-                outcome.credentials.forEach { assertIs<IssuedCredential>(it) }
-            }
-        }
-    }
 }

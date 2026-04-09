@@ -25,8 +25,9 @@ import kotlinx.serialization.json.jsonObject
 
 @Serializable
 @JvmInline
-value class KeyAttestationJWT(val value: String) {
-
+value class KeyAttestationJWT(
+    val value: String,
+) {
     val attestedKeys: List<JWK>
         get() = validateJwt(value).getOrThrow()
 
@@ -35,40 +36,40 @@ value class KeyAttestationJWT(val value: String) {
     }
 
     companion object {
+        fun validateJwt(value: String): Result<List<JWK>> =
+            runCatching {
+                val jwt = SignedJWT.parse(value)
+                jwt.ensureSignedNotMAC()
 
-        fun validateJwt(value: String): Result<List<JWK>> = runCatching {
-            val jwt = SignedJWT.parse(value)
-            jwt.ensureSignedNotMAC()
-
-            require(jwt.header?.type?.type == OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE) {
-                "Invalid Key Attestation JWT. Type must be set to `$OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE`"
-            }
-
-            val claims = Json.parseToJsonElement(jwt.jwtClaimsSet.toString()).jsonObject
-            requireNotNull(claims["iat"]) { "Invalid Key Attestation JWT. Misses `iat` claim" }
-
-            val attestedKeysClaimEntries = claims[OpenId4VCISpec.KEY_ATTESTATION_ATTESTED_KEYS]?.jsonArray
-            requireNotNull(attestedKeysClaimEntries) { "Invalid Key Attestation JWT. Misses `attested_keys` claim" }
-            require(attestedKeysClaimEntries.isNotEmpty()) {
-                "Invalid Key Attestation JWT. `attested_keys` claim must not be empty"
-            }
-            attestedKeysClaimEntries.mapIndexed { index, keyElement ->
-                require(keyElement is JsonObject) {
-                    "Invalid Key Attestation JWT. Item at index $index in `attested_keys` is not a JSON object."
+                require(jwt.header?.type?.type == OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE) {
+                    "Invalid Key Attestation JWT. Type must be set to `$OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE`"
                 }
-                runCatching {
-                    JWK.parse(keyElement.toString())
-                }.getOrElse { e ->
-                    throw IllegalArgumentException(
-                        "Invalid Key Attestation JWT. Item at index $index in `attested_keys` is not a valid JWK: ${e.message}",
-                        e,
-                    )
-                }.also {
-                    require(!it.isPrivate) {
-                        "Invalid Key Attestation JWT. Item at index $index in `attested_keys` must be a public key."
+
+                val claims = Json.parseToJsonElement(jwt.jwtClaimsSet.toString()).jsonObject
+                requireNotNull(claims["iat"]) { "Invalid Key Attestation JWT. Misses `iat` claim" }
+
+                val attestedKeysClaimEntries = claims[OpenId4VCISpec.KEY_ATTESTATION_ATTESTED_KEYS]?.jsonArray
+                requireNotNull(attestedKeysClaimEntries) { "Invalid Key Attestation JWT. Misses `attested_keys` claim" }
+                require(attestedKeysClaimEntries.isNotEmpty()) {
+                    "Invalid Key Attestation JWT. `attested_keys` claim must not be empty"
+                }
+                attestedKeysClaimEntries.mapIndexed { index, keyElement ->
+                    require(keyElement is JsonObject) {
+                        "Invalid Key Attestation JWT. Item at index $index in `attested_keys` is not a JSON object."
+                    }
+                    runCatching {
+                        JWK.parse(keyElement.toString())
+                    }.getOrElse { e ->
+                        throw IllegalArgumentException(
+                            "Invalid Key Attestation JWT. Item at index $index in `attested_keys` is not a valid JWK: ${e.message}",
+                            e,
+                        )
+                    }.also {
+                        require(!it.isPrivate) {
+                            "Invalid Key Attestation JWT. Item at index $index in `attested_keys` must be a public key."
+                        }
                     }
                 }
             }
-        }
     }
 }

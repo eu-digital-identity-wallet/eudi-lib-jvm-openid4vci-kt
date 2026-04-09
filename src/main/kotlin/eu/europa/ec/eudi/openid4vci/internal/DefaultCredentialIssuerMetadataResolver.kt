@@ -41,19 +41,20 @@ private val CONTENT_TYPE_APPLICATION_JWT = ContentType.parse("application/jwt")
 internal class DefaultCredentialIssuerMetadataResolver(
     private val httpClient: HttpClient,
 ) : CredentialIssuerMetadataResolver {
-
     override suspend fun resolve(
         issuer: CredentialIssuerId,
         policy: IssuerMetadataPolicy,
-    ): Result<CredentialIssuerMetadata> = runCatchingCancellable {
-        val wellKnownUrl = issuer.wellKnown()
-        val json = when (policy) {
-            IssuerMetadataPolicy.IgnoreSigned -> wellKnownUrl.requestUnsigned()
-            is IssuerMetadataPolicy.RequireSigned -> wellKnownUrl.requestSigned(policy.issuerTrust, issuer)
-            is IssuerMetadataPolicy.PreferSigned -> wellKnownUrl.requestPreferringSigned(policy.issuerTrust, issuer)
+    ): Result<CredentialIssuerMetadata> =
+        runCatchingCancellable {
+            val wellKnownUrl = issuer.wellKnown()
+            val json =
+                when (policy) {
+                    IssuerMetadataPolicy.IgnoreSigned -> wellKnownUrl.requestUnsigned()
+                    is IssuerMetadataPolicy.RequireSigned -> wellKnownUrl.requestSigned(policy.issuerTrust, issuer)
+                    is IssuerMetadataPolicy.PreferSigned -> wellKnownUrl.requestPreferringSigned(policy.issuerTrust, issuer)
+                }
+            CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer)
         }
-        CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer)
-    }
 
     private suspend fun Url.requestUnsigned(): String {
         val response = getAcceptingContentTypes(ContentType.Application.Json)
@@ -65,7 +66,10 @@ internal class DefaultCredentialIssuerMetadataResolver(
         return response.body<String>()
     }
 
-    private suspend fun Url.requestSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): String {
+    private suspend fun Url.requestSigned(
+        issuerTrust: IssuerTrust,
+        issuer: CredentialIssuerId,
+    ): String {
         val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT)
         val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
         ensure(contentType?.withoutParameters() == CONTENT_TYPE_APPLICATION_JWT) {
@@ -77,23 +81,32 @@ internal class DefaultCredentialIssuerMetadataResolver(
             }
     }
 
-    private suspend fun Url.requestPreferringSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): String {
+    private suspend fun Url.requestPreferringSigned(
+        issuerTrust: IssuerTrust,
+        issuer: CredentialIssuerId,
+    ): String {
         val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT, ContentType.Application.Json)
         val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
         requireNotNull(contentType) { "Credential issuer did not respond with a content type header" }
 
         return when (contentType.withoutParameters()) {
-            CONTENT_TYPE_APPLICATION_JWT -> parseAndVerifySignedMetadata(
-                jwt = response.body<String>(),
-                issuerTrust = issuerTrust,
-                issuer = issuer,
-            ).getOrElse {
-                throw CredentialIssuerMetadataError.InvalidSignedMetadata(it)
+            CONTENT_TYPE_APPLICATION_JWT -> {
+                parseAndVerifySignedMetadata(
+                    jwt = response.body<String>(),
+                    issuerTrust = issuerTrust,
+                    issuer = issuer,
+                ).getOrElse {
+                    throw CredentialIssuerMetadataError.InvalidSignedMetadata(it)
+                }
             }
 
-            ContentType.Application.Json -> response.body<String>()
+            ContentType.Application.Json -> {
+                response.body<String>()
+            }
 
-            else -> "Unexpected content type $contentType when retrieving issuer metadata."
+            else -> {
+                "Unexpected content type $contentType when retrieving issuer metadata."
+            }
         }
     }
 
@@ -108,41 +121,48 @@ internal class DefaultCredentialIssuerMetadataResolver(
         jwt: String,
         issuerTrust: IssuerTrust,
         issuer: CredentialIssuerId,
-    ): Result<String> = runCatchingCancellable {
-        val signedJwt = SignedJWT.parse(jwt)
-        val processor = DefaultJWTProcessor<SecurityContext>()
-            .apply {
-                jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
-                jwsKeySelector = issuerTrust.keySelector(signedJwt)
-                jwtClaimsSetVerifier =
-                    DefaultJWTClaimsVerifier(
-                        null,
-                        JWTClaimsSet.Builder()
-                            .subject(issuer.value.value.toExternalForm())
-                            .build(),
-                        setOf("iat", "sub"),
-                    )
-            }
+    ): Result<String> =
+        runCatchingCancellable {
+            val signedJwt = SignedJWT.parse(jwt)
+            val processor =
+                DefaultJWTProcessor<SecurityContext>()
+                    .apply {
+                        jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
+                        jwsKeySelector = issuerTrust.keySelector(signedJwt)
+                        jwtClaimsSetVerifier =
+                            DefaultJWTClaimsVerifier(
+                                null,
+                                JWTClaimsSet
+                                    .Builder()
+                                    .subject(issuer.value.value.toExternalForm())
+                                    .build(),
+                                setOf("iat", "sub"),
+                            )
+                    }
 
-        val claimsSet = processor.process(signedJwt, null)
-        JSONObjectUtils.toJSONString(claimsSet.toJSONObject())
-    }
+            val claimsSet = processor.process(signedJwt, null)
+            JSONObjectUtils.toJSONString(claimsSet.toJSONObject())
+        }
 
     private suspend fun IssuerTrust.keySelector(signedJwt: SignedJWT): JWSKeySelector<SecurityContext> {
-        val jwk = when (this) {
-            is IssuerTrust.ByPublicKey -> jwk.toPublicJWK()
-
-            is IssuerTrust.ByCertificateChain -> {
-                val certChain = requireNotNull(signedJwt.header.x509CertChain) {
-                    "missing 'x5c' header claim"
-                }.let { X509CertChainUtils.parse(it) }
-
-                require(certificateChainTrust.isTrusted(certChain)) {
-                    "certificate chain in 'x5c' header claim is not trusted"
+        val jwk =
+            when (this) {
+                is IssuerTrust.ByPublicKey -> {
+                    jwk.toPublicJWK()
                 }
-                JWK.parse(certChain.first())
+
+                is IssuerTrust.ByCertificateChain -> {
+                    val certChain =
+                        requireNotNull(signedJwt.header.x509CertChain) {
+                            "missing 'x5c' header claim"
+                        }.let { X509CertChainUtils.parse(it) }
+
+                    require(certificateChainTrust.isTrusted(certChain)) {
+                        "certificate chain in 'x5c' header claim is not trusted"
+                    }
+                    JWK.parse(certChain.first())
+                }
             }
-        }
         require(jwk is AsymmetricJWK) {
             "Metadata signing key should be asymmetric."
         }
@@ -153,9 +173,10 @@ internal class DefaultCredentialIssuerMetadataResolver(
 
     private suspend fun Url.getAcceptingContentTypes(vararg contentTypes: ContentType): HttpResponse =
         try {
-            val response = httpClient.get(this) {
-                contentTypes.forEach { accept(it) }
-            }
+            val response =
+                httpClient.get(this) {
+                    contentTypes.forEach { accept(it) }
+                }
             require(response.status.isSuccess()) {
                 "Credential issuer responded with status code: ${response.status}"
             }
@@ -167,13 +188,14 @@ internal class DefaultCredentialIssuerMetadataResolver(
 
 internal fun CredentialIssuerId.wellKnown(): Url {
     val issuer = Url(this.value.toString())
-    val pathSegment = buildString {
-        append(OpenId4VCISpec.CREDENTIAL_ISSUER_WELL_KNOWN_PATH)
-        val joinedSegments = issuer.segments.joinToString(separator = "/")
-        if (joinedSegments.isNotBlank()) {
-            append("/")
+    val pathSegment =
+        buildString {
+            append(OpenId4VCISpec.CREDENTIAL_ISSUER_WELL_KNOWN_PATH)
+            val joinedSegments = issuer.segments.joinToString(separator = "/")
+            if (joinedSegments.isNotBlank()) {
+                append("/")
+            }
+            append(joinedSegments)
         }
-        append(joinedSegments)
-    }
     return URLBuilder(issuer).apply { path(pathSegment) }.build()
 }

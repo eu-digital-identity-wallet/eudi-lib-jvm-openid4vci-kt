@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("ktlint:standard:max-line-length")
+
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod
@@ -43,7 +45,6 @@ interface Issuer :
     RequestIssuance,
     QueryForDeferredCredential,
     NotifyIssuer {
-
     val credentialOffer: CredentialOffer
     val dPoPJwtFactory: DPoPJwtFactory?
 
@@ -60,7 +61,6 @@ interface Issuer :
     fun AuthorizedRequest.deferredContext(deferredCredential: SubmissionOutcome.Deferred): DeferredIssuanceContext
 
     companion object {
-
         /**
          * Fetches & validates the issuer's [CredentialIssuerMetadata] and list
          * of [CIAuthorizationServerMetadata][OAUTH2 server(s) metadata] used by the issuer
@@ -76,23 +76,27 @@ interface Issuer :
             httpClient: HttpClient,
             credentialIssuerId: CredentialIssuerId,
             policy: IssuerMetadataPolicy,
-        ): Pair<CredentialIssuerMetadata, List<CIAuthorizationServerMetadata>> = coroutineScope {
-            with(httpClient) {
-                val issuerMetadata = run {
-                    val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
-                    resolver.resolve(credentialIssuerId, policy).getOrThrow()
-                }
-                val authorizationServersMetadata =
-                    issuerMetadata.authorizationServers.distinct().map { authServerUrl ->
-                        async {
-                            val resolver = DefaultAuthorizationServerMetadataResolver(httpClient)
-                            resolver.resolve(authServerUrl).getOrThrow()
+        ): Pair<CredentialIssuerMetadata, List<CIAuthorizationServerMetadata>> =
+            coroutineScope {
+                with(httpClient) {
+                    val issuerMetadata =
+                        run {
+                            val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
+                            resolver.resolve(credentialIssuerId, policy).getOrThrow()
                         }
-                    }.awaitAll()
+                    val authorizationServersMetadata =
+                        issuerMetadata.authorizationServers
+                            .distinct()
+                            .map { authServerUrl ->
+                                async {
+                                    val resolver = DefaultAuthorizationServerMetadataResolver(httpClient)
+                                    resolver.resolve(authServerUrl).getOrThrow()
+                                }
+                            }.awaitAll()
 
-                issuerMetadata to authorizationServersMetadata
+                    issuerMetadata to authorizationServersMetadata
+                }
             }
-        }
 
         /**
          * Factory method for creating an instance of [Issuer] based on a resolved and validated credential offer.
@@ -112,149 +116,162 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): Result<Issuer> = runCatching {
-            config.clientAuthentication.ensureSupportedByAuthorizationServer(
-                credentialOffer.authorizationServerMetadata,
-            )
-
-            val dPoPJwtFactory = DPoPJwtFactory.createForServer(
-                dPoPUsage = config.dPoPUsage,
-                clock = config.clock,
-                oauthServerMetadata = credentialOffer.authorizationServerMetadata,
-            ).getOrThrow()
-
-            val authorizationEndpointClient =
-                credentialOffer.authorizationServerMetadata
-                    .authorizationEndpointURI
-                    ?.let {
-                        AuthorizationEndpointClient(
-                            credentialOffer.credentialIssuerIdentifier,
-                            credentialOffer.authorizationServerMetadata,
-                            config,
-                            dPoPJwtFactory,
-                            httpClient,
-                        )
-                    }
-
-            val tokenEndpointClient =
-                TokenEndpointClient(
-                    credentialOffer.credentialIssuerIdentifier,
+        ): Result<Issuer> =
+            runCatching {
+                config.clientAuthentication.ensureSupportedByAuthorizationServer(
                     credentialOffer.authorizationServerMetadata,
-                    config,
-                    dPoPJwtFactory,
-                    httpClient,
                 )
 
-            val authorizeIssuance =
-                AuthorizeIssuanceImpl(
-                    credentialOffer,
-                    config,
-                    authorizationEndpointClient,
-                    tokenEndpointClient,
-                )
+                val dPoPJwtFactory =
+                    DPoPJwtFactory
+                        .createForServer(
+                            dPoPUsage = config.dPoPUsage,
+                            clock = config.clock,
+                            oauthServerMetadata = credentialOffer.authorizationServerMetadata,
+                        ).getOrThrow()
 
-            val issuanceEncryptionSpecs = issuanceEncryptionSpecs(
-                issuerMetadata = credentialOffer.credentialIssuerMetadata,
-                encryptionSupportConfig = config.encryptionSupportConfig,
-                requestEncryptionSpecFactory = requestEncryptionSpecFactory,
-                responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-            ).getOrThrow()
+                val authorizationEndpointClient =
+                    credentialOffer.authorizationServerMetadata
+                        .authorizationEndpointURI
+                        ?.let {
+                            AuthorizationEndpointClient(
+                                credentialOffer.credentialIssuerIdentifier,
+                                credentialOffer.authorizationServerMetadata,
+                                config,
+                                dPoPJwtFactory,
+                                httpClient,
+                            )
+                        }
 
-            val requestIssuance = run {
-                val credentialEndpointClient =
-                    CredentialEndpointClient(
-                        credentialOffer.credentialIssuerMetadata.credentialEndpoint,
+                val tokenEndpointClient =
+                    TokenEndpointClient(
+                        credentialOffer.credentialIssuerIdentifier,
+                        credentialOffer.authorizationServerMetadata,
+                        config,
                         dPoPJwtFactory,
                         httpClient,
                     )
-                val nonceEndpointClient = credentialOffer.credentialIssuerMetadata.nonceEndpoint?.let {
-                    NonceEndpointClient(
-                        credentialOffer.credentialIssuerMetadata.nonceEndpoint,
-                        httpClient,
+
+                val authorizeIssuance =
+                    AuthorizeIssuanceImpl(
+                        credentialOffer,
+                        config,
+                        authorizationEndpointClient,
+                        tokenEndpointClient,
                     )
-                }
-                RequestIssuanceImpl(
-                    credentialOffer,
-                    config,
-                    credentialEndpointClient,
-                    nonceEndpointClient,
-                    credentialOffer.credentialIssuerMetadata.batchCredentialIssuance,
-                    issuanceEncryptionSpecs,
-                )
-            }
 
-            val queryForDeferredCredential =
-                when (val deferredEndpoint = credentialOffer.credentialIssuerMetadata.deferredCredentialEndpoint) {
-                    null -> QueryForDeferredCredential.NotSupported
-                    else -> {
-                        val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
-                        val deferredEndPointClient =
-                            DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, httpClient)
-                        QueryForDeferredCredential(refreshAccessToken, deferredEndPointClient, issuanceEncryptionSpecs)
+                val issuanceEncryptionSpecs =
+                    issuanceEncryptionSpecs(
+                        issuerMetadata = credentialOffer.credentialIssuerMetadata,
+                        encryptionSupportConfig = config.encryptionSupportConfig,
+                        requestEncryptionSpecFactory = requestEncryptionSpecFactory,
+                        responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+                    ).getOrThrow()
+
+                val requestIssuance =
+                    run {
+                        val credentialEndpointClient =
+                            CredentialEndpointClient(
+                                credentialOffer.credentialIssuerMetadata.credentialEndpoint,
+                                dPoPJwtFactory,
+                                httpClient,
+                            )
+                        val nonceEndpointClient =
+                            credentialOffer.credentialIssuerMetadata.nonceEndpoint?.let {
+                                NonceEndpointClient(
+                                    credentialOffer.credentialIssuerMetadata.nonceEndpoint,
+                                    httpClient,
+                                )
+                            }
+                        RequestIssuanceImpl(
+                            credentialOffer,
+                            config,
+                            credentialEndpointClient,
+                            nonceEndpointClient,
+                            credentialOffer.credentialIssuerMetadata.batchCredentialIssuance,
+                            issuanceEncryptionSpecs,
+                        )
                     }
-                }
 
-            val notifyIssuer =
-                when (val notificationEndpoint = credentialOffer.credentialIssuerMetadata.notificationEndpoint) {
-                    null -> NotifyIssuer.NoOp
-                    else -> {
-                        val notificationEndPointClient =
-                            NotificationEndPointClient(notificationEndpoint, dPoPJwtFactory, httpClient)
-                        NotifyIssuer(notificationEndPointClient)
-                    }
-                }
-
-            object :
-                Issuer,
-                AuthorizeIssuance by authorizeIssuance,
-                RequestIssuance by requestIssuance,
-                QueryForDeferredCredential by queryForDeferredCredential,
-                NotifyIssuer by notifyIssuer {
-                override val credentialOffer: CredentialOffer
-                    get() = credentialOffer
-
-                override val dPoPJwtFactory: DPoPJwtFactory?
-                    get() = dPoPJwtFactory
-
-                override fun AuthorizedRequest.deferredContext(
-                    deferredCredential: SubmissionOutcome.Deferred,
-                ): DeferredIssuanceContext {
-                    val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
-                    val authorizationServerMetadata = credentialOffer.authorizationServerMetadata
-
-                    val deferredEndpoint =
-                        checkNotNull(credentialIssuerMetadata.deferredCredentialEndpoint?.value) {
-                            "Missing deferred credential endpoint"
+                val queryForDeferredCredential =
+                    when (val deferredEndpoint = credentialOffer.credentialIssuerMetadata.deferredCredentialEndpoint) {
+                        null -> {
+                            QueryForDeferredCredential.NotSupported
                         }
 
-                    val challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL()
+                        else -> {
+                            val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
+                            val deferredEndPointClient =
+                                DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, httpClient)
+                            QueryForDeferredCredential(refreshAccessToken, deferredEndPointClient, issuanceEncryptionSpecs)
+                        }
+                    }
 
-                    val tokenEndpoint =
-                        checkNotNull(authorizationServerMetadata.tokenEndpointURI?.toURL()) {
-                            "Missing token endpoint"
+                val notifyIssuer =
+                    when (val notificationEndpoint = credentialOffer.credentialIssuerMetadata.notificationEndpoint) {
+                        null -> {
+                            NotifyIssuer.NoOp
                         }
 
-                    return DeferredIssuanceContext(
-                        DeferredIssuerConfig(
-                            credentialIssuerId = credentialOffer.credentialIssuerIdentifier,
-                            clientAuthentication = config.clientAuthentication,
-                            deferredEndpoint = deferredEndpoint,
-                            authorizationServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
-                            challengeEndpoint = challengeEndpoint,
-                            tokenEndpoint = tokenEndpoint,
-                            requestEncryptionSpec = issuanceEncryptionSpecs.requestEncryptionSpec,
-                            responseEncryptionParams = issuanceEncryptionSpecs.responseEncryptionSpec?.let {
-                                it.encryptionMethod to it.compressionAlgorithm
-                            },
-                            dPoPSigner = dPoPJwtFactory?.signer,
-                            clientAttestationPoPBuilder = config.clientAttestationPoPBuilder,
-                            clock = config.clock,
-                        ),
-                        AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
-                    )
+                        else -> {
+                            val notificationEndPointClient =
+                                NotificationEndPointClient(notificationEndpoint, dPoPJwtFactory, httpClient)
+                            NotifyIssuer(notificationEndPointClient)
+                        }
+                    }
+
+                object :
+                    Issuer,
+                    AuthorizeIssuance by authorizeIssuance,
+                    RequestIssuance by requestIssuance,
+                    QueryForDeferredCredential by queryForDeferredCredential,
+                    NotifyIssuer by notifyIssuer {
+                    override val credentialOffer: CredentialOffer
+                        get() = credentialOffer
+
+                    override val dPoPJwtFactory: DPoPJwtFactory?
+                        get() = dPoPJwtFactory
+
+                    override fun AuthorizedRequest.deferredContext(
+                        deferredCredential: SubmissionOutcome.Deferred,
+                    ): DeferredIssuanceContext {
+                        val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
+                        val authorizationServerMetadata = credentialOffer.authorizationServerMetadata
+
+                        val deferredEndpoint =
+                            checkNotNull(credentialIssuerMetadata.deferredCredentialEndpoint?.value) {
+                                "Missing deferred credential endpoint"
+                            }
+
+                        val challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL()
+
+                        val tokenEndpoint =
+                            checkNotNull(authorizationServerMetadata.tokenEndpointURI?.toURL()) {
+                                "Missing token endpoint"
+                            }
+
+                        return DeferredIssuanceContext(
+                            DeferredIssuerConfig(
+                                credentialIssuerId = credentialOffer.credentialIssuerIdentifier,
+                                clientAuthentication = config.clientAuthentication,
+                                deferredEndpoint = deferredEndpoint,
+                                authorizationServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
+                                challengeEndpoint = challengeEndpoint,
+                                tokenEndpoint = tokenEndpoint,
+                                requestEncryptionSpec = issuanceEncryptionSpecs.requestEncryptionSpec,
+                                responseEncryptionParams =
+                                    issuanceEncryptionSpecs.responseEncryptionSpec?.let {
+                                        it.encryptionMethod to it.compressionAlgorithm
+                                    },
+                                dPoPSigner = dPoPJwtFactory?.signer,
+                                clientAttestationPoPBuilder = config.clientAttestationPoPBuilder,
+                                clock = config.clock,
+                            ),
+                            AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
+                        )
+                    }
                 }
             }
-        }
 
         /**
          * Factory method for creating an instance of [Issuer] based on a credential offer URI.
@@ -275,11 +292,12 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): Result<Issuer> = runCatchingCancellable {
-            val credentialOfferRequestResolver = CredentialOfferRequestResolver(httpClient, config.issuerMetadataPolicy)
-            val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUri).getOrThrow()
-            make(config, credentialOffer, httpClient, requestEncryptionSpecFactory, responseEncryptionSpecFactory).getOrThrow()
-        }
+        ): Result<Issuer> =
+            runCatchingCancellable {
+                val credentialOfferRequestResolver = CredentialOfferRequestResolver(httpClient, config.issuerMetadataPolicy)
+                val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUri).getOrThrow()
+                make(config, credentialOffer, httpClient, requestEncryptionSpecFactory, responseEncryptionSpecFactory).getOrThrow()
+            }
 
         /**
          * Factory method for creating an instance of [Issuer] with a credential offer (Wallet initiated)
@@ -305,25 +323,26 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): Result<Issuer> = runCatchingCancellable {
-            require(credentialConfigurationIdentifiers.isNotEmpty()) {
-                "At least one credential configuration identifier must be specified"
+        ): Result<Issuer> =
+            runCatchingCancellable {
+                require(credentialConfigurationIdentifiers.isNotEmpty()) {
+                    "At least one credential configuration identifier must be specified"
+                }
+
+                val (credentialIssuerMetadata, authServersMetadata) =
+                    metaData(httpClient, credentialIssuerId, config.issuerMetadataPolicy)
+
+                val credentialOffer =
+                    CredentialOffer(
+                        credentialIssuerId,
+                        credentialIssuerMetadata,
+                        authServersMetadata.first(),
+                        credentialConfigurationIdentifiers,
+                        Grants.AuthorizationCode(issuerState = null),
+                    )
+
+                make(config, credentialOffer, httpClient, requestEncryptionSpecFactory, responseEncryptionSpecFactory).getOrThrow()
             }
-
-            val (credentialIssuerMetadata, authServersMetadata) =
-                metaData(httpClient, credentialIssuerId, config.issuerMetadataPolicy)
-
-            val credentialOffer =
-                CredentialOffer(
-                    credentialIssuerId,
-                    credentialIssuerMetadata,
-                    authServersMetadata.first(),
-                    credentialConfigurationIdentifiers,
-                    Grants.AuthorizationCode(issuerState = null),
-                )
-
-            make(config, credentialOffer, httpClient, requestEncryptionSpecFactory, responseEncryptionSpecFactory).getOrThrow()
-        }
     }
 }
 

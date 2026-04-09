@@ -27,7 +27,6 @@ internal class NotificationEndPointClient(
     private val dPoPJwtFactory: DPoPJwtFactory?,
     private val httpClient: HttpClient,
 ) {
-
     suspend fun notifyIssuer(
         accessToken: AccessToken,
         resourceServerDpopNonce: Nonce?,
@@ -43,16 +42,17 @@ internal class NotificationEndPointClient(
         event: CredentialIssuanceEvent,
         retried: Boolean,
     ): Nonce? {
-        val response = httpClient.request(
-            HttpRequestBuilder()
-                .apply {
-                    method = HttpMethod.Post
-                    url.takeFrom(notificationEndpoint.value)
-                    bearerOrDPoPAuth(accessToken, dPoPJwtFactory, resourceServerDpopNonce)
-                    contentType(ContentType.Application.Json)
-                    setBody(NotificationTO.from(event))
-                },
-        )
+        val response =
+            httpClient.request(
+                HttpRequestBuilder()
+                    .apply {
+                        method = HttpMethod.Post
+                        url.takeFrom(notificationEndpoint.value)
+                        bearerOrDPoPAuth(accessToken, dPoPJwtFactory, resourceServerDpopNonce)
+                        contentType(ContentType.Application.Json)
+                        setBody(NotificationTO.from(event))
+                    },
+            )
 
         return if (response.status.isSuccess()) {
             response.dpopNonce() ?: resourceServerDpopNonce

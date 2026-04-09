@@ -28,80 +28,89 @@ const val PID_MsoMdoc = "eu.europa.ec.eudiw.pid_mso_mdoc"
 const val DEGREE_JwtVcJson = "UniversityDegree_jwt_vc_json"
 const val MDL_MsoMdoc = "MobileDrivingLicense_msoMdoc"
 
-val CredentialOfferMixedDocTypes_NO_GRANTS = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_SdJwtVC", "$PID_MsoMdoc", "$DEGREE_JwtVcJson"]          
-        }
-""".trimIndent()
+val CredentialOfferMixedDocTypes_NO_GRANTS =
+    """
+    {
+      "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+      "credential_configuration_ids": ["$PID_SdJwtVC", "$PID_MsoMdoc", "$DEGREE_JwtVcJson"]          
+    }
+    """.trimIndent()
 
-val CredentialOfferMsoMdoc_NO_GRANTS = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_MsoMdoc"]          
-        }
-""".trimIndent()
+val CredentialOfferMsoMdoc_NO_GRANTS =
+    """
+    {
+      "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+      "credential_configuration_ids": ["$PID_MsoMdoc"]          
+    }
+    """.trimIndent()
 
-val CredentialOfferWithSdJwtVc_NO_GRANTS = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_SdJwtVC"]          
-        }
-""".trimIndent()
+val CredentialOfferWithSdJwtVc_NO_GRANTS =
+    """
+    {
+      "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+      "credential_configuration_ids": ["$PID_SdJwtVC"]          
+    }
+    """.trimIndent()
 
-val CredentialOfferWithMDLMdoc_NO_GRANTS = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$MDL_MsoMdoc"]
-        }
-""".trimIndent()
+val CredentialOfferWithMDLMdoc_NO_GRANTS =
+    """
+    {
+      "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+      "credential_configuration_ids": ["$MDL_MsoMdoc"]
+    }
+    """.trimIndent()
 
-val CredentialOfferMixedDocTypes_PRE_AUTH_GRANT = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_MsoMdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
-          "grants": {
-            "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
-              "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
-              "tx_code": {
-                "input_mode": "numeric",
-                "length": 4
-              }
-            }
+val CredentialOfferMixedDocTypes_PRE_AUTH_GRANT =
+    """
+    {
+      "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+      "credential_configuration_ids": ["$PID_MsoMdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+      "grants": {
+        "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+          "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
+          "tx_code": {
+            "input_mode": "numeric",
+            "length": 4
           }
         }
-""".trimIndent()
+      }
+    }
+    """.trimIndent()
 
-val CredentialOfferMixedDocTypes_AUTH_GRANT = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
-          "grants": {
-            "authorization_code": {
-              "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
-            }
-          }
+val CredentialOfferMixedDocTypes_AUTH_GRANT =
+    """
+    {
+      "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+      "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+      "grants": {
+        "authorization_code": {
+          "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
         }
-""".trimIndent()
+      }
+    }
+    """.trimIndent()
 
-val OpenId4VCIConfiguration = OpenId4VCIConfig(
-    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
-    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-    encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    dPoPUsage = DPoPUsage.Never,
-)
+val OpenId4VCIConfiguration =
+    OpenId4VCIConfig(
+        clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
+        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+        encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+        dPoPUsage = DPoPUsage.Never,
+    )
 
-val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
-    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
-    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-    encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    dPoPUsage = DPoPUsage.IfSupported(
-        ecSigner(
-            curve = Curve.P_256,
-            alg = JWSAlgorithm.ES256,
-        ),
-    ),
-)
+val OpenId4VCIConfigurationWithDpopSigner =
+    OpenId4VCIConfig(
+        clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
+        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+        encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+        dPoPUsage =
+            DPoPUsage.IfSupported(
+                ecSigner(
+                    curve = Curve.P_256,
+                    alg = JWSAlgorithm.ES256,
+                ),
+            ),
+    )
 
 suspend fun authorizeRequestForCredentialOffer(
     config: OpenId4VCIConfig? = OpenId4VCIConfiguration,
@@ -110,13 +119,15 @@ suspend fun authorizeRequestForCredentialOffer(
     requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
     httpClient: HttpClient,
 ): Pair<AuthorizedRequest, Issuer> {
-    val issuer = Issuer.make(
-        config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
-        credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
-        httpClient = httpClient,
-        responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-        requestEncryptionSpecFactory = requestEncryptionSpecFactory,
-    ).getOrThrow()
+    val issuer =
+        Issuer
+            .make(
+                config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
+                credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
+                httpClient = httpClient,
+                responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+                requestEncryptionSpecFactory = requestEncryptionSpecFactory,
+            ).getOrThrow()
 
     val authorizedRequest =
         with(issuer) {
@@ -137,12 +148,14 @@ suspend fun preAuthorizeRequestForCredentialOffer(
     httpClient: HttpClient,
     txCode: String = "1234",
 ): Pair<AuthorizedRequest, Issuer> {
-    val issuer = Issuer.make(
-        config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
-        credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
-        httpClient = httpClient,
-        responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-    ).getOrThrow()
+    val issuer =
+        Issuer
+            .make(
+                config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
+                credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
+                httpClient = httpClient,
+                responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+            ).getOrThrow()
 
     val authorizedRequest = issuer.authorizeWithPreAuthorizationCode(txCode).getOrThrow()
 

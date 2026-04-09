@@ -33,14 +33,17 @@ internal class ChallengeEndpointClient(
     private val challengeEndpoint: URL,
     private val httpClient: HttpClient,
 ) {
-    suspend fun getChallenge(): Result<Nonce> = runCatchingCancellable {
-        val challenge = httpClient.post(challengeEndpoint) {
-            expectSuccess = true
-            accept(ContentType.Application.Json)
-        }.body<ChallengeTO>()
+    suspend fun getChallenge(): Result<Nonce> =
+        runCatchingCancellable {
+            val challenge =
+                httpClient
+                    .post(challengeEndpoint) {
+                        expectSuccess = true
+                        accept(ContentType.Application.Json)
+                    }.body<ChallengeTO>()
 
-        Nonce(challenge.challenge)
-    }
+            Nonce(challenge.challenge)
+        }
 }
 
 @Serializable

@@ -37,7 +37,6 @@ internal class AuthorizeIssuanceImpl(
     private val authorizationEndpointClient: AuthorizationEndpointClient?,
     private val tokenEndpointClient: TokenEndpointClient,
 ) : AuthorizeIssuance {
-
     override suspend fun prepareAuthorizationRequest(walletState: String?): Result<AuthorizationRequestPrepared> =
         runCatchingCancellable {
             requireNotNull(authorizationEndpointClient) {
@@ -50,18 +49,20 @@ internal class AuthorizeIssuanceImpl(
             val state = walletState ?: NimbusState().value
             val issuerState = credentialOffer.grants?.authorizationCode()?.issuerState
             val (codeVerifier, authorizationCodeUrl, dpopNonce) =
-                authorizationEndpointClient.submitParOrCreateAuthorizationRequestUrl(
-                    scopes,
-                    configurationIds,
-                    state,
-                    issuerState,
-                ).getOrThrow()
+                authorizationEndpointClient
+                    .submitParOrCreateAuthorizationRequestUrl(
+                        scopes,
+                        configurationIds,
+                        state,
+                        issuerState,
+                    ).getOrThrow()
             AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier, state, configurationIds, dpopNonce)
         }
 
     private fun scopesAndCredentialConfigurationIds(): Pair<List<Scope>, List<CredentialConfigurationIdentifier>> {
         val scopes = mutableListOf<Scope>()
         val configurationIdentifiers = mutableListOf<CredentialConfigurationIdentifier>()
+
         fun credentialConfigurationById(id: CredentialConfigurationIdentifier): CredentialConfiguration {
             val issuerMetadata = credentialOffer.credentialIssuerMetadata
             return requireNotNull(issuerMetadata.credentialConfigurationsSupported[id]) {
@@ -70,7 +71,9 @@ internal class AuthorizeIssuanceImpl(
         }
         for (id in credentialOffer.credentialConfigurationIdentifiers) {
             val credentialConfiguration = credentialConfigurationById(id)
+
             fun authDetailsByCfgId() = configurationIdentifiers.add(id)
+
             fun addScope(): Boolean = credentialConfiguration.scope?.let { scopes.add(Scope(it)) } ?: false
             when (config.authorizeIssuanceConfig) {
                 AuthorizeIssuanceConfig.AUTHORIZATION_DETAILS -> authDetailsByCfgId()
@@ -84,60 +87,66 @@ internal class AuthorizeIssuanceImpl(
         authorizationCode: AuthorizationCode,
         serverState: String,
         authDetailsOption: AccessTokenOption,
-    ): Result<AuthorizedRequest> = runCatchingCancellable {
-        ensure(serverState == state) { InvalidAuthorizationState() }
-        val credConfigIdsAsAuthDetails = identifiersSentAsAuthDetails.filter(authDetailsOption)
-        val (tokenResponse, newDpopNonce) =
-            tokenEndpointClient.requestAccessTokenAuthFlow(
-                authorizationCode,
-                pkceVerifier,
-                credConfigIdsAsAuthDetails,
-                dpopNonce,
-            ).getOrThrow()
+    ): Result<AuthorizedRequest> =
+        runCatchingCancellable {
+            ensure(serverState == state) { InvalidAuthorizationState() }
+            val credConfigIdsAsAuthDetails = identifiersSentAsAuthDetails.filter(authDetailsOption)
+            val (tokenResponse, newDpopNonce) =
+                tokenEndpointClient
+                    .requestAccessTokenAuthFlow(
+                        authorizationCode,
+                        pkceVerifier,
+                        credConfigIdsAsAuthDetails,
+                        dpopNonce,
+                    ).getOrThrow()
 
-        AuthorizedRequest(
-            accessToken = tokenResponse.accessToken,
-            refreshToken = tokenResponse.refreshToken,
-            credentialIdentifiers = tokenResponse.authorizationDetails,
-            timestamp = tokenResponse.timestamp,
-            authorizationServerDpopNonce = newDpopNonce,
-            resourceServerDpopNonce = null,
-            grant = Grant.AuthorizationCode,
-        )
-    }
+            AuthorizedRequest(
+                accessToken = tokenResponse.accessToken,
+                refreshToken = tokenResponse.refreshToken,
+                credentialIdentifiers = tokenResponse.authorizationDetails,
+                timestamp = tokenResponse.timestamp,
+                authorizationServerDpopNonce = newDpopNonce,
+                resourceServerDpopNonce = null,
+                grant = Grant.AuthorizationCode,
+            )
+        }
 
     override suspend fun authorizeWithPreAuthorizationCode(
         txCode: String?,
         authDetailsOption: AccessTokenOption,
-    ): Result<AuthorizedRequest> = runCatchingCancellable {
-        val offeredGrants = requireNotNull(credentialOffer.grants) {
-            "Grant not specified in credential offer."
-        }
-        val preAuthorizedCode = requireNotNull(offeredGrants.preAuthorizedCode()) {
-            "Pre-authorized code grant expected"
-        }
-        with(preAuthorizedCode) { validate(txCode) }
-        val credConfigIdsAsAuthDetails =
-            credentialOffer.credentialConfigurationIdentifiers.filter(authDetailsOption)
+    ): Result<AuthorizedRequest> =
+        runCatchingCancellable {
+            val offeredGrants =
+                requireNotNull(credentialOffer.grants) {
+                    "Grant not specified in credential offer."
+                }
+            val preAuthorizedCode =
+                requireNotNull(offeredGrants.preAuthorizedCode()) {
+                    "Pre-authorized code grant expected"
+                }
+            with(preAuthorizedCode) { validate(txCode) }
+            val credConfigIdsAsAuthDetails =
+                credentialOffer.credentialConfigurationIdentifiers.filter(authDetailsOption)
 
-        val (tokenResponse, newDpopNonce) =
-            tokenEndpointClient.requestAccessTokenPreAuthFlow(
-                preAuthorizedCode,
-                txCode,
-                credConfigIdsAsAuthDetails,
-                dpopNonce = null,
-            ).getOrThrow()
+            val (tokenResponse, newDpopNonce) =
+                tokenEndpointClient
+                    .requestAccessTokenPreAuthFlow(
+                        preAuthorizedCode,
+                        txCode,
+                        credConfigIdsAsAuthDetails,
+                        dpopNonce = null,
+                    ).getOrThrow()
 
-        AuthorizedRequest(
-            accessToken = tokenResponse.accessToken,
-            refreshToken = tokenResponse.refreshToken,
-            credentialIdentifiers = tokenResponse.authorizationDetails,
-            timestamp = tokenResponse.timestamp,
-            authorizationServerDpopNonce = newDpopNonce,
-            resourceServerDpopNonce = null,
-            grant = Grant.PreAuthorizedCodeGrant,
-        )
-    }
+            AuthorizedRequest(
+                accessToken = tokenResponse.accessToken,
+                refreshToken = tokenResponse.refreshToken,
+                credentialIdentifiers = tokenResponse.authorizationDetails,
+                timestamp = tokenResponse.timestamp,
+                authorizationServerDpopNonce = newDpopNonce,
+                resourceServerDpopNonce = null,
+                grant = Grant.PreAuthorizedCodeGrant,
+            )
+        }
 }
 
 private fun Grants.PreAuthorizedCode.validate(txCode: String?) {

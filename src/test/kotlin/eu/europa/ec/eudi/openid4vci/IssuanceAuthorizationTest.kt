@@ -32,69 +32,76 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 class IssuanceAuthorizationTest {
-
     @Test
-    fun `successful authorization with authorization code flow (wallet initiated)`() = runTest {
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker { request ->
-                val form = with(request) { parPostApplyAssertionsAndGetFormData(false) }
+    fun `successful authorization with authorization code flow (wallet initiated)`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                    parPostMocker { request ->
+                        val form = with(request) { parPostApplyAssertionsAndGetFormData(false) }
 
-                assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
-                    form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
-                }
-                assertTrue("Missing scope eu.europa.ec.eudiw.pid_mso_mdoc") {
-                    form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc") ?: false
-                }
-            },
-            tokenPostMocker { request ->
-                with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
-            },
-        )
+                        assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
+                            form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
+                        }
+                        assertTrue("Missing scope eu.europa.ec.eudiw.pid_mso_mdoc") {
+                            form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc") ?: false
+                        }
+                    },
+                    tokenPostMocker { request ->
+                        with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
+                    },
+                )
 
-        val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
-        val issuer = Issuer.make(
-            config = OpenId4VCIConfiguration,
-            credentialOffer = offer,
-            httpClient = mockedHttpClient,
-        ).getOrThrow()
-        with(issuer) {
-            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
-            val authorizationCode = UUID.randomUUID().toString()
-            val serverState = authRequestPrepared.state // dummy don't use it
-            authRequestPrepared
-                .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState).getOrThrow()
-                .also { println(it) }
+            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val issuer =
+                Issuer
+                    .make(
+                        config = OpenId4VCIConfiguration,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getOrThrow()
+            with(issuer) {
+                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
+                val authorizationCode = UUID.randomUUID().toString()
+                val serverState = authRequestPrepared.state // dummy don't use it
+                authRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
+                    .getOrThrow()
+                    .also { println(it) }
+            }
         }
-    }
 
     @Test
     fun `successful authorization with authorization code flow`() =
         runTest {
-            val mockedHttpClient = mockedHttpClient(
-                credentialIssuerMetadataWellKnownMocker(),
-                authServerWellKnownMocker(),
-                parPostMocker { request ->
-                    val form = with(request) { parPostApplyAssertionsAndGetFormData(false) }
-                    assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
-                        form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
-                    }
-                    assertTrue("Missing scope eu.europa.ec.eudiw.pid_mso_mdoc") {
-                        form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc") ?: false
-                    }
-                },
-                tokenPostMocker { request ->
-                    with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
-                },
-            )
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                    parPostMocker { request ->
+                        val form = with(request) { parPostApplyAssertionsAndGetFormData(false) }
+                        assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
+                            form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
+                        }
+                        assertTrue("Missing scope eu.europa.ec.eudiw.pid_mso_mdoc") {
+                            form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc") ?: false
+                        }
+                    },
+                    tokenPostMocker { request ->
+                        with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
+                    },
+                )
 
             val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
-            val issuer = Issuer.make(
-                config = OpenId4VCIConfiguration,
-                credentialOffer = offer,
-                httpClient = mockedHttpClient,
-            ).getOrThrow()
+            val issuer =
+                Issuer
+                    .make(
+                        config = OpenId4VCIConfiguration,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getOrThrow()
             with(issuer) {
                 val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
@@ -108,22 +115,25 @@ class IssuanceAuthorizationTest {
     @Test
     fun `successful authorization with pre-authorization code flow`() =
         runTest {
-            val mockedHttpClient = mockedHttpClient(
-                authServerWellKnownMocker(),
-                credentialIssuerMetadataWellKnownMocker(),
-                parPostMocker {
-                    fail("No pushed authorization request should have been sent in case of pre-authorized code flow")
-                },
-                tokenPostMocker { request ->
-                    with(request) { tokenPostApplyPreAuthFlowAssertionsAndGetFormData() }
-                },
-            )
+            val mockedHttpClient =
+                mockedHttpClient(
+                    authServerWellKnownMocker(),
+                    credentialIssuerMetadataWellKnownMocker(),
+                    parPostMocker {
+                        fail("No pushed authorization request should have been sent in case of pre-authorized code flow")
+                    },
+                    tokenPostMocker { request ->
+                        with(request) { tokenPostApplyPreAuthFlowAssertionsAndGetFormData() }
+                    },
+                )
             val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
-            val issuer = Issuer.make(
-                config = OpenId4VCIConfiguration,
-                credentialOffer = offer,
-                httpClient = mockedHttpClient,
-            ).getOrThrow()
+            val issuer =
+                Issuer
+                    .make(
+                        config = OpenId4VCIConfiguration,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getOrThrow()
             with(issuer) {
                 authorizeWithPreAuthorizationCode("1234").getOrThrow()
             }
@@ -132,17 +142,20 @@ class IssuanceAuthorizationTest {
     @Test
     fun `(pre-auth flow) when pre-authorized grant's tx_code is of wrong length exception is raised`() =
         runTest {
-            val mockedHttpClient = mockedHttpClient(
-                authServerWellKnownMocker(),
-                credentialIssuerMetadataWellKnownMocker(),
-            )
+            val mockedHttpClient =
+                mockedHttpClient(
+                    authServerWellKnownMocker(),
+                    credentialIssuerMetadataWellKnownMocker(),
+                )
 
             val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
-            val issuer = Issuer.make(
-                config = OpenId4VCIConfiguration,
-                credentialOffer = offer,
-                httpClient = mockedHttpClient,
-            ).getOrThrow()
+            val issuer =
+                Issuer
+                    .make(
+                        config = OpenId4VCIConfiguration,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getOrThrow()
 
             with(issuer) {
                 authorizeWithPreAuthorizationCode("123456")
@@ -162,17 +175,20 @@ class IssuanceAuthorizationTest {
     @Test
     fun `(pre-auth flow) when pre-authorized grant's tx_code is of wrong input mode exception is raised`() =
         runTest {
-            val mockedHttpClient = mockedHttpClient(
-                authServerWellKnownMocker(),
-                credentialIssuerMetadataWellKnownMocker(),
-            )
+            val mockedHttpClient =
+                mockedHttpClient(
+                    authServerWellKnownMocker(),
+                    credentialIssuerMetadataWellKnownMocker(),
+                )
 
             val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
-            val issuer = Issuer.make(
-                config = OpenId4VCIConfiguration,
-                credentialOffer = offer,
-                httpClient = mockedHttpClient,
-            ).getOrThrow()
+            val issuer =
+                Issuer
+                    .make(
+                        config = OpenId4VCIConfiguration,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getOrThrow()
 
             with(issuer) {
                 authorizeWithPreAuthorizationCode("AbdSS2356")
@@ -192,33 +208,38 @@ class IssuanceAuthorizationTest {
     @Test
     fun `when par endpoint responds with failure, exception PushedAuthorizationRequestFailed is thrown`() =
         runTest {
-            val mockedHttpClient = mockedHttpClient(
-                authServerWellKnownMocker(),
-                credentialIssuerMetadataWellKnownMocker(),
-                RequestMocker(
-                    requestMatcher = endsWith("/ext/par/request", HttpMethod.Post),
-                    responseBuilder = {
-                        respond(
-                            content = Json.encodeToString(
-                                PushedAuthorizationRequestResponseTO.Failure(
-                                    "invalid_request",
-                                    "The redirect_uri is not valid for the given client",
-                                ),
-                            ),
-                            status = HttpStatusCode.BadRequest,
-                            headers = headersOf(
-                                HttpHeaders.ContentType to listOf("application/json"),
-                            ),
-                        )
-                    },
-                ),
-            )
+            val mockedHttpClient =
+                mockedHttpClient(
+                    authServerWellKnownMocker(),
+                    credentialIssuerMetadataWellKnownMocker(),
+                    RequestMocker(
+                        requestMatcher = endsWith("/ext/par/request", HttpMethod.Post),
+                        responseBuilder = {
+                            respond(
+                                content =
+                                    Json.encodeToString(
+                                        PushedAuthorizationRequestResponseTO.Failure(
+                                            "invalid_request",
+                                            "The redirect_uri is not valid for the given client",
+                                        ),
+                                    ),
+                                status = HttpStatusCode.BadRequest,
+                                headers =
+                                    headersOf(
+                                        HttpHeaders.ContentType to listOf("application/json"),
+                                    ),
+                            )
+                        },
+                    ),
+                )
             val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_AUTH_GRANT)
-            val issuer = Issuer.make(
-                config = OpenId4VCIConfiguration,
-                credentialOffer = offer,
-                httpClient = mockedHttpClient,
-            ).getOrThrow()
+            val issuer =
+                Issuer
+                    .make(
+                        config = OpenId4VCIConfiguration,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getOrThrow()
             with(issuer) {
                 prepareAuthorizationRequest()
                     .fold(
@@ -237,33 +258,38 @@ class IssuanceAuthorizationTest {
     @Test
     fun `(auth code flow) when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown`() =
         runTest {
-            val mockedHttpClient = mockedHttpClient(
-                authServerWellKnownMocker(),
-                credentialIssuerMetadataWellKnownMocker(),
-                parPostMocker(),
-                RequestMocker(
-                    requestMatcher = endsWith("/token", HttpMethod.Post),
-                    responseBuilder = {
-                        respond(
-                            content = Json.encodeToString(
-                                TokenResponseTO.Failure(
-                                    error = "unauthorized_client",
-                                ),
-                            ),
-                            status = HttpStatusCode.BadRequest,
-                            headers = headersOf(
-                                HttpHeaders.ContentType to listOf("application/json"),
-                            ),
-                        )
-                    },
-                ),
-            )
+            val mockedHttpClient =
+                mockedHttpClient(
+                    authServerWellKnownMocker(),
+                    credentialIssuerMetadataWellKnownMocker(),
+                    parPostMocker(),
+                    RequestMocker(
+                        requestMatcher = endsWith("/token", HttpMethod.Post),
+                        responseBuilder = {
+                            respond(
+                                content =
+                                    Json.encodeToString(
+                                        TokenResponseTO.Failure(
+                                            error = "unauthorized_client",
+                                        ),
+                                    ),
+                                status = HttpStatusCode.BadRequest,
+                                headers =
+                                    headersOf(
+                                        HttpHeaders.ContentType to listOf("application/json"),
+                                    ),
+                            )
+                        },
+                    ),
+                )
             val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_AUTH_GRANT)
-            val issuer = Issuer.make(
-                config = OpenId4VCIConfiguration,
-                credentialOffer = offer,
-                httpClient = mockedHttpClient,
-            ).getOrThrow()
+            val issuer =
+                Issuer
+                    .make(
+                        config = OpenId4VCIConfiguration,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getOrThrow()
 
             with(issuer) {
                 val parPlaced = prepareAuthorizationRequest().getOrThrow()
@@ -287,32 +313,37 @@ class IssuanceAuthorizationTest {
     @Test
     fun `(pre-auth code flow) when token endpoint responds with failure, exception AccessTokenRequestFailed is thrown`() =
         runTest {
-            val mockedHttpClient = mockedHttpClient(
-                authServerWellKnownMocker(),
-                credentialIssuerMetadataWellKnownMocker(),
-                RequestMocker(
-                    requestMatcher = endsWith("/token", HttpMethod.Post),
-                    responseBuilder = {
-                        respond(
-                            content = Json.encodeToString(
-                                TokenResponseTO.Failure(
-                                    error = "unauthorized_client",
-                                ),
-                            ),
-                            status = HttpStatusCode.BadRequest,
-                            headers = headersOf(
-                                HttpHeaders.ContentType to listOf("application/json"),
-                            ),
-                        )
-                    },
-                ),
-            )
+            val mockedHttpClient =
+                mockedHttpClient(
+                    authServerWellKnownMocker(),
+                    credentialIssuerMetadataWellKnownMocker(),
+                    RequestMocker(
+                        requestMatcher = endsWith("/token", HttpMethod.Post),
+                        responseBuilder = {
+                            respond(
+                                content =
+                                    Json.encodeToString(
+                                        TokenResponseTO.Failure(
+                                            error = "unauthorized_client",
+                                        ),
+                                    ),
+                                status = HttpStatusCode.BadRequest,
+                                headers =
+                                    headersOf(
+                                        HttpHeaders.ContentType to listOf("application/json"),
+                                    ),
+                            )
+                        },
+                    ),
+                )
             val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
-            val issuer = Issuer.make(
-                config = OpenId4VCIConfiguration,
-                credentialOffer = offer,
-                httpClient = mockedHttpClient,
-            ).getOrThrow()
+            val issuer =
+                Issuer
+                    .make(
+                        config = OpenId4VCIConfiguration,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getOrThrow()
 
             with(issuer) {
                 authorizeWithPreAuthorizationCode("1234")
@@ -332,9 +363,8 @@ class IssuanceAuthorizationTest {
     private suspend fun credentialOffer(
         httpClient: HttpClient,
         credentialOfferStr: String,
-    ): CredentialOffer {
-        return CredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.IgnoreSigned)
+    ): CredentialOffer =
+        CredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.IgnoreSigned)
             .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
             .getOrThrow()
-    }
 }

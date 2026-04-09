@@ -27,7 +27,6 @@ import java.util.*
  * Cryptographic Binding Methods for issued Credentials.
  */
 sealed interface CryptographicBindingMethod : Serializable {
-
     /**
      * JWK format.
      */
@@ -45,12 +44,16 @@ sealed interface CryptographicBindingMethod : Serializable {
     /**
      * DID method.
      */
-    data class DID(val method: String) : CryptographicBindingMethod
+    data class DID(
+        val method: String,
+    ) : CryptographicBindingMethod
 
     /**
      * Other format
      */
-    data class Other(val value: String) : CryptographicBindingMethod
+    data class Other(
+        val value: String,
+    ) : CryptographicBindingMethod
 }
 
 /**
@@ -66,7 +69,8 @@ sealed interface ProofTypeMeta : Serializable {
     data class Jwt(
         val algorithms: List<JWSAlgorithm>,
         override val keyAttestationRequirement: KeyAttestationRequirement,
-    ) : ProofTypeMeta, HasKeyAttestationRequirement {
+    ) : ProofTypeMeta,
+        HasKeyAttestationRequirement {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of JWT cannot be empty" }
         }
@@ -79,13 +83,16 @@ sealed interface ProofTypeMeta : Serializable {
     data class Attestation(
         val algorithms: List<JWSAlgorithm>,
         override val keyAttestationRequirement: KeyAttestationRequirement.Required,
-    ) : ProofTypeMeta, HasKeyAttestationRequirement {
+    ) : ProofTypeMeta,
+        HasKeyAttestationRequirement {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of Attestation cannot be empty" }
         }
     }
 
-    data class Unsupported(val type: String) : ProofTypeMeta
+    data class Unsupported(
+        val type: String,
+    ) : ProofTypeMeta
 }
 
 interface HasKeyAttestationRequirement {
@@ -93,7 +100,6 @@ interface HasKeyAttestationRequirement {
 }
 
 sealed interface KeyAttestationRequirement {
-
     data object NotRequired : KeyAttestationRequirement {
         private fun readResolve(): Any = NotRequired
     }
@@ -121,32 +127,37 @@ sealed interface KeyAttestationRequirement {
 
         companion object
     }
+
     companion object {
         val RequiredNoConstraints: Required = Required(null, null)
     }
 }
 
-fun ProofTypeMeta.type(): ProofType? = when (this) {
-    is ProofTypeMeta.Jwt -> ProofType.JWT
-    is ProofTypeMeta.DiVp -> ProofType.DI_VP
-    is ProofTypeMeta.Attestation -> ProofType.ATTESTATION
-    is ProofTypeMeta.Unsupported -> null
-}
+fun ProofTypeMeta.type(): ProofType? =
+    when (this) {
+        is ProofTypeMeta.Jwt -> ProofType.JWT
+        is ProofTypeMeta.DiVp -> ProofType.DI_VP
+        is ProofTypeMeta.Attestation -> ProofType.ATTESTATION
+        is ProofTypeMeta.Unsupported -> null
+    }
 
-fun ProofTypeMeta.algorithms(): List<JWSAlgorithm> = when (this) {
-    is ProofTypeMeta.Jwt -> algorithms
-    is ProofTypeMeta.Attestation -> algorithms
-    is ProofTypeMeta.DiVp -> emptyList()
-    is ProofTypeMeta.Unsupported -> emptyList()
-}
+fun ProofTypeMeta.algorithms(): List<JWSAlgorithm> =
+    when (this) {
+        is ProofTypeMeta.Jwt -> algorithms
+        is ProofTypeMeta.Attestation -> algorithms
+        is ProofTypeMeta.DiVp -> emptyList()
+        is ProofTypeMeta.Unsupported -> emptyList()
+    }
 
 @JvmInline
-value class ProofTypesSupported private constructor(val values: Set<ProofTypeMeta>) {
-
+value class ProofTypesSupported private constructor(
+    val values: Set<ProofTypeMeta>,
+) {
     operator fun get(type: ProofType): ProofTypeMeta? = values.firstOrNull { it.type() == type }
 
     companion object {
         val Empty: ProofTypesSupported = ProofTypesSupported(emptySet())
+
         operator fun invoke(values: Set<ProofTypeMeta>): ProofTypesSupported {
             require(values.groupBy(ProofTypeMeta::type).all { (_, instances) -> instances.size == 1 }) {
                 "Multiple instance of the same proof type are not allowed"
@@ -170,7 +181,6 @@ data class Display(
     val backgroundImage: URI? = null,
     val textColor: CssColor? = null,
 ) : Serializable {
-
     /**
      * Logo information.
      */
@@ -204,7 +214,6 @@ data class Claim(
     @SerialName("mandatory") val mandatory: Boolean? = false,
     @SerialName("display") val display: List<Display> = emptyList(),
 ) : Serializable {
-
     /**
      * Display properties of a Claim.
      */
@@ -222,7 +231,9 @@ data class Claim(
  * @see <a href="https://www.iana.org/assignments/cose/cose.xhtml">CBOR Object Signing and Encryption (COSE)</a>
  */
 @JvmInline
-value class CoseAlgorithm(val value: Int) : Serializable {
+value class CoseAlgorithm(
+    val value: Int,
+) : Serializable {
     override fun toString(): String = value.toString()
 }
 
@@ -244,7 +255,9 @@ data class MsoMdocCredential(
  * @see <a href="https://www.iana.org/assignments/jose/jose.xhtml">JSON Object Signing and Encryption (JOSE)</a>
  */
 @JvmInline
-value class JwsAlgorithm(val name: String) : Serializable {
+value class JwsAlgorithm(
+    val name: String,
+) : Serializable {
     override fun toString(): String = name
 }
 
@@ -271,7 +284,9 @@ data class W3CJsonLdCredentialDefinition(
  * @see <a href="https://w3c-ccg.github.io/ld-cryptosuite-registry/">Linked Data Cryptographic Suite Registry</a>
  */
 @JvmInline
-value class LinkedDataAlgorithm(val identifier: String) : Serializable {
+value class LinkedDataAlgorithm(
+    val identifier: String,
+) : Serializable {
     override fun toString(): String = identifier
 }
 
@@ -310,7 +325,6 @@ data class W3CSignedJwtCredential(
     override val credentialMetadata: CredentialMetadata?,
     val credentialDefinition: CredentialDefinition,
 ) : CredentialConfiguration {
-
     data class CredentialDefinition(
         val type: List<String>,
     )

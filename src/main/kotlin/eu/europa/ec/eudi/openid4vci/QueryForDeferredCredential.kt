@@ -21,7 +21,6 @@ import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
 import kotlin.time.Duration
 
 sealed interface DeferredCredentialQueryOutcome : java.io.Serializable {
-
     data class Issued(
         val credentials: List<IssuedCredential>,
         val notificationId: NotificationId?,
@@ -46,7 +45,6 @@ sealed interface DeferredCredentialQueryOutcome : java.io.Serializable {
  * An interface for querying credential issuer deferred endpoint.
  */
 fun interface QueryForDeferredCredential {
-
     /**
      * Given an authorized request submits a deferred credential request for an identifier of a Deferred Issuance transaction.
      *
@@ -78,31 +76,33 @@ fun interface QueryForDeferredCredential {
             refreshAccessToken: RefreshAccessToken,
             deferredEndPointClient: DeferredEndPointClient,
             exchangeEncryptionSpecification: ExchangeEncryptionSpecification,
-        ): QueryForDeferredCredential = object : QueryForDeferredCredential {
+        ): QueryForDeferredCredential =
+            object : QueryForDeferredCredential {
+                override suspend fun AuthorizedRequest.queryForDeferredCredential(
+                    transactionId: TransactionId,
+                ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> =
+                    runCatchingCancellable {
+                        val refreshed = refreshIfNeeded(this)
+                        val (outcome, newResourceServerDpopNonce) = placeDeferredCredentialRequest(refreshed, transactionId)
+                        refreshed.withResourceServerDpopNonce(newResourceServerDpopNonce) to outcome
+                    }
 
-            override suspend fun AuthorizedRequest.queryForDeferredCredential(
-                transactionId: TransactionId,
-            ): Result<AuthorizedRequestAnd<DeferredCredentialQueryOutcome>> = runCatchingCancellable {
-                val refreshed = refreshIfNeeded(this)
-                val (outcome, newResourceServerDpopNonce) = placeDeferredCredentialRequest(refreshed, transactionId)
-                refreshed.withResourceServerDpopNonce(newResourceServerDpopNonce) to outcome
+                private suspend fun refreshIfNeeded(authorizedRequest: AuthorizedRequest): AuthorizedRequest =
+                    with(refreshAccessToken) {
+                        authorizedRequest.refreshIfNeeded().getOrThrow()
+                    }
+
+                private suspend fun placeDeferredCredentialRequest(
+                    authorizedRequest: AuthorizedRequest,
+                    transactionId: TransactionId,
+                ): Pair<DeferredCredentialQueryOutcome, Nonce?> =
+                    deferredEndPointClient
+                        .placeDeferredCredentialRequest(
+                            authorizedRequest.accessToken,
+                            authorizedRequest.resourceServerDpopNonce,
+                            transactionId,
+                            exchangeEncryptionSpecification,
+                        ).getOrThrow()
             }
-
-            private suspend fun refreshIfNeeded(authorizedRequest: AuthorizedRequest): AuthorizedRequest =
-                with(refreshAccessToken) {
-                    authorizedRequest.refreshIfNeeded().getOrThrow()
-                }
-
-            private suspend fun placeDeferredCredentialRequest(
-                authorizedRequest: AuthorizedRequest,
-                transactionId: TransactionId,
-            ): Pair<DeferredCredentialQueryOutcome, Nonce?> =
-                deferredEndPointClient.placeDeferredCredentialRequest(
-                    authorizedRequest.accessToken,
-                    authorizedRequest.resourceServerDpopNonce,
-                    transactionId,
-                    exchangeEncryptionSpecification,
-                ).getOrThrow()
-        }
     }
 }

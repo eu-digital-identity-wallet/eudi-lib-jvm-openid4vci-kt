@@ -17,12 +17,11 @@ package eu.europa.ec.eudi.openid4vci
 
 import kotlinx.coroutines.CancellationException
 
-internal inline fun <R> runCatchingCancellable(block: () -> R): Result<R> {
-    return try {
+internal inline fun <R> runCatchingCancellable(block: () -> R): Result<R> =
+    try {
         Result.success(block())
     } catch (ce: CancellationException) {
         throw ce
     } catch (e: Throwable) {
         Result.failure(e)
     }
-}
