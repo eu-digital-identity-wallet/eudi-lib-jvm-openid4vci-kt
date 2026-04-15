@@ -100,6 +100,7 @@ val OpenId4VCIConfiguration = OpenId4VCIConfig(
     clientAuthentication = ClientAuthentication.None("MyWallet_ClientId", DPoPUsage.Never),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+    proofs = ProofsConfig.All,
 )
 
 val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
@@ -114,7 +115,7 @@ val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
     ),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-
+    proofs = ProofsConfig.All,
 )
 
 suspend fun authorizeRequestForCredentialOffer(

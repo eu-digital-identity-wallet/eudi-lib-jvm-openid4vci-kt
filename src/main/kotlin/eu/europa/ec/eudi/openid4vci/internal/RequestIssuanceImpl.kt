@@ -109,6 +109,7 @@ internal class RequestIssuanceImpl(
         grant: Grant,
     ): Pair<List<Proof>, Nonce?> {
         val credentialConfiguration = credentialSupportedById(credentialConfigId)
+        config.proofs.ensureCompatibleWith(credentialConfiguration.proofTypesSupported)
         val proofRequirement = proofsSpecification.ensureCompatibleWith(credentialConfiguration)
 
         return when (proofsSpecification) {
@@ -492,4 +493,40 @@ internal sealed interface SubmissionOutcomeInternal {
             is Success -> copy(selectedCredentialReusePolicy = selectedCredentialReusePolicy)
             is Deferred, is Failed -> this
         }
+}
+
+private fun ProofsConfig.ensureCompatibleWith(supportedProofTypes: ProofTypesSupported) {
+    when (supportedProofTypes) {
+        ProofTypesSupported.Empty -> {
+            require(supportsNonDeviceBound) { "Wallet doesn't support non-device-bound attestations" }
+        }
+
+        else -> {
+            val deviceBoundConfig = requireNotNull(deviceBound) { "Wallet doesn't support device-bound attestations" }
+
+            val supportsJwtProofs = supportedProofTypes[ProofType.JWT]?.let { jwtProof ->
+                check(jwtProof is ProofTypeMeta.Jwt)
+                val supportsAnySigningAlgorithm =
+                    if (null == deviceBoundConfig.algorithms) true
+                    else jwtProof.algorithms.any { it in deviceBoundConfig.algorithms }
+                val proofType = when (jwtProof.keyAttestationRequirement) {
+                    KeyAttestationRequirement.NotRequired -> ProofsConfig.DeviceBound.Proof.JwtProofWithoutKeyAttestation
+                    is KeyAttestationRequirement.Required -> ProofsConfig.DeviceBound.Proof.JwtProofWithKeyAttestation
+                }
+                val supportsProofType = proofType in deviceBoundConfig.proofs
+                supportsAnySigningAlgorithm && supportsProofType
+            } ?: false
+
+            val supportsAttestationProofs = supportedProofTypes[ProofType.ATTESTATION]?.let { attestationProof ->
+                check(attestationProof is ProofTypeMeta.Attestation)
+                val supportsAnySigningAlgorithm =
+                    if (null == deviceBoundConfig.algorithms) true
+                    else attestationProof.algorithms.any { it in deviceBoundConfig.algorithms }
+                val supportsProofType = ProofsConfig.DeviceBound.Proof.AttestationProof in deviceBoundConfig.proofs
+                supportsAnySigningAlgorithm && supportsProofType
+            } ?: false
+
+            require(supportsJwtProofs || supportsAttestationProofs) { "Wallet doesn't support any of the advertised Proofs" }
+        }
+    }
 }

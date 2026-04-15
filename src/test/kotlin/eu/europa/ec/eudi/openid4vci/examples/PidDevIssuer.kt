@@ -46,6 +46,7 @@ internal object PidDevIssuer :
         authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         parUsage = ParUsage.Required,
         supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
+        proofs = ProofsConfig.All,
     )
 
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_vc_sd_jwt")

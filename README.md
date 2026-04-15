@@ -598,6 +598,7 @@ data class OpenId4VCIConfig(
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     val supportedReuseMethods: Set<ReuseMethod> = emptySet(),
+    val proofs: ProofsConfig, 
 )
 ```
 
@@ -618,6 +619,7 @@ Options available:
   - `IssuerMetadataPolicy.PreferSigned`: presence of signed metadata is optional, if present values from signed metadata take precedence
   - `IssuerMetadataPolicy.IgnoreSigned`: signed metadata are ignored
 - supportedReuseMethods: A set of `ReuseMethod`s supported by the wallet for credential reuse. Defaults to `emptySet()`.
+- proofs: Proofs types supported by the Wallet. Wallet can choose whether to support non-device-bound attestations, and device-bound attestations alongside the supported proof types. 
 
 Trust between the Wallet and the Signer of the signed metadata advertised by the Credential Issuer is established using one of the following ways:
 - `IssuerTrust.ByPublicKey`: trusting the public key used to sign the metadata
