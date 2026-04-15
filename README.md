@@ -578,6 +578,7 @@ data class OpenId4VCIConfig(
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+    val proofs: ProofsConfig, 
 )
 ```
 
@@ -597,6 +598,7 @@ Options available:
   - `IssuerMetadataPolicy.RequireSigned`: require the presence of signed metadata and use only values from signed metadata
   - `IssuerMetadataPolicy.PreferSigned`: presence of signed metadata is optional, if present values from signed metadata take precedence
   - `IssuerMetadataPolicy.IgnoreSigned`: signed metadata are ignored
+- proofs: Proofs types supported by the Wallet. Wallet can choose whether to support non-device-bound attestations, and device-bound attestations alongside the supported proof types. 
 
 Trust between the Wallet and the Signer of the signed metadata advertised by the Credential Issuer is established using one of the following ways:
 - `IssuerTrust.ByPublicKey`: trusting the public key used to sign the metadata

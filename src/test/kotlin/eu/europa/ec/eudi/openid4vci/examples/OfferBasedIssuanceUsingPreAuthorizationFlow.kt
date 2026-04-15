@@ -28,6 +28,7 @@ fun main(): Unit = runBlocking {
         authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
         encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
         dPoPUsage = DPoPUsage.Never,
+        proofs = ProofsConfig.All,
     )
     val credentialOfferUrl =
         "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Ftrial.authlete.net" +
