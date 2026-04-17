@@ -49,8 +49,7 @@ typealias ClientAttestation = Pair<ClientAttestationJWT, ClientAttestationPoPJWT
  * be used by the instance for client authentication
  */
 @ConsistentCopyVisibility
-data class ClientAttestationJWT private constructor(val jwt: SignedJWT) {
-    val claimsSet: ClientAttestationJWTClaims by lazy { jwt.jwtClaimsSet.decodeAs<ClientAttestationJWTClaims>().getOrThrow() }
+data class ClientAttestationJWT private constructor(val jwt: SignedJWT, val claimsSet: ClientAttestationJWTClaims) {
     val clientId: ClientId get() = claimsSet.subject.value
     val cnf: ConfirmationClaim get() = claimsSet.confirmation
     val publicKey: JWK get() = cnf.jwk
@@ -60,8 +59,8 @@ data class ClientAttestationJWT private constructor(val jwt: SignedJWT) {
             jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
             jwt.ensureSignedOrVerified()
             jwt.ensureSignedWithAllowedAlgorithm()
-            jwt.ensureValidClaimsSet<ClientAttestationJWTClaims>()
-            return ClientAttestationJWT(jwt)
+            val claimsSet = jwt.ensureValidClaimsSet<ClientAttestationJWTClaims>()
+            return ClientAttestationJWT(jwt, claimsSet)
         }
     }
 }
