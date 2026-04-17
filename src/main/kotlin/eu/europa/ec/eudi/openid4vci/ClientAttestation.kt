@@ -52,7 +52,7 @@ typealias ClientAttestation = Pair<ClientAttestationJWT, ClientAttestationPoPJWT
 data class ClientAttestationJWT private constructor(val jwt: SignedJWT) {
     val claimsSet: ClientAttestationJWTClaims by lazy { jwt.jwtClaimsSet.decodeAs<ClientAttestationJWTClaims>().getOrThrow() }
     val clientId: ClientId get() = claimsSet.subject.value
-    val cnf: Confirmation get() = claimsSet.confirmation
+    val cnf: ConfirmationClaim get() = claimsSet.confirmation
     val publicKey: JWK get() = cnf.jwk
 
     companion object {
@@ -71,10 +71,16 @@ data class ClientAttestationJWTClaims(
     @Required @SerialName(RFC7519.ISSUER) val issuer: NonBlankString,
     @Required @SerialName(RFC7519.SUBJECT) val subject: NonBlankString,
     @Required @SerialName(RFC7519.EXPIRATION_TIME) @Serializable(with = NumericInstantSerializer::class) val expirationTime: Instant,
-    @Required @SerialName(RFC7800.CONFIRMATION) val confirmation: Confirmation,
+    @Required @SerialName(RFC7800.CONFIRMATION) val confirmation: ConfirmationClaim,
     @SerialName(RFC7519.ISSUED_AT) @Serializable(with = NumericInstantSerializer::class) val issuedAt: Instant? = null,
     @SerialName(RFC7519.NOT_BEFORE) @Serializable(with = NumericInstantSerializer::class) val notBefore: Instant? = null,
-    @Required @SerialName(TS3.EUDI_WALLET_INFO) val eudiWalletInfo: EudiWalletInfo,
+    @Required @SerialName(OpenId4VCISpec.WALLET_ATTESTATION_WALLET_NAME) val walletName: NonBlankString,
+    @SerialName(OpenId4VCISpec.WALLET_ATTESTATION_WALLET_LINK) val walletLink: NonBlankString? = null,
+    @SerialName(TokenStatusListSpec.STATUS) val status: StatusClaim? = null,
+    @Required @SerialName(TS3.WALLET_VERSION) val walletVersion: NonBlankString,
+    @Required @SerialName(TS3.WALLET_SOLUTION_CERTIFICATION_INFORMATION) val walletSolutionCertificationInformation:
+        WalletSolutionCertificationInformation,
+    @Required @SerialName(TS3.CLIENT_STATUS) val clientStatus: ClientStatusClaim,
 )
 
 @Serializable
@@ -88,7 +94,7 @@ value class NonBlankString(val value: String) {
 }
 
 @Serializable
-data class Confirmation(
+data class ConfirmationClaim(
     @Required @SerialName(RFC7800.JWK) @Serializable(with = JWKJsonObjectSerializer::class) val jwk: JWK,
 ) {
     init {
@@ -97,17 +103,14 @@ data class Confirmation(
 }
 
 @Serializable
-data class EudiWalletInfo(
-    @Required @SerialName(TS3.GENERAL_INFO) val generalInfo: GeneralInfo,
+data class StatusClaim(
+    @Required @SerialName(TokenStatusListSpec.STATUS_LIST) val statusList: StatusListTokenClaim,
 )
 
 @Serializable
-data class GeneralInfo(
-    @Required @SerialName(TS3.WALLET_PROVIDER_NAME) val walletProviderName: NonBlankString,
-    @Required @SerialName(TS3.WALLET_SOLUTION_ID) val walletSolutionId: NonBlankString,
-    @Required @SerialName(TS3.WALLET_SOLUTION_VERSION) val walletSolutionVersion: NonBlankString,
-    @Required @SerialName(TS3.WALLET_SOLUTION_CERTIFICATION_INFORMATION) val walletSolutionCertificationInformation:
-        WalletSolutionCertificationInformation,
+data class StatusListTokenClaim(
+    @Required @SerialName(TokenStatusListSpec.INDEX) val index: UInt,
+    @Required @SerialName(TokenStatusListSpec.URI) val uri: NonBlankString,
 )
 
 @Serializable
@@ -121,6 +124,12 @@ value class WalletSolutionCertificationInformation(val value: JsonElement) {
 
     override fun toString(): String = value.toString()
 }
+
+@Serializable
+data class ClientStatusClaim(
+    @Required @SerialName(TokenStatusListSpec.STATUS) val status: StatusClaim,
+    @Required @SerialName(RFC7519.EXPIRATION_TIME) @Serializable(with = NumericInstantSerializer::class) val expiresAt: Instant,
+)
 
 /**
  * Qualification of a JWT that adheres to client attestation PoP JWT

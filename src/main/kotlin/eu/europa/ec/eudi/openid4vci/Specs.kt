@@ -37,6 +37,9 @@ object OpenId4VCISpec {
     const val CREDENTIAL_ISSUER_WELL_KNOWN_PATH = "/.well-known/openid-credential-issuer"
 
     const val SIGNED_METADATA_JWT_TYPE = "openidvci-issuer-metadata+jwt"
+
+    const val WALLET_ATTESTATION_WALLET_NAME: String = "wallet_name"
+    const val WALLET_ATTESTATION_WALLET_LINK: String = "wallet_link"
 }
 
 /**
@@ -116,12 +119,9 @@ object TS3 {
     val WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS: Set<JWSAlgorithm> =
         setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
 
-    const val EUDI_WALLET_INFO: String = "eudi_wallet_info"
-    const val GENERAL_INFO: String = "general_info"
-    const val WALLET_PROVIDER_NAME: String = "wallet_provider_name"
-    const val WALLET_SOLUTION_ID: String = "wallet_solution_id"
-    const val WALLET_SOLUTION_VERSION: String = "wallet_solution_version"
+    const val WALLET_VERSION: String = "wallet_version"
     const val WALLET_SOLUTION_CERTIFICATION_INFORMATION: String = "wallet_solution_certification_information"
+    const val CLIENT_STATUS: String = "client_status"
 }
 
 /**
@@ -130,4 +130,14 @@ object TS3 {
 object RFC7800 {
     const val CONFIRMATION: String = "cnf"
     const val JWK: String = "jwk"
+}
+
+/**
+ * [Token Status List](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-status-list]
+ */
+object TokenStatusListSpec {
+    const val STATUS: String = "status"
+    const val STATUS_LIST: String = "status_list"
+    const val INDEX: String = "idx"
+    const val URI: String = "uri"
 }

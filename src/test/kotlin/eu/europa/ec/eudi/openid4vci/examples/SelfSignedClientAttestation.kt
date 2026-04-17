@@ -41,6 +41,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaDuration
 
@@ -69,18 +70,24 @@ internal fun selfSignedClient(
             issuer = NonBlankString(clientId),
             subject = NonBlankString(clientId),
             expirationTime = exp,
-            confirmation = Confirmation(jwk = walletInstanceKey.toPublicJWK()),
+            confirmation = ConfirmationClaim(jwk = walletInstanceKey.toPublicJWK()),
             issuedAt = now,
             notBefore = now,
-            eudiWalletInfo = EudiWalletInfo(
-                generalInfo = GeneralInfo(
-                    walletProviderName = NonBlankString("ARF"),
-                    walletSolutionId = NonBlankString("EUDIW"),
-                    walletSolutionVersion = NonBlankString("0.0.1"),
-                    walletSolutionCertificationInformation = WalletSolutionCertificationInformation(
-                        JsonPrimitive("https://github.com/eu-digital-identity-wallet/eudi-doc-architecture-and-reference-framework"),
+            walletName = NonBlankString("SmartWallet-mobile"),
+            walletLink = NonBlankString("https://example.org/wallets/SmartWallet-mobile/info"),
+            status = null,
+            walletVersion = NonBlankString("1.0.1"),
+            walletSolutionCertificationInformation = WalletSolutionCertificationInformation(
+                JsonPrimitive("https://example.org/certification/SmartWalletMobile/1-0-1/"),
+            ),
+            clientStatus = ClientStatusClaim(
+                status = StatusClaim(
+                    statusList = StatusListTokenClaim(
+                        index = 1337u,
+                        uri = NonBlankString("https://revocation_url/wia-statuslists/42"),
                     ),
                 ),
+                expiresAt = now + 90.days.toJavaDuration(),
             ),
         )
         val builder = ClientAttestationJwtBuilder(algorithm, signer, claims, headerCustomization)
