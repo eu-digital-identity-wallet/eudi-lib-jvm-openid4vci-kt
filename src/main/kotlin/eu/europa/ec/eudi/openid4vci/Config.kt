@@ -85,7 +85,7 @@ data class OpenId4VCIConfig(
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
-    val supportedCredentialReusePolicies: Set<SupportedReusePolicy> = emptySet(),
+    val supportedCredentialReusePolicies: Set<EudiReusePolicyType> = emptySet(),
 ) {
 
     /**
@@ -153,7 +153,7 @@ data class OpenId4VCIConfig(
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
-        supportedCredentialReusePolicies: Set<SupportedReusePolicy> = emptySet(),
+        supportedCredentialReusePolicies: Set<EudiReusePolicyType> = emptySet(),
     ) : this(
         ClientAuthentication.None(clientId),
         authFlowRedirectionURI,

@@ -39,9 +39,7 @@ internal object PidDevIssuer :
         authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         dPoPUsage = DPoPUsage.Required(CryptoGenerator.ecSigner()),
         parUsage = ParUsage.Required,
-        supportedCredentialReusePolicies = setOf(
-            SupportedReusePolicy.ArfAnnex2ReusePolicy(setOf(ArfAnnex2ReuseMethod.ONCE_ONLY)),
-        ),
+        supportedCredentialReusePolicies = setOf(EudiReusePolicyType.ONCE_ONLY),
     )
 
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_vc_sd_jwt")

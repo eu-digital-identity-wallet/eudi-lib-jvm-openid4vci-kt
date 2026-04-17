@@ -116,3 +116,14 @@ object TS3 {
     val WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS: Set<JWSAlgorithm> =
         setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
 }
+
+object ETSI4723 {
+    const val REUSE_POLICY_ARF_ANNEX_II = "arf_annex_ii"
+    const val CREDENTIAL_REUSE_POLICY = "credential_reuse_policy"
+    const val CREDENTIAL_REUSE_POLICY_ID = "id"
+    const val CREDENTIAL_REUSE_POLICY_OPTIONS = "options"
+    const val REUSE_POLICY_OPTION_DETAILS = "details"
+    const val REUSE_POLICY_OPTION_BATCH_SIZE = "batch_size"
+    const val REUSE_POLICY_OPTION_TRIGGER_UNUSED = "reissue_trigger_unused"
+    const val REUSE_POLICY_OPTION_TRIGGER_LIFETIME = "reissue_trigger_lifetime_left"
+}

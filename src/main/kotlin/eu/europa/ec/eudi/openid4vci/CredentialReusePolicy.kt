@@ -17,7 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import java.io.Serializable
 
-enum class ArfAnnex2ReuseMethod {
+enum class EudiReusePolicyType {
     ONCE_ONLY,
     LIMITED_TIME,
     ROTATING_BATCH,
@@ -33,21 +33,16 @@ enum class ArfAnnex2ReuseMethod {
         }
 
     companion object {
-        fun fromJsonValue(value: String): ArfAnnex2ReuseMethod =
+        fun fromJsonValue(value: String): EudiReusePolicyType =
             entries.firstOrNull { it.jsonValue == value }
                 ?: throw IllegalArgumentException("Unsupported arf_annex_ii reuse method: $value")
     }
 }
 
 /**
- * A single option in the reuse policy.
- */
-sealed interface ReusePolicyOption : Serializable
-
-/**
  * A single ARF Annex II option in the reuse policy.
  */
-sealed interface ArfAnnex2ReusePolicyOption : ReusePolicyOption {
+sealed interface EudiReusePolicy {
 
     val batchSize: Int?
     val reissueTriggerUnused: Int?
@@ -56,34 +51,34 @@ sealed interface ArfAnnex2ReusePolicyOption : ReusePolicyOption {
     /**
      * Checks if the client supports this reuse policy option.
      */
-    fun isSupported(supportedReuseMethods: Set<ArfAnnex2ReuseMethod>): Boolean
+    fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>): Boolean
 
     data class OnceOnly(
         override val batchSize: Int,
         override val reissueTriggerUnused: Int,
-    ) : ArfAnnex2ReusePolicyOption {
+    ) : EudiReusePolicy {
 
         init {
             validateBatchSize(batchSize)
             validateReissueTriggerUnused(reissueTriggerUnused, batchSize)
         }
 
-        override fun isSupported(supportedReuseMethods: Set<ArfAnnex2ReuseMethod>): Boolean =
-            supportedReuseMethods.contains(ArfAnnex2ReuseMethod.ONCE_ONLY)
+        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>): Boolean =
+            supportedReusePolicies.contains(EudiReusePolicyType.ONCE_ONLY)
 
         override val reissueTriggerLifetimeLeft: Long? = null
     }
 
     data class LimitedTime(
         override val reissueTriggerLifetimeLeft: Long,
-    ) : ArfAnnex2ReusePolicyOption {
+    ) : EudiReusePolicy {
 
         init {
             validateReissueTriggerLifetimeLeft(reissueTriggerLifetimeLeft)
         }
 
-        override fun isSupported(supportedReuseMethods: Set<ArfAnnex2ReuseMethod>): Boolean =
-            supportedReuseMethods.contains(ArfAnnex2ReuseMethod.LIMITED_TIME)
+        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>): Boolean =
+            supportedReusePolicies.contains(EudiReusePolicyType.LIMITED_TIME)
 
         override val reissueTriggerUnused: Int? = null
         override val batchSize: Int? = null
@@ -92,7 +87,7 @@ sealed interface ArfAnnex2ReusePolicyOption : ReusePolicyOption {
     data class RotatingBatch(
         override val batchSize: Int,
         override val reissueTriggerLifetimeLeft: Long,
-    ) : ArfAnnex2ReusePolicyOption {
+    ) : EudiReusePolicy {
 
         init {
             validateBatchSize(batchSize)
@@ -101,15 +96,15 @@ sealed interface ArfAnnex2ReusePolicyOption : ReusePolicyOption {
 
         override val reissueTriggerUnused: Int? = null
 
-        override fun isSupported(supportedReuseMethods: Set<ArfAnnex2ReuseMethod>): Boolean =
-            supportedReuseMethods.contains(ArfAnnex2ReuseMethod.ROTATING_BATCH)
+        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>): Boolean =
+            supportedReusePolicies.contains(EudiReusePolicyType.ROTATING_BATCH)
     }
 
     data class PerRelyingParty(
         override val batchSize: Int,
         override val reissueTriggerLifetimeLeft: Long,
         override val reissueTriggerUnused: Int,
-    ) : ArfAnnex2ReusePolicyOption {
+    ) : EudiReusePolicy {
 
         init {
             validateBatchSize(batchSize)
@@ -117,17 +112,17 @@ sealed interface ArfAnnex2ReusePolicyOption : ReusePolicyOption {
             validateReissueTriggerUnused(reissueTriggerUnused, batchSize)
         }
 
-        override fun isSupported(supportedReuseMethods: Set<ArfAnnex2ReuseMethod>): Boolean =
-            supportedReuseMethods.contains(ArfAnnex2ReuseMethod.PER_RELYING_PARTY)
+        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>): Boolean =
+            supportedReusePolicies.contains(EudiReusePolicyType.PER_RELYING_PARTY)
     }
 
     companion object {
         fun fromDetails(
-            details: List<ArfAnnex2ReuseMethod>,
+            details: List<EudiReusePolicyType>,
             batchSize: Int? = null,
             reissueTriggerUnused: Int? = null,
             reissueTriggerLifetimeLeft: Long? = null,
-        ): List<ArfAnnex2ReusePolicyOption> {
+        ): List<EudiReusePolicy> {
             val normalizedDetails = details.distinct()
 
             require(normalizedDetails.isNotEmpty()) { "details must not be empty" }
@@ -138,7 +133,7 @@ sealed interface ArfAnnex2ReusePolicyOption : ReusePolicyOption {
 
             return normalizedDetails.map { detail ->
                 when (detail) {
-                    ArfAnnex2ReuseMethod.ONCE_ONLY -> OnceOnly(
+                    EudiReusePolicyType.ONCE_ONLY -> OnceOnly(
                         batchSize = requireNotNull(batchSize) {
                             "batch_size is required when details contains once_only, rotating-batch, or per-relying-party"
                         },
@@ -147,14 +142,14 @@ sealed interface ArfAnnex2ReusePolicyOption : ReusePolicyOption {
                         },
                     )
 
-                    ArfAnnex2ReuseMethod.LIMITED_TIME -> LimitedTime(
+                    EudiReusePolicyType.LIMITED_TIME -> LimitedTime(
                         reissueTriggerLifetimeLeft = requireNotNull(reissueTriggerLifetimeLeft) {
                             "reissue_trigger_lifetime_left is required when details contains limited_time, " +
                                 "rotating-batch, or per-relying-party"
                         },
                     )
 
-                    ArfAnnex2ReuseMethod.ROTATING_BATCH -> RotatingBatch(
+                    EudiReusePolicyType.ROTATING_BATCH -> RotatingBatch(
                         batchSize = requireNotNull(batchSize) {
                             "batch_size is required when details contains once_only, rotating-batch, or per-relying-party"
                         },
@@ -164,7 +159,7 @@ sealed interface ArfAnnex2ReusePolicyOption : ReusePolicyOption {
                         },
                     )
 
-                    ArfAnnex2ReuseMethod.PER_RELYING_PARTY -> PerRelyingParty(
+                    EudiReusePolicyType.PER_RELYING_PARTY -> PerRelyingParty(
                         batchSize = requireNotNull(batchSize) {
                             "batch_size is required when details contains once_only, " +
                                 "rotating-batch, or per-relying-party"
@@ -181,9 +176,9 @@ sealed interface ArfAnnex2ReusePolicyOption : ReusePolicyOption {
             }
         }
 
-        private fun validateBaseMethodCombination(details: List<ArfAnnex2ReuseMethod>) {
-            val hasOnceOnly = ArfAnnex2ReuseMethod.ONCE_ONLY in details
-            val hasLimitedTime = ArfAnnex2ReuseMethod.LIMITED_TIME in details
+        private fun validateBaseMethodCombination(details: List<EudiReusePolicyType>) {
+            val hasOnceOnly = EudiReusePolicyType.ONCE_ONLY in details
+            val hasLimitedTime = EudiReusePolicyType.LIMITED_TIME in details
 
             require(hasOnceOnly.xor(hasLimitedTime)) {
                 "details must contain exactly one base method: once_only or limited_time"
@@ -206,41 +201,16 @@ sealed interface ArfAnnex2ReusePolicyOption : ReusePolicyOption {
 }
 
 /**
- * Sealed hierarchy representing the reuse policies supported by the wallet.
- */
-sealed interface SupportedReusePolicy : Serializable {
-
-    /**
-     * The wallet supports ARF Annex II reuse policy with specific reuse methods.
-     *
-     * @param supportedReuseMethods the reuse methods supported by the wallet
-     */
-    data class ArfAnnex2ReusePolicy(
-        val supportedReuseMethods: Set<ArfAnnex2ReuseMethod>,
-    ) : SupportedReusePolicy {
-        init {
-            require(supportedReuseMethods.isNotEmpty()) { "supportedReuseMethods must not be empty" }
-        }
-    }
-}
-
-/**
  * Credential reuse policy as it may appear in the credential metadata of a credential configuration.
  *
  */
 sealed interface CredentialReusePolicy : Serializable {
 
     /**
-     * Returns the effective batch size for this reuse policy, if the policy dictates batch issuance.
-     */
-    fun effectiveBatchSize(supportedReusePolicies: Set<SupportedReusePolicy>): Int?
-
-    /**
      * No reuse policy is defined.
      */
     data object None : CredentialReusePolicy {
         private fun readResolve(): Any = None
-        override fun effectiveBatchSize(supportedReusePolicies: Set<SupportedReusePolicy>): Int? = null
     }
 
     /**
@@ -248,8 +218,8 @@ sealed interface CredentialReusePolicy : Serializable {
      *
      * @param options extra details about the specific reuse policy
      */
-    data class ArfAnnex2ReusePolicy(
-        val options: List<ArfAnnex2ReusePolicyOption>,
+    data class EUDI(
+        val options: List<EudiReusePolicy>,
     ) : CredentialReusePolicy {
 
         init {
@@ -257,27 +227,13 @@ sealed interface CredentialReusePolicy : Serializable {
             validateNoOverlappingDetails(options)
         }
 
-        /**
-         * For ARF Annex II, returns the batch_size from the first option that is supported and has it.
-         */
-        override fun effectiveBatchSize(supportedReusePolicies: Set<SupportedReusePolicy>): Int? {
-            val supportedMethods = supportedReusePolicies
-                .filterIsInstance<SupportedReusePolicy.ArfAnnex2ReusePolicy>()
-                .flatMap { it.supportedReuseMethods }
-                .toSet()
-            return options
-                .filter { it.isSupported(supportedMethods) }
-                .firstNotNullOfOrNull { it.batchSize }
-        }
-
         companion object {
-            const val ID = "arf_annex_ii"
 
-            private fun validateNoOverlappingDetails(options: List<ArfAnnex2ReusePolicyOption>) {
+            private fun validateNoOverlappingDetails(options: List<EudiReusePolicy>) {
                 if (options.size <= 1) return
                 val optionTypes = options.map { it::class }
                 require(optionTypes.size == optionTypes.toSet().size) {
-                    "When multiple policy options are defined, each ArfAnnex2ReusePolicyOption type must be unique"
+                    "When multiple policy options are defined, each option type must be unique"
                 }
             }
         }

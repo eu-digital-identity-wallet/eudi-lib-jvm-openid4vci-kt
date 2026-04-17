@@ -62,14 +62,14 @@ private sealed interface CredentialSupportedTO {
 
 @Serializable
 private data class ArfAnnex2CredentialReusePolicyOptionTO(
-    @SerialName("details") @Required val details: List<String>,
-    @SerialName("batch_size") val batchSize: Int? = null,
-    @SerialName("reissue_trigger_unused") val reissueTriggerUnused: Int? = null,
-    @SerialName("reissue_trigger_lifetime_left") val reissueTriggerLifetimeLeft: Long? = null,
+    @SerialName(ETSI4723.REUSE_POLICY_OPTION_DETAILS) @Required val details: List<String>,
+    @SerialName(ETSI4723.REUSE_POLICY_OPTION_BATCH_SIZE) val batchSize: Int? = null,
+    @SerialName(ETSI4723.REUSE_POLICY_OPTION_TRIGGER_UNUSED) val reissueTriggerUnused: Int? = null,
+    @SerialName(ETSI4723.REUSE_POLICY_OPTION_TRIGGER_LIFETIME) val reissueTriggerLifetimeLeft: Long? = null,
 ) {
-    fun toDomain(): List<ArfAnnex2ReusePolicyOption> =
-        ArfAnnex2ReusePolicyOption.fromDetails(
-            details = details.map { ArfAnnex2ReuseMethod.fromJsonValue(it) },
+    fun toDomain(): List<EudiReusePolicy> =
+        EudiReusePolicy.fromDetails(
+            details = details.map { EudiReusePolicyType.fromJsonValue(it) },
             batchSize = batchSize,
             reissueTriggerUnused = reissueTriggerUnused,
             reissueTriggerLifetimeLeft = reissueTriggerLifetimeLeft,
@@ -78,16 +78,16 @@ private data class ArfAnnex2CredentialReusePolicyOptionTO(
 
 @Serializable
 private data class CredentialReusePolicyTO(
-    @SerialName("id") @Required val id: String,
-    @SerialName("options") val options: List<JsonElement>? = null,
+    @SerialName(ETSI4723.CREDENTIAL_REUSE_POLICY_ID) @Required val id: String,
+    @SerialName(ETSI4723.CREDENTIAL_REUSE_POLICY_OPTIONS) val options: List<JsonElement>? = null,
 ) {
     fun toDomain(): CredentialReusePolicy =
         when (id) {
-            CredentialReusePolicy.ArfAnnex2ReusePolicy.ID -> {
+            ETSI4723.REUSE_POLICY_ARF_ANNEX_II -> {
                 val parsed = options?.flatMap {
                     JsonSupport.decodeFromJsonElement<ArfAnnex2CredentialReusePolicyOptionTO>(it).toDomain()
                 }.orEmpty()
-                CredentialReusePolicy.ArfAnnex2ReusePolicy(parsed)
+                CredentialReusePolicy.EUDI(parsed)
             }
             else -> CredentialReusePolicy.None
         }
@@ -98,7 +98,7 @@ private data class CredentialMetadataTO(
     @SerialName("display") val display: List<CredentialSupportedDisplayTO>? = null,
     @SerialName("claims") val claims: List<ClaimTO>? = null,
     @Serializable(with = KeepKnownReusePolicies::class)
-    @SerialName("credential_reuse_policy") val credentialReusePolicy: CredentialReusePolicyTO? = null,
+    @SerialName(ETSI4723.CREDENTIAL_REUSE_POLICY) val credentialReusePolicy: CredentialReusePolicyTO? = null,
 ) {
     fun toDomain(): CredentialMetadata {
         val display = display?.map { it.toDomain() }.orEmpty()
@@ -117,10 +117,7 @@ private object KeepKnownReusePolicies : JsonTransformingSerializer<CredentialReu
         else buildJsonObject { put("id", "unknown") }
     }
 
-    private val knownPolicies =
-        setOf(
-            CredentialReusePolicy.ArfAnnex2ReusePolicy.ID,
-        )
+    private val knownPolicies = setOf(ETSI4723.REUSE_POLICY_ARF_ANNEX_II)
 
     private fun JsonElement.isKnown(): Boolean =
         when (this) {
