@@ -18,7 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.jwk.JWK
-import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessToken
+import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessTokenImpl
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
 import io.ktor.client.*
@@ -105,9 +105,9 @@ data class DeferredIssuanceContext(
  *
  * The [DeferredIssuanceContext] can be obtained by [Issuer.deferredContext]
  *
- * Finally, [DeferredIssuer] supports transparent refresh of access token
+ * Finally, [DeferredIssuer] provides the [RefreshAccessToken] capability and, supports transparent refresh of access token
  */
-interface DeferredIssuer : QueryForDeferredCredential {
+interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
 
     companion object {
 
@@ -183,7 +183,7 @@ interface DeferredIssuer : QueryForDeferredCredential {
                 httpClient,
             )
 
-            val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
+            val refreshAccessToken = RefreshAccessTokenImpl(config.clock, tokenEndpointClient)
 
             val deferredEndPointClient = DeferredEndPointClient(
                 CredentialIssuerEndpoint.invoke(config.deferredEndpoint.toString()).getOrThrow(),
@@ -213,6 +213,7 @@ interface DeferredIssuer : QueryForDeferredCredential {
                 )
             object :
                 DeferredIssuer,
+                RefreshAccessToken by refreshAccessToken,
                 QueryForDeferredCredential by queryForDeferredCredential {}
         }
     }

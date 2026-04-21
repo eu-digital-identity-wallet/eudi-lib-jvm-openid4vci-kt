@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.IssuerDoesNotSupportDeferredIssuance
-import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessToken
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
 import kotlin.time.Duration
 

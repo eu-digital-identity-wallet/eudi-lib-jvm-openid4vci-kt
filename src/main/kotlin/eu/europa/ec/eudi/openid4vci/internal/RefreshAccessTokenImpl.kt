@@ -16,23 +16,30 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest
+import eu.europa.ec.eudi.openid4vci.RefreshAccessToken
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
 import eu.europa.ec.eudi.openid4vci.runCatchingCancellable
 import java.time.Clock
 
-internal class RefreshAccessToken(
+internal class RefreshAccessTokenImpl(
     private val clock: Clock,
     private val tokenEndpointClient: TokenEndpointClient,
-) {
+) : RefreshAccessToken {
 
-    suspend fun AuthorizedRequest.refreshIfNeeded(): Result<AuthorizedRequest> = runCatchingCancellable {
-        val at = clock.instant()
-        when {
-            !isAccessTokenExpired(at) -> this
-            refreshToken == null -> error("Refresh token was not provided")
-            else -> refresh(this)
+    override suspend fun AuthorizedRequest.refresh(): Result<AuthorizedRequest> =
+        runCatchingCancellable {
+            refresh(this)
         }
-    }
+
+    override suspend fun AuthorizedRequest.refreshIfNeeded(): Result<AuthorizedRequest> =
+        runCatchingCancellable {
+            val at = clock.instant()
+            when {
+                !isAccessTokenExpired(at) -> this
+                refreshToken == null -> error("Refresh token was not provided")
+                else -> refresh(this)
+            }
+        }
 
     private suspend fun refresh(authorizedRequest: AuthorizedRequest): AuthorizedRequest {
         val refreshToken = requireNotNull(authorizedRequest.refreshToken)
