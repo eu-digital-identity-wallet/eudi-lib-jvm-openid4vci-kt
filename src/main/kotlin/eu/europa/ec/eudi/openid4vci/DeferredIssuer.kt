@@ -107,6 +107,7 @@ data class DeferredIssuanceContext(
  *
  * Finally, [DeferredIssuer] provides the [RefreshAccessToken] capability and, supports transparent refresh of access token
  */
+@Deprecated("Use Issuer instead")
 interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
 
     companion object {
