@@ -318,6 +318,39 @@ val authorizedRequest =
 > reduce the scope of the `access_token` by passing `authorization_details` to the token endpoint.
 > Function `authorizeWithPreAuthorizationCode` supports this via parameter `authDetailsOption: AccessTokenOption`
 
+### Refresh Access Token
+
+A Wallet/Caller can refresh the `AccessToken` of an `AuthorizedRequest` using a `refresh_token` grant.
+
+Prerequisites:
+1. Authorization Server supports `refresh_token` grant
+2. `AuthorizedRequest` contains a `RefreshAccessToken`
+
+#### Refresh Access Token if expired
+
+Library will perform a `refresh_token` grant, and return the updated `AuthorizedRequest`:
+
+```kotlin
+val authorizedRequest = // has been retrieved in a previous step
+
+val (updatedAuthorizedRequest) =  
+    with(issuer) {
+        authorizedRequest.refresh().getOrThrow()
+    }
+```
+
+#### Refresh Access Token if needed
+
+Library will perform a `refresh_token` grant in case `AuthorizedRequest` contains an expired `AccessToken`, and will return the updated `AuthorizedRequest`: 
+
+```kotlin
+val authorizedRequest = // has been retrieved in a previous step
+
+val (updatedAuthorizedRequest) =  
+    with(issuer) {
+        authorizedRequest.refreshIfNeeded().getOrThrow()
+    }
+```
 
 ### Place credential request
 
@@ -447,6 +480,7 @@ val (updatedAuthorizedRequest, outcome) =
     }    
 
 ```
+
 #### Query for deferred credentials next steps
 
 - Validate credential and store it. That's out of library scope, or
