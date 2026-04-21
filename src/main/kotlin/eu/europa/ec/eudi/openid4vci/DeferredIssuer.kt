@@ -183,7 +183,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                 httpClient,
             )
 
-            val refreshAccessToken = RefreshAccessTokenImpl(config.clock, tokenEndpointClient)
+            val refreshAccessToken = RefreshAccessTokenImpl(tokenEndpointClient)
 
             val deferredEndPointClient = DeferredEndPointClient(
                 CredentialIssuerEndpoint.invoke(config.deferredEndpoint.toString()).getOrThrow(),
@@ -207,6 +207,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
 
             val queryForDeferredCredential =
                 QueryForDeferredCredential(
+                    config.clock,
                     refreshAccessToken,
                     deferredEndPointClient,
                     issuanceEncryptionSpecs,

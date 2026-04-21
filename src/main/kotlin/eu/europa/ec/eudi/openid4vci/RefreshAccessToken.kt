@@ -24,10 +24,4 @@ interface RefreshAccessToken {
      * Performs a `refresh_token` grant against the Token Endpoint of the Authorization Server to fetch a new Access Token, and Refresh Token.
      */
     suspend fun AuthorizedRequest.refresh(): Result<AuthorizedRequest>
-
-    /**
-     * Performs a `refresh_token` grant against the Token Endpoint of the Authorization Server to fetch a new Access Token, and Refresh Token,
-     * in case the current Access Token is expired.
-     */
-    suspend fun AuthorizedRequest.refreshIfNeeded(): Result<AuthorizedRequest>
 }

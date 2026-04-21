@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.IssuerDoesNotSupportDeferredIssuance
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
+import java.time.Clock
 import kotlin.time.Duration
 
 sealed interface DeferredCredentialQueryOutcome : java.io.Serializable {
@@ -68,12 +69,14 @@ fun interface QueryForDeferredCredential {
          * Factory method that produces a [QueryForDeferredCredential]
          * that is capable of refreshing the access_token if needed, and if possible.
          *
+         * @param clock Wallet's clock
          * @param refreshAccessToken the ability to refresh the [AuthorizedRequest]
          * @param deferredEndPointClient client of the deferred endpoint
          * @param exchangeEncryptionSpecification encryption specifications for encrypted request and response
          * that has been sent to the credential issuer
          */
         internal operator fun invoke(
+            clock: Clock,
             refreshAccessToken: RefreshAccessToken,
             deferredEndPointClient: DeferredEndPointClient,
             exchangeEncryptionSpecification: ExchangeEncryptionSpecification,
@@ -87,10 +90,13 @@ fun interface QueryForDeferredCredential {
                 refreshed.withResourceServerDpopNonce(newResourceServerDpopNonce) to outcome
             }
 
-            private suspend fun refreshIfNeeded(authorizedRequest: AuthorizedRequest): AuthorizedRequest =
-                with(refreshAccessToken) {
-                    authorizedRequest.refreshIfNeeded().getOrThrow()
+            private suspend fun refreshIfNeeded(authorizedRequest: AuthorizedRequest): AuthorizedRequest {
+                val now = clock.instant()
+                return if (!authorizedRequest.isAccessTokenExpired(now)) authorizedRequest
+                else with(refreshAccessToken) {
+                    authorizedRequest.refresh().getOrThrow()
                 }
+            }
 
             private suspend fun placeDeferredCredentialRequest(
                 authorizedRequest: AuthorizedRequest,

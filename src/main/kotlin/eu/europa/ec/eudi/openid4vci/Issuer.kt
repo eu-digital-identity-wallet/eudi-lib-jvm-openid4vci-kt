@@ -185,7 +185,7 @@ interface Issuer :
                 )
             }
 
-            val refreshAccessToken = RefreshAccessTokenImpl(config.clock, tokenEndpointClient)
+            val refreshAccessToken = RefreshAccessTokenImpl(tokenEndpointClient)
 
             val queryForDeferredCredential =
                 when (val deferredEndpoint = credentialOffer.credentialIssuerMetadata.deferredCredentialEndpoint) {
@@ -193,7 +193,7 @@ interface Issuer :
                     else -> {
                         val deferredEndPointClient =
                             DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, httpClient)
-                        QueryForDeferredCredential(refreshAccessToken, deferredEndPointClient, issuanceEncryptionSpecs)
+                        QueryForDeferredCredential(config.clock, refreshAccessToken, deferredEndPointClient, issuanceEncryptionSpecs)
                     }
                 }
 

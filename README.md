@@ -326,8 +326,6 @@ Prerequisites:
 1. Authorization Server supports `refresh_token` grant
 2. `AuthorizedRequest` contains a `RefreshAccessToken`
 
-#### Refresh Access Token if expired
-
 Library will perform a `refresh_token` grant, and return the updated `AuthorizedRequest`:
 
 ```kotlin
@@ -336,19 +334,6 @@ val authorizedRequest = // has been retrieved in a previous step
 val (updatedAuthorizedRequest) =  
     with(issuer) {
         authorizedRequest.refresh().getOrThrow()
-    }
-```
-
-#### Refresh Access Token if needed
-
-Library will perform a `refresh_token` grant in case `AuthorizedRequest` contains an expired `AccessToken`, and will return the updated `AuthorizedRequest`: 
-
-```kotlin
-val authorizedRequest = // has been retrieved in a previous step
-
-val (updatedAuthorizedRequest) =  
-    with(issuer) {
-        authorizedRequest.refreshIfNeeded().getOrThrow()
     }
 ```
 

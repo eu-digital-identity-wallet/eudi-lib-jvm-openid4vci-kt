@@ -17,38 +17,22 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest
 import eu.europa.ec.eudi.openid4vci.RefreshAccessToken
+import eu.europa.ec.eudi.openid4vci.RefreshToken
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
 import eu.europa.ec.eudi.openid4vci.runCatchingCancellable
-import java.time.Clock
 
-internal class RefreshAccessTokenImpl(
-    private val clock: Clock,
-    private val tokenEndpointClient: TokenEndpointClient,
-) : RefreshAccessToken {
+internal class RefreshAccessTokenImpl(private val tokenEndpointClient: TokenEndpointClient) : RefreshAccessToken {
 
     override suspend fun AuthorizedRequest.refresh(): Result<AuthorizedRequest> =
         runCatchingCancellable {
-            refresh(this)
+            val refreshToken = checkNotNull<RefreshToken>(refreshToken) { "Refresh token was not provided" }
+            val (tokenResponse, newDpopNonce) =
+                tokenEndpointClient.refreshAccessToken(refreshToken, authorizationServerDpopNonce).getOrThrow()
+            withRefreshedAccessToken(
+                refreshedAccessToken = tokenResponse.accessToken,
+                newRefreshToken = tokenResponse.refreshToken,
+                at = tokenResponse.timestamp,
+                newAuthorizationServerDpopNonce = newDpopNonce,
+            )
         }
-
-    override suspend fun AuthorizedRequest.refreshIfNeeded(): Result<AuthorizedRequest> =
-        runCatchingCancellable {
-            val at = clock.instant()
-            when {
-                !isAccessTokenExpired(at) -> this
-                else -> refresh(this)
-            }
-        }
-
-    private suspend fun refresh(authorizedRequest: AuthorizedRequest): AuthorizedRequest {
-        val refreshToken = checkNotNull(authorizedRequest.refreshToken) { "Refresh token was not provided" }
-        val (tokenResponse, newDpopNonce) =
-            tokenEndpointClient.refreshAccessToken(refreshToken, authorizedRequest.authorizationServerDpopNonce).getOrThrow()
-        return authorizedRequest.withRefreshedAccessToken(
-            refreshedAccessToken = tokenResponse.accessToken,
-            newRefreshToken = tokenResponse.refreshToken,
-            at = tokenResponse.timestamp,
-            newAuthorizationServerDpopNonce = newDpopNonce,
-        )
-    }
 }

@@ -49,7 +49,7 @@ class RefreshAccessTokenImplTest {
     fun `fails when no refresh token is present`() = runTest {
         val engine = MockEngine { fail("no http calls were expected") }
         val tokenEndpointClient = tokenEndpointClient(HttpClient(engine))
-        val refreshAccessToken = RefreshAccessTokenImpl(clock, tokenEndpointClient)
+        val refreshAccessToken = RefreshAccessTokenImpl(tokenEndpointClient)
 
         val authorizedRequest = authorizedRequest(
             accessTokenIssuedAt = clock.instant(),
@@ -61,33 +61,10 @@ class RefreshAccessTokenImplTest {
             val exception = assertFailsWith<IllegalStateException> { authorizedRequest.refresh().getOrThrow() }
             assertEquals("Refresh token was not provided", exception.message)
         }
-
-        with(refreshAccessToken) {
-            val exception = assertFailsWith<IllegalStateException> { authorizedRequest.refreshIfNeeded().getOrThrow() }
-            assertEquals("Refresh token was not provided", exception.message)
-        }
     }
 
     @Test
-    fun `does not refresh when not needed`() = runTest {
-        val engine = MockEngine { fail("no http calls were expected") }
-        val tokenEndpointClient = tokenEndpointClient(HttpClient(engine))
-        val refreshAccessToken = RefreshAccessTokenImpl(clock, tokenEndpointClient)
-
-        val authorizedRequest = authorizedRequest(
-            accessTokenIssuedAt = clock.instant(),
-            accessTokenExpiresIn = 10.minutes.toJavaDuration(),
-            refreshToken = RefreshToken("Refresh"),
-        )
-
-        val refreshedAuthorizedRequest = with(refreshAccessToken) {
-            authorizedRequest.refreshIfNeeded().getOrThrow()
-        }
-        assertEquals(authorizedRequest, refreshedAuthorizedRequest)
-    }
-
-    @Test
-    fun `refreshes when manually forced`() = runTest {
+    fun `refreshes when manually invoked`() = runTest {
         val httpClient = mockedHttpClient(
             tokenPostMocker {
                 assertEquals(HttpMethod.Post, it.method)
@@ -97,7 +74,7 @@ class RefreshAccessTokenImplTest {
             },
         )
         val tokenEndpointClient = tokenEndpointClient(httpClient)
-        val refreshAccessToken = RefreshAccessTokenImpl(clock, tokenEndpointClient)
+        val refreshAccessToken = RefreshAccessTokenImpl(tokenEndpointClient)
 
         val authorizedRequest = authorizedRequest(
             accessTokenIssuedAt = clock.instant(),
@@ -107,33 +84,6 @@ class RefreshAccessTokenImplTest {
 
         val refreshedAuthorizedRequest = with(refreshAccessToken) {
             authorizedRequest.refresh().getOrThrow()
-        }
-        assertNotEquals(authorizedRequest, refreshedAuthorizedRequest)
-        assertNotEquals(authorizedRequest.accessToken, refreshedAuthorizedRequest.accessToken)
-        assertEquals(authorizedRequest.refreshToken, refreshedAuthorizedRequest.refreshToken)
-    }
-
-    @Test
-    fun `refreshes if needed`() = runTest {
-        val httpClient = mockedHttpClient(
-            tokenPostMocker {
-                assertEquals(HttpMethod.Post, it.method)
-                val formData = assertIs<FormDataContent>(it.body).formData
-                assertEquals("refresh_token", formData["grant_type"])
-                assertEquals("Refresh", formData["refresh_token"])
-            },
-        )
-        val tokenEndpointClient = tokenEndpointClient(httpClient)
-        val refreshAccessToken = RefreshAccessTokenImpl(clock, tokenEndpointClient)
-
-        val authorizedRequest = authorizedRequest(
-            accessTokenIssuedAt = clock.instant(),
-            accessTokenExpiresIn = 0.minutes.toJavaDuration(),
-            refreshToken = RefreshToken("Refresh"),
-        )
-
-        val refreshedAuthorizedRequest = with(refreshAccessToken) {
-            authorizedRequest.refreshIfNeeded().getOrThrow()
         }
         assertNotEquals(authorizedRequest, refreshedAuthorizedRequest)
         assertNotEquals(authorizedRequest.accessToken, refreshedAuthorizedRequest.accessToken)
