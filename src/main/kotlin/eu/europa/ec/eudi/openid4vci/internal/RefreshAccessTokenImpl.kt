@@ -36,13 +36,12 @@ internal class RefreshAccessTokenImpl(
             val at = clock.instant()
             when {
                 !isAccessTokenExpired(at) -> this
-                refreshToken == null -> error("Refresh token was not provided")
                 else -> refresh(this)
             }
         }
 
     private suspend fun refresh(authorizedRequest: AuthorizedRequest): AuthorizedRequest {
-        val refreshToken = requireNotNull(authorizedRequest.refreshToken)
+        val refreshToken = checkNotNull(authorizedRequest.refreshToken) { "Refresh token was not provided" }
         val (tokenResponse, newDpopNonce) =
             tokenEndpointClient.refreshAccessToken(refreshToken, authorizedRequest.authorizationServerDpopNonce).getOrThrow()
         return authorizedRequest.withRefreshedAccessToken(
