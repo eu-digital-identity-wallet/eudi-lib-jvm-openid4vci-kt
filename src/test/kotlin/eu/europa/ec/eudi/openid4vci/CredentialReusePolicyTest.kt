@@ -15,6 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.jwk.Curve
+import org.junit.jupiter.api.assertDoesNotThrow
+import java.net.URI
 import kotlin.test.*
 
 internal class CredentialReusePolicyTest {
@@ -75,7 +78,7 @@ internal class CredentialReusePolicyTest {
     fun `fails when rotating-batch is used without a base detail`() {
         assertFailsWith<IllegalArgumentException> {
             EudiReusePolicy.fromDetails(
-                details = listOf(EudiReusePolicyType.ROTATING_BATCH),
+                details = listOf(EudiReusePolicyType.RotatingBatch),
                 batchSize = 10,
                 reissueTriggerLifetimeLeft = 100,
             )
@@ -86,7 +89,7 @@ internal class CredentialReusePolicyTest {
     fun `fails when per-relying-party is used without a base detail`() {
         assertFailsWith<IllegalArgumentException> {
             EudiReusePolicy.fromDetails(
-                details = listOf(EudiReusePolicyType.PER_RELYING_PARTY),
+                details = listOf(EudiReusePolicyType.PerRelyingParty),
                 batchSize = 10,
                 reissueTriggerUnused = 2,
                 reissueTriggerLifetimeLeft = 100,
@@ -98,7 +101,7 @@ internal class CredentialReusePolicyTest {
     fun `fails when details contains both once_only and limited_time`() {
         assertFailsWith<IllegalArgumentException> {
             EudiReusePolicy.fromDetails(
-                details = listOf(EudiReusePolicyType.ONCE_ONLY, EudiReusePolicyType.LIMITED_TIME),
+                details = listOf(EudiReusePolicyType.OnceOnly, EudiReusePolicyType.LimitedTime),
                 batchSize = 10,
                 reissueTriggerUnused = 2,
                 reissueTriggerLifetimeLeft = 100,
@@ -110,7 +113,7 @@ internal class CredentialReusePolicyTest {
     fun `fails when once_only is missing batch_size`() {
         assertFailsWith<IllegalArgumentException> {
             EudiReusePolicy.fromDetails(
-                details = listOf(EudiReusePolicyType.ONCE_ONLY),
+                details = listOf(EudiReusePolicyType.OnceOnly),
                 reissueTriggerUnused = 2,
             )
         }
@@ -120,7 +123,7 @@ internal class CredentialReusePolicyTest {
     fun `fails when once_only is missing reissue_trigger_unused`() {
         assertFailsWith<IllegalArgumentException> {
             EudiReusePolicy.fromDetails(
-                details = listOf(EudiReusePolicyType.ONCE_ONLY),
+                details = listOf(EudiReusePolicyType.OnceOnly),
                 batchSize = 10,
             )
         }
@@ -140,7 +143,7 @@ internal class CredentialReusePolicyTest {
     fun `fails when limited_time is missing reissue_trigger_lifetime_left`() {
         assertFailsWith<IllegalArgumentException> {
             EudiReusePolicy.fromDetails(
-                details = listOf(EudiReusePolicyType.LIMITED_TIME),
+                details = listOf(EudiReusePolicyType.LimitedTime),
             )
         }
     }
@@ -149,7 +152,7 @@ internal class CredentialReusePolicyTest {
     fun `fails when rotating-batch is missing batch_size`() {
         assertFailsWith<IllegalArgumentException> {
             EudiReusePolicy.fromDetails(
-                details = listOf(EudiReusePolicyType.LIMITED_TIME, EudiReusePolicyType.ROTATING_BATCH),
+                details = listOf(EudiReusePolicyType.LimitedTime, EudiReusePolicyType.RotatingBatch),
                 reissueTriggerLifetimeLeft = 100,
             )
         }
@@ -159,9 +162,9 @@ internal class CredentialReusePolicyTest {
     fun `fromDetails returns one option per detail entry`() {
         val options = EudiReusePolicy.fromDetails(
             details = listOf(
-                EudiReusePolicyType.LIMITED_TIME,
-                EudiReusePolicyType.ROTATING_BATCH,
-                EudiReusePolicyType.PER_RELYING_PARTY,
+                EudiReusePolicyType.LimitedTime,
+                EudiReusePolicyType.RotatingBatch,
+                EudiReusePolicyType.PerRelyingParty,
             ),
             batchSize = 5,
             reissueTriggerLifetimeLeft = 655433,
@@ -180,8 +183,8 @@ internal class CredentialReusePolicyTest {
     fun `fromDetails returns once_only and per_relying_party options for combined details`() {
         val options = EudiReusePolicy.fromDetails(
             details = listOf(
-                EudiReusePolicyType.ONCE_ONLY,
-                EudiReusePolicyType.PER_RELYING_PARTY,
+                EudiReusePolicyType.OnceOnly,
+                EudiReusePolicyType.PerRelyingParty,
             ),
             batchSize = 10,
             reissueTriggerUnused = 3,
@@ -206,7 +209,7 @@ internal class CredentialReusePolicyTest {
     @Test
     fun `CredentialReusePolicy None has no effective batch size`() {
         val policy = CredentialReusePolicy.None
-        assertNull(policy.effectiveBatchSize(EudiReusePolicyType.entries.toSet()))
+        // There is no effectiveBatchSize in None
     }
 
     @Test
@@ -259,13 +262,13 @@ internal class CredentialReusePolicyTest {
             ),
         )
         // If ROTATING_BATCH is not supported, it should pick the second one
-        assertEquals(10, policy.effectiveBatchSize(setOf(EudiReusePolicyType.ONCE_ONLY)))
+        assertEquals(10, policy.effectiveBatchSize(setOf(EudiReusePolicyType.OnceOnly)))
 
         // If ROTATING_BATCH is supported, it should pick the first one
         assertEquals(
             5,
             policy.effectiveBatchSize(
-                setOf(EudiReusePolicyType.LIMITED_TIME, EudiReusePolicyType.ROTATING_BATCH),
+                setOf(EudiReusePolicyType.LimitedTime, EudiReusePolicyType.RotatingBatch),
             ),
         )
     }
@@ -284,7 +287,7 @@ internal class CredentialReusePolicyTest {
             ),
         )
         // Only LIMITED_TIME is supported, which doesn't have batch_size
-        assertNull(policy.effectiveBatchSize(setOf(EudiReusePolicyType.LIMITED_TIME)))
+        assertNull(policy.effectiveBatchSize(setOf(EudiReusePolicyType.LimitedTime)))
     }
 
     @Test
@@ -301,5 +304,29 @@ internal class CredentialReusePolicyTest {
         }
 
         assertTrue(exception.message?.contains("unknown_method") == true)
+    }
+
+    @Test
+    fun `fails when supportedCredentialReusePolicies is provided but doesn't contain a base method`() {
+        assertFailsWith<IllegalArgumentException> {
+            OpenId4VCIConfig(
+                clientAuthentication = ClientAuthentication.None("wallet"),
+                authFlowRedirectionURI = URI("eudi-openid4vci://cb"),
+                encryptionSupportConfig = EncryptionSupportConfig.invoke(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+                supportedCredentialReusePolicies = setOf(EudiReusePolicyType.RotatingBatch),
+            )
+        }
+    }
+
+    @Test
+    fun `succeeds when supportedCredentialReusePolicies is provided and contains a base method`() {
+        assertDoesNotThrow {
+            OpenId4VCIConfig(
+                clientAuthentication = ClientAuthentication.None("wallet"),
+                authFlowRedirectionURI = URI("eudi-openid4vci://cb"),
+                encryptionSupportConfig = EncryptionSupportConfig.invoke(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+                supportedCredentialReusePolicies = setOf(EudiReusePolicyType.OnceOnly),
+            )
+        }
     }
 }

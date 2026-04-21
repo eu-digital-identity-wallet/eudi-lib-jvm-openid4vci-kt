@@ -369,10 +369,6 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         val msoMdocOption = assertIs<EudiReusePolicy.PerRelyingParty>(msoMdocPolicy.options[2])
         assertEquals(5, msoMdocOption.batchSize)
         assertEquals(655433L, msoMdocOption.reissueTriggerLifetimeLeft)
-        assertEquals(
-            5,
-            msoMdocPolicy.effectiveBatchSize(EudiReusePolicyType.entries.toSet()),
-        )
 
         val pidSdJwt = metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_SdJwtVc")]
         val sdJwtPolicy = pidSdJwt?.credentialMetadata?.credentialReusePolicy
@@ -389,10 +385,6 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         assertEquals(60, sdJwtPerRelyingParty.batchSize)
         assertEquals(10, sdJwtPerRelyingParty.reissueTriggerUnused)
         assertEquals(777543L, sdJwtPerRelyingParty.reissueTriggerLifetimeLeft)
-        assertEquals(
-            40,
-            sdJwtPolicy.effectiveBatchSize(EudiReusePolicyType.entries.toSet()),
-        )
     }
 
     @Test

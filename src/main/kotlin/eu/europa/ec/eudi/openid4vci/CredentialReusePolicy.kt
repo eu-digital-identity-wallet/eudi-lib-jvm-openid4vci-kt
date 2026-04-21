@@ -17,25 +17,25 @@ package eu.europa.ec.eudi.openid4vci
 
 import java.io.Serializable
 
-enum class EudiReusePolicyType {
-    ONCE_ONLY,
-    LIMITED_TIME,
-    ROTATING_BATCH,
-    PER_RELYING_PARTY,
-    ;
-
-    val jsonValue: String
-        get() = when (this) {
-            ONCE_ONLY -> "once_only"
-            LIMITED_TIME -> "limited_time"
-            ROTATING_BATCH -> "rotating-batch"
-            PER_RELYING_PARTY -> "per-relying-party"
-        }
+sealed class EudiReusePolicyType(val jsonValue: String) {
+    data object OnceOnly : EudiReusePolicyType("once_only")
+    data object LimitedTime : EudiReusePolicyType("limited_time")
+    data object RotatingBatch : EudiReusePolicyType("rotating-batch")
+    data object PerRelyingParty : EudiReusePolicyType("per-relying-party")
 
     companion object {
         fun fromJsonValue(value: String): EudiReusePolicyType =
             entries.firstOrNull { it.jsonValue == value }
-                ?: throw IllegalArgumentException("Unsupported arf_annex_ii reuse method: $value")
+                ?: throw IllegalArgumentException("Unsupported credential reuse method: $value")
+
+        val entries: List<EudiReusePolicyType> by lazy {
+            listOf(
+                OnceOnly,
+                LimitedTime,
+                RotatingBatch,
+                PerRelyingParty,
+            )
+        }
     }
 }
 
@@ -51,7 +51,7 @@ sealed interface EudiReusePolicy {
     /**
      * Checks if the client supports this reuse policy option.
      */
-    fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>): Boolean
+    fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>?): Boolean
 
     data class OnceOnly(
         override val batchSize: Int,
@@ -63,8 +63,8 @@ sealed interface EudiReusePolicy {
             validateReissueTriggerUnused(reissueTriggerUnused, batchSize)
         }
 
-        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>): Boolean =
-            supportedReusePolicies.contains(EudiReusePolicyType.ONCE_ONLY)
+        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>?): Boolean =
+            supportedReusePolicies?.contains(EudiReusePolicyType.OnceOnly) ?: false
 
         override val reissueTriggerLifetimeLeft: Long? = null
     }
@@ -77,8 +77,8 @@ sealed interface EudiReusePolicy {
             validateReissueTriggerLifetimeLeft(reissueTriggerLifetimeLeft)
         }
 
-        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>): Boolean =
-            supportedReusePolicies.contains(EudiReusePolicyType.LIMITED_TIME)
+        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>?): Boolean =
+            supportedReusePolicies?.contains(EudiReusePolicyType.LimitedTime) ?: false
 
         override val reissueTriggerUnused: Int? = null
         override val batchSize: Int? = null
@@ -96,8 +96,8 @@ sealed interface EudiReusePolicy {
 
         override val reissueTriggerUnused: Int? = null
 
-        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>): Boolean =
-            supportedReusePolicies.contains(EudiReusePolicyType.ROTATING_BATCH)
+        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>?): Boolean =
+            supportedReusePolicies?.contains(EudiReusePolicyType.RotatingBatch) ?: false
     }
 
     data class PerRelyingParty(
@@ -112,8 +112,8 @@ sealed interface EudiReusePolicy {
             validateReissueTriggerUnused(reissueTriggerUnused, batchSize)
         }
 
-        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>): Boolean =
-            supportedReusePolicies.contains(EudiReusePolicyType.PER_RELYING_PARTY)
+        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>?): Boolean =
+            supportedReusePolicies?.contains(EudiReusePolicyType.PerRelyingParty) ?: false
     }
 
     companion object {
@@ -133,7 +133,7 @@ sealed interface EudiReusePolicy {
 
             return normalizedDetails.map { detail ->
                 when (detail) {
-                    EudiReusePolicyType.ONCE_ONLY -> OnceOnly(
+                    EudiReusePolicyType.OnceOnly -> OnceOnly(
                         batchSize = requireNotNull(batchSize) {
                             "batch_size is required when details contains once_only, rotating-batch, or per-relying-party"
                         },
@@ -142,14 +142,14 @@ sealed interface EudiReusePolicy {
                         },
                     )
 
-                    EudiReusePolicyType.LIMITED_TIME -> LimitedTime(
+                    EudiReusePolicyType.LimitedTime -> LimitedTime(
                         reissueTriggerLifetimeLeft = requireNotNull(reissueTriggerLifetimeLeft) {
                             "reissue_trigger_lifetime_left is required when details contains limited_time, " +
                                 "rotating-batch, or per-relying-party"
                         },
                     )
 
-                    EudiReusePolicyType.ROTATING_BATCH -> RotatingBatch(
+                    EudiReusePolicyType.RotatingBatch -> RotatingBatch(
                         batchSize = requireNotNull(batchSize) {
                             "batch_size is required when details contains once_only, rotating-batch, or per-relying-party"
                         },
@@ -159,7 +159,7 @@ sealed interface EudiReusePolicy {
                         },
                     )
 
-                    EudiReusePolicyType.PER_RELYING_PARTY -> PerRelyingParty(
+                    EudiReusePolicyType.PerRelyingParty -> PerRelyingParty(
                         batchSize = requireNotNull(batchSize) {
                             "batch_size is required when details contains once_only, " +
                                 "rotating-batch, or per-relying-party"
@@ -177,8 +177,8 @@ sealed interface EudiReusePolicy {
         }
 
         private fun validateBaseMethodCombination(details: List<EudiReusePolicyType>) {
-            val hasOnceOnly = EudiReusePolicyType.ONCE_ONLY in details
-            val hasLimitedTime = EudiReusePolicyType.LIMITED_TIME in details
+            val hasOnceOnly = EudiReusePolicyType.OnceOnly in details
+            val hasLimitedTime = EudiReusePolicyType.LimitedTime in details
 
             require(hasOnceOnly.xor(hasLimitedTime)) {
                 "details must contain exactly one base method: once_only or limited_time"
