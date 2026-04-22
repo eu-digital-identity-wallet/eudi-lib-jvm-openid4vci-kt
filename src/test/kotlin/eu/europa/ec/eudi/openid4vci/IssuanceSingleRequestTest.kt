@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
@@ -994,5 +995,142 @@ class IssuanceSingleRequestTest {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
                 authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
             }
+        }
+
+    @Test
+    fun `when wallet does not support non device bound attestation, issuance fails`() =
+        runTest {
+            val mockedHttpClient = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+            )
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                config = OpenId4VCIConfiguration.copy(proofs = ProofsConfig.None),
+                credentialOfferStr = CredentialOfferWithMDLMdoc_NO_GRANTS,
+                httpClient = mockedHttpClient,
+            )
+
+            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val exception = assertFailsWith<IllegalArgumentException> {
+                    authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
+                }
+                assertEquals("Wallet doesn't support non-device-bound attestations", exception.message)
+            }
+        }
+
+    @Test
+    fun `when wallet does not support device bound attestation, issuance fails`() =
+        runTest {
+            val mockedHttpClient = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+            )
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                config = OpenId4VCIConfiguration.copy(proofs = ProofsConfig.None),
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                httpClient = mockedHttpClient,
+            )
+
+            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val exception = assertFailsWith<IllegalArgumentException> {
+                    authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec()).getOrThrow()
+                }
+                assertEquals("Wallet doesn't support device-bound attestations", exception.message)
+            }
+        }
+
+    @Test
+    fun `when wallet does supports device bound attestation, but none of the advertised algorithms, issuance fails`() =
+        runTest {
+            val mockedHttpClient = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+            )
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                config = OpenId4VCIConfiguration.copy(
+                    proofs = ProofsConfig(
+                        supportsNonDeviceBound = false,
+                        deviceBound = ProofsConfig.DeviceBound(
+                            algorithms = setOf(
+                                JWSAlgorithm.ES512,
+                            ),
+                            proofs = setOf(ProofsConfig.DeviceBound.Proof.JwtProofWithoutKeyAttestation),
+                        ),
+                    ),
+                ),
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                httpClient = mockedHttpClient,
+            )
+
+            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val exception = assertFailsWith<IllegalArgumentException> {
+                    authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec()).getOrThrow()
+                }
+                assertEquals("Wallet doesn't support any of the advertised Proofs", exception.message)
+            }
+        }
+
+    @Test
+    fun `when wallet does not support the required device bound attestation proof, issuance fails`() =
+        runTest {
+            suspend fun test(
+                supportedProofType: ProofsConfig.DeviceBound.Proof,
+                credentialOffer: String,
+                proofsSpecification: ProofsSpecification,
+            ) {
+                val mockedHttpClient = mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
+                    authServerWellKnownMocker(),
+                    parPostMocker(),
+                    tokenPostMocker(),
+                )
+                val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                    config = OpenId4VCIConfiguration.copy(
+                        proofs = ProofsConfig(
+                            supportsNonDeviceBound = false,
+                            deviceBound = ProofsConfig.DeviceBound(
+                                algorithms = null,
+                                proofs = setOf(supportedProofType),
+                            ),
+                        ),
+                    ),
+                    credentialOfferStr = credentialOffer,
+                    httpClient = mockedHttpClient,
+                )
+
+                val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+                with(issuer) {
+                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                    val exception = assertFailsWith<IllegalArgumentException> {
+                        authorizedRequest.request(requestPayload, proofsSpecification).getOrThrow()
+                    }
+                    assertEquals("Wallet doesn't support any of the advertised Proofs", exception.message)
+                }
+            }
+
+            // Wallet supports Jwt Proofs without Key Attestations, but Credential Issuer requires Jwt Proofs with Key Attestations
+            test(
+                ProofsConfig.DeviceBound.Proof.JwtProofWithoutKeyAttestation,
+                CredentialOfferWithSdJwtVc_NO_GRANTS,
+                noKeyAttestationJwtProofsSpec(),
+            )
+
+            // Wallet supports Jwt Proofs with Key Attestations, but Credential Issuer requires Jwt Proofs without Key Attestations
+            test(ProofsConfig.DeviceBound.Proof.JwtProofWithKeyAttestation, CredentialOfferMsoMdoc_NO_GRANTS, keyAttestationJwtProofsSpec())
+
+            // Wallet supports Attestation Proofs, but Credential Issuer requires Jwt Proofs without Key Attestations
+            test(ProofsConfig.DeviceBound.Proof.AttestationProof, CredentialOfferMsoMdoc_NO_GRANTS, attestationProofSpec())
         }
 }
