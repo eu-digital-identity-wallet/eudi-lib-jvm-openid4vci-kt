@@ -231,11 +231,11 @@ data class EncryptionSupportConfig(
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val ecConfig: EcConfig?,
     val rsaConfig: RsaConfig?,
-    val supportedEncryptionMethods: List<EncryptionMethod> = allowedEncryptionMethods,
+    val supportedEncryptionMethods: List<EncryptionMethod> = SUPPORTED_ENCRYPTION_ALGORITHMS.toList(),
 ) {
     init {
         require(supportedEncryptionMethods.isNotEmpty()) { "At least one encryption method must be provided" }
-        val unsupportedEncryptionMethods = supportedEncryptionMethods.filterNot { it in allowedEncryptionMethods }
+        val unsupportedEncryptionMethods = supportedEncryptionMethods.filterNot { it in SUPPORTED_ENCRYPTION_ALGORITHMS }
         require(unsupportedEncryptionMethods.isEmpty()) {
             "Unsupported encryption methods: ${unsupportedEncryptionMethods.joinToString(", ") { it.name }}"
         }
@@ -250,6 +250,11 @@ data class EncryptionSupportConfig(
     }
 
     companion object {
+        val SUPPORTED_ENCRYPTION_ALGORITHMS: Set<EncryptionMethod> get() =
+            ContentCryptoProvider.SUPPORTED_ENCRYPTION_METHODS -
+                EncryptionMethod.A128CBC_HS256_DEPRECATED -
+                EncryptionMethod.A256CBC_HS512_DEPRECATED
+
         operator fun invoke(
             ecKeyCurve: Curve,
             rcaKeySize: Int,
@@ -262,18 +267,13 @@ data class EncryptionSupportConfig(
     }
 }
 
-private val allowedEncryptionMethods: List<EncryptionMethod> get() = ContentCryptoProvider.SUPPORTED_ENCRYPTION_METHODS.allowedMethods()
-private fun Set<EncryptionMethod>.allowedMethods(): List<EncryptionMethod> = this.filterNot {
-    it in setOf(EncryptionMethod.A128CBC_HS256_DEPRECATED, EncryptionMethod.A256CBC_HS512_DEPRECATED)
-}
-
 data class RsaConfig(
     val rcaKeySize: Int,
-    val supportedJWEAlgorithms: List<JWEAlgorithm> = allowedRSAAlgorithms,
+    val supportedJWEAlgorithms: List<JWEAlgorithm> = SUPPORTED_ENCRYPTION_ALGORITHMS.toList(),
 ) {
     init {
         require(supportedJWEAlgorithms.isNotEmpty()) { "At least one encryption algorithm must be provided" }
-        val unsupportedJWEAlgorithms = supportedJWEAlgorithms.filterNot { it in allowedRSAAlgorithms }
+        val unsupportedJWEAlgorithms = supportedJWEAlgorithms.filterNot { it in SUPPORTED_ENCRYPTION_ALGORITHMS }
         require(unsupportedJWEAlgorithms.isEmpty()) {
             "Unsupported encryption algorithms: ${unsupportedJWEAlgorithms.joinToString(", ") { it.name }}"
         }
@@ -281,26 +281,32 @@ data class RsaConfig(
             "supportedJWEAlgorithms contains duplicate values"
         }
     }
-}
 
-private val allowedRSAAlgorithms: List<JWEAlgorithm> get() = RSAEncrypter.SUPPORTED_ALGORITHMS.allowedAlgorithms()
-private fun Set<JWEAlgorithm>.allowedAlgorithms(): List<JWEAlgorithm> = this.filterNot {
-    it in setOf(JWEAlgorithm.RSA1_5, JWEAlgorithm.RSA_OAEP)
+    companion object {
+        val SUPPORTED_ENCRYPTION_ALGORITHMS: Set<JWEAlgorithm> get() =
+            RSAEncrypter.SUPPORTED_ALGORITHMS -
+                JWEAlgorithm.RSA1_5 -
+                JWEAlgorithm.RSA_OAEP
+    }
 }
 
 data class EcConfig(
     val ecKeyCurve: Curve,
-    val supportedJWEAlgorithms: List<JWEAlgorithm> = ECDHEncrypter.SUPPORTED_ALGORITHMS.toList(),
+    val supportedJWEAlgorithms: List<JWEAlgorithm> = SUPPORTED_ENCRYPTION_ALGORITHMS.toList(),
 ) {
     init {
         require(supportedJWEAlgorithms.isNotEmpty()) { "At least one encryption algorithm must be provided" }
-        val unsupportedJWEAlgorithms = supportedJWEAlgorithms.filterNot { it in ECDHEncrypter.SUPPORTED_ALGORITHMS }
+        val unsupportedJWEAlgorithms = supportedJWEAlgorithms.filterNot { it in SUPPORTED_ENCRYPTION_ALGORITHMS }
         require(unsupportedJWEAlgorithms.isEmpty()) {
             "Unsupported encryption algorithms: ${unsupportedJWEAlgorithms.joinToString(", ") { it.name }}"
         }
         require(supportedJWEAlgorithms.distinctBy { it.name }.size == supportedJWEAlgorithms.size) {
             "supportedJWEAlgorithms contains duplicate values"
         }
+    }
+
+    companion object {
+        val SUPPORTED_ENCRYPTION_ALGORITHMS: Set<JWEAlgorithm> get() = ECDHEncrypter.SUPPORTED_ALGORITHMS
     }
 }
 
