@@ -231,11 +231,11 @@ data class EncryptionSupportConfig(
     val credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
     val ecConfig: EcConfig?,
     val rsaConfig: RsaConfig?,
-    val supportedEncryptionMethods: List<EncryptionMethod> = SUPPORTED_ENCRYPTION_ALGORITHMS.toList(),
+    val supportedEncryptionMethods: List<EncryptionMethod> = SUPPORTED_ENCRYPTION_METHODS.toList(),
 ) {
     init {
         require(supportedEncryptionMethods.isNotEmpty()) { "At least one encryption method must be provided" }
-        val unsupportedEncryptionMethods = supportedEncryptionMethods.filterNot { it in SUPPORTED_ENCRYPTION_ALGORITHMS }
+        val unsupportedEncryptionMethods = supportedEncryptionMethods.filterNot { it in SUPPORTED_ENCRYPTION_METHODS }
         require(unsupportedEncryptionMethods.isEmpty()) {
             "Unsupported encryption methods: ${unsupportedEncryptionMethods.joinToString(", ") { it.name }}"
         }
@@ -250,7 +250,7 @@ data class EncryptionSupportConfig(
     }
 
     companion object {
-        val SUPPORTED_ENCRYPTION_ALGORITHMS: Set<EncryptionMethod> get() =
+        val SUPPORTED_ENCRYPTION_METHODS: Set<EncryptionMethod> get() =
             ContentCryptoProvider.SUPPORTED_ENCRYPTION_METHODS -
                 EncryptionMethod.A128CBC_HS256_DEPRECATED -
                 EncryptionMethod.A256CBC_HS512_DEPRECATED
