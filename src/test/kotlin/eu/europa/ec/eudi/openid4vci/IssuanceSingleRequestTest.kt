@@ -39,7 +39,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
 import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
-import java.util.UUID
+import java.util.*
 import kotlin.test.*
 
 class IssuanceSingleRequestTest {
@@ -144,6 +144,53 @@ class IssuanceSingleRequestTest {
             with(issuer) {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
                 authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256, 4)).getOrThrow()
+            }
+        }
+    }
+
+    @Test
+    fun `when key attestation JWT proof contains more attested keys than the batch limit IssuerBatchSizeLimitExceeded is thrown`() =
+        runTest {
+            val mockedKtorHttpClientFactory = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.KEY_ATTESTATION_REQUIRED),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                nonceEndpointMocker(),
+            )
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+                httpClient = mockedKtorHttpClientFactory,
+            )
+
+            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+            assertFailsWith<CredentialIssuanceError.IssuerBatchSizeLimitExceeded> {
+                with(issuer) {
+                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                    authorizedRequest.request(requestPayload, keyAttestationJwtProofsSpec(Curve.P_256, 4)).getOrThrow()
+                }
+            }
+        }
+
+    @Test
+    fun `when attestation proof contains more attested keys than the batch limit IssuerBatchSizeLimitExceeded is thrown`() = runTest {
+        val mockedKtorHttpClientFactory = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            httpClient = mockedKtorHttpClientFactory,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        assertFailsWith<CredentialIssuanceError.IssuerBatchSizeLimitExceeded> {
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                authorizedRequest.request(requestPayload, attestationProofSpec(keysNo = 4)).getOrThrow()
             }
         }
     }
@@ -274,7 +321,8 @@ class IssuanceSingleRequestTest {
         val (_, outcome) = with(issuer) {
             authorizedRequest.request(requestPayload, noKeyAttestationJwtProofsSpec(Curve.P_256)).getOrThrow()
         }
-        assertIs<SubmissionOutcome.Success>(outcome)
+        val success = assertIs<SubmissionOutcome.Success>(outcome)
+        assertNull(success.selectedCredentialReusePolicy)
     }
 
     @Test

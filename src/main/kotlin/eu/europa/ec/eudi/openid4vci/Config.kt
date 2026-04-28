@@ -73,6 +73,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
  * @param parUsage whether to use PAR in case of authorization code grant
  * @param clock Wallet's clock
  * @param issuerMetadataPolicy policy concerning signed metadata usage
+ * @param supportedCredentialReusePolicies the reuse policies supported by the wallet, used to validate against credential issuer metadata.
  */
 data class OpenId4VCIConfig(
     val clientAuthentication: ClientAuthentication,
@@ -84,7 +85,16 @@ data class OpenId4VCIConfig(
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+    val supportedCredentialReusePolicies: Set<EudiReusePolicyType>? = null,
 ) {
+
+    init {
+        supportedCredentialReusePolicies?.let {
+            require(it.contains(EudiReusePolicyType.OnceOnly) || it.contains(EudiReusePolicyType.LimitedTime)) {
+                "supportedCredentialReusePolicies must contain at least one of OnceOnly or LimitedTime"
+            }
+        }
+    }
 
     /**
      * Creates a new [OpenId4VCIConfig] instance for a Wallet that uses [a Public OAuth 2.0 Client][ClientAuthentication.None].
@@ -151,6 +161,7 @@ data class OpenId4VCIConfig(
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+        supportedCredentialReusePolicies: Set<EudiReusePolicyType>? = null,
     ) : this(
         ClientAuthentication.None(clientId),
         authFlowRedirectionURI,
@@ -161,6 +172,7 @@ data class OpenId4VCIConfig(
         parUsage,
         clock,
         issuerMetadataPolicy,
+        supportedCredentialReusePolicies,
     )
 
     @Deprecated(
