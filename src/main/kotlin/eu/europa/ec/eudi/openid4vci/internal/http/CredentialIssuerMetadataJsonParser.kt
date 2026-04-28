@@ -30,6 +30,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import java.net.URI
 import java.util.*
+import kotlin.time.Duration.Companion.seconds
 
 internal object CredentialIssuerMetadataJsonParser {
 
@@ -72,7 +73,7 @@ private data class ArfAnnex2CredentialReusePolicyOptionTO(
             details = details.map { EudiReusePolicyType.fromJsonValue(it) },
             batchSize = batchSize,
             reissueTriggerUnused = reissueTriggerUnused,
-            reissueTriggerLifetimeLeft = reissueTriggerLifetimeLeft,
+            reissueTriggerLifetimeLeft = reissueTriggerLifetimeLeft?.seconds,
         )
 }
 

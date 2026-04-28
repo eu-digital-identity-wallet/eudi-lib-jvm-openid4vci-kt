@@ -27,6 +27,7 @@ import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.*
+import kotlin.time.Duration.Companion.seconds
 
 internal class DefaultCredentialIssuerMetadataResolverTest {
 
@@ -365,10 +366,10 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         assertIs<EudiReusePolicy.LimitedTime>(msoMdocPolicy.options[0])
         val msoMdocRotatingBatch = assertIs<EudiReusePolicy.RotatingBatch>(msoMdocPolicy.options[1])
         assertEquals(5, msoMdocRotatingBatch.batchSize)
-        assertEquals(655433L, msoMdocRotatingBatch.reissueTriggerLifetimeLeft)
+        assertEquals(655433.seconds, msoMdocRotatingBatch.reissueTriggerLifetimeLeft)
         val msoMdocOption = assertIs<EudiReusePolicy.PerRelyingParty>(msoMdocPolicy.options[2])
         assertEquals(5, msoMdocOption.batchSize)
-        assertEquals(655433L, msoMdocOption.reissueTriggerLifetimeLeft)
+        assertEquals(655433.seconds, msoMdocOption.reissueTriggerLifetimeLeft)
 
         val pidSdJwt = metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_SdJwtVc")]
         val sdJwtPolicy = pidSdJwt?.credentialMetadata?.credentialReusePolicy
@@ -377,14 +378,14 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         assertIs<EudiReusePolicy.LimitedTime>(sdJwtPolicy.options[0])
         val sdJwtRotatingBatch = assertIs<EudiReusePolicy.RotatingBatch>(sdJwtPolicy.options[1])
         assertEquals(40, sdJwtRotatingBatch.batchSize)
-        assertEquals(655433L, sdJwtRotatingBatch.reissueTriggerLifetimeLeft)
+        assertEquals(655433.seconds, sdJwtRotatingBatch.reissueTriggerLifetimeLeft)
         val sdJwtOnceOnly = assertIs<EudiReusePolicy.OnceOnly>(sdJwtPolicy.options[2])
         assertEquals(60, sdJwtOnceOnly.batchSize)
         assertEquals(10, sdJwtOnceOnly.reissueTriggerUnused)
         val sdJwtPerRelyingParty = assertIs<EudiReusePolicy.PerRelyingParty>(sdJwtPolicy.options[3])
         assertEquals(60, sdJwtPerRelyingParty.batchSize)
         assertEquals(10, sdJwtPerRelyingParty.reissueTriggerUnused)
-        assertEquals(777543L, sdJwtPerRelyingParty.reissueTriggerLifetimeLeft)
+        assertEquals(777543.seconds, sdJwtPerRelyingParty.reissueTriggerLifetimeLeft)
     }
 
     @Test

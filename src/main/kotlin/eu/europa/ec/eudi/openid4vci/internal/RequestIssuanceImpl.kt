@@ -314,11 +314,11 @@ internal class RequestIssuanceImpl(
             if (selectedReusePolicy != null) {
                 when (selectedReusePolicy) {
                     is EudiReusePolicy.LimitedTime ->
-                        CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+                        throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+
                     else -> {
-                        val policyBatchSize = selectedReusePolicy.batchSize
-                        ensureNotNull(policyBatchSize) {
-                            error("Batch reuse policy ${selectedReusePolicy::class} with null batch size")
+                        val policyBatchSize = checkNotNull(selectedReusePolicy.batchSize) {
+                            "Batch reuse policy ${selectedReusePolicy::class} with null batch size"
                         }
                         ensure(this <= policyBatchSize) {
                             CredentialIssuanceError.IssuerBatchSizeLimitExceeded(policyBatchSize)
@@ -327,7 +327,7 @@ internal class RequestIssuanceImpl(
                 }
             } else {
                 when (batchCredentialIssuance) {
-                    BatchCredentialIssuance.NotSupported -> CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+                    BatchCredentialIssuance.NotSupported -> throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
                     is BatchCredentialIssuance.Supported -> {
                         val maxBatchSize = batchCredentialIssuance.batchSize
                         ensure(this <= maxBatchSize) {

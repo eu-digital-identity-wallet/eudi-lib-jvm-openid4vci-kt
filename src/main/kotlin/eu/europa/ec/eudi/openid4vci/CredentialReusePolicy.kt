@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import java.io.Serializable
+import kotlin.time.Duration
 
 sealed class EudiReusePolicyType(val jsonValue: String) {
     data object OnceOnly : EudiReusePolicyType("once_only")
@@ -46,7 +47,7 @@ sealed interface EudiReusePolicy {
 
     val batchSize: Int?
     val reissueTriggerUnused: Int?
-    val reissueTriggerLifetimeLeft: Long?
+    val reissueTriggerLifetimeLeft: Duration?
 
     /**
      * Checks if the client supports this reuse policy option.
@@ -66,11 +67,11 @@ sealed interface EudiReusePolicy {
         override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>?): Boolean =
             supportedReusePolicies?.contains(EudiReusePolicyType.OnceOnly) ?: false
 
-        override val reissueTriggerLifetimeLeft: Long? = null
+        override val reissueTriggerLifetimeLeft: Duration? = null
     }
 
     data class LimitedTime(
-        override val reissueTriggerLifetimeLeft: Long,
+        override val reissueTriggerLifetimeLeft: Duration,
     ) : EudiReusePolicy {
 
         init {
@@ -86,7 +87,7 @@ sealed interface EudiReusePolicy {
 
     data class RotatingBatch(
         override val batchSize: Int,
-        override val reissueTriggerLifetimeLeft: Long,
+        override val reissueTriggerLifetimeLeft: Duration,
     ) : EudiReusePolicy {
 
         init {
@@ -102,7 +103,7 @@ sealed interface EudiReusePolicy {
 
     data class PerRelyingParty(
         override val batchSize: Int,
-        override val reissueTriggerLifetimeLeft: Long,
+        override val reissueTriggerLifetimeLeft: Duration,
         override val reissueTriggerUnused: Int,
     ) : EudiReusePolicy {
 
@@ -121,7 +122,7 @@ sealed interface EudiReusePolicy {
             details: List<EudiReusePolicyType>,
             batchSize: Int? = null,
             reissueTriggerUnused: Int? = null,
-            reissueTriggerLifetimeLeft: Long? = null,
+            reissueTriggerLifetimeLeft: Duration? = null,
         ): List<EudiReusePolicy> {
             val normalizedDetails = details.distinct()
 
@@ -194,8 +195,8 @@ sealed interface EudiReusePolicy {
             require(reissueTriggerUnused < batchSize) { "reissue_trigger_unused must be lower than batch_size" }
         }
 
-        private fun validateReissueTriggerLifetimeLeft(reissueTriggerLifetimeLeft: Long) {
-            require(reissueTriggerLifetimeLeft > 0) { "reissue_trigger_lifetime_left must be greater than 0" }
+        private fun validateReissueTriggerLifetimeLeft(reissueTriggerLifetimeLeft: Duration) {
+            require(reissueTriggerLifetimeLeft.isPositive()) { "reissue_trigger_lifetime_left must be greater than 0" }
         }
     }
 }
