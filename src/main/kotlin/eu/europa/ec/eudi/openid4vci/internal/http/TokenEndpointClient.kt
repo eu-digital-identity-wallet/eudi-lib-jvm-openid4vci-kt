@@ -89,7 +89,8 @@ internal sealed interface TokenResponseTO {
 internal class TokenEndpointClient(
     private val credentialIssuerId: CredentialIssuerId,
     private val clock: Clock,
-    private val clientAuthentication: ClientAuthentication,
+    private val clientId: ClientId,
+    private val provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
     private val authFlowRedirectionURI: URI,
     private val authServerId: URL,
     private val challengeEndpoint: URL?,
@@ -111,11 +112,13 @@ internal class TokenEndpointClient(
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
         dPoPJwtFactory: DPoPJwtFactory?,
+        provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
         httpClient: HttpClient,
     ) : this(
         credentialIssuerId,
         config.clock,
-        config.clientAuthentication,
+        config.clientAuthentication.id,
+        provisionedClientAttestation,
         authFlowRedirectionURI = config.authFlowRedirectionURI,
         authServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
         challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL(),
@@ -147,7 +150,7 @@ internal class TokenEndpointClient(
         }
         val params =
             TokenEndpointForm.authCodeFlow(
-                clientId = clientAuthentication.id,
+                clientId = clientId,
                 authorizationCode = authorizationCode,
                 redirectionURI = authFlowRedirectionURI,
                 pkceVerifier = pkceVerifier,
@@ -178,7 +181,7 @@ internal class TokenEndpointClient(
         }
         val params =
             TokenEndpointForm.preAuthCodeFlow(
-                clientId = clientAuthentication.id,
+                clientId = clientId,
                 preAuthorizedCode = preAuthorizedCode,
                 txCode = txCode,
                 authorizationDetails = authDetails,
@@ -198,7 +201,7 @@ internal class TokenEndpointClient(
         refreshToken: RefreshToken,
         dpopNonce: Nonce?,
     ): Result<Pair<TokenResponse, Nonce?>> = runCatchingCancellable {
-        val params = TokenEndpointForm.refreshAccessToken(clientAuthentication.id, refreshToken)
+        val params = TokenEndpointForm.refreshAccessToken(clientId, refreshToken)
         placeTokenRequest(params, dpopNonce)
     }
 
@@ -212,11 +215,9 @@ internal class TokenEndpointClient(
             retriedAbcaChallenge: Boolean,
             retriedDPoPNonce: Boolean,
         ): Pair<TokenResponseTO, Nonce?> {
-            val abcaChallenge = when (clientAuthentication) {
-                is ClientAuthentication.AttestationBased ->
-                    existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
-                else -> null
-            }
+            val abcaChallenge =
+                if (null != provisionedClientAttestation) existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
+                else null
 
             val response = run {
                 val formParameters = Parameters.build {
@@ -302,14 +303,16 @@ internal class TokenEndpointClient(
     }
 
     private suspend fun generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
-        when (clientAuthentication) {
-            is ClientAuthentication.AttestationBased ->
-                with(clientAttestationPoPBuilder) {
-                    val popJWT = clientAuthentication.attestationPoPJWT(clock, authServerId, challenge)
-                    clientAuthentication.attestationJWT to popJWT
-                }
-
-            else -> null
+        provisionedClientAttestation?.let { (clientAttestation, clientAttestationPoPSpec) ->
+            with(clientAttestationPoPBuilder) {
+                val popJWT = clientAttestationPoPSpec.attestationPoPJWT(
+                    clock,
+                    clientId,
+                    authServerId,
+                    challenge,
+                )
+                clientAttestation to popJWT
+            }
         }
 }
 
