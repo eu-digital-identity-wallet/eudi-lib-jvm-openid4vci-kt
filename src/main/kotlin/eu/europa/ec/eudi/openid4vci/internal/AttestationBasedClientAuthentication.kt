@@ -35,24 +35,25 @@ import java.time.Clock
  */
 internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder {
 
-    override suspend fun ClientAuthentication.AttestationBased.attestationPoPJWT(
+    override suspend fun ClientAttestationPoPJWTSpec.attestationPoPJWT(
         clock: Clock,
+        clientId: ClientId,
         authorizationServerId: URL,
         challenge: Nonce?,
     ): ClientAttestationPoPJWT {
         val now = clock.instant()
         val claimSet = ClientAttestationPOPClaims(
-            issuer = id,
+            issuer = clientId,
             audience = authorizationServerId,
             jwtId = JwtId(JWTID().value),
             issuedAt = now,
             challenge = challenge,
             notBefore = now,
         )
-        val signedJwt = popJwtSpec.signer.use { signOperation ->
+        val signedJwt = signer.use { signOperation ->
             JwtSigner<ClientAttestationPOPClaims, JWK>(
                 signOperation = signOperation,
-                algorithm = popJwtSpec.signer.javaAlgorithm.toJoseAlg(),
+                algorithm = signer.javaAlgorithm.toJoseAlg(),
                 customizeHeader = {
                     put(RFC7519.TYPE, AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE)
                 },
@@ -85,31 +86,3 @@ internal fun HttpRequestBuilder.clientAttestationHeaders(
     header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_HEADER, attestation.jwt.serialize())
     header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_POP_HEADER, pop.jwt.serialize())
 }
-
-internal suspend fun OpenId4VCIConfig.generateClientAttestationIfNeeded(
-    authorizationServerId: URL,
-    challenge: Nonce?,
-): ClientAttestation? =
-    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(
-        clock,
-        clientAuthentication,
-        authorizationServerId,
-        challenge,
-    )
-
-internal suspend fun DeferredIssuerConfig.generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
-    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(clock, clientAuthentication, authorizationServerId, challenge)
-
-private suspend fun ClientAttestationPoPBuilder.generateClientAttestationIfNeeded(
-    clock: Clock,
-    clientAuthentication: ClientAuthentication,
-    authorizationServerId: URL,
-    challenge: Nonce?,
-): ClientAttestation? =
-    when (clientAuthentication) {
-        is ClientAuthentication.AttestationBased -> {
-            val clientAttestationPoPJwt = clientAuthentication.attestationPoPJWT(clock, authorizationServerId, challenge)
-            clientAuthentication.attestationJWT to clientAttestationPoPJwt
-        }
-        else -> null
-    }

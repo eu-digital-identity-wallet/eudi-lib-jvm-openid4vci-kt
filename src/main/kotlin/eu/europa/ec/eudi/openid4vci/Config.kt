@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.RSAEncrypter
 import com.nimbusds.jose.crypto.impl.ContentCryptoProvider
@@ -27,6 +28,21 @@ import java.net.URI
 import java.time.Clock
 
 typealias ClientId = String
+
+/**
+ * Provisions a [ClientAttestationJWT] and the relevant [specification][ClientAttestationPoPJWTSpec] to produce a [ClientAttestationPoPJWT],
+ * in the context of a specific Authorization Server.
+ */
+interface ProvisionClientAttestation {
+    val algorithm: JWSAlgorithm
+
+    suspend operator fun invoke(authorizationServer: HttpsUrl): Provisioned
+
+    data class Provisioned(
+        val clientAttestation: ClientAttestationJWT,
+        val clientAttestationPoPSpec: ClientAttestationPoPJWTSpec,
+    )
+}
 
 /**
  * The Client Authentication Method used by the Wallet.
@@ -47,16 +63,9 @@ sealed interface ClientAuthentication : java.io.Serializable {
      * Attestation-Based Client Authentication.
      */
     data class AttestationBased(
-        val attestationJWT: ClientAttestationJWT,
-        val popJwtSpec: ClientAttestationPoPJWTSpec,
-    ) : ClientAuthentication {
-        init {
-            require(attestationJWT.clientId.isNotBlank())
-            require(!attestationJWT.publicKey.isPrivate) { "InstanceKey should be public" }
-        }
-
-        override val id: ClientId get() = attestationJWT.clientId
-    }
+        override val id: ClientId,
+        val provisionClientAttestation: ProvisionClientAttestation,
+    ) : ClientAuthentication
 }
 
 /**

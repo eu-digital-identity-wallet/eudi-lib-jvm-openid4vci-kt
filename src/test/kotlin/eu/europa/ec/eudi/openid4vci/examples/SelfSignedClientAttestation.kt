@@ -79,7 +79,12 @@ internal fun selfSignedClient(
         builder.build()
     }
     val popJwtSpec = ClientAttestationPoPJWTSpec(Signer.fromNimbusEcKey(walletInstanceKey, walletInstanceKey.toPublicJWK(), null, null))
-    return ClientAuthentication.AttestationBased(clientAttestationJWT, popJwtSpec)
+    val provisionClientAttestation = object : ProvisionClientAttestation {
+        override val algorithm: JWSAlgorithm = clientAttestationJWT.jwt.header.algorithm
+        override suspend fun invoke(authorizationServer: HttpsUrl): ProvisionClientAttestation.Provisioned =
+            ProvisionClientAttestation.Provisioned(clientAttestationJWT, popJwtSpec)
+    }
+    return ClientAuthentication.AttestationBased(clientId, provisionClientAttestation)
 }
 
 /**

@@ -27,7 +27,6 @@ import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
 import eu.europa.ec.eudi.openid4vci.internal.clientAttestationHeaders
-import eu.europa.ec.eudi.openid4vci.internal.generateClientAttestationIfNeeded
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -77,6 +76,7 @@ internal class AuthorizationEndpointClient(
     private val challengeEndpoint: URL?,
     private val config: OpenId4VCIConfig,
     private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
     private val httpClient: HttpClient,
 ) {
 
@@ -85,6 +85,7 @@ internal class AuthorizationEndpointClient(
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
         dPoPJwtFactory: DPoPJwtFactory?,
+        provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
         httpClient: HttpClient,
     ) : this(
         credentialIssuerId,
@@ -94,6 +95,7 @@ internal class AuthorizationEndpointClient(
         challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL(),
         config,
         dPoPJwtFactory,
+        provisionedClientAttestation,
         httpClient,
     )
 
@@ -274,12 +276,11 @@ internal class AuthorizationEndpointClient(
                 dPoPJwtFactory?.createDPoPJwt(Htm.POST, url, null, existingDpopNonce)
                     ?.getOrThrow()?.serialize()
 
-            val abcaChallenge = when (config.clientAuthentication) {
-                is ClientAuthentication.AttestationBased ->
-                    existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
-                else -> null
-            }
-            val clientAttestation = config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL(), abcaChallenge)
+            val abcaChallenge =
+                if (null != provisionedClientAttestation) existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
+                else null
+
+            val clientAttestation = generateClientAttestationIfNeeded(abcaChallenge)
 
             val response = httpClient.submitForm(url.toString(), formParameters) {
                 clientAttestation?.let {
@@ -342,6 +343,19 @@ internal class AuthorizationEndpointClient(
             dpopNonceRetried = false,
         )
     }
+
+    private suspend fun generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
+        provisionedClientAttestation?.let { (clientAttestation, clientAttestationPoPSpec) ->
+            with(config.clientAttestationPoPBuilder) {
+                val popJWT = clientAttestationPoPSpec.attestationPoPJWT(
+                    config.clock,
+                    config.clientAuthentication.id,
+                    URI(authorizationIssuer).toURL(),
+                    challenge,
+                )
+                clientAttestation to popJWT
+            }
+        }
 
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =
         authorizationRequest.toParameters().mapValues { (_, value) -> value[0] }.toMap()

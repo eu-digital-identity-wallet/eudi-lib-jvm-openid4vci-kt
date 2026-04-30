@@ -128,8 +128,9 @@ fun interface ClientAttestationPoPBuilder {
      *
      * @return the PoP JWT
      */
-    suspend fun ClientAuthentication.AttestationBased.attestationPoPJWT(
+    suspend fun ClientAttestationPoPJWTSpec.attestationPoPJWT(
         clock: Clock,
+        clientId: ClientId,
         authorizationServerId: URL,
         challenge: Nonce?,
     ): ClientAttestationPoPJWT

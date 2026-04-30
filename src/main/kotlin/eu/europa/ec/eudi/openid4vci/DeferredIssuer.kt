@@ -162,7 +162,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
          *
          * @return the deferred issuer instance
          */
-        fun make(
+        suspend fun make(
             config: DeferredIssuerConfig,
             responseEncryptionKey: JWK?,
             httpClient: HttpClient,
@@ -171,10 +171,20 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                 DPoPJwtFactory(signer = signer, clock = config.clock)
             }
 
+            val provisionedClientAttestation =
+                when (val clientAuthentication = config.clientAuthentication) {
+                    is ClientAuthentication.AttestationBased -> {
+                        val authorizationServer = HttpsUrl(config.authorizationServerId.toExternalForm()).getOrThrow()
+                        clientAuthentication.provisionClientAttestation(authorizationServer)
+                    }
+                    else -> null
+                }
+
             val tokenEndpointClient = TokenEndpointClient(
                 config.credentialIssuerId,
                 config.clock,
-                config.clientAuthentication,
+                config.clientAuthentication.id,
+                provisionedClientAttestation,
                 URI.create("https://willNotBeUsed"), // this will not be used
                 config.authorizationServerId,
                 challengeEndpoint = config.challengeEndpoint,
