@@ -640,6 +640,34 @@ val credentialOfferUri: String = "..."
 val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()
 ```
 
+### Supported Encryption Algorithms
+
+Library supports the following JWE algorithms:
+
+* `ECDH-ES`
+* `ECDH-ES+A128KW`
+* `ECDH-ES+A192KW`
+* `ECDH-ES+A256KW`
+* `RSA-OAEP-256`
+* `RSA-OAEP-384`
+* `RSA-OAEP-512`
+
+### Supported Encryption Methods
+
+Library supports the following JWE methods:
+
+* `A128CBC-HS256`
+* `A192CBC-HS384`
+* `A256CBC-HS512`
+* `A128GCM`
+* `A192GCM`
+* `A256GCM`
+* `XC20P`
+
+> [!NOTE]
+> 
+> To use `XC20P` the optional dependency `com.google.crypto.tink:tink` is required.
+
 ## Other features
 
 ### Pushed authorization requests
