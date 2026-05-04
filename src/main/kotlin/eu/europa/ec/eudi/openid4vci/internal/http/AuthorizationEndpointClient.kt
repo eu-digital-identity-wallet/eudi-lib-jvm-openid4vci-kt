@@ -345,8 +345,8 @@ internal class AuthorizationEndpointClient(
     }
 
     private suspend fun generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
-        provisionedClientAttestation?.let { (clientAttestation, clientAttestationPoPSpec) ->
-            with(config.clientAttestationPoPBuilder) {
+        provisionedClientAttestation?.let { (clientAttestation, clientAttestationPoPSpec, clientAttestationPoPBuilder) ->
+            with(clientAttestationPoPBuilder) {
                 val popJWT = clientAttestationPoPSpec.attestationPoPJWT(
                     config.clock,
                     config.clientAuthentication.id,
