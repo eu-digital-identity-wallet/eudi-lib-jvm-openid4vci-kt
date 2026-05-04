@@ -597,6 +597,7 @@ data class OpenId4VCIConfig(
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+    val supportedReuseMethods: Set<ReuseMethod> = emptySet(),
 )
 ```
 
@@ -616,6 +617,7 @@ Options available:
   - `IssuerMetadataPolicy.RequireSigned`: require the presence of signed metadata and use only values from signed metadata
   - `IssuerMetadataPolicy.PreferSigned`: presence of signed metadata is optional, if present values from signed metadata take precedence
   - `IssuerMetadataPolicy.IgnoreSigned`: signed metadata are ignored
+- supportedReuseMethods: A set of `ReuseMethod`s supported by the wallet for credential reuse. Defaults to `emptySet()`.
 
 Trust between the Wallet and the Signer of the signed metadata advertised by the Credential Issuer is established using one of the following ways:
 - `IssuerTrust.ByPublicKey`: trusting the public key used to sign the metadata
@@ -631,10 +633,11 @@ val openId4VCIConfig = OpenId4VCIConfig(
     encryptionSupportConfig = EncryptionSupportConfig(
         compressionAlgorithms = listOf(CompressionAlgorithm.DEF), // which JWE compression algorithms are supported
         credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses,
-        ecConfig =  EcConfig(curve = Curve.P_256, supportedJWEAlgorithms = EcConfig.SUPPORTED_ENCRYPTION_ALGORITHMS.toList()), // the EC Curve and JWE algorithms supported
-        rsaConfig =  RsaConfig(rcaKeySize = 4096, supportedJWEAlgorithms = RsaConfig.SUPPORTED_ENCRYPTION_ALGORITHMS.toList()), // the RSA key size and JWE algorithms supported
-        supportedEncryptionMethods = EncryptionSupportConfig.SUPPORTED_ENCRYPTION_METHODS.toList() // which JWE encryption methods are supported
-    )
+        ecConfig =  EcConfig(curve = Curve.P_256, supportedJWEAlgorithms = ECDHEncrypter.SUPPORTED_ALGORITHMS.toList()), // the EC Curve and JWE algorithms supported
+        rsaConfig =  RsaConfig(rcaKeySize = 4096, supportedJWEAlgorithms = RSAEncrypter.SUPPORTED_ALGORITHMS.toList()), // the RSA key size and JWE algorithms supported
+        supportedEncryptionMethods = ContentCryptoProvider.SUPPORTED_ENCRYPTION_METHODS.toList() // which JWE encryption methods are supported
+    ),
+    supportedReuseMethods = setOf(ReuseMethod.ONCE_ONLY, ReuseMethod.LIMITED_TIME) // which reuse methods are supported
 )
 val credentialOfferUri: String = "..." 
 val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()
