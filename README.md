@@ -318,6 +318,24 @@ val authorizedRequest =
 > reduce the scope of the `access_token` by passing `authorization_details` to the token endpoint.
 > Function `authorizeWithPreAuthorizationCode` supports this via parameter `authDetailsOption: AccessTokenOption`
 
+### Refresh Access Token
+
+A Wallet/Caller can refresh the `AccessToken` of an `AuthorizedRequest` using a `refresh_token` grant.
+
+Prerequisites:
+1. Authorization Server supports `refresh_token` grant
+2. `AuthorizedRequest` contains a `RefreshAccessToken`
+
+Library will perform a `refresh_token` grant, and return the updated `AuthorizedRequest`:
+
+```kotlin
+val authorizedRequest = // has been retrieved in a previous step
+
+val (updatedAuthorizedRequest) =  
+    with(issuer) {
+        authorizedRequest.refresh().getOrThrow()
+    }
+```
 
 ### Place credential request
 
@@ -447,6 +465,7 @@ val (updatedAuthorizedRequest, outcome) =
     }    
 
 ```
+
 #### Query for deferred credentials next steps
 
 - Validate credential and store it. That's out of library scope, or
@@ -623,6 +642,34 @@ val openId4VCIConfig = OpenId4VCIConfig(
 val credentialOfferUri: String = "..." 
 val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()
 ```
+
+### Supported Encryption Algorithms
+
+Library supports the following JWE algorithms:
+
+* `ECDH-ES`
+* `ECDH-ES+A128KW`
+* `ECDH-ES+A192KW`
+* `ECDH-ES+A256KW`
+* `RSA-OAEP-256`
+* `RSA-OAEP-384`
+* `RSA-OAEP-512`
+
+### Supported Encryption Methods
+
+Library supports the following JWE methods:
+
+* `A128CBC-HS256`
+* `A192CBC-HS384`
+* `A256CBC-HS512`
+* `A128GCM`
+* `A192GCM`
+* `A256GCM`
+* `XC20P`
+
+> [!NOTE]
+> 
+> To use `XC20P` the optional dependency `com.google.crypto.tink:tink` is required.
 
 ## Other features
 

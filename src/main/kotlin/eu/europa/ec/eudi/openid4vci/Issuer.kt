@@ -29,6 +29,7 @@ import java.net.URI
  *
  * Provides the following capabilities
  * - [AuthorizeIssuance]
+ * - [RefreshAccessToken]
  * - [RequestIssuance]
  * - [QueryForDeferredCredential]
  * - [NotifyIssuer]
@@ -40,6 +41,7 @@ import java.net.URI
  */
 interface Issuer :
     AuthorizeIssuance,
+    RefreshAccessToken,
     RequestIssuance,
     QueryForDeferredCredential,
     NotifyIssuer {
@@ -183,14 +185,15 @@ interface Issuer :
                 )
             }
 
+            val refreshAccessToken = RefreshAccessTokenImpl(tokenEndpointClient)
+
             val queryForDeferredCredential =
                 when (val deferredEndpoint = credentialOffer.credentialIssuerMetadata.deferredCredentialEndpoint) {
                     null -> QueryForDeferredCredential.NotSupported
                     else -> {
-                        val refreshAccessToken = RefreshAccessToken(config.clock, tokenEndpointClient)
                         val deferredEndPointClient =
                             DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, httpClient)
-                        QueryForDeferredCredential(refreshAccessToken, deferredEndPointClient, issuanceEncryptionSpecs)
+                        QueryForDeferredCredential(config.clock, refreshAccessToken, deferredEndPointClient, issuanceEncryptionSpecs)
                     }
                 }
 
@@ -207,6 +210,7 @@ interface Issuer :
             object :
                 Issuer,
                 AuthorizeIssuance by authorizeIssuance,
+                RefreshAccessToken by refreshAccessToken,
                 RequestIssuance by requestIssuance,
                 QueryForDeferredCredential by queryForDeferredCredential,
                 NotifyIssuer by notifyIssuer {
