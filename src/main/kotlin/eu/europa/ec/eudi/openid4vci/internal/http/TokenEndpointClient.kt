@@ -96,7 +96,6 @@ internal class TokenEndpointClient(
     private val challengeEndpoint: URL?,
     private val tokenEndpoint: URL,
     private val dPoPJwtFactory: DPoPJwtFactory?,
-    private val clientAttestationPoPBuilder: ClientAttestationPoPBuilder,
     private val httpClient: HttpClient,
 ) {
 
@@ -124,7 +123,6 @@ internal class TokenEndpointClient(
         challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL(),
         tokenEndpoint = authorizationServerMetadata.tokenEndpointURI.toURL(),
         dPoPJwtFactory,
-        config.clientAttestationPoPBuilder,
         httpClient,
     )
 
@@ -303,7 +301,7 @@ internal class TokenEndpointClient(
     }
 
     private suspend fun generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
-        provisionedClientAttestation?.let { (clientAttestation, clientAttestationPoPSpec) ->
+        provisionedClientAttestation?.let { (clientAttestation, clientAttestationPoPSpec, clientAttestationPoPBuilder) ->
             with(clientAttestationPoPBuilder) {
                 val popJWT = clientAttestationPoPSpec.attestationPoPJWT(
                     clock,

@@ -260,7 +260,6 @@ interface Issuer :
                                 it.encryptionMethod to it.compressionAlgorithm
                             },
                             dPoPSigner = dPoPJwtFactory?.signer,
-                            clientAttestationPoPBuilder = config.clientAttestationPoPBuilder,
                             clock = config.clock,
                         ),
                         AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),

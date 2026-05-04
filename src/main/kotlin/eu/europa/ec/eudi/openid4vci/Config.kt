@@ -30,8 +30,8 @@ import java.time.Clock
 typealias ClientId = String
 
 /**
- * Provisions a [ClientAttestationJWT] and the relevant [specification][ClientAttestationPoPJWTSpec] to produce a [ClientAttestationPoPJWT],
- * in the context of a specific Authorization Server.
+ * Provisions a [Client Attestation][ClientAttestationJWT], alongside a [specification][ClientAttestationPoPJWTSpec]
+ * and [builder][ClientAttestationPoPBuilder] to produce a [ClientAttestationPoPJWT], in the context of an Authorization Server.
  */
 interface ProvisionClientAttestation {
     val algorithm: JWSAlgorithm
@@ -41,6 +41,7 @@ interface ProvisionClientAttestation {
     data class Provisioned(
         val clientAttestation: ClientAttestationJWT,
         val clientAttestationPoPSpec: ClientAttestationPoPJWTSpec,
+        val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     )
 }
 
@@ -78,7 +79,6 @@ sealed interface ClientAuthentication : java.io.Serializable {
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
  * @param dPoPUsage whether to use DPoP or not
- * @param clientAttestationPoPBuilder a way to build a [ClientAttestationPoPJWT]
  * @param parUsage whether to use PAR in case of authorization code grant
  * @param clock Wallet's clock
  * @param issuerMetadataPolicy policy concerning signed metadata usage
@@ -90,7 +90,6 @@ data class OpenId4VCIConfig(
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPUsage: DPoPUsage = DPoPUsage.Never,
-    val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
@@ -106,7 +105,6 @@ data class OpenId4VCIConfig(
         encryptionSupportConfig: EncryptionSupportConfig,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         dPoPUsage: DPoPUsage = DPoPUsage.Never,
-        clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
@@ -117,7 +115,6 @@ data class OpenId4VCIConfig(
         encryptionSupportConfig,
         authorizeIssuanceConfig,
         dPoPUsage,
-        clientAttestationPoPBuilder,
         parUsage,
         clock,
         issuerMetadataPolicy,
@@ -134,7 +131,6 @@ data class OpenId4VCIConfig(
         encryptionSupportConfig: EncryptionSupportConfig,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         dPoPSigner: Signer<JWK>? = null,
-        clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
@@ -145,7 +141,6 @@ data class OpenId4VCIConfig(
         encryptionSupportConfig,
         authorizeIssuanceConfig,
         dPoPSigner?.let { DPoPUsage.IfSupported(it) } ?: DPoPUsage.Never,
-        clientAttestationPoPBuilder,
         parUsage,
         clock,
         issuerMetadataPolicy,
@@ -162,7 +157,6 @@ data class OpenId4VCIConfig(
         encryptionSupportConfig: EncryptionSupportConfig,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         dPoPSigner: Signer<JWK>? = null,
-        clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
@@ -173,7 +167,6 @@ data class OpenId4VCIConfig(
         encryptionSupportConfig,
         authorizeIssuanceConfig,
         dPoPSigner?.let { DPoPUsage.IfSupported(it) } ?: DPoPUsage.Never,
-        clientAttestationPoPBuilder,
         parUsage,
         clock,
         issuerMetadataPolicy,
