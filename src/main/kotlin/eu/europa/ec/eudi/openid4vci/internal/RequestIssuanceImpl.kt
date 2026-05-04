@@ -104,7 +104,9 @@ internal class RequestIssuanceImpl(
         credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
     ): Pair<List<Proof>, Nonce?> {
-        proofsSpecification.ensureCompatibleWith(credentialConfigId)
+        val credentialConfiguration = credentialSupportedById(credentialConfigId)
+        config.proofs.ensureCompatibleWith(credentialConfiguration.proofTypesSupported)
+        proofsSpecification.ensureCompatibleWith(credentialConfiguration)
 
         return when (proofsSpecification) {
             is ProofsSpecification.NoProofs -> emptyList<Proof>() to null
@@ -147,8 +149,7 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private fun ProofsSpecification.ensureCompatibleWith(credentialConfigId: CredentialConfigurationIdentifier) {
-        val credentialConfiguration = credentialSupportedById(credentialConfigId)
+    private fun ProofsSpecification.ensureCompatibleWith(credentialConfiguration: CredentialConfiguration) {
         val proofTypesSupported = credentialConfiguration.proofTypesSupported
 
         when (this) {
@@ -181,9 +182,11 @@ internal class RequestIssuanceImpl(
             }
 
             is ProofsSpecification.AttestationProof -> {
-                requireNotNull(proofTypesSupported[ProofType.ATTESTATION]) {
+                val proofRequirement = proofTypesSupported[ProofType.ATTESTATION]
+                requireNotNull(proofRequirement) {
                     "Credential configuration doesn't support attestation proofs."
                 }
+                check(proofRequirement is ProofTypeMeta.Attestation)
             }
         }
     }
@@ -403,4 +406,40 @@ internal sealed interface SubmissionOutcomeInternal {
             is Deferred -> SubmissionOutcome.Deferred(transactionId, interval)
             is Failed -> SubmissionOutcome.Failed(error)
         }
+}
+
+private fun ProofsConfig.ensureCompatibleWith(supportedProofTypes: ProofTypesSupported) {
+    when (supportedProofTypes) {
+        ProofTypesSupported.Empty -> {
+            require(supportsNonDeviceBound) { "Wallet doesn't support non-device-bound attestations" }
+        }
+
+        else -> {
+            val deviceBoundConfig = requireNotNull(deviceBound) { "Wallet doesn't support device-bound attestations" }
+
+            val supportsJwtProofs = supportedProofTypes[ProofType.JWT]?.let { jwtProof ->
+                check(jwtProof is ProofTypeMeta.Jwt)
+                val supportsAnySigningAlgorithm =
+                    if (null == deviceBoundConfig.algorithms) true
+                    else jwtProof.algorithms.any { it in deviceBoundConfig.algorithms }
+                val proofType = when (jwtProof.keyAttestationRequirement) {
+                    KeyAttestationRequirement.NotRequired -> ProofsConfig.DeviceBound.Proof.JwtProofWithoutKeyAttestation
+                    is KeyAttestationRequirement.Required -> ProofsConfig.DeviceBound.Proof.JwtProofWithKeyAttestation
+                }
+                val supportsProofType = proofType in deviceBoundConfig.proofs
+                supportsAnySigningAlgorithm && supportsProofType
+            } ?: false
+
+            val supportsAttestationProofs = supportedProofTypes[ProofType.ATTESTATION]?.let { attestationProof ->
+                check(attestationProof is ProofTypeMeta.Attestation)
+                val supportsAnySigningAlgorithm =
+                    if (null == deviceBoundConfig.algorithms) true
+                    else attestationProof.algorithms.any { it in deviceBoundConfig.algorithms }
+                val supportsProofType = ProofsConfig.DeviceBound.Proof.AttestationProof in deviceBoundConfig.proofs
+                supportsAnySigningAlgorithm && supportsProofType
+            } ?: false
+
+            require(supportsJwtProofs || supportsAttestationProofs) { "Wallet doesn't support any of the advertised Proofs" }
+        }
+    }
 }
