@@ -263,13 +263,13 @@ internal class CredentialReusePolicyTest {
             ),
         )
         // If ROTATING_BATCH is not supported, it should pick the second one
-        assertEquals(10, policy.effectiveBatchSize(setOf(EudiReusePolicyType.OnceOnly)))
+        assertEquals(10, policy.effectiveBatchSize(CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly))))
 
         // If ROTATING_BATCH is supported, it should pick the first one
         assertEquals(
             5,
             policy.effectiveBatchSize(
-                setOf(EudiReusePolicyType.LimitedTime, EudiReusePolicyType.RotatingBatch),
+                CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.LimitedTime, EudiReusePolicyType.RotatingBatch)),
             ),
         )
     }
@@ -288,7 +288,7 @@ internal class CredentialReusePolicyTest {
             ),
         )
         // Only LIMITED_TIME is supported, which doesn't have batch_size
-        assertNull(policy.effectiveBatchSize(setOf(EudiReusePolicyType.LimitedTime)))
+        assertNull(policy.effectiveBatchSize(CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.LimitedTime))))
     }
 
     @Test
@@ -314,7 +314,8 @@ internal class CredentialReusePolicyTest {
                 clientAuthentication = ClientAuthentication.None("wallet"),
                 authFlowRedirectionURI = URI("eudi-openid4vci://cb"),
                 encryptionSupportConfig = EncryptionSupportConfig.invoke(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-                supportedCredentialReusePolicies = setOf(EudiReusePolicyType.RotatingBatch),
+                dPoPUsage = DPoPUsage.Never,
+                supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.RotatingBatch)),
             )
         }
     }
@@ -326,8 +327,23 @@ internal class CredentialReusePolicyTest {
                 clientAuthentication = ClientAuthentication.None("wallet"),
                 authFlowRedirectionURI = URI("eudi-openid4vci://cb"),
                 encryptionSupportConfig = EncryptionSupportConfig.invoke(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-                supportedCredentialReusePolicies = setOf(EudiReusePolicyType.OnceOnly),
+                dPoPUsage = DPoPUsage.Never,
+                supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
             )
         }
+    }
+
+    @Test
+    fun `isSupported returns true if the policy type is in the supported policies`() {
+        val policy = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly))
+        assertTrue(EudiReusePolicy.OnceOnly(10, 2).isSupported(policy))
+        assertFalse(EudiReusePolicy.LimitedTime(100.seconds).isSupported(policy))
+    }
+
+    @Test
+    fun `isSupported returns true if the policy type is in the required policies`() {
+        val policy = CredentialReusePolicies.Required(setOf(EudiReusePolicyType.OnceOnly))
+        assertTrue(EudiReusePolicy.OnceOnly(10, 2).isSupported(policy))
+        assertFalse(EudiReusePolicy.LimitedTime(100.seconds).isSupported(policy))
     }
 }

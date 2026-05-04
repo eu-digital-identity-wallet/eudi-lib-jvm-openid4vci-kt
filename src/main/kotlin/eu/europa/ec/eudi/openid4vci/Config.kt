@@ -85,16 +85,8 @@ data class OpenId4VCIConfig(
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
-    val supportedCredentialReusePolicies: Set<EudiReusePolicyType>? = null,
+    val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
 ) {
-
-    init {
-        supportedCredentialReusePolicies?.let {
-            require(it.contains(EudiReusePolicyType.OnceOnly) || it.contains(EudiReusePolicyType.LimitedTime)) {
-                "supportedCredentialReusePolicies must contain at least one of OnceOnly or LimitedTime"
-            }
-        }
-    }
 
     /**
      * Creates a new [OpenId4VCIConfig] instance for a Wallet that uses [a Public OAuth 2.0 Client][ClientAuthentication.None].
@@ -109,6 +101,7 @@ data class OpenId4VCIConfig(
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+        supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     ) : this(
         ClientAuthentication.None(clientId),
         authFlowRedirectionURI,
@@ -119,6 +112,7 @@ data class OpenId4VCIConfig(
         parUsage,
         clock,
         issuerMetadataPolicy,
+        supportedCredentialReusePolicies,
     )
 
     /**
@@ -135,6 +129,7 @@ data class OpenId4VCIConfig(
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+        supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     ) : this (
         clientAuthentication,
         authFlowRedirectionURI,
@@ -145,6 +140,7 @@ data class OpenId4VCIConfig(
         parUsage,
         clock,
         issuerMetadataPolicy,
+        supportedCredentialReusePolicies,
     )
 
     /**
@@ -161,7 +157,7 @@ data class OpenId4VCIConfig(
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
-        supportedCredentialReusePolicies: Set<EudiReusePolicyType>? = null,
+        supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     ) : this(
         ClientAuthentication.None(clientId),
         authFlowRedirectionURI,
@@ -181,6 +177,37 @@ data class OpenId4VCIConfig(
     )
     val clientId: ClientId
         get() = clientAuthentication.id
+}
+
+/**
+ * Wallet's policy regarding supported credential reuse policies.
+ */
+sealed interface CredentialReusePolicies {
+    val policyTypes: Set<EudiReusePolicyType>
+
+    /**
+     * The Wallet supports the provided reuse policies.
+     */
+    data class Supported(override val policyTypes: Set<EudiReusePolicyType>) : CredentialReusePolicies {
+        init {
+            require(policyTypes.isNotEmpty()) { "policyTypes must not be empty" }
+            require(policyTypes.contains(EudiReusePolicyType.OnceOnly) || policyTypes.contains(EudiReusePolicyType.LimitedTime)) {
+                "policyTypes must contain at least one of OnceOnly or LimitedTime"
+            }
+        }
+    }
+
+    /**
+     * The Wallet requires at least one of the provided reuse policies to be used.
+     */
+    data class Required(override val policyTypes: Set<EudiReusePolicyType>) : CredentialReusePolicies {
+        init {
+            require(policyTypes.isNotEmpty()) { "policyTypes must not be empty" }
+            require(policyTypes.contains(EudiReusePolicyType.OnceOnly) || policyTypes.contains(EudiReusePolicyType.LimitedTime)) {
+                "policyTypes must contain at least one of OnceOnly or LimitedTime"
+            }
+        }
+    }
 }
 
 /**

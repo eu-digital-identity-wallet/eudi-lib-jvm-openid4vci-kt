@@ -52,7 +52,7 @@ sealed interface EudiReusePolicy {
     /**
      * Checks if the client supports this reuse policy option.
      */
-    fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>?): Boolean
+    fun isSupported(supportedReusePolicies: CredentialReusePolicies?): Boolean
 
     data class OnceOnly(
         override val batchSize: Int,
@@ -64,8 +64,8 @@ sealed interface EudiReusePolicy {
             validateReissueTriggerUnused(reissueTriggerUnused, batchSize)
         }
 
-        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>?): Boolean =
-            supportedReusePolicies?.contains(EudiReusePolicyType.OnceOnly) ?: false
+        override fun isSupported(supportedReusePolicies: CredentialReusePolicies?): Boolean =
+            supportedReusePolicies?.policyTypes?.contains(EudiReusePolicyType.OnceOnly) ?: false
 
         override val reissueTriggerLifetimeLeft: Duration? = null
     }
@@ -78,8 +78,8 @@ sealed interface EudiReusePolicy {
             validateReissueTriggerLifetimeLeft(reissueTriggerLifetimeLeft)
         }
 
-        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>?): Boolean =
-            supportedReusePolicies?.contains(EudiReusePolicyType.LimitedTime) ?: false
+        override fun isSupported(supportedReusePolicies: CredentialReusePolicies?): Boolean =
+            supportedReusePolicies?.policyTypes?.contains(EudiReusePolicyType.LimitedTime) ?: false
 
         override val reissueTriggerUnused: Int? = null
         override val batchSize: Int? = null
@@ -97,8 +97,8 @@ sealed interface EudiReusePolicy {
 
         override val reissueTriggerUnused: Int? = null
 
-        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>?): Boolean =
-            supportedReusePolicies?.contains(EudiReusePolicyType.RotatingBatch) ?: false
+        override fun isSupported(supportedReusePolicies: CredentialReusePolicies?): Boolean =
+            supportedReusePolicies?.policyTypes?.contains(EudiReusePolicyType.RotatingBatch) ?: false
     }
 
     data class PerRelyingParty(
@@ -113,8 +113,8 @@ sealed interface EudiReusePolicy {
             validateReissueTriggerUnused(reissueTriggerUnused, batchSize)
         }
 
-        override fun isSupported(supportedReusePolicies: Set<EudiReusePolicyType>?): Boolean =
-            supportedReusePolicies?.contains(EudiReusePolicyType.PerRelyingParty) ?: false
+        override fun isSupported(supportedReusePolicies: CredentialReusePolicies?): Boolean =
+            supportedReusePolicies?.policyTypes?.contains(EudiReusePolicyType.PerRelyingParty) ?: false
     }
 
     companion object {

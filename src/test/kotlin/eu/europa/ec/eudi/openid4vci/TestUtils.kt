@@ -149,7 +149,7 @@ suspend fun preAuthorizeRequestForCredentialOffer(
     return authorizedRequest to issuer
 }
 
-fun CredentialReusePolicy.effectiveBatchSize(supportedReusePolicies: Set<EudiReusePolicyType>): Int? =
+fun CredentialReusePolicy.effectiveBatchSize(supportedReusePolicies: CredentialReusePolicies): Int? =
     when (this) {
         is CredentialReusePolicy.EUDI -> {
             options

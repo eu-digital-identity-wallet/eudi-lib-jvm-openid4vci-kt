@@ -204,7 +204,30 @@ internal class RequestIssuanceImpl(
     private fun selectCredentialReusePolicy(
         credentialConfiguration: CredentialConfiguration,
     ): EudiReusePolicy? {
-        val reusePolicy = credentialConfiguration.credentialMetadata?.credentialReusePolicy ?: return null
+        val reusePolicy = credentialConfiguration.credentialMetadata?.credentialReusePolicy
+        val issuerEudiReuseTypes = when (reusePolicy) {
+            is CredentialReusePolicy.EUDI -> {
+                reusePolicy.options.map {
+                    when (it) {
+                        is EudiReusePolicy.OnceOnly -> EudiReusePolicyType.OnceOnly
+                        is EudiReusePolicy.LimitedTime -> EudiReusePolicyType.LimitedTime
+                        is EudiReusePolicy.RotatingBatch -> EudiReusePolicyType.RotatingBatch
+                        is EudiReusePolicy.PerRelyingParty -> EudiReusePolicyType.PerRelyingParty
+                    }
+                }.toSet()
+            }
+            else -> null
+        }
+
+        if (config.supportedCredentialReusePolicies is CredentialReusePolicies.Required) {
+            requireNotNull(issuerEudiReuseTypes) {
+                "Credential reuse policies are required but not supported by issuer"
+            }
+            require(config.supportedCredentialReusePolicies.policyTypes.intersect(issuerEudiReuseTypes).isNotEmpty()) {
+                "None of the required credential reuse policies are supported by issuer"
+            }
+        }
+
         return when (reusePolicy) {
             is CredentialReusePolicy.EUDI -> {
                 val selectedPolicy = reusePolicy.options.firstOrNull {
