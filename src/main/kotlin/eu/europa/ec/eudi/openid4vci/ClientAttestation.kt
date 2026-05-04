@@ -182,3 +182,19 @@ fun interface ClientAttestationPoPBuilder {
         val Default: ClientAttestationPoPBuilder = DefaultClientAttestationPoPBuilder
     }
 }
+
+internal suspend fun ProvisionClientAttestation.Provisioned.generateClientAttestation(
+    clock: Clock,
+    clientId: ClientId,
+    authorizationServerId: URL,
+    challenge: Nonce?,
+): ClientAttestation =
+    with(clientAttestationPoPBuilder) {
+        val popJWT = clientAttestationPoPSpec.attestationPoPJWT(
+            clock,
+            clientId,
+            authorizationServerId,
+            challenge,
+        )
+        ClientAttestation(clientAttestation, popJWT)
+    }

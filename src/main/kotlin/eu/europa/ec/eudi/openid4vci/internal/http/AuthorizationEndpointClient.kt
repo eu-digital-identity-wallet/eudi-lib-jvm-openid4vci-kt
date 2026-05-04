@@ -280,7 +280,12 @@ internal class AuthorizationEndpointClient(
                 if (null != provisionedClientAttestation) existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
                 else null
 
-            val clientAttestation = generateClientAttestationIfNeeded(abcaChallenge)
+            val clientAttestation = provisionedClientAttestation?.generateClientAttestation(
+                config.clock,
+                config.clientAuthentication.id,
+                URI(authorizationIssuer).toURL(),
+                abcaChallenge,
+            )
 
             val response = httpClient.submitForm(url.toString(), formParameters) {
                 clientAttestation?.let {
@@ -343,19 +348,6 @@ internal class AuthorizationEndpointClient(
             dpopNonceRetried = false,
         )
     }
-
-    private suspend fun generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
-        provisionedClientAttestation?.let { (clientAttestation, clientAttestationPoPSpec, clientAttestationPoPBuilder) ->
-            with(clientAttestationPoPBuilder) {
-                val popJWT = clientAttestationPoPSpec.attestationPoPJWT(
-                    config.clock,
-                    config.clientAuthentication.id,
-                    URI(authorizationIssuer).toURL(),
-                    challenge,
-                )
-                clientAttestation to popJWT
-            }
-        }
 
     private fun PushedAuthorizationRequest.asFormPostParams(): Map<String, String> =
         authorizationRequest.toParameters().mapValues { (_, value) -> value[0] }.toMap()

@@ -217,14 +217,21 @@ internal class TokenEndpointClient(
                 if (null != provisionedClientAttestation) existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
                 else null
 
+            val clientAttestation = provisionedClientAttestation?.generateClientAttestation(
+                clock,
+                clientId,
+                authServerId,
+                abcaChallenge,
+            )
+
             val response = run {
                 val formParameters = Parameters.build {
                     params.entries.forEach { (k, v) -> append(k, v) }
                 }
+
                 val dpopProof =
                     dPoPJwtFactory?.createDPoPJwt(Htm.POST, tokenEndpoint, null, existingDpopNonce)
                         ?.getOrThrow()?.serialize()
-                val clientAttestation = generateClientAttestationIfNeeded(abcaChallenge)
 
                 httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
                     dpopProof?.let { header(DPoP, it) }
@@ -299,19 +306,6 @@ internal class TokenEndpointClient(
         }
             .toFormParamString()
     }
-
-    private suspend fun generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
-        provisionedClientAttestation?.let { (clientAttestation, clientAttestationPoPSpec, clientAttestationPoPBuilder) ->
-            with(clientAttestationPoPBuilder) {
-                val popJWT = clientAttestationPoPSpec.attestationPoPJWT(
-                    clock,
-                    clientId,
-                    authServerId,
-                    challenge,
-                )
-                clientAttestation to popJWT
-            }
-        }
 }
 
 internal object TokenEndpointForm {
