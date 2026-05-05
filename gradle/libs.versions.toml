@@ -1,11 +1,11 @@
 [versions]
 java = "17"
-kotlin = "2.2.21"
+kotlin = "2.3.21"
 coroutines = "1.10.2"
 dependency-check = "12.2.0"
 spotless = "7.0.2"
 nimbus-sdk = "11.37"
-ktor = "3.3.3"
+ktor = "3.4.3"
 jsoup = "1.22.1"
 cbor = "0.9"
 ktlint = "0.50.0"
@@ -15,7 +15,7 @@ logback = "1.5.32"
 kover = "0.9.8"
 tink = "1.21.0"
 bouncycastle = "1.83"
-serialization = "1.9.0"
+serialization = "1.11.0"
 
 [libraries]
 nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
