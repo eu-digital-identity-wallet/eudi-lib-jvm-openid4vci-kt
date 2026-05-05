@@ -108,22 +108,29 @@ interface Issuer :
          * @return if wallet's [config] can satisfy the requirements of [credentialOffer] an [Issuer] will be
          * created. Otherwise, there would be a failed result
          */
-        fun make(
+        suspend fun make(
             config: OpenId4VCIConfig,
             credentialOffer: CredentialOffer,
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<Issuer> = runCatching {
-            config.clientAuthentication.ensureSupportedByAuthorizationServer(
-                credentialOffer.authorizationServerMetadata,
-            )
-
             val dPoPJwtFactory = DPoPJwtFactory.createForServer(
                 dPoPUsage = config.dPoPUsage,
                 clock = config.clock,
                 oauthServerMetadata = credentialOffer.authorizationServerMetadata,
             ).getOrThrow()
+
+            val provisionedClientAttestation =
+                when (val clientAuthentication = config.clientAuthentication) {
+                    is ClientAuthentication.AttestationBased -> {
+                        val authorizationServer = HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
+                        val provisionedClientAttestation = clientAuthentication.provisionClientAttestation(authorizationServer)
+                        provisionedClientAttestation.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
+                        provisionedClientAttestation
+                    }
+                    else -> null
+                }
 
             val authorizationEndpointClient =
                 credentialOffer.authorizationServerMetadata
@@ -134,6 +141,7 @@ interface Issuer :
                             credentialOffer.authorizationServerMetadata,
                             config,
                             dPoPJwtFactory,
+                            provisionedClientAttestation,
                             httpClient,
                         )
                     }
@@ -144,6 +152,7 @@ interface Issuer :
                     credentialOffer.authorizationServerMetadata,
                     config,
                     dPoPJwtFactory,
+                    provisionedClientAttestation,
                     httpClient,
                 )
 
@@ -251,7 +260,6 @@ interface Issuer :
                                 it.encryptionMethod to it.compressionAlgorithm
                             },
                             dPoPSigner = dPoPJwtFactory?.signer,
-                            clientAttestationPoPBuilder = config.clientAttestationPoPBuilder,
                             clock = config.clock,
                         ),
                         AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
@@ -331,25 +339,25 @@ interface Issuer :
     }
 }
 
-internal fun ClientAuthentication.ensureSupportedByAuthorizationServer(authorizationServerMetadata: CIAuthorizationServerMetadata) {
-    if (this is ClientAuthentication.AttestationBased) {
-        val supportedAuthenticationMethods = authorizationServerMetadata.tokenEndpointAuthMethods.orEmpty()
-        val authenticationMethod =
-            ClientAuthenticationMethod(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_CLIENT_AUTHENTICATION_METHOD)
-        require(authenticationMethod in supportedAuthenticationMethods) {
-            "${authenticationMethod.value} Authentication Method not supported by Authorization Server"
-        }
+internal fun ProvisionClientAttestation.Provisioned.ensureSupportedByAuthorizationServer(
+    authorizationServerMetadata: CIAuthorizationServerMetadata,
+) {
+    val supportedAuthenticationMethods = authorizationServerMetadata.tokenEndpointAuthMethods.orEmpty()
+    val authenticationMethod =
+        ClientAuthenticationMethod(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_CLIENT_AUTHENTICATION_METHOD)
+    require(authenticationMethod in supportedAuthenticationMethods) {
+        "${authenticationMethod.value} Authentication Method not supported by Authorization Server"
+    }
 
-        val supportedClientAttestationJWSAlgs = authorizationServerMetadata.clientAttestationJWSAlgs.orEmpty()
-        val clientAttestationJWSAlg = attestationJWT.jwt.header.algorithm
-        require(clientAttestationJWSAlg in supportedClientAttestationJWSAlgs) {
-            "${clientAttestationJWSAlg.name} Client Attestation JWS Algorithm not supported by Authorization Server"
-        }
+    val supportedClientAttestationJWSAlgs = authorizationServerMetadata.clientAttestationJWSAlgs.orEmpty()
+    val clientAttestationJWSAlg = clientAttestation.jwt.header.algorithm
+    require(clientAttestationJWSAlg in supportedClientAttestationJWSAlgs) {
+        "${clientAttestationJWSAlg.name} Client Attestation JWS Algorithm not supported by Authorization Server"
+    }
 
-        val supportedClientAttestationPOPJWSAlgs = authorizationServerMetadata.clientAttestationPOPJWSAlgs.orEmpty()
-        val clientAttestationPOPJWSAlg = popJwtSpec.signer.javaAlgorithm.toJoseAlg()
-        require(clientAttestationPOPJWSAlg in supportedClientAttestationPOPJWSAlgs) {
-            "${clientAttestationPOPJWSAlg.name} Client Attestation POP JWS Algorithm not supported by Authorization Server"
-        }
+    val supportedClientAttestationPOPJWSAlgs = authorizationServerMetadata.clientAttestationPOPJWSAlgs.orEmpty()
+    val clientAttestationPOPJWSAlg = clientAttestationPoPSpec.signer.javaAlgorithm.toJoseAlg()
+    require(clientAttestationPOPJWSAlg in supportedClientAttestationPOPJWSAlgs) {
+        "${clientAttestationPOPJWSAlg.name} Client Attestation POP JWS Algorithm not supported by Authorization Server"
     }
 }

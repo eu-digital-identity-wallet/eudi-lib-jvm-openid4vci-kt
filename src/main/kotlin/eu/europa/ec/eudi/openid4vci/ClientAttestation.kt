@@ -131,8 +131,9 @@ fun interface ClientAttestationPoPBuilder {
      *
      * @return the PoP JWT
      */
-    suspend fun ClientAuthentication.AttestationBased.attestationPoPJWT(
+    suspend fun ClientAttestationPoPJWTSpec.attestationPoPJWT(
         clock: Clock,
+        clientId: ClientId,
         authorizationServerId: URL,
         challenge: Nonce?,
     ): ClientAttestationPoPJWT
@@ -164,3 +165,19 @@ private fun SignedJWT.ensureType(expectedType: JOSEObjectType) {
         "Expected SignedJWT `typ` to be '${expectedType.type}', but found '${header.type?.type}' instead"
     }
 }
+
+internal suspend fun ProvisionClientAttestation.Provisioned.generateClientAttestation(
+    clock: Clock,
+    clientId: ClientId,
+    authorizationServerId: URL,
+    challenge: Nonce?,
+): ClientAttestation =
+    with(clientAttestationPoPBuilder) {
+        val popJWT = clientAttestationPoPSpec.attestationPoPJWT(
+            clock,
+            clientId,
+            authorizationServerId,
+            challenge,
+        )
+        ClientAttestation(clientAttestation, popJWT)
+    }

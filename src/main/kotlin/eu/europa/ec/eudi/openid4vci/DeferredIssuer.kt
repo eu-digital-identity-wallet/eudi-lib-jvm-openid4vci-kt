@@ -34,9 +34,8 @@ import java.time.Clock
  * @param deferredEndpoint the URL of the deferred endpoint
  * @param challengeEndpoint the URL of the challenge endpoint for Attestation-Based Client Authentication provided by the Authorization Server
  * @param tokenEndpoint the URL of the token endpoint. Will be used if needed, to refresh the access token
- * @param authServerId the URL of the authorization server that was selected for authenticating the initial request.
+ * @param authorizationServerId the URL of the authorization server that was selected for authenticating the initial request.
  * @param credentialIssuerId the ID of the Credential Issuer
- * @param clientAttestationPoPBuilder the builder for the client attestation proof of possession.
  *   Must be provided only if client was of Client.Attested kind.
  * @param requestEncryptionSpec the request encryption spec. Must be provided only if request encryption was used in the initial request.
  * @param responseEncryptionParams encryption method and compression algorithm as/if used in the initial request.
@@ -53,7 +52,6 @@ data class DeferredIssuerConfig(
     val requestEncryptionSpec: EncryptionSpec?,
     val responseEncryptionParams: Pair<EncryptionMethod, CompressionAlgorithm?>?,
     val dPoPSigner: Signer<JWK>? = null,
-    val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
     val clock: Clock = Clock.systemDefaultZone(),
 )
 
@@ -162,7 +160,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
          *
          * @return the deferred issuer instance
          */
-        fun make(
+        suspend fun make(
             config: DeferredIssuerConfig,
             responseEncryptionKey: JWK?,
             httpClient: HttpClient,
@@ -171,16 +169,25 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                 DPoPJwtFactory(signer = signer, clock = config.clock)
             }
 
+            val provisionedClientAttestation =
+                when (val clientAuthentication = config.clientAuthentication) {
+                    is ClientAuthentication.AttestationBased -> {
+                        val authorizationServer = HttpsUrl(config.authorizationServerId.toExternalForm()).getOrThrow()
+                        clientAuthentication.provisionClientAttestation(authorizationServer)
+                    }
+                    else -> null
+                }
+
             val tokenEndpointClient = TokenEndpointClient(
                 config.credentialIssuerId,
                 config.clock,
-                config.clientAuthentication,
+                config.clientAuthentication.id,
+                provisionedClientAttestation,
                 URI.create("https://willNotBeUsed"), // this will not be used
                 config.authorizationServerId,
                 challengeEndpoint = config.challengeEndpoint,
                 tokenEndpoint = config.tokenEndpoint,
                 dPoPJwtFactory,
-                config.clientAttestationPoPBuilder,
                 httpClient,
             )
 
