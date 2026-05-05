@@ -183,6 +183,7 @@ data class Display(
 data class CredentialMetadata(
     val display: List<Display>? = emptyList(),
     val claims: List<Claim>? = emptyList(),
+    val credentialReusePolicy: CredentialReusePolicy = CredentialReusePolicy.None,
 )
 
 /**

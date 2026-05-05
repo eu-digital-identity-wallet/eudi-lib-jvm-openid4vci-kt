@@ -58,8 +58,15 @@ internal class RequestIssuanceImpl(
         proofsSpecification: ProofsSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatchingCancellable {
         validateRequestPayload(requestPayload, credentialIdentifiers.orEmpty())
+        val credentialConfiguration = credentialSupportedById(requestPayload.credentialConfigurationIdentifier)
+        val selectedCredentialReusePolicy = selectCredentialReusePolicy(credentialConfiguration)
 
-        val (proofs, proofsDpopNonce) = buildProofs(proofsSpecification, requestPayload.credentialConfigurationIdentifier, grant)
+        val (proofs, proofsDpopNonce) = buildProofs(
+            proofsSpecification,
+            selectedCredentialReusePolicy,
+            requestPayload.credentialConfigurationIdentifier,
+            grant,
+        )
         val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
 
         // Place the request
@@ -74,7 +81,7 @@ internal class RequestIssuanceImpl(
         // Update state (maybe) with new Dpop Nonce from resource server
         val updatedAuthorizedRequest =
             this.withResourceServerDpopNonce(newResourceServerDpopNonce ?: proofsOrAuthRequestDpopNonce)
-        updatedAuthorizedRequest to outcome.toPub()
+        updatedAuthorizedRequest to outcome.withSelectedCredentialReusePolicy(selectedCredentialReusePolicy).toPub()
     }
 
     private fun validateRequestPayload(
@@ -101,6 +108,7 @@ internal class RequestIssuanceImpl(
 
     private suspend fun buildProofs(
         proofsSpecification: ProofsSpecification,
+        selectedReusePolicy: EudiReusePolicy?,
         credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
     ): Pair<List<Proof>, Nonce?> {
@@ -114,6 +122,7 @@ internal class RequestIssuanceImpl(
                 val proofs = listOf(
                     jwtProofWithKeyAttestation(
                         proofsSpecification,
+                        selectedReusePolicy,
                         credentialConfigId,
                         grant,
                         cNonceAndDPoPNonce?.cnonce,
@@ -126,6 +135,7 @@ internal class RequestIssuanceImpl(
                 val cNonceAndDPoPNonce = cNonce()
                 val proofs = jwtProofsWithoutKeyAttestation(
                     proofsSpecification,
+                    selectedReusePolicy,
                     credentialConfigId,
                     grant,
                     cNonceAndDPoPNonce?.cnonce,
@@ -138,6 +148,7 @@ internal class RequestIssuanceImpl(
                 val proofs = listOf(
                     attestationProof(
                         proofsSpecification,
+                        selectedReusePolicy,
                         credentialConfigId,
                         cNonceAndDPoPNonce?.cnonce,
                     ),
@@ -147,7 +158,9 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private fun ProofsSpecification.ensureCompatibleWith(credentialConfigId: CredentialConfigurationIdentifier) {
+    private fun ProofsSpecification.ensureCompatibleWith(
+        credentialConfigId: CredentialConfigurationIdentifier,
+    ) {
         val credentialConfiguration = credentialSupportedById(credentialConfigId)
         val proofTypesSupported = credentialConfiguration.proofTypesSupported
 
@@ -188,6 +201,47 @@ internal class RequestIssuanceImpl(
         }
     }
 
+    private fun selectCredentialReusePolicy(
+        credentialConfiguration: CredentialConfiguration,
+    ): EudiReusePolicy? {
+        val reusePolicy = credentialConfiguration.credentialMetadata?.credentialReusePolicy
+        val issuerEudiReuseTypes = when (reusePolicy) {
+            is CredentialReusePolicy.EUDI -> {
+                reusePolicy.options.map {
+                    when (it) {
+                        is EudiReusePolicy.OnceOnly -> EudiReusePolicyType.OnceOnly
+                        is EudiReusePolicy.LimitedTime -> EudiReusePolicyType.LimitedTime
+                        is EudiReusePolicy.RotatingBatch -> EudiReusePolicyType.RotatingBatch
+                        is EudiReusePolicy.PerRelyingParty -> EudiReusePolicyType.PerRelyingParty
+                    }
+                }.toSet()
+            }
+            else -> null
+        }
+
+        if (config.supportedCredentialReusePolicies is CredentialReusePolicies.Required) {
+            requireNotNull(issuerEudiReuseTypes) {
+                "Credential reuse policies are required but not supported by issuer"
+            }
+            require(config.supportedCredentialReusePolicies.policyTypes.intersect(issuerEudiReuseTypes).isNotEmpty()) {
+                "None of the required credential reuse policies are supported by issuer"
+            }
+        }
+
+        return when (reusePolicy) {
+            is CredentialReusePolicy.EUDI -> {
+                val selectedPolicy = reusePolicy.options.firstOrNull {
+                    it.isSupported(config.supportedCredentialReusePolicies)
+                }
+                requireNotNull(selectedPolicy) {
+                    "The configured credential reuse policies cannot support the credential's reuse policy."
+                }
+            }
+
+            else -> null
+        }
+    }
+
     private fun credentialSupportedById(credentialId: CredentialConfigurationIdentifier): CredentialConfiguration {
         val credentialSupported =
             credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported[credentialId]
@@ -198,6 +252,7 @@ internal class RequestIssuanceImpl(
 
     private suspend fun jwtProofWithKeyAttestation(
         proofsSpecification: ProofsSpecification.JwtProofs.WithKeyAttestation,
+        selectedReusePolicy: EudiReusePolicy?,
         credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
         cNonce: Nonce?,
@@ -211,6 +266,7 @@ internal class RequestIssuanceImpl(
         val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
         val jwtProof = proofSigner.use { operation ->
             operation.publicMaterial.ensureKeyAttestationJwtAlgIsSupported(credentialConfigId, ProofType.JWT)
+            operation.publicMaterial.attestedKeys.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
             val signer = KeyAttestationJwtProofSigner(joseAlg, operation, keyIndex)
             val signedJwt = signer.sign(claims)
             SignedJWT.parse(signedJwt)
@@ -233,6 +289,7 @@ internal class RequestIssuanceImpl(
 
     private suspend fun jwtProofsWithoutKeyAttestation(
         proofsSpecification: ProofsSpecification.JwtProofs.NoKeyAttestation,
+        selectedReusePolicy: EudiReusePolicy?,
         credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
         cNonce: Nonce?,
@@ -242,7 +299,7 @@ internal class RequestIssuanceImpl(
             javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
         }
         return proofsSpecification.proofsSigner.use { operation ->
-            operation.assertMatchesBatchIssuanceBatchSize()
+            operation.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
             val proofsSigner = JwtProofsSigner(joseAlg, operation)
             val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
             proofsSigner.sign(claims).map {
@@ -253,30 +310,57 @@ internal class RequestIssuanceImpl(
 
     private suspend fun attestationProof(
         proofsSpecification: ProofsSpecification.AttestationProof,
+        selectedReusePolicy: EudiReusePolicy?,
         credentialConfigId: CredentialConfigurationIdentifier,
         cNonce: Nonce?,
     ): Proof.Attestation {
         val keyAttestationJwt = proofsSpecification.attestationProvider(cNonce)
         keyAttestationJwt.ensureKeyAttestationJwtAlgIsSupported(credentialConfigId, ProofType.ATTESTATION)
+        keyAttestationJwt.attestedKeys.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
         return Proof.Attestation(keyAttestationJwt)
     }
 
-    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize() =
-        when (val popSignersNo = operations.size) {
-            0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
-            1 -> Unit
-            else -> {
+    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize(
+        selectedReusePolicy: EudiReusePolicy?,
+    ) = operations.size.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
+
+    private fun List<JWK>.assertMatchesBatchIssuanceBatchSize(
+        selectedReusePolicy: EudiReusePolicy?,
+    ) = size.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
+
+    private fun Int.assertMatchesBatchIssuanceBatchSize(
+        selectedReusePolicy: EudiReusePolicy?,
+    ) = when (this) {
+        0 -> error("At least one PopSigner is required in Authorized.ProofRequired")
+        1 -> Unit
+        else -> {
+            if (selectedReusePolicy != null) {
+                when (selectedReusePolicy) {
+                    is EudiReusePolicy.LimitedTime ->
+                        throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+
+                    else -> {
+                        val policyBatchSize = checkNotNull(selectedReusePolicy.batchSize) {
+                            "Batch reuse policy ${selectedReusePolicy::class} with null batch size"
+                        }
+                        ensure(this <= policyBatchSize) {
+                            CredentialIssuanceError.IssuerBatchSizeLimitExceeded(policyBatchSize)
+                        }
+                    }
+                }
+            } else {
                 when (batchCredentialIssuance) {
-                    BatchCredentialIssuance.NotSupported -> CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+                    BatchCredentialIssuance.NotSupported -> throw CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
                     is BatchCredentialIssuance.Supported -> {
                         val maxBatchSize = batchCredentialIssuance.batchSize
-                        ensure(popSignersNo <= maxBatchSize) {
+                        ensure(this <= maxBatchSize) {
                             CredentialIssuanceError.IssuerBatchSizeLimitExceeded(maxBatchSize)
                         }
                     }
                 }
             }
         }
+    }
 
     private fun String.toSupportedJoseAlgorithm(credentialConfigId: CredentialConfigurationIdentifier): JWSAlgorithm {
         val proofTypesSupported = credentialSupportedById(credentialConfigId).proofTypesSupported
@@ -382,6 +466,7 @@ internal sealed interface SubmissionOutcomeInternal {
     data class Success(
         val credentials: List<IssuedCredential>,
         val notificationId: NotificationId?,
+        val selectedCredentialReusePolicy: EudiReusePolicy? = null,
     ) : SubmissionOutcomeInternal
 
     data class Deferred(
@@ -399,8 +484,16 @@ internal sealed interface SubmissionOutcomeInternal {
 
     fun toPub(): SubmissionOutcome =
         when (this) {
-            is Success -> SubmissionOutcome.Success(credentials, notificationId)
+            is Success -> SubmissionOutcome.Success(credentials, notificationId, selectedCredentialReusePolicy)
             is Deferred -> SubmissionOutcome.Deferred(transactionId, interval)
             is Failed -> SubmissionOutcome.Failed(error)
+        }
+
+    fun withSelectedCredentialReusePolicy(
+        selectedCredentialReusePolicy: EudiReusePolicy?,
+    ): SubmissionOutcomeInternal =
+        when (this) {
+            is Success -> copy(selectedCredentialReusePolicy = selectedCredentialReusePolicy)
+            is Deferred, is Failed -> this
         }
 }
