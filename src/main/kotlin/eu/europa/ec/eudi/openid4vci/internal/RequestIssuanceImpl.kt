@@ -509,12 +509,12 @@ private fun ProofsConfig.ensureCompatibleWith(supportedProofTypes: ProofTypesSup
                 val supportsAnySigningAlgorithm =
                     if (null == deviceBoundConfig.algorithms) true
                     else jwtProof.algorithms.any { it in deviceBoundConfig.algorithms }
-                val proofType = when (jwtProof.keyAttestationRequirement) {
+                val requiredProofType = when (jwtProof.keyAttestationRequirement) {
                     KeyAttestationRequirement.NotRequired -> ProofsConfig.DeviceBound.Proof.JwtProofWithoutKeyAttestation
                     is KeyAttestationRequirement.Required -> ProofsConfig.DeviceBound.Proof.JwtProofWithKeyAttestation
                 }
-                val supportsProofType = proofType in deviceBoundConfig.proofs
-                supportsAnySigningAlgorithm && supportsProofType
+                val supportsRequiredProofType = requiredProofType in deviceBoundConfig.proofs
+                supportsAnySigningAlgorithm && supportsRequiredProofType
             } ?: false
 
             val supportsAttestationProofs = supportedProofTypes[ProofType.ATTESTATION]?.let { attestationProof ->
@@ -522,8 +522,8 @@ private fun ProofsConfig.ensureCompatibleWith(supportedProofTypes: ProofTypesSup
                 val supportsAnySigningAlgorithm =
                     if (null == deviceBoundConfig.algorithms) true
                     else attestationProof.algorithms.any { it in deviceBoundConfig.algorithms }
-                val supportsProofType = ProofsConfig.DeviceBound.Proof.AttestationProof in deviceBoundConfig.proofs
-                supportsAnySigningAlgorithm && supportsProofType
+                val supportsRequiredProofType = ProofsConfig.DeviceBound.Proof.AttestationProof in deviceBoundConfig.proofs
+                supportsAnySigningAlgorithm && supportsRequiredProofType
             } ?: false
 
             require(supportsJwtProofs || supportsAttestationProofs) { "Wallet doesn't support any of the advertised Proofs" }

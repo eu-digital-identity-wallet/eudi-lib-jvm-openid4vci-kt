@@ -341,7 +341,12 @@ data class ProofsConfig(
     companion object {
         val All: ProofsConfig = ProofsConfig(
             supportsNonDeviceBound = true,
-            deviceBound = DeviceBound(null, DeviceBound.Proof.entries.toSet()),
+            deviceBound = DeviceBound(
+                null,
+                DeviceBound.Proof.JwtProofWithoutKeyAttestation,
+                DeviceBound.Proof.JwtProofWithKeyAttestation,
+                DeviceBound.Proof.AttestationProof,
+            ),
         )
     }
 
@@ -355,15 +360,17 @@ data class ProofsConfig(
         val algorithms: Set<JWSAlgorithm>?,
         val proofs: Set<Proof>,
     ) {
+        constructor(algorithms: Set<JWSAlgorithm>?, proof: Proof, vararg proofs: Proof) : this(algorithms, setOf(proof, *proofs))
+
         init {
             require(null == algorithms || algorithms.isNotEmpty()) { "At least one algorithm must be supported" }
             require(proofs.isNotEmpty()) { "At least one proof must be supported" }
         }
 
-        enum class Proof {
-            JwtProofWithoutKeyAttestation,
-            JwtProofWithKeyAttestation,
-            AttestationProof,
+        sealed interface Proof {
+            data object JwtProofWithoutKeyAttestation : Proof
+            data object JwtProofWithKeyAttestation : Proof
+            data object AttestationProof : Proof
         }
     }
 }
