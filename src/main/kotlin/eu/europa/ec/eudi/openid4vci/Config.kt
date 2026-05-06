@@ -104,8 +104,7 @@ data class OpenId4VCIConfig(
 ) {
 
     /**
-     * Creates a new [OpenId4VCIConfig] instance for a Wallet that uses [a Public OAuth 2.0 Client][ClientAuthentication.None], and all
-     * [Proof Types][ProofsConfig].
+     * Creates a new [OpenId4VCIConfig] instance for a Wallet that uses [a Public OAuth 2.0 Client][ClientAuthentication.None].
      */
     constructor(
         clientId: ClientId,
@@ -117,6 +116,7 @@ data class OpenId4VCIConfig(
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
+        proofs: ProofsConfig,
     ) : this(
         ClientAuthentication.None(clientId, dPoPUsage),
         authFlowRedirectionURI,
@@ -126,7 +126,7 @@ data class OpenId4VCIConfig(
         clock,
         issuerMetadataPolicy,
         supportedCredentialReusePolicies,
-        ProofsConfig.All,
+        proofs,
     )
 }
 
@@ -338,18 +338,6 @@ data class ProofsConfig(
     val supportsDeviceBound: Boolean
         get() = null != deviceBound
 
-    companion object {
-        val All: ProofsConfig = ProofsConfig(
-            supportsNonDeviceBound = true,
-            deviceBound = DeviceBound(
-                null,
-                DeviceBound.Proof.JwtProofWithoutKeyAttestation,
-                DeviceBound.Proof.JwtProofWithKeyAttestation,
-                DeviceBound.Proof.AttestationProof,
-            ),
-        )
-    }
-
     /**
      * The Proofs a Wallet supports for device-bound attestations.
      *
@@ -357,13 +345,11 @@ data class ProofsConfig(
      * @property proofs The Proofs the Wallet supports for device-bound attestations.
      */
     data class DeviceBound(
-        val algorithms: Set<JWSAlgorithm>?,
+        val algorithms: Set<JWSAlgorithm>,
         val proofs: Set<Proof>,
     ) {
-        constructor(algorithms: Set<JWSAlgorithm>?, proof: Proof, vararg proofs: Proof) : this(algorithms, setOf(proof, *proofs))
-
         init {
-            require(null == algorithms || algorithms.isNotEmpty()) { "At least one algorithm must be supported" }
+            require(algorithms.isNotEmpty()) { "At least one algorithm must be supported" }
             require(proofs.isNotEmpty()) { "At least one proof must be supported" }
         }
 
@@ -373,4 +359,6 @@ data class ProofsConfig(
             data object AttestationProof : Proof
         }
     }
+
+    companion object
 }

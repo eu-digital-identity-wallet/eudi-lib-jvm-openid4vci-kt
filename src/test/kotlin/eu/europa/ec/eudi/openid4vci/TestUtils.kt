@@ -27,6 +27,7 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.ecSigner
+import eu.europa.ec.eudi.openid4vci.ProofsConfig.DeviceBound
 import io.ktor.client.*
 import io.ktor.client.request.HttpRequestData
 import java.net.URI
@@ -100,7 +101,7 @@ val OpenId4VCIConfiguration = OpenId4VCIConfig(
     clientAuthentication = ClientAuthentication.None("MyWallet_ClientId", DPoPUsage.Never),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    proofs = ProofsConfig.All,
+    proofs = ProofsConfig.EC,
 )
 
 val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
@@ -115,7 +116,7 @@ val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
     ),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    proofs = ProofsConfig.All,
+    proofs = ProofsConfig.EC,
 )
 
 suspend fun authorizeRequestForCredentialOffer(
@@ -191,3 +192,20 @@ internal fun HttpRequestData.verifyDPoPProof(walletInstanceKey: ECKey, dpopNonce
     jwtProcessor.process(dpopProof, null)
     assertEquals(walletInstanceKey.toPublicJWK(), dpopProof.header.jwk)
 }
+
+internal val ProofsConfig.Companion.EC: ProofsConfig
+    get() = ProofsConfig(
+        supportsNonDeviceBound = true,
+        deviceBound = DeviceBound(
+            setOf(
+                JWSAlgorithm.ES256,
+                JWSAlgorithm.ES384,
+                JWSAlgorithm.ES512,
+            ),
+            setOf(
+                DeviceBound.Proof.JwtProofWithoutKeyAttestation,
+                DeviceBound.Proof.JwtProofWithKeyAttestation,
+                DeviceBound.Proof.AttestationProof,
+            ),
+        ),
+    )

@@ -1260,7 +1260,7 @@ class IssuanceSingleRequestTest {
                         proofs = ProofsConfig(
                             supportsNonDeviceBound = false,
                             deviceBound = ProofsConfig.DeviceBound(
-                                algorithms = null,
+                                algorithms = setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512),
                                 proofs = setOf(supportedProofType),
                             ),
                         ),

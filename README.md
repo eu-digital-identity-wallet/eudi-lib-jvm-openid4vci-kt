@@ -639,7 +639,14 @@ val openId4VCIConfig = OpenId4VCIConfig(
         rsaConfig =  RsaConfig(rcaKeySize = 4096, supportedJWEAlgorithms = RSAEncrypter.SUPPORTED_ALGORITHMS.toList()), // the RSA key size and JWE algorithms supported
         supportedEncryptionMethods = ContentCryptoProvider.SUPPORTED_ENCRYPTION_METHODS.toList() // which JWE encryption methods are supported
     ),
-    supportedReuseMethods = setOf(ReuseMethod.ONCE_ONLY, ReuseMethod.LIMITED_TIME) // which reuse methods are supported
+    supportedReuseMethods = setOf(ReuseMethod.ONCE_ONLY, ReuseMethod.LIMITED_TIME), // which reuse methods are supported
+    proofs = ProofsConfig(
+        supportsNonDeviceBound = true,
+        deviceBound = DeviceBound(
+            algorithms = setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512),
+            proofs = setOf(Proof.JwtProofWithKeyAttestation, Proof.AttestationProof),
+        ),
+    ), //which proof types and signing algorithms are supported
 )
 val credentialOfferUri: String = "..." 
 val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()
