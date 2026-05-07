@@ -18,9 +18,13 @@ package eu.europa.ec.eudi.openid4vci.internal
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDSAVerifier
+import com.nimbusds.jose.crypto.Ed25519Verifier
+import com.nimbusds.jose.crypto.MACVerifier
 import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.OctetKeyPair
+import com.nimbusds.jose.jwk.OctetSequenceKey
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
@@ -408,20 +412,20 @@ internal class RequestIssuanceImpl(
             ?: throw IllegalArgumentException("Missing 'key_attestation' in JWT header")
         val keyAttestation = KeyAttestationJWT(keyAttestationJwt)
         val attestedKeys = keyAttestation.attestedKeys
-        val jwk = attestedKeys.firstOrNull { jwk: JWK ->
-            try {
-                val verifier: JWSVerifier? = when (jwk) {
-                    is RSAKey -> RSASSAVerifier(jwk)
-                    is ECKey -> ECDSAVerifier(jwk)
-                    else -> null
-                }
-                verifier != null && jwtProof.verify(verifier)
-            } catch (_: Exception) {
-                false
-            }
+        val verifier: JWSVerifier? = when (val jwk = attestedKeys.first()) {
+            is RSAKey -> RSASSAVerifier(jwk)
+            is ECKey -> ECDSAVerifier(jwk)
+            is OctetKeyPair -> Ed25519Verifier(jwk)
+            is OctetSequenceKey -> MACVerifier(jwk)
+            else -> null
         }
-        requireNotNull(jwk) {
-            "Signed JWT is not signed by any of the attested keys in key_attestation."
+        val signatureVerified = try {
+            verifier != null && jwtProof.verify(verifier)
+        } catch (_: Exception) {
+            false
+        }
+        require(signatureVerified) {
+            "Signed JWT is not signed by the first attested key in key_attestation."
         }
     }
 

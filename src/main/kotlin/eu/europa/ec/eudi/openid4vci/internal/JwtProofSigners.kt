@@ -71,7 +71,7 @@ internal fun JsonObjectBuilder.jwtProofHeader(key: JwtBindingKey) {
 
 internal fun JsonObjectBuilder.keyAttestationJwtProofHeader(keyAttestation: KeyAttestationJWT, keyIndex: Int) {
     check(keyIndex in keyAttestation.attestedKeys.indices) {
-        "Key index $keyIndex is out of bounds for attested keys: $keyAttestation.attestedKeys.size"
+        "Key index $keyIndex is out of bounds for attested keys: ${keyAttestation.attestedKeys.size}"
     }
 
     put("typ", OpenId4VCISpec.JWT_PROOF_TYPE)
