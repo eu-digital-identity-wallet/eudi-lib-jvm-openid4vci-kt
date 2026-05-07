@@ -279,7 +279,7 @@ internal class RequestIssuanceImpl(
         credentialConfigId: CredentialConfigurationIdentifier,
         proofType: ProofType,
     ) {
-        val attestationJwtAlg = SignedJWT.parse(value).header.algorithm
+        val attestationJwtAlg = header.algorithm
         val proofTypesSupported = credentialSupportedById(credentialConfigId).proofTypesSupported
         val spec = proofTypesSupported.values.firstOrNull { it.type() == proofType }
         ensure(spec != null && attestationJwtAlg in spec.algorithms()) {
