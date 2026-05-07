@@ -33,6 +33,7 @@ import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import eu.europa.ec.eudi.openid4vci.internal.wellKnownUrl
 import io.ktor.http.*
 import java.net.URI
+import java.time.Duration
 import java.util.*
 
 object SampleIssuer {
@@ -354,6 +355,7 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
             logo = Display.Logo(URI.create("https://credential-issuer.example.com/logo.png"), "Credential Issuer Logo"),
         ),
     ),
+    PositiveDuration(Duration.ofDays(30L)),
 )
 
 /**

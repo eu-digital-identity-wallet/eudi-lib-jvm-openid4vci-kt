@@ -40,6 +40,7 @@ import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertNull
 import org.junit.jupiter.api.assertThrows
 import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
+import java.time.Duration
 import java.util.*
 import kotlin.test.*
 import kotlin.time.Duration.Companion.days
@@ -1013,6 +1014,56 @@ class IssuanceSingleRequestTest {
             }
             authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
         }
+    }
+
+    @Test
+    fun `preferred_client_status_period is provided to wallet during client attestation provisioning if present`() = runTest {
+        suspend fun test(issuerMetadataVersion: IssuerMetadataVersion, expectedPreferredClientStatusPeriod: PositiveDuration?) {
+            val walletInstanceKey = ECKeyGenerator(Curve.P_521).keyID(UUID.randomUUID().toString()).generate()
+            val client = selfSignedClient(
+                walletInstanceKey = walletInstanceKey,
+                clientId = "MyWallet_ClientId",
+            ) { _, preferredClientStatusPeriod ->
+                when (expectedPreferredClientStatusPeriod) {
+                    null -> assertNull(preferredClientStatusPeriod)
+                    else -> assertEquals(expectedPreferredClientStatusPeriod, preferredClientStatusPeriod)
+                }
+            }
+            val abcaChallenge = Nonce(UUID.randomUUID().toString())
+            val updatedAbcaChallenge = Nonce(UUID.randomUUID().toString())
+
+            val mockedHttpClient = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion),
+                authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+                challengePostMocker(abcaChallenge),
+                parPostMocker {
+                    it.verifySelfSignedClientAttestation(walletInstanceKey, abcaChallenge)
+                },
+                challengePostMocker(updatedAbcaChallenge),
+                tokenPostMocker {
+                    it.verifySelfSignedClientAttestation(walletInstanceKey, updatedAbcaChallenge)
+                },
+                nonceEndpointMocker(),
+                singleIssuanceRequestMocker(),
+            )
+
+            val config = OpenId4VCIConfiguration.copy(clientAuthentication = client)
+
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                config = config,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+                httpClient = mockedHttpClient,
+            )
+
+            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
+            }
+        }
+
+        test(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED, null)
+        test(IssuerMetadataVersion.WITH_PREFERRED_CLIENT_STATUS_PERIOD, PositiveDuration(Duration.ofDays(30L)))
     }
 
     @Test

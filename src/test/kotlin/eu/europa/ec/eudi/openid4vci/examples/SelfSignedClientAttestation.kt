@@ -62,7 +62,7 @@ internal fun selfSignedClient(
     walletInstanceKey: ECKey,
     clientId: String,
     duration: Duration = 10.minutes,
-    headerCustomization: JWSHeader.Builder.() -> Unit = {},
+    assertions: (HttpsUrl, PositiveDuration?) -> Unit = { _, _ -> },
 ): ClientAuthentication.AttestationBased {
     val algorithm = walletInstanceKey.jwsAlgorithm
     val signer = DefaultJWSSignerFactory().createJWSSigner(walletInstanceKey, algorithm)
@@ -91,7 +91,7 @@ internal fun selfSignedClient(
                 expiresAt = now + 90.days.toJavaDuration(),
             ),
         )
-        val builder = ClientAttestationJwtBuilder(algorithm, signer, claims, headerCustomization)
+        val builder = ClientAttestationJwtBuilder(algorithm, signer, claims)
         builder.build()
     }
     val popJwtSpec = Signer.fromNimbusEcKey(walletInstanceKey, walletInstanceKey.toPublicJWK(), null, null)
@@ -99,8 +99,13 @@ internal fun selfSignedClient(
         override val algorithm: JwsAlgorithm = JwsAlgorithm(clientAttestationJWT.header.algorithm.name)
         override val popAlgorithm: JwsAlgorithm
             get() = JwsAlgorithm(popJwtSpec.javaAlgorithm.toJoseAlg().name)
-        override suspend operator fun invoke(authorizationServer: HttpsUrl): ProvisionClientAttestation.Provisioned =
-            ProvisionClientAttestation.Provisioned(clientAttestationJWT, popJwtSpec)
+        override suspend operator fun invoke(
+            authorizationServer: HttpsUrl,
+            preferredClientStatusPeriod: PositiveDuration?,
+        ): ProvisionClientAttestation.Provisioned {
+            assertions(authorizationServer, preferredClientStatusPeriod)
+            return ProvisionClientAttestation.Provisioned(clientAttestationJWT, popJwtSpec)
+        }
     }
     return ClientAuthentication.AttestationBased(clientId, provisionClientAttestation)
 }
@@ -109,7 +114,6 @@ private class ClientAttestationJwtBuilder(
     private val algorithm: JWSAlgorithm,
     private val signer: JWSSigner,
     private val claims: ClientAttestationJWTClaims,
-    private val headerCustomization: JWSHeader.Builder.() -> Unit = {},
 ) {
     init {
         requireIsNotMAC(algorithm)
@@ -127,23 +131,21 @@ private class ClientAttestationJwtBuilder(
     }
 
     private fun jwsHeader(): JWSHeader =
-        JWSHeader.Builder(algorithm).apply {
-            headerCustomization()
-            type(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
-        }.build()
+        JWSHeader.Builder(algorithm)
+            .type(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
+            .build()
 
     private fun claimsSetFrom(claims: ClientAttestationJWTClaims): JWTClaimsSet = JWTClaimsSet.parse(JsonSupport.encodeToString(claims))
 
     companion object {
         fun ecKey256(
             claims: ClientAttestationJWTClaims,
-            headerCustomization: JWSHeader.Builder.() -> Unit = {},
             privateKey: ECKey,
         ): ClientAttestationJwtBuilder {
             require(privateKey.curve == Curve.P_256)
             val algorithm = JWSAlgorithm.ES256
             val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
-            return ClientAttestationJwtBuilder(algorithm, signer, claims, headerCustomization)
+            return ClientAttestationJwtBuilder(algorithm, signer, claims)
         }
     }
 }
