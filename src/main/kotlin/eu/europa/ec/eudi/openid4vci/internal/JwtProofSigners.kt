@@ -20,13 +20,11 @@ import eu.europa.ec.eudi.openid4vci.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import java.time.Instant
 
 @Serializable
 internal data class JwtProofClaims(
     @SerialName("aud") val audience: String,
-    @Serializable(with = NumericInstantSerializer::class)
-    @SerialName("iat") val issuedAt: Instant,
+    @SerialName("iat") val issuedAt: InstantAsEpochSecond,
     @SerialName("iss") val issuer: String? = null,
     @SerialName("nonce") val nonce: String? = null,
 )

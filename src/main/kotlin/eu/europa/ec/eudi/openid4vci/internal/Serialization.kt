@@ -181,9 +181,9 @@ internal object ClaimPathSerializer : KSerializer<ClaimPath> {
     }
 }
 
-object NumericInstantSerializer : KSerializer<Instant> {
+object InstantEpochSecondSerializer : KSerializer<Instant> {
     override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("NumericInstant", PrimitiveKind.LONG)
+        PrimitiveSerialDescriptor("InstantEpochSecondSerializer", PrimitiveKind.LONG)
 
     override fun serialize(encoder: Encoder, value: Instant) {
         encoder.encodeLong(value.epochSecond)

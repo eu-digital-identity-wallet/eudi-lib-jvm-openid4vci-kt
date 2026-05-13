@@ -31,7 +31,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.URL
 import java.time.Clock
-import java.time.Instant
 
 /**
  * These JWTs are transmitted via HTTP headers in an HTTP request from a Client Instance
@@ -69,10 +68,10 @@ data class ClientAttestationJWT private constructor(val jwt: SignedJWT, val clai
 data class ClientAttestationJWTClaims(
     @Required @SerialName(RFC7519.ISSUER) val issuer: NonBlankString,
     @Required @SerialName(RFC7519.SUBJECT) val subject: NonBlankString,
-    @Required @SerialName(RFC7519.EXPIRATION_TIME) @Serializable(with = NumericInstantSerializer::class) val expirationTime: Instant,
+    @Required @SerialName(RFC7519.EXPIRATION_TIME) val expirationTime: InstantAsEpochSecond,
     @Required @SerialName(RFC7800.CONFIRMATION) val confirmation: ConfirmationClaim,
-    @SerialName(RFC7519.ISSUED_AT) @Serializable(with = NumericInstantSerializer::class) val issuedAt: Instant? = null,
-    @SerialName(RFC7519.NOT_BEFORE) @Serializable(with = NumericInstantSerializer::class) val notBefore: Instant? = null,
+    @SerialName(RFC7519.ISSUED_AT) val issuedAt: InstantAsEpochSecond? = null,
+    @SerialName(RFC7519.NOT_BEFORE) val notBefore: InstantAsEpochSecond? = null,
     @Required @SerialName(OpenId4VCISpec.WALLET_ATTESTATION_WALLET_NAME) val walletName: NonBlankString,
     @SerialName(OpenId4VCISpec.WALLET_ATTESTATION_WALLET_LINK) val walletLink: NonBlankString? = null,
     @SerialName(TokenStatusListSpec.STATUS) val status: StatusClaim? = null,
@@ -127,7 +126,7 @@ value class WalletSolutionCertificationInformation(val value: JsonElement) {
 @Serializable
 data class ClientStatusClaim(
     @Required @SerialName(TokenStatusListSpec.STATUS) val status: StatusClaim,
-    @Required @SerialName(RFC7519.EXPIRATION_TIME) @Serializable(with = NumericInstantSerializer::class) val expiresAt: Instant,
+    @Required @SerialName(RFC7519.EXPIRATION_TIME) val expiresAt: InstantAsEpochSecond,
 )
 
 /**
@@ -162,9 +161,9 @@ data class ClientAttestationPOPClaims(
     @SerialName(RFC7519.ISSUER) @Required val issuer: ClientId,
     @SerialName(RFC7519.AUDIENCE) @Required @Serializable(with = URLSerializer::class) val audience: URL,
     @SerialName(RFC7519.JWT_ID) @Required val jwtId: JwtId,
-    @SerialName(RFC7519.ISSUED_AT) @Required @Serializable(with = NumericInstantSerializer::class) val issuedAt: Instant,
+    @SerialName(RFC7519.ISSUED_AT) @Required val issuedAt: InstantAsEpochSecond,
     @SerialName(AttestationBasedClientAuthenticationSpec.CHALLENGE_CLAIM) val challenge: Nonce? = null,
-    @SerialName(RFC7519.NOT_BEFORE) @Serializable(with = NumericInstantSerializer::class) val notBefore: Instant? = null,
+    @SerialName(RFC7519.NOT_BEFORE) val notBefore: InstantAsEpochSecond? = null,
 )
 
 //
