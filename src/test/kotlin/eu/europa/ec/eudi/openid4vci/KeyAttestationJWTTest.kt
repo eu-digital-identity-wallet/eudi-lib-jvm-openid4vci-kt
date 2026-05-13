@@ -115,7 +115,7 @@ class KeyAttestationJWTTest {
                     StatusClaim(
                         StatusListTokenClaim(
                             7u,
-                            NonBlankString("https://revocation_url/wua-type-statuslists/3"),
+                            URI.create("https://revocation_url/wua-type-statuslists/3"),
                         ),
                     ),
                     Instant.now() + Duration.ofDays(90L),
@@ -148,7 +148,7 @@ class KeyAttestationJWTTest {
                     StatusClaim(
                         StatusListTokenClaim(
                             7u,
-                            NonBlankString("https://revocation_url/wua-type-statuslists/3"),
+                            URI.create("https://revocation_url/wua-type-statuslists/3"),
                         ),
                     ),
                     Instant.now() + Duration.ofDays(90L),
@@ -181,7 +181,7 @@ class KeyAttestationJWTTest {
                     StatusClaim(
                         StatusListTokenClaim(
                             7u,
-                            NonBlankString("https://revocation_url/wua-type-statuslists/3"),
+                            URI.create("https://revocation_url/wua-type-statuslists/3"),
                         ),
                     ),
                     Instant.now() + Duration.ofDays(90L),
@@ -214,7 +214,7 @@ class KeyAttestationJWTTest {
                     StatusClaim(
                         StatusListTokenClaim(
                             7u,
-                            NonBlankString("https://revocation_url/wua-type-statuslists/3"),
+                            URI.create("https://revocation_url/wua-type-statuslists/3"),
                         ),
                     ),
                     Instant.now() + Duration.ofDays(90L),
@@ -245,7 +245,7 @@ class KeyAttestationJWTTest {
             StatusClaim(
                 StatusListTokenClaim(
                     7u,
-                    NonBlankString("https://revocation_url/wua-type-statuslists/3"),
+                    URI.create("https://revocation_url/wua-type-statuslists/3"),
                 ),
             ),
             now + Duration.ofDays(90L),
@@ -296,7 +296,7 @@ class KeyAttestationJWTTest {
                         StatusClaim(
                             StatusListTokenClaim(
                                 7u,
-                                NonBlankString("https://revocation_url/wua-type-statuslists/3"),
+                                URI.create("https://revocation_url/wua-type-statuslists/3"),
                             ),
                         ),
                         Instant.now() + Duration.ofDays(90L),

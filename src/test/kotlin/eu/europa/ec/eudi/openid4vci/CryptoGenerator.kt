@@ -165,7 +165,7 @@ object CryptoGenerator {
                 StatusClaim(
                     StatusListTokenClaim(
                         7u,
-                        NonBlankString("https://revocation_url/wua-type-statuslists/3"),
+                        URI.create("https://revocation_url/wua-type-statuslists/3"),
                     ),
                 ),
                 now() + 90.days.toJavaDuration(),

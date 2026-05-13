@@ -227,6 +227,16 @@ object URLSerializer : KSerializer<URL> {
     override fun deserialize(decoder: Decoder): URL = URI.create(decoder.decodeString()).toURL()
 }
 
+object URISerializer : KSerializer<URI> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("URI", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: URI) {
+        encoder.encodeString(value.toString())
+    }
+
+    override fun deserialize(decoder: Decoder): URI = URI.create(decoder.decodeString())
+}
+
 object JWKJsonObjectSerializer : KSerializer<JWK> {
     private val serializer = JsonObject.serializer()
 

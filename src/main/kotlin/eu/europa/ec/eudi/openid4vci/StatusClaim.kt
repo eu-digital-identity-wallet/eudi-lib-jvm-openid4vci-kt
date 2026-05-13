@@ -15,9 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.internal.URISerializer
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.net.URI
 
 @Serializable
 data class StatusClaim(
@@ -27,5 +29,5 @@ data class StatusClaim(
 @Serializable
 data class StatusListTokenClaim(
     @Required @SerialName(TokenStatusListSpec.INDEX) val index: UInt,
-    @Required @SerialName(TokenStatusListSpec.URI) val uri: NonBlankString,
+    @Required @SerialName(TokenStatusListSpec.URI) @Serializable(with = URISerializer::class) val uri: URI,
 )
