@@ -412,15 +412,15 @@ internal class RequestIssuanceImpl(
             ?: throw IllegalArgumentException("Missing 'key_attestation' in JWT header")
         val keyAttestation = KeyAttestationJWT(keyAttestationJwt)
         val attestedKeys = keyAttestation.attestedKeys
-        val verifier: JWSVerifier? = when (val jwk = attestedKeys.first()) {
+        val verifier: JWSVerifier = when (val jwk = attestedKeys.first()) {
             is RSAKey -> RSASSAVerifier(jwk)
             is ECKey -> ECDSAVerifier(jwk)
             is OctetKeyPair -> Ed25519Verifier(jwk)
             is OctetSequenceKey -> MACVerifier(jwk)
-            else -> null
+            else -> throw IllegalArgumentException("Unsupported key type: ${jwk.keyType.value}")
         }
         val signatureVerified = try {
-            verifier != null && jwtProof.verify(verifier)
+            jwtProof.verify(verifier)
         } catch (_: Exception) {
             false
         }
