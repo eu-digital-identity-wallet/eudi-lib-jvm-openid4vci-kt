@@ -260,17 +260,6 @@ internal fun <T : Any> JWTClaimsSet.decodeAs(deserializationStrategy: Deserializ
 
 internal inline fun <reified T : Any> JWTClaimsSet.decodeAs(): Result<T> = decodeAs(serializer())
 
-object ClientAttestationJWTSerializer : KSerializer<ClientAttestationJWT> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("ClientAttestationJWTSerializer", PrimitiveKind.STRING)
-
-    override fun serialize(encoder: Encoder, value: ClientAttestationJWT) {
-        encoder.encodeString(value.serialize())
-    }
-
-    override fun deserialize(decoder: Decoder): ClientAttestationJWT = ClientAttestationJWT(decoder.decodeString())
-}
-
 object KeyAttestationJWTSerializer : KSerializer<KeyAttestationJWT> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("KeyAttestationJWTSerializedSignedJWTSerializer", PrimitiveKind.STRING)

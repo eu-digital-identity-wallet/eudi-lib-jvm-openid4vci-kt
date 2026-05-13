@@ -47,7 +47,6 @@ typealias ClientAttestation = Pair<ClientAttestationJWT, ClientAttestationPoPJWT
  * be used by the instance for client authentication
  */
 @ConsistentCopyVisibility
-@Serializable(with = ClientAttestationJWTSerializer::class)
 data class ClientAttestationJWT private constructor(val jwt: String, val header: JWSHeader, val claimsSet: ClientAttestationJWTClaims) {
     val clientId: ClientId get() = claimsSet.subject.value
     val cnf: ConfirmationClaim get() = claimsSet.confirmation
@@ -65,8 +64,6 @@ data class ClientAttestationJWT private constructor(val jwt: String, val header:
         }
     }
 }
-
-fun ClientAttestationJWT.serialize(): String = jwt
 
 @Serializable
 data class ClientAttestationJWTClaims(
