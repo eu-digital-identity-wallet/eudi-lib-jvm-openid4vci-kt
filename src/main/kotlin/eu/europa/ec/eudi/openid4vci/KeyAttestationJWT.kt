@@ -21,6 +21,10 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.internal.JWKJsonObjectSerializer
 import eu.europa.ec.eudi.openid4vci.internal.URLSerializer
+import eu.europa.ec.eudi.openid4vci.internal.ensureSignedOrVerified
+import eu.europa.ec.eudi.openid4vci.internal.ensureSignedWithAllowedAlgorithm
+import eu.europa.ec.eudi.openid4vci.internal.ensureType
+import eu.europa.ec.eudi.openid4vci.internal.ensureValidClaimsSet
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

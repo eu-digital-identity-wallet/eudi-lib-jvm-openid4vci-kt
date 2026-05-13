@@ -16,10 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
-import com.nimbusds.jose.JWSObject
-import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.SignedJWT
@@ -182,37 +179,5 @@ fun interface ClientAttestationPoPBuilder {
 
     companion object {
         val Default: ClientAttestationPoPBuilder = DefaultClientAttestationPoPBuilder
-    }
-}
-
-internal fun SignedJWT.ensureSignedOrVerified() {
-    require(state == JWSObject.State.SIGNED || state == JWSObject.State.VERIFIED) {
-        "Provided JWT is not signed"
-    }
-}
-
-internal fun SignedJWT.ensureSignedWithAllowedAlgorithm(allowedAlgorithms: Set<JWSAlgorithm>) {
-    require(header.algorithm in allowedAlgorithms) {
-        "Signature algorithm must be one of $allowedAlgorithms"
-    }
-}
-
-internal inline fun <reified T : Any> SignedJWT.ensureValidClaimsSet(): T =
-    jwtClaimsSet.decodeAs<T>().getOrElse { throw IllegalArgumentException("Invalid Claims Set.", it) }
-
-internal fun SignedJWT.ensureSignedNotMAC() {
-    ensureSignedOrVerified()
-    val alg = requireNotNull(header.algorithm) { "Invalid JWT misses header alg" }
-    requireIsNotMAC(alg)
-}
-
-internal fun requireIsNotMAC(alg: JWSAlgorithm) =
-    require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
-
-internal fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
-
-internal fun SignedJWT.ensureType(expectedType: JOSEObjectType) {
-    require(expectedType == header.type) {
-        "Expected SignedJWT `typ` to be '${expectedType.type}', but found '${header.type?.type}' instead"
     }
 }

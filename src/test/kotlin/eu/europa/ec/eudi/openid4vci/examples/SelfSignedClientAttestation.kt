@@ -31,6 +31,7 @@ import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
+import eu.europa.ec.eudi.openid4vci.internal.requireIsNotMAC
 import io.ktor.client.request.*
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
