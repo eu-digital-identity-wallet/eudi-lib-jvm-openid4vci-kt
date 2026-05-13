@@ -30,7 +30,7 @@ import java.net.URL
 @ConsistentCopyVisibility
 @Serializable(with = KeyAttestationJWTSerializer::class)
 data class KeyAttestationJWT private constructor(val jwt: String, val header: JWSHeader, val claimsSet: KeyAttestationJWTClaims) {
-    val attestedKeys: List<JWK> get() = claimsSet.attestedKeys
+    val attestedKeys: List<JWK> get() = claimsSet.attestedKeys.value
 
     companion object {
         operator fun invoke(jwt: String): KeyAttestationJWT = invoke(SignedJWT.parse(jwt))
@@ -47,10 +47,21 @@ data class KeyAttestationJWT private constructor(val jwt: String, val header: JW
 
 fun KeyAttestationJWT.serialize(): String = jwt
 
-typealias AttestedKeys = List<
-    @Serializable(with = JWKJsonObjectSerializer::class)
-    JWK,
-    >
+@JvmInline
+@Serializable
+value class AttestedKeys(
+    val value: List<
+        @Serializable(with = JWKJsonObjectSerializer::class)
+        JWK,
+        >,
+) : Iterable<JWK> by value {
+    init {
+        require(value.isNotEmpty()) { "attestedKeys must not be empty" }
+        require(value.none { it.isPrivate }) { "attestedKeys must all be public" }
+    }
+
+    override fun toString(): String = value.toString()
+}
 
 @Serializable
 data class KeyAttestationJWTClaims(
@@ -65,8 +76,6 @@ data class KeyAttestationJWTClaims(
     @Required @SerialName(TS3.KEY_STORAGE_STATUS) val keyStorageStatus: KeyStorageStatus,
 ) {
     init {
-        require(attestedKeys.isNotEmpty()) { "attestedKeys must not be empty" }
-        require(attestedKeys.none { it.isPrivate }) { "attestedKeys must all be public" }
         keyStorage.ensureLoAHigh { "keyStorage must contain [${AttackPotentialResistance.Iso18045High}]" }
         userAuthentication.ensureLoAHigh { "userAuthentication must contain [${AttackPotentialResistance.Iso18045High}]" }
     }

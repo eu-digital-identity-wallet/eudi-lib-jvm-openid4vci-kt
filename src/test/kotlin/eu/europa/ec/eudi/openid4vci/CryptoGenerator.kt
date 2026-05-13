@@ -155,7 +155,7 @@ object CryptoGenerator {
         val keyAttestationJWTClaims = KeyAttestationJWTClaims(
             issuedAt = now(),
             expiresAt = now() + 3600.seconds.toJavaDuration(),
-            attestedKeys.map { it.toPublicJWK() },
+            AttestedKeys(attestedKeys.map { it.toPublicJWK() }),
             keyStorage = listOf(AttackPotentialResistance.Iso18045High),
             userAuthentication = listOf(AttackPotentialResistance.Iso18045High),
             URI.create("https://example.org/certification/wscd/GlobalPlatform/").toURL(),

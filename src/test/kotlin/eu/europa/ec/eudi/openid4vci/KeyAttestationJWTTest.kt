@@ -268,7 +268,7 @@ class KeyAttestationJWTTest {
         val expectedClaimsSet = KeyAttestationJWTClaims(
             issuedAt = iat,
             expiresAt = exp,
-            attestedKeys,
+            AttestedKeys(attestedKeys),
             keyStorage = keyStorage,
             userAuthentication = userAuthentication,
             certification,
