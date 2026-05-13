@@ -16,12 +16,8 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.crypto.RSASSAVerifier
-import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CNonceAndDPoPNonce
@@ -257,8 +253,7 @@ internal class RequestIssuanceImpl(
         grant: Grant,
         cNonce: Nonce?,
     ): Proof.Jwt {
-        val (proofSignerProvider, keyIndex) = proofsSpecification
-        val proofSigner = proofSignerProvider(cNonce)
+        val proofSigner = proofsSpecification.proofSignerProvider(cNonce)
         val joseAlg = run {
             val javaSigningAlgorithm = proofSigner.javaAlgorithm
             javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
@@ -267,7 +262,7 @@ internal class RequestIssuanceImpl(
         val jwtProof = proofSigner.use { operation ->
             operation.publicMaterial.ensureKeyAttestationJwtAlgIsSupported(credentialConfigId, ProofType.JWT)
             operation.publicMaterial.attestedKeys.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
-            val signer = KeyAttestationJwtProofSigner(joseAlg, operation, keyIndex)
+            val signer = KeyAttestationJwtProofSigner(joseAlg, operation, ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX)
             val signedJwt = signer.sign(claims)
             SignedJWT.parse(signedJwt)
         }
@@ -279,7 +274,7 @@ internal class RequestIssuanceImpl(
         credentialConfigId: CredentialConfigurationIdentifier,
         proofType: ProofType,
     ) {
-        val attestationJwtAlg = SignedJWT.parse(value).header.algorithm
+        val attestationJwtAlg = header.algorithm
         val proofTypesSupported = credentialSupportedById(credentialConfigId).proofTypesSupported
         val spec = proofTypesSupported.values.firstOrNull { it.type() == proofType }
         ensure(spec != null && attestationJwtAlg in spec.algorithms()) {
@@ -408,20 +403,15 @@ internal class RequestIssuanceImpl(
             ?: throw IllegalArgumentException("Missing 'key_attestation' in JWT header")
         val keyAttestation = KeyAttestationJWT(keyAttestationJwt)
         val attestedKeys = keyAttestation.attestedKeys
-        val jwk = attestedKeys.firstOrNull { jwk: JWK ->
-            try {
-                val verifier: JWSVerifier? = when (jwk) {
-                    is RSAKey -> RSASSAVerifier(jwk)
-                    is ECKey -> ECDSAVerifier(jwk)
-                    else -> null
-                }
-                verifier != null && jwtProof.verify(verifier)
-            } catch (_: Exception) {
-                false
-            }
+        val signatureVerified = try {
+            val signingKey = attestedKeys[ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX].toECKey()
+            val verifier = ECDSAVerifier(signingKey)
+            jwtProof.verify(verifier)
+        } catch (_: Exception) {
+            false
         }
-        requireNotNull(jwk) {
-            "Signed JWT is not signed by any of the attested keys in key_attestation."
+        require(signatureVerified) {
+            "Signed JWT is not signed by the first attested key in key_attestation."
         }
     }
 

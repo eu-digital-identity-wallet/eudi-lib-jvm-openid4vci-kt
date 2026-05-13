@@ -71,10 +71,10 @@ internal fun JsonObjectBuilder.jwtProofHeader(key: JwtBindingKey) {
 
 internal fun JsonObjectBuilder.keyAttestationJwtProofHeader(keyAttestation: KeyAttestationJWT, keyIndex: Int) {
     check(keyIndex in keyAttestation.attestedKeys.indices) {
-        "Key index $keyIndex is out of bounds for attested keys: $keyAttestation.attestedKeys.size"
+        "Key index $keyIndex is out of bounds for attested keys: ${keyAttestation.attestedKeys.size}"
     }
 
     put("typ", OpenId4VCISpec.JWT_PROOF_TYPE)
     put(OpenId4VCISpec.JOSE_HEADER_KEY_ID, keyIndex.toString())
-    put(OpenId4VCISpec.JOSE_HEADER_KEY_ATTESTATION, keyAttestation.value)
+    put(OpenId4VCISpec.JOSE_HEADER_KEY_ATTESTATION, keyAttestation.jwt)
 }

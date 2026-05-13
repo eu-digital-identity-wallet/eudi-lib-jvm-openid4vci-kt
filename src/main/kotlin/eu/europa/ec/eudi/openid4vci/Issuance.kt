@@ -146,7 +146,6 @@ sealed interface ProofsSpecification {
 
         data class WithKeyAttestation(
             val proofSignerProvider: suspend (Nonce?) -> Signer<KeyAttestationJWT>,
-            val keyIndex: Int,
         ) : JwtProofs
     }
 

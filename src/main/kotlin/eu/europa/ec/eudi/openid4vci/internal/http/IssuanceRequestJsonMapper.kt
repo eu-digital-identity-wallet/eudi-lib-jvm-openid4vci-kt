@@ -125,7 +125,7 @@ internal data class CredentialRequestTO(
             else ProofsTO(
                 jwtProofs = filterIsInstance<Proof.Jwt>().map { it.jwt.serialize() }.takeIf { it.isNotEmpty() },
                 diVpProofs = filterIsInstance<Proof.DiVp>().map { it.diVp }.takeIf { it.isNotEmpty() },
-                attestationProofs = filterIsInstance<Proof.Attestation>().map { it.keyAttestation.value }.takeIf { it.isNotEmpty() },
+                attestationProofs = filterIsInstance<Proof.Attestation>().map { it.keyAttestation.jwt }.takeIf { it.isNotEmpty() },
             )
     }
 }
