@@ -16,10 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
-import com.nimbusds.jose.JWSObject
-import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.SignedJWT
@@ -58,7 +55,7 @@ data class ClientAttestationJWT private constructor(val jwt: String, val header:
         operator fun invoke(jwt: SignedJWT): ClientAttestationJWT {
             jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
             jwt.ensureSignedOrVerified()
-            jwt.ensureSignedWithAllowedAlgorithm()
+            jwt.ensureSignedWithAllowedAlgorithm(TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS)
             val claimsSet = jwt.ensureValidClaimsSet<ClientAttestationJWTClaims>()
             return ClientAttestationJWT(jwt.serialize(), jwt.header, claimsSet)
         }
@@ -100,17 +97,6 @@ data class ConfirmationClaim(
         require(!jwk.isPrivate) { "jwk must be public" }
     }
 }
-
-@Serializable
-data class StatusClaim(
-    @Required @SerialName(TokenStatusListSpec.STATUS_LIST) val statusList: StatusListTokenClaim,
-)
-
-@Serializable
-data class StatusListTokenClaim(
-    @Required @SerialName(TokenStatusListSpec.INDEX) val index: UInt,
-    @Required @SerialName(TokenStatusListSpec.URI) val uri: NonBlankString,
-)
 
 typealias WalletSolutionCertificationInformation = JsonElement
 
@@ -193,37 +179,5 @@ fun interface ClientAttestationPoPBuilder {
 
     companion object {
         val Default: ClientAttestationPoPBuilder = DefaultClientAttestationPoPBuilder
-    }
-}
-
-internal fun SignedJWT.ensureSignedOrVerified() {
-    require(state == JWSObject.State.SIGNED || state == JWSObject.State.VERIFIED) {
-        "Provided JWT is not signed"
-    }
-}
-
-private fun SignedJWT.ensureSignedWithAllowedAlgorithm() {
-    require(header.algorithm in TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS) {
-        "Invalid Attestation JWT. Signature algorithm must be one of ${TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS}"
-    }
-}
-
-private inline fun <reified T : Any> SignedJWT.ensureValidClaimsSet(): T =
-    jwtClaimsSet.decodeAs<T>().getOrElse { throw IllegalArgumentException("Invalid Attestation JWT. Invalid Claims Set.", it) }
-
-internal fun SignedJWT.ensureSignedNotMAC() {
-    ensureSignedOrVerified()
-    val alg = requireNotNull(header.algorithm) { "Invalid JWT misses header alg" }
-    requireIsNotMAC(alg)
-}
-
-internal fun requireIsNotMAC(alg: JWSAlgorithm) =
-    require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
-
-internal fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
-
-private fun SignedJWT.ensureType(expectedType: JOSEObjectType) {
-    require(expectedType == header.type) {
-        "Expected SignedJWT `typ` to be '${expectedType.type}', but found '${header.type?.type}' instead"
     }
 }

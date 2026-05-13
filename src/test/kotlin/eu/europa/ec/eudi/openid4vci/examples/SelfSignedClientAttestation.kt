@@ -31,8 +31,10 @@ import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
+import eu.europa.ec.eudi.openid4vci.internal.requireIsNotMAC
 import io.ktor.client.request.*
 import kotlinx.serialization.json.JsonPrimitive
+import java.net.URI
 import java.security.Key
 import java.time.Clock
 import java.util.*
@@ -82,7 +84,7 @@ internal fun selfSignedClient(
                 status = StatusClaim(
                     statusList = StatusListTokenClaim(
                         index = 1337u,
-                        uri = NonBlankString("https://revocation_url/wia-statuslists/42"),
+                        uri = URI.create("https://revocation_url/wia-statuslists/42"),
                     ),
                 ),
                 expiresAt = now + 90.days.toJavaDuration(),
