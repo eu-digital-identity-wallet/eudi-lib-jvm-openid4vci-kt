@@ -25,6 +25,7 @@ import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.MissingRequiredRequestEncryptionSpecification
+import eu.europa.ec.eudi.openid4vci.internal.InstantEpochSecondSerializer
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
 import kotlinx.serialization.Serializable
 import java.net.URI
@@ -392,3 +393,7 @@ value class JwtId(val value: String) {
     }
     override fun toString(): String = value
 }
+
+typealias InstantAsEpochSecond =
+    @Serializable(with = InstantEpochSecondSerializer::class)
+    Instant

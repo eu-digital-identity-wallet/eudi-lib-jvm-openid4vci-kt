@@ -341,7 +341,7 @@ internal fun ClientAuthentication.ensureSupportedByAuthorizationServer(authoriza
         }
 
         val supportedClientAttestationJWSAlgs = authorizationServerMetadata.clientAttestationJWSAlgs.orEmpty()
-        val clientAttestationJWSAlg = attestationJWT.jwt.header.algorithm
+        val clientAttestationJWSAlg = attestationJWT.header.algorithm
         require(clientAttestationJWSAlg in supportedClientAttestationJWSAlgs) {
             "${clientAttestationJWSAlg.name} Client Attestation JWS Algorithm not supported by Authorization Server"
         }
