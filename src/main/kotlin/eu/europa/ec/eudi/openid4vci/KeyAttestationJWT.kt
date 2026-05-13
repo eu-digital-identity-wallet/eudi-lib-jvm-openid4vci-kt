@@ -67,12 +67,37 @@ data class KeyAttestationJWTClaims(
     init {
         require(attestedKeys.isNotEmpty()) { "attestedKeys must not be empty" }
         require(attestedKeys.none { it.isPrivate }) { "attestedKeys must all be public" }
-        require(1 == keyStorage.size && AttackPotentialResistance.Iso18045High == keyStorage.first()) {
-            "keyStorage must be [${AttackPotentialResistance.Iso18045High}]"
+        keyStorage.ensureLoAHigh { "keyStorage must contain [${AttackPotentialResistance.Iso18045High}]" }
+        userAuthentication.ensureLoAHigh { "userAuthentication must contain [${AttackPotentialResistance.Iso18045High}]" }
+    }
+
+    companion object {
+        /**
+         * Enforces the TS3 requirement that `key_storage` and `user_authentication` must ensure LoA High, i.e. must contain `iso_18045_high`.
+         */
+        private fun List<AttackPotentialResistance>.ensureLoAHigh(error: () -> String) {
+            require(AttackPotentialResistance.Iso18045High in this) { error() }
         }
-        require(1 == userAuthentication.size && AttackPotentialResistance.Iso18045High == userAuthentication.first()) {
-            "userAuthentication must be [${AttackPotentialResistance.Iso18045High}]"
-        }
+
+        operator fun invoke(
+            issuedAt: InstantAsEpochSecond,
+            expiresAt: InstantAsEpochSecond,
+            attestedKeys: AttestedKeys,
+            certification: URL,
+            nonce: Nonce?,
+            status: StatusClaim?,
+            keyStorageStatus: KeyStorageStatus,
+        ): KeyAttestationJWTClaims = KeyAttestationJWTClaims(
+            issuedAt = issuedAt,
+            expiresAt = expiresAt,
+            attestedKeys,
+            keyStorage = listOf(AttackPotentialResistance.Iso18045High),
+            userAuthentication = listOf(AttackPotentialResistance.Iso18045High),
+            certification,
+            nonce,
+            status,
+            keyStorageStatus,
+        )
     }
 }
 

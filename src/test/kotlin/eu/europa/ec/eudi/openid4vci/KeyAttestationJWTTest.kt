@@ -167,13 +167,13 @@ class KeyAttestationJWTTest {
     }
 
     @Test
-    fun `KeyAttestationJWT must contain only iso_18045_high in key_storage claim`() {
+    fun `KeyAttestationJWT must contain iso_18045_high in key_storage claim`() {
         val jwt = KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
             .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
             .iat(Instant.now())
             .exp(Instant.now() + Duration.ofDays(1L))
             .attestedKeys(listOf(ECKeyGenerator(Curve.P_256).generate().toPublicJWK()))
-            .keyStorage(listOf(AttackPotentialResistance.Iso18045Moderate, AttackPotentialResistance.Iso18045High))
+            .keyStorage(listOf(AttackPotentialResistance.Iso18045Moderate))
             .userAuthentication(emptyList())
             .certification(URI.create("https://example.org/certification/wscd/GlobalPlatform/").toURL())
             .keyStorageStatus(
@@ -196,18 +196,18 @@ class KeyAttestationJWTTest {
         assertEquals("Invalid Claims Set.", exception.message)
 
         val cause = assertIs<IllegalArgumentException>(exception.cause)
-        assertEquals("keyStorage must be [iso_18045_high]", cause.message)
+        assertEquals("keyStorage must contain [iso_18045_high]", cause.message)
     }
 
     @Test
-    fun `KeyAttestationJWT must contain only iso_18045_high in user_authentication claim`() {
+    fun `KeyAttestationJWT must contain iso_18045_high in user_authentication claim`() {
         val jwt = KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
             .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
             .iat(Instant.now())
             .exp(Instant.now() + Duration.ofDays(1L))
             .attestedKeys(listOf(ECKeyGenerator(Curve.P_256).generate().toPublicJWK()))
             .keyStorage(listOf(AttackPotentialResistance.Iso18045High))
-            .userAuthentication(listOf(AttackPotentialResistance.Iso18045Moderate, AttackPotentialResistance.Iso18045High))
+            .userAuthentication(listOf(AttackPotentialResistance.Iso18045Moderate))
             .certification(URI.create("https://example.org/certification/wscd/GlobalPlatform/").toURL())
             .keyStorageStatus(
                 KeyStorageStatus(
@@ -229,7 +229,7 @@ class KeyAttestationJWTTest {
         assertEquals("Invalid Claims Set.", exception.message)
 
         val cause = assertIs<IllegalArgumentException>(exception.cause)
-        assertEquals("userAuthentication must be [iso_18045_high]", cause.message)
+        assertEquals("userAuthentication must contain [iso_18045_high]", cause.message)
     }
 
     @Test
