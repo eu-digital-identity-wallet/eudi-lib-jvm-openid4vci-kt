@@ -16,16 +16,8 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.crypto.Ed25519Verifier
-import com.nimbusds.jose.crypto.MACVerifier
-import com.nimbusds.jose.crypto.RSASSAVerifier
-import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.jwk.OctetKeyPair
-import com.nimbusds.jose.jwk.OctetSequenceKey
-import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CNonceAndDPoPNonce
@@ -411,14 +403,9 @@ internal class RequestIssuanceImpl(
             ?: throw IllegalArgumentException("Missing 'key_attestation' in JWT header")
         val keyAttestation = KeyAttestationJWT(keyAttestationJwt)
         val attestedKeys = keyAttestation.attestedKeys
-        val verifier: JWSVerifier = when (val jwk = attestedKeys[ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX]) {
-            is RSAKey -> RSASSAVerifier(jwk)
-            is ECKey -> ECDSAVerifier(jwk)
-            is OctetKeyPair -> Ed25519Verifier(jwk)
-            is OctetSequenceKey -> MACVerifier(jwk)
-            else -> throw IllegalArgumentException("Unsupported key type: ${jwk.keyType.value}")
-        }
         val signatureVerified = try {
+            val signingKey = attestedKeys[ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX].toECKey()
+            val verifier = ECDSAVerifier(signingKey)
             jwtProof.verify(verifier)
         } catch (_: Exception) {
             false
