@@ -20,13 +20,11 @@ import eu.europa.ec.eudi.openid4vci.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import java.time.Instant
 
 @Serializable
 internal data class JwtProofClaims(
     @SerialName("aud") val audience: String,
-    @Serializable(with = NumericInstantSerializer::class)
-    @SerialName("iat") val issuedAt: Instant,
+    @SerialName("iat") val issuedAt: InstantAsEpochSecond,
     @SerialName("iss") val issuer: String? = null,
     @SerialName("nonce") val nonce: String? = null,
 )
@@ -63,7 +61,7 @@ internal fun JsonObjectBuilder.jwtProofHeader(key: JwtBindingKey) {
             put(OpenId4VCISpec.JOSE_HEADER_KEY_ID, key.identity)
         }
         is JwtBindingKey.Jwk -> {
-            put(OpenId4VCISpec.JOSE_HEADER_JWK, key.jwk.asJsonElement())
+            put(OpenId4VCISpec.JOSE_HEADER_JWK, key.jwk.publicJwkAsJsonElement())
         }
         is JwtBindingKey.X509 -> {
             put(OpenId4VCISpec.JOSE_HEADER_X5C, key.chain.asJsonElement())

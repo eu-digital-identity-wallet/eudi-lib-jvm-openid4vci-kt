@@ -181,9 +181,9 @@ internal object ClaimPathSerializer : KSerializer<ClaimPath> {
     }
 }
 
-object NumericInstantSerializer : KSerializer<Instant> {
+object InstantEpochSecondSerializer : KSerializer<Instant> {
     override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("NumericInstant", PrimitiveKind.LONG)
+        PrimitiveSerialDescriptor("InstantEpochSecondSerializer", PrimitiveKind.LONG)
 
     override fun serialize(encoder: Encoder, value: Instant) {
         encoder.encodeLong(value.epochSecond)
@@ -211,7 +211,7 @@ object JWTClaimsSetSerializer : KSerializer<JWTClaimsSet> {
     }
 }
 
-fun JWK.asJsonElement(): JsonElement = Json.parseToJsonElement(this.toPublicJWK().toJSONString())
+fun JWK.publicJwkAsJsonElement(): JsonElement = Json.parseToJsonElement(this.toPublicJWK().toJSONString())
 
 fun List<X509Certificate>.asJsonElement(): JsonArray = JsonArray(
     this.map { Json.encodeToJsonElement(Base64.getEncoder().encodeToString(it.encoded)) },
@@ -226,3 +226,26 @@ object URLSerializer : KSerializer<URL> {
 
     override fun deserialize(decoder: Decoder): URL = URI.create(decoder.decodeString()).toURL()
 }
+
+object JWKJsonObjectSerializer : KSerializer<JWK> {
+    private val serializer = JsonObject.serializer()
+
+    override val descriptor: SerialDescriptor = SerialDescriptor("JWKJsonObjectSerializer", serializer.descriptor)
+
+    override fun serialize(encoder: Encoder, value: JWK) {
+        val serialized = JsonSupport.decodeFromString<JsonObject>(value.toJSONString())
+        encoder.encodeSerializableValue(serializer, serialized)
+    }
+
+    override fun deserialize(decoder: Decoder): JWK {
+        val serialized = decoder.decodeSerializableValue(serializer)
+        return JWK.parse(JsonSupport.encodeToString(serialized))
+    }
+}
+
+internal fun <T : Any> JWTClaimsSet.decodeAs(deserializationStrategy: DeserializationStrategy<T>): Result<T> =
+    runCatching {
+        JsonSupport.decodeFromString(deserializationStrategy, JSONObjectUtils.toJSONString(toJSONObject()))
+    }
+
+internal inline fun <reified T : Any> JWTClaimsSet.decodeAs(): Result<T> = decodeAs(serializer())

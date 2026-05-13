@@ -208,7 +208,7 @@ data class DeferredIssuanceStoredContextTO(
             return DeferredIssuanceStoredContextTO(
                 credentialIssuerId = dCtx.config.credentialIssuerId.toString(),
                 clientId = dCtx.config.clientAuthentication.id,
-                clientAttestationJwt = dCtx.config.clientAuthentication.ifAttested { attestationJWT.jwt.serialize() },
+                clientAttestationJwt = dCtx.config.clientAuthentication.ifAttested { attestationJWT.jwt },
                 clientAttestationPopKeyId = dCtx.config.clientAuthentication.ifAttested { checkNotNull(clientAttestationPopKeyId) },
                 deferredEndpoint = dCtx.config.deferredEndpoint.toString(),
                 authServerId = dCtx.config.authorizationServerId.toString(),

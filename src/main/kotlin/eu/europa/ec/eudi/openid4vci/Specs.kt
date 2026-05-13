@@ -37,6 +37,9 @@ object OpenId4VCISpec {
     const val CREDENTIAL_ISSUER_WELL_KNOWN_PATH = "/.well-known/openid-credential-issuer"
 
     const val SIGNED_METADATA_JWT_TYPE = "openidvci-issuer-metadata+jwt"
+
+    const val WALLET_ATTESTATION_WALLET_NAME: String = "wallet_name"
+    const val WALLET_ATTESTATION_WALLET_LINK: String = "wallet_link"
 }
 
 /**
@@ -115,9 +118,17 @@ object RFC7519 {
 object TS3 {
     val WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS: Set<JWSAlgorithm> =
         setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
+
+    const val WALLET_VERSION: String = "wallet_version"
+    const val WALLET_SOLUTION_CERTIFICATION_INFORMATION: String = "wallet_solution_certification_information"
+    const val CLIENT_STATUS: String = "client_status"
 }
 
-object ETSI4723 {
+/**
+ * [Electronic Signatures and Trust Infrastructures (ESI); Profiles for Electronic Attestation of Attributes;
+ * Part 3: Profiles for issuance of EAA or PID](https://www.etsi.org/deliver/etsi_ts/119400_119499/11947203/01.01.01_60/ts_11947203v010101p.pdf)
+ */
+object ETSI119472Part3 {
     const val REUSE_POLICY_ARF_ANNEX_II = "arf_annex_ii"
     const val CREDENTIAL_REUSE_POLICY = "credential_reuse_policy"
     const val CREDENTIAL_REUSE_POLICY_ID = "id"
@@ -126,4 +137,22 @@ object ETSI4723 {
     const val REUSE_POLICY_OPTION_BATCH_SIZE = "batch_size"
     const val REUSE_POLICY_OPTION_TRIGGER_UNUSED = "reissue_trigger_unused"
     const val REUSE_POLICY_OPTION_TRIGGER_LIFETIME = "reissue_trigger_lifetime_left"
+}
+
+/**
+ * [Proof-of-Possession Key Semantics for JSON Web Tokens (JWTs)](https://www.rfc-editor.org/rfc/rfc7800)
+ */
+object RFC7800 {
+    const val CONFIRMATION: String = "cnf"
+    const val JWK: String = "jwk"
+}
+
+/**
+ * [Token Status List](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-status-list]
+ */
+object TokenStatusListSpec {
+    const val STATUS: String = "status"
+    const val STATUS_LIST: String = "status_list"
+    const val INDEX: String = "idx"
+    const val URI: String = "uri"
 }
