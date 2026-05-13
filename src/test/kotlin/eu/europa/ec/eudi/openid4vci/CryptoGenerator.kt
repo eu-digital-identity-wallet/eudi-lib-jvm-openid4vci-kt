@@ -27,8 +27,10 @@ import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
+import java.net.URI
 import java.security.KeyFactory
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
@@ -36,6 +38,9 @@ import java.security.interfaces.ECPrivateKey
 import java.security.spec.PKCS8EncodedKeySpec
 import java.time.Instant.now
 import java.util.*
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toJavaDuration
 
 object CryptoGenerator {
 
@@ -86,7 +91,7 @@ object CryptoGenerator {
                 provider = null,
             )
         }
-        return ProofsSpecification.JwtProofs.WithKeyAttestation(signerProvider, 1)
+        return ProofsSpecification.JwtProofs.WithKeyAttestation(signerProvider)
     }
 
     fun attestationProofSpec(
@@ -146,18 +151,33 @@ object CryptoGenerator {
         certificate: X509Certificate,
         signer: JWSSigner,
         nonce: Nonce? = null,
-    ): SignedJWT = SignedJWT(
-        JWSHeader.Builder(JWSAlgorithm.ES256)
+    ): SignedJWT {
+        val keyAttestationJWTClaims = KeyAttestationJWTClaims(
+            issuedAt = now(),
+            expiresAt = now() + 3600.seconds.toJavaDuration(),
+            AttestedKeys(attestedKeys.map { it.toPublicJWK() }),
+            keyStorage = listOf(AttackPotentialResistance.Iso18045High),
+            userAuthentication = listOf(AttackPotentialResistance.Iso18045High),
+            URI.create("https://example.org/certification/wscd/GlobalPlatform/").toURL(),
+            nonce,
+            null,
+            KeyStorageStatus(
+                StatusClaim(
+                    StatusListTokenClaim(
+                        7u,
+                        URI.create("https://revocation_url/wua-type-statuslists/3"),
+                    ),
+                ),
+                now() + 90.days.toJavaDuration(),
+            ),
+        )
+
+        val header = JWSHeader.Builder(JWSAlgorithm.ES256)
             .type(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
             .x509CertChain(listOf(com.nimbusds.jose.util.Base64.encode(certificate.encoded)))
-            .build(),
-        JWTClaimsSet.Builder().apply {
-            claim(OpenId4VCISpec.KEY_ATTESTATION_ATTESTED_KEYS, attestedKeys.map { it.toPublicJWK().toJSONObject() })
-            claim(OpenId4VCISpec.KEY_ATTESTATION_KEY_STORAGE, listOf("iso_18045_moderate"))
-            claim(OpenId4VCISpec.KEY_ATTESTATION_USER_AUTHENTICATION, listOf("iso_18045_moderate"))
-            nonce?.let { claim("nonce", nonce.value) }
-            issueTime(Date.from(now()))
-            expirationTime(Date.from(now().plusSeconds(3600)))
-        }.build(),
-    ).apply { sign(signer) }
+            .build()
+        val claimsSet = JWTClaimsSet.parse(JsonSupport.encodeToString(keyAttestationJWTClaims))
+
+        return SignedJWT(header, claimsSet).apply { sign(signer) }
+    }
 }
