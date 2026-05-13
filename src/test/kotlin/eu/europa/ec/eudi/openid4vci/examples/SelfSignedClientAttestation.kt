@@ -77,9 +77,7 @@ internal fun selfSignedClient(
             walletLink = NonBlankString("https://example.org/wallets/SmartWallet-mobile/info"),
             status = null,
             walletVersion = NonBlankString("1.0.1"),
-            walletSolutionCertificationInformation = WalletSolutionCertificationInformation(
-                JsonPrimitive("https://example.org/certification/SmartWalletMobile/1-0-1/"),
-            ),
+            walletSolutionCertificationInformation = JsonPrimitive("https://example.org/certification/SmartWalletMobile/1-0-1/"),
             clientStatus = ClientStatusClaim(
                 status = StatusClaim(
                     statusList = StatusListTokenClaim(

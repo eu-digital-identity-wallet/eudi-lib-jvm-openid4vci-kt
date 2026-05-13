@@ -27,8 +27,6 @@ import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import java.net.URL
 import java.time.Clock
 
@@ -111,17 +109,7 @@ data class StatusListTokenClaim(
     @Required @SerialName(TokenStatusListSpec.URI) val uri: NonBlankString,
 )
 
-@Serializable
-@JvmInline
-value class WalletSolutionCertificationInformation(val value: JsonElement) {
-    init {
-        require(value is JsonObject || (value is JsonPrimitive && value.isString && value.content.isNotBlank())) {
-            "value must be a JsonObject or a JsonPrimitive with a non-blank string value"
-        }
-    }
-
-    override fun toString(): String = value.toString()
-}
+typealias WalletSolutionCertificationInformation = JsonElement
 
 @Serializable
 data class ClientStatusClaim(
