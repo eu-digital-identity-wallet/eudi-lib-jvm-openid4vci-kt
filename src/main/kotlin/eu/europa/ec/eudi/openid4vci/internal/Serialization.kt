@@ -99,7 +99,7 @@ internal object ProofSerializer : KSerializer<Proof> {
                 encoder,
                 ProofJson(
                     proofType = ProofType.ATTESTATION.toString().lowercase(),
-                    attestation = value.keyAttestation.serialize(),
+                    attestation = value.keyAttestation.jwt,
                 ),
             )
         }
@@ -259,14 +259,3 @@ internal fun <T : Any> JWTClaimsSet.decodeAs(deserializationStrategy: Deserializ
     }
 
 internal inline fun <reified T : Any> JWTClaimsSet.decodeAs(): Result<T> = decodeAs(serializer())
-
-object KeyAttestationJWTSerializer : KSerializer<KeyAttestationJWT> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("KeyAttestationJWTSerializedSignedJWTSerializer", PrimitiveKind.STRING)
-
-    override fun serialize(encoder: Encoder, value: KeyAttestationJWT) {
-        encoder.encodeString(value.serialize())
-    }
-
-    override fun deserialize(decoder: Decoder): KeyAttestationJWT = KeyAttestationJWT(decoder.decodeString())
-}

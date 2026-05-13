@@ -20,7 +20,6 @@ import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.internal.JWKJsonObjectSerializer
-import eu.europa.ec.eudi.openid4vci.internal.KeyAttestationJWTSerializer
 import eu.europa.ec.eudi.openid4vci.internal.URLSerializer
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
@@ -28,7 +27,6 @@ import kotlinx.serialization.Serializable
 import java.net.URL
 
 @ConsistentCopyVisibility
-@Serializable(with = KeyAttestationJWTSerializer::class)
 data class KeyAttestationJWT private constructor(val jwt: String, val header: JWSHeader, val claimsSet: KeyAttestationJWTClaims) {
     val attestedKeys: List<JWK> get() = claimsSet.attestedKeys.value
 
@@ -44,8 +42,6 @@ data class KeyAttestationJWT private constructor(val jwt: String, val header: JW
         }
     }
 }
-
-fun KeyAttestationJWT.serialize(): String = jwt
 
 @JvmInline
 @Serializable
