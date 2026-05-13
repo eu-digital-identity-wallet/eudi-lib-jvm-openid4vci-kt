@@ -211,7 +211,7 @@ object JWTClaimsSetSerializer : KSerializer<JWTClaimsSet> {
     }
 }
 
-fun JWK.asJsonElement(): JsonElement = Json.parseToJsonElement(this.toPublicJWK().toJSONString())
+fun JWK.publicJwkAsJsonElement(): JsonElement = Json.parseToJsonElement(this.toPublicJWK().toJSONString())
 
 fun List<X509Certificate>.asJsonElement(): JsonArray = JsonArray(
     this.map { Json.encodeToJsonElement(Base64.getEncoder().encodeToString(it.encoded)) },
