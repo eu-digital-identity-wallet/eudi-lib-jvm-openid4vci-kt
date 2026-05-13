@@ -47,7 +47,7 @@ data class KeyAttestationJWT private constructor(val jwt: String, val header: JW
 
 fun KeyAttestationJWT.serialize(): String = jwt
 
-typealias JWKList = List<
+typealias AttestedKeys = List<
     @Serializable(with = JWKJsonObjectSerializer::class)
     JWK,
     >
@@ -56,7 +56,7 @@ typealias JWKList = List<
 data class KeyAttestationJWTClaims(
     @Required @SerialName(RFC7519.ISSUED_AT) val issuedAt: InstantAsEpochSecond,
     @Required @SerialName(RFC7519.EXPIRATION_TIME) val expiresAt: InstantAsEpochSecond,
-    @Required @SerialName(OpenId4VCISpec.ATTESTED_KEYS) val attestedKeys: JWKList,
+    @Required @SerialName(OpenId4VCISpec.ATTESTED_KEYS) val attestedKeys: AttestedKeys,
     @Required @SerialName(OpenId4VCISpec.KEY_STORAGE) val keyStorage: List<AttackPotentialResistance>,
     @Required @SerialName(OpenId4VCISpec.USER_AUTHENTICATION) val userAuthentication: List<AttackPotentialResistance>,
     @Required @SerialName(OpenId4VCISpec.CERTIFICATION) @Serializable(with = URLSerializer::class) val certification: URL,
