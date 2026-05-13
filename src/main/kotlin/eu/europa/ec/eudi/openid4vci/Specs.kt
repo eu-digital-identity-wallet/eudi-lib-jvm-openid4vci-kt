@@ -124,7 +124,11 @@ object TS3 {
     const val CLIENT_STATUS: String = "client_status"
 }
 
-object ETSI4723 {
+/**
+ * [Electronic Signatures and Trust Infrastructures (ESI); Profiles for Electronic Attestation of Attributes;
+ * Part 3: Profiles for issuance of EAA or PID](https://www.etsi.org/deliver/etsi_ts/119400_119499/11947203/01.01.01_60/ts_11947203v010101p.pdf)
+ */
+object ETSI119472Part3 {
     const val REUSE_POLICY_ARF_ANNEX_II = "arf_annex_ii"
     const val CREDENTIAL_REUSE_POLICY = "credential_reuse_policy"
     const val CREDENTIAL_REUSE_POLICY_ID = "id"
