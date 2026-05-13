@@ -145,12 +145,12 @@ sealed interface ProofsSpecification {
         ) : JwtProofs
 
         data class WithKeyAttestation(
-            val proofSignerProvider: suspend (Nonce?) -> Signer<KeyAttestationJWT>,
+            val proofSignerProvider: suspend (Nonce?, PositiveDuration?) -> Signer<KeyAttestationJWT>,
         ) : JwtProofs
     }
 
     data class AttestationProof(
-        val attestationProvider: suspend (Nonce?) -> KeyAttestationJWT,
+        val attestationProvider: suspend (Nonce?, PositiveDuration?) -> KeyAttestationJWT,
     ) : ProofsSpecification
 }
 

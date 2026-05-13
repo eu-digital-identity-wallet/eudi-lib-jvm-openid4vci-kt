@@ -101,6 +101,7 @@ sealed interface KeyAttestationRequirement {
     data class Required(
         val keyStorageConstraints: List<String>?,
         val userAuthenticationConstraints: List<String>?,
+        val preferredKeyStorageStatusPeriod: PositiveDuration?,
     ) : KeyAttestationRequirement {
         init {
 
@@ -122,7 +123,7 @@ sealed interface KeyAttestationRequirement {
         companion object
     }
     companion object {
-        val RequiredNoConstraints: Required = Required(null, null)
+        val RequiredNoConstraints: Required = Required(null, null, null)
     }
 }
 

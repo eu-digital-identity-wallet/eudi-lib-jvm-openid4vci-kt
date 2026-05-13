@@ -130,6 +130,7 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
                 KeyAttestationRequirement.Required(
                     listOf("iso_18045_high", "iso_18045_enhanced-basic"),
                     null,
+                    null,
                 ),
             ),
         ),
@@ -191,6 +192,7 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
                 KeyAttestationRequirement.Required(
                     listOf("iso_18045_high", "iso_18045_enhanced-basic"),
                     listOf("iso_18045_high", "iso_18045_enhanced-basic"),
+                    null,
                 ),
             ),
         ),

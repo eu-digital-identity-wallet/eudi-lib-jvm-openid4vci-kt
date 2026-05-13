@@ -77,9 +77,11 @@ object CryptoGenerator {
     fun keyAttestationJwtProofsSpec(
         curve: Curve = Curve.P_256,
         attestedKeysCount: Int = 3,
+        assertions: (Nonce?, PositiveDuration?) -> Unit = { _, _ -> },
     ): ProofsSpecification {
         val ecKeys = List(attestedKeysCount) { randomECSigningKey(curve) }
-        val signerProvider: suspend (Nonce?) -> Signer<KeyAttestationJWT> = { cNonce ->
+        val signerProvider: suspend (Nonce?, PositiveDuration?) -> Signer<KeyAttestationJWT> = { cNonce, preferredKeyStorageStatusPeriod ->
+            assertions(cNonce, preferredKeyStorageStatusPeriod)
             Signer.fromNimbusEcKey(
                 ecPrivateKey = ecKeys[0],
                 keyInfo =
@@ -97,8 +99,10 @@ object CryptoGenerator {
     fun attestationProofSpec(
         curve: Curve = Curve.P_256,
         keysNo: Int = 3,
+        assertions: (Nonce?, PositiveDuration?) -> Unit = { _, _ -> },
     ) =
-        ProofsSpecification.AttestationProof { nonce ->
+        ProofsSpecification.AttestationProof { nonce, preferredKeyStorageStatusPeriod ->
+            assertions(nonce, preferredKeyStorageStatusPeriod)
             keyAttestationJwt(
                 List(keysNo) {
                     randomECSigningKey(curve)

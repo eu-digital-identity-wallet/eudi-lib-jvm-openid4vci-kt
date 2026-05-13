@@ -139,8 +139,9 @@ private data class ProofTypeSupportedMetaTO(
 
 @Serializable
 private data class KeyAttestationRequirementTO(
-    @SerialName("key_storage") val keyStorage: List<String>? = null,
-    @SerialName("user_authentication") val userAuthentication: List<String>? = null,
+    @SerialName(OpenId4VCISpec.KEY_ATTESTATION_KEY_STORAGE) val keyStorage: List<String>? = null,
+    @SerialName(OpenId4VCISpec.KEY_ATTESTATION_USER_AUTHENTICATION) val userAuthentication: List<String>? = null,
+    @SerialName(TS3.PREFERRED_KEY_STORAGE_STATUS_PERIOD) val preferredKeyStorageStatusPeriod: DurationAsSeconds? = null,
 )
 
 /**
@@ -660,7 +661,11 @@ private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTy
 
 private fun KeyAttestationRequirementTO?.toDomain(): KeyAttestationRequirement = when {
     this == null -> KeyAttestationRequirement.NotRequired
-    else -> KeyAttestationRequirement.Required(keyStorage, userAuthentication)
+    else -> KeyAttestationRequirement.Required(
+        keyStorage,
+        userAuthentication,
+        preferredKeyStorageStatusPeriod?.let { PositiveDuration(it) },
+    )
 }
 
 /**

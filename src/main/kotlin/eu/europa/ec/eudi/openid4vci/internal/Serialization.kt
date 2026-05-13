@@ -32,6 +32,7 @@ import kotlinx.serialization.json.*
 import java.net.URI
 import java.net.URL
 import java.security.cert.X509Certificate
+import java.time.Duration
 import java.time.Instant
 import java.util.*
 
@@ -259,3 +260,13 @@ internal fun <T : Any> JWTClaimsSet.decodeAs(deserializationStrategy: Deserializ
     }
 
 internal inline fun <reified T : Any> JWTClaimsSet.decodeAs(): Result<T> = decodeAs(serializer())
+
+object DurationSecondsSerializer : KSerializer<Duration> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DurationSecondsSerializer", PrimitiveKind.LONG)
+
+    override fun serialize(encoder: Encoder, value: Duration) {
+        encoder.encodeLong(value.toSeconds())
+    }
+
+    override fun deserialize(decoder: Decoder): Duration = Duration.ofSeconds(decoder.decodeLong())
+}
