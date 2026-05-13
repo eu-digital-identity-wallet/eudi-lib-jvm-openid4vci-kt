@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.jwk.JWK
@@ -46,18 +47,20 @@ typealias ClientAttestation = Pair<ClientAttestationJWT, ClientAttestationPoPJWT
  * be used by the instance for client authentication
  */
 @ConsistentCopyVisibility
-data class ClientAttestationJWT private constructor(val jwt: SignedJWT, val claimsSet: ClientAttestationJWTClaims) {
+data class ClientAttestationJWT private constructor(val jwt: String, val header: JWSHeader, val claimsSet: ClientAttestationJWTClaims) {
     val clientId: ClientId get() = claimsSet.subject.value
     val cnf: ConfirmationClaim get() = claimsSet.confirmation
     val publicKey: JWK get() = cnf.jwk
 
     companion object {
+        operator fun invoke(jwt: String): ClientAttestationJWT = invoke(SignedJWT.parse(jwt))
+
         operator fun invoke(jwt: SignedJWT): ClientAttestationJWT {
             jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
             jwt.ensureSignedOrVerified()
             jwt.ensureSignedWithAllowedAlgorithm()
             val claimsSet = jwt.ensureValidClaimsSet<ClientAttestationJWTClaims>()
-            return ClientAttestationJWT(jwt, claimsSet)
+            return ClientAttestationJWT(jwt.serialize(), jwt.header, claimsSet)
         }
     }
 }
