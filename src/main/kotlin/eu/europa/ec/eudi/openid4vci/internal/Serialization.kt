@@ -243,7 +243,9 @@ object JWKJsonObjectSerializer : KSerializer<JWK> {
     }
 }
 
-internal inline fun <reified T : Any> JWTClaimsSet.decodeAs(deserializationStrategy: DeserializationStrategy<T> = serializer()): Result<T> =
+internal fun <T : Any> JWTClaimsSet.decodeAs(deserializationStrategy: DeserializationStrategy<T>): Result<T> =
     runCatching {
         JsonSupport.decodeFromString(deserializationStrategy, JSONObjectUtils.toJSONString(toJSONObject()))
     }
+
+internal inline fun <reified T : Any> JWTClaimsSet.decodeAs(): Result<T> = decodeAs(serializer())
