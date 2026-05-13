@@ -261,8 +261,7 @@ internal class RequestIssuanceImpl(
         grant: Grant,
         cNonce: Nonce?,
     ): Proof.Jwt {
-        val (proofSignerProvider, keyIndex) = proofsSpecification
-        val proofSigner = proofSignerProvider(cNonce)
+        val proofSigner = proofsSpecification.proofSignerProvider(cNonce)
         val joseAlg = run {
             val javaSigningAlgorithm = proofSigner.javaAlgorithm
             javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
@@ -271,7 +270,7 @@ internal class RequestIssuanceImpl(
         val jwtProof = proofSigner.use { operation ->
             operation.publicMaterial.ensureKeyAttestationJwtAlgIsSupported(credentialConfigId, ProofType.JWT)
             operation.publicMaterial.attestedKeys.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
-            val signer = KeyAttestationJwtProofSigner(joseAlg, operation, keyIndex)
+            val signer = KeyAttestationJwtProofSigner(joseAlg, operation, ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX)
             val signedJwt = signer.sign(claims)
             SignedJWT.parse(signedJwt)
         }
@@ -412,7 +411,7 @@ internal class RequestIssuanceImpl(
             ?: throw IllegalArgumentException("Missing 'key_attestation' in JWT header")
         val keyAttestation = KeyAttestationJWT(keyAttestationJwt)
         val attestedKeys = keyAttestation.attestedKeys
-        val verifier: JWSVerifier = when (val jwk = attestedKeys.first()) {
+        val verifier: JWSVerifier = when (val jwk = attestedKeys[ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX]) {
             is RSAKey -> RSASSAVerifier(jwk)
             is ECKey -> ECDSAVerifier(jwk)
             is OctetKeyPair -> Ed25519Verifier(jwk)

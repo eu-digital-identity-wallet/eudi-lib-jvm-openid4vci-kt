@@ -146,17 +146,13 @@ sealed interface ProofsSpecification {
 
         data class WithKeyAttestation(
             val proofSignerProvider: suspend (Nonce?) -> Signer<KeyAttestationJWT>,
-        ) : JwtProofs {
-            val keyIndex: Int = 0
-        }
+        ) : JwtProofs
     }
 
     data class AttestationProof(
         val attestationProvider: suspend (Nonce?) -> KeyAttestationJWT,
     ) : ProofsSpecification
 }
-
-internal operator fun ProofsSpecification.JwtProofs.WithKeyAttestation.component2(): Int = keyIndex
 
 /**
  * An interface for submitting a credential issuance request.

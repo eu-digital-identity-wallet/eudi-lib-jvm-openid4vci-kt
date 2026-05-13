@@ -149,6 +149,7 @@ object ETSI119472Part3 {
     const val REUSE_POLICY_OPTION_BATCH_SIZE = "batch_size"
     const val REUSE_POLICY_OPTION_TRIGGER_UNUSED = "reissue_trigger_unused"
     const val REUSE_POLICY_OPTION_TRIGGER_LIFETIME = "reissue_trigger_lifetime_left"
+    const val KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX: Int = 0
 }
 
 /**

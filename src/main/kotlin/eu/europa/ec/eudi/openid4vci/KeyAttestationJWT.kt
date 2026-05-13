@@ -63,6 +63,8 @@ value class AttestedKeys(
     override fun toString(): String = value.toString()
 }
 
+operator fun AttestedKeys.get(index: Int): JWK = value[index]
+
 @Serializable
 data class KeyAttestationJWTClaims(
     @Required @SerialName(RFC7519.ISSUED_AT) val issuedAt: InstantAsEpochSecond,
