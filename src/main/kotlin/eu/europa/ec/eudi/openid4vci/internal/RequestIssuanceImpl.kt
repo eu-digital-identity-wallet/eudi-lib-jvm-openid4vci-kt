@@ -115,11 +115,10 @@ internal class RequestIssuanceImpl(
             is ProofsSpecification.NoProofs -> emptyList<Proof>() to null
 
             is ProofsSpecification.JwtProofs.WithKeyAttestation -> {
-                check(proofRequirement is ProofTypeMeta.Jwt)
                 val cNonceAndDPoPNonce = cNonce()
                 val proofs = listOf(
                     jwtProofWithKeyAttestation(
-                        proofRequirement,
+                        proofRequirement as ProofTypeMeta.Jwt,
                         proofsSpecification,
                         selectedReusePolicy,
                         grant,
@@ -130,10 +129,9 @@ internal class RequestIssuanceImpl(
             }
 
             is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
-                check(proofRequirement is ProofTypeMeta.Jwt)
                 val cNonceAndDPoPNonce = cNonce()
                 val proofs = jwtProofsWithoutKeyAttestation(
-                    proofRequirement,
+                    proofRequirement as ProofTypeMeta.Jwt,
                     proofsSpecification,
                     selectedReusePolicy,
                     grant,
@@ -143,11 +141,10 @@ internal class RequestIssuanceImpl(
             }
 
             is ProofsSpecification.AttestationProof -> {
-                check(proofRequirement is ProofTypeMeta.Attestation)
                 val cNonceAndDPoPNonce = cNonce()
                 val proofs = listOf(
                     attestationProof(
-                        proofRequirement,
+                        proofRequirement as ProofTypeMeta.Attestation,
                         proofsSpecification,
                         selectedReusePolicy,
                         cNonceAndDPoPNonce?.cnonce,
