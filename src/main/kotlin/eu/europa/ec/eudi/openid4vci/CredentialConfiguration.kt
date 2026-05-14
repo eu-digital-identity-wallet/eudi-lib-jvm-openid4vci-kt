@@ -99,8 +99,8 @@ sealed interface KeyAttestationRequirement {
     }
 
     data class Required(
-        val keyStorageConstraints: List<String>?,
-        val userAuthenticationConstraints: List<String>?,
+        val keyStorageConstraints: List<AttackPotentialResistance>?,
+        val userAuthenticationConstraints: List<AttackPotentialResistance>?,
         val preferredKeyStorageStatusPeriod: PositiveDuration?,
     ) : KeyAttestationRequirement {
         init {

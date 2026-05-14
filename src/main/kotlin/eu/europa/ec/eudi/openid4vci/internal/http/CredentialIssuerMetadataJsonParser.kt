@@ -139,8 +139,8 @@ private data class ProofTypeSupportedMetaTO(
 
 @Serializable
 private data class KeyAttestationRequirementTO(
-    @SerialName(OpenId4VCISpec.KEY_ATTESTATION_KEY_STORAGE) val keyStorage: List<String>? = null,
-    @SerialName(OpenId4VCISpec.KEY_ATTESTATION_USER_AUTHENTICATION) val userAuthentication: List<String>? = null,
+    @SerialName(OpenId4VCISpec.KEY_ATTESTATION_KEY_STORAGE) val keyStorage: List<AttackPotentialResistance>? = null,
+    @SerialName(OpenId4VCISpec.KEY_ATTESTATION_USER_AUTHENTICATION) val userAuthentication: List<AttackPotentialResistance>? = null,
     @SerialName(TS3.PREFERRED_KEY_STORAGE_STATUS_PERIOD) val preferredKeyStorageStatusPeriod: DurationAsSeconds? = null,
 )
 
