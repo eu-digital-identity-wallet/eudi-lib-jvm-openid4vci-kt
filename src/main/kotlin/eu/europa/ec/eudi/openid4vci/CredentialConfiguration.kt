@@ -99,8 +99,9 @@ sealed interface KeyAttestationRequirement {
     }
 
     data class Required(
-        val keyStorageConstraints: List<String>?,
-        val userAuthenticationConstraints: List<String>?,
+        val keyStorageConstraints: List<AttackPotentialResistance>?,
+        val userAuthenticationConstraints: List<AttackPotentialResistance>?,
+        val preferredKeyStorageStatusPeriod: PositiveDuration?,
     ) : KeyAttestationRequirement {
         init {
 
@@ -121,9 +122,8 @@ sealed interface KeyAttestationRequirement {
 
         companion object
     }
-    companion object {
-        val RequiredNoConstraints: Required = Required(null, null)
-    }
+
+    companion object
 }
 
 fun ProofTypeMeta.type(): ProofType? = when (this) {

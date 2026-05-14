@@ -134,6 +134,7 @@ object TS3 {
     const val WALLET_SOLUTION_CERTIFICATION_INFORMATION: String = "wallet_solution_certification_information"
     const val CLIENT_STATUS: String = "client_status"
     const val KEY_STORAGE_STATUS: String = "key_storage_status"
+    const val PREFERRED_KEY_STORAGE_STATUS_PERIOD: String = "preferred_key_storage_status_period"
 }
 
 /**
