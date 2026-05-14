@@ -122,9 +122,8 @@ sealed interface KeyAttestationRequirement {
 
         companion object
     }
-    companion object {
-        val RequiredNoConstraints: Required = Required(null, null, null)
-    }
+
+    companion object
 }
 
 fun ProofTypeMeta.type(): ProofType? = when (this) {
