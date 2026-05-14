@@ -37,10 +37,13 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.assertDoesNotThrow
+import org.junit.jupiter.api.assertNull
 import org.junit.jupiter.api.assertThrows
 import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
 import java.util.*
 import kotlin.test.*
+import kotlin.time.Duration.Companion.days
+import kotlin.time.toJavaDuration
 
 class IssuanceSingleRequestTest {
 
@@ -836,7 +839,10 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
+            val proofSpec = attestationProofSpec { _, preferredKeyStorageStatusPeriod ->
+                assertEquals(1.days.toJavaDuration(), preferredKeyStorageStatusPeriod?.value)
+            }
+            authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
         }
     }
 
@@ -858,7 +864,10 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, attestationProofSpec(curve = Curve.P_384)).getOrThrow()
+            val proofSpec = attestationProofSpec(curve = Curve.P_384) { _, preferredKeyStorageStatusPeriod ->
+                assertEquals(1.days.toJavaDuration(), preferredKeyStorageStatusPeriod?.value)
+            }
+            authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
         }
     }
 
@@ -949,7 +958,10 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
+            val proofSpec = attestationProofSpec { _, preferredKeyStorageStatusPeriod ->
+                assertEquals(1.days.toJavaDuration(), preferredKeyStorageStatusPeriod?.value)
+            }
+            authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
         }
     }
 
@@ -1040,7 +1052,10 @@ class IssuanceSingleRequestTest {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             with(issuer) {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
+                val proofSpec = attestationProofSpec { _, preferredKeyStorageStatusPeriod ->
+                    assertEquals(1.days.toJavaDuration(), preferredKeyStorageStatusPeriod?.value)
+                }
+                authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
             }
         }
 }
