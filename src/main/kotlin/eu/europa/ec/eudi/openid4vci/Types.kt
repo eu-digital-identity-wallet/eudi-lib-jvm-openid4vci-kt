@@ -25,6 +25,7 @@ import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.MissingRequiredRequestEncryptionSpecification
+import eu.europa.ec.eudi.openid4vci.internal.DurationSecondsSerializer
 import eu.europa.ec.eudi.openid4vci.internal.InstantEpochSecondSerializer
 import eu.europa.ec.eudi.openid4vci.internal.URISerializer
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
@@ -411,3 +412,14 @@ data class StatusListTokenClaim(
     @Required @SerialName(TokenStatusListSpec.INDEX) val index: UInt,
     @Required @SerialName(TokenStatusListSpec.URI) @Serializable(with = URISerializer::class) val uri: URI,
 )
+
+typealias DurationAsSeconds =
+    @Serializable(with = DurationSecondsSerializer::class)
+    Duration
+
+@JvmInline
+value class PositiveDuration(val value: Duration) {
+    init {
+        require(value > Duration.ZERO) { "Duration must be positive" }
+    }
+}

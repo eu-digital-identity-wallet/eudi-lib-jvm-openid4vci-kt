@@ -128,7 +128,8 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
             ProofTypeMeta.Jwt(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
                 KeyAttestationRequirement.Required(
-                    listOf("iso_18045_high", "iso_18045_enhanced-basic"),
+                    listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
+                    null,
                     null,
                 ),
             ),
@@ -189,8 +190,9 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
             ProofTypeMeta.Jwt(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
                 KeyAttestationRequirement.Required(
-                    listOf("iso_18045_high", "iso_18045_enhanced-basic"),
-                    listOf("iso_18045_high", "iso_18045_enhanced-basic"),
+                    listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
+                    listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
+                    null,
                 ),
             ),
         ),

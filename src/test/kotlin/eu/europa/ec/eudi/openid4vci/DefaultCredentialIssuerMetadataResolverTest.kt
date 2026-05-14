@@ -21,6 +21,7 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
+import eu.europa.ec.eudi.openid4vci.KeyAttestationRequirement.Required
 import eu.europa.ec.eudi.openid4vci.internal.wellKnown
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -141,7 +142,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
             val proofs = credentialConfigs.jwtProofTypeSupported("MobileDrivingLicense_msoMdoc")
             proofs != null && proofs.all {
                 val proof = it.keyAttestationRequirement
-                proof == KeyAttestationRequirement.RequiredNoConstraints
+                proof == Required(null, null, null)
             }
         }
 
