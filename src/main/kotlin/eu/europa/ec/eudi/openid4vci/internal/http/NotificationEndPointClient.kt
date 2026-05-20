@@ -25,6 +25,7 @@ import io.ktor.http.*
 internal class NotificationEndPointClient(
     private val notificationEndpoint: CredentialIssuerEndpoint,
     private val dPoPJwtFactory: DPoPJwtFactory?,
+
     private val httpClient: HttpClient,
 ) {
 

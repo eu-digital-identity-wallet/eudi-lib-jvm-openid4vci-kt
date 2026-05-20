@@ -15,10 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.UnableToResolveAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.UnableToResolveCredentialIssuerMetadata
-import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestValidationError.InvalidGrants
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -80,48 +80,78 @@ private enum class InputModeTO {
     NUMERIC,
 }
 
-internal class DefaultCredentialOfferRequestResolver(
+internal class CredentialOfferRequestResolver(
     private val httpClient: HttpClient,
-    private val issuerMetadataPolicy: IssuerMetadataPolicy,
-) : CredentialOfferRequestResolver {
-    override suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer> = runCatchingCancellable {
-        val credentialOffer = fetchOffer(request)
-        val credentialIssuerId = CredentialIssuerId(credentialOffer.credentialIssuerIdentifier)
-            .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).raise() }
+    private val requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
+    private val responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
+) {
 
-        ensure(credentialOffer.credentialConfigurationIds.isNotEmpty()) {
-            val er = IllegalArgumentException("credentials are required")
-            CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
-        }
+    suspend fun resolve(config: OpenId4VCIConfig, request: CredentialOfferRequest): Result<CredentialOffer> =
+        runCatchingCancellable {
+            val credentialOffer = fetchOffer(request)
+            val credentialIssuerId = CredentialIssuerId(credentialOffer.credentialIssuerIdentifier)
+                .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).raise() }
 
-        val credentialIssuerMetadata = fetchIssuerMetaData(credentialIssuerId)
-        val credentials = credentialOffer.credentialConfigurationIds.map { CredentialConfigurationIdentifier(it) }
-        ensure(credentialIssuerMetadata.credentialConfigurationsSupported.keys.containsAll(credentials)) {
-            val er = IllegalArgumentException("Credential offer contains unknown credential ids")
-            CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
-        }
-
-        val grants = credentialOffer.grants?.toGrants(credentialIssuerMetadata)
-        val authorizationServer = grants?.authServer() ?: credentialIssuerMetadata.authorizationServers[0]
-        val authorizationServerMetadata = fetchAuthServerMetaData(authorizationServer)
-        if (grants is Grants.AuthorizationCode) {
-            ensureNotNull(authorizationServerMetadata.authorizationEndpointURI) {
-                val error =
-                    IllegalArgumentException(
-                        "Credential Offer requires Authorization Code Grant, but the Authorization Server does not support it",
-                    )
-                CredentialOfferRequestValidationError.InvalidGrants(error).toException()
+            ensure(credentialOffer.credentialConfigurationIds.isNotEmpty()) {
+                val er = IllegalArgumentException("credentials are required")
+                CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
             }
-        }
 
-        CredentialOffer(
-            credentialIssuerId,
-            credentialIssuerMetadata,
-            authorizationServerMetadata,
-            credentials,
-            grants,
-        )
-    }
+            val credentialIssuerMetadata = fetchIssuerMetaData(config.issuerMetadataPolicy, credentialIssuerId)
+            val credentials = credentialOffer.credentialConfigurationIds.map { CredentialConfigurationIdentifier(it) }
+            ensure(credentialIssuerMetadata.credentialConfigurationsSupported.keys.containsAll(credentials)) {
+                val er = IllegalArgumentException("Credential offer contains unknown credential ids")
+                CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
+            }
+
+            val grants = credentialOffer.grants?.toGrants(credentialIssuerMetadata)
+            val authorizationServer = grants?.authServer() ?: credentialIssuerMetadata.authorizationServers[0]
+            val authorizationServerMetadata = fetchAuthServerMetaData(authorizationServer)
+            if (grants is Grants.AuthorizationCode) {
+                ensureNotNull(authorizationServerMetadata.authorizationEndpointURI) {
+                    val error =
+                        IllegalArgumentException(
+                            "Credential Offer requires Authorization Code Grant, but the Authorization Server does not support it",
+                        )
+                    CredentialOfferRequestValidationError.InvalidGrants(error).toException()
+                }
+            }
+
+            val exchangeEncryptionSpecification = issuanceEncryptionSpecs(
+                issuerMetadata = credentialIssuerMetadata,
+                encryptionSupportConfig = config.encryptionSupportConfig,
+                requestEncryptionSpecFactory = requestEncryptionSpecFactory,
+                responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+            ).getOrThrow()
+
+            val dPoPCtx = run {
+                val dPoPUsage = when (val clientAuthentication = config.clientAuthentication) {
+                    is ClientAuthentication.AttestationBased -> DPoPUsage.Required(
+                        clientAuthentication.provisionClientAttestation.popAlgorithm,
+                    )
+                    is ClientAuthentication.None -> when (val u = clientAuthentication.dPoPUsage) {
+                        is DPoPUsage.IfSupported<Signer<JWK>> -> {
+                            DPoPUsage.IfSupported(JwsAlgorithm(u.value.javaAlgorithm.toJoseAlg().name))
+                        }
+                        is DPoPUsage.Required<Signer<JWK>> -> {
+                            DPoPUsage.Required(JwsAlgorithm(u.value.javaAlgorithm.toJoseAlg().name))
+                        }
+                        DPoPUsage.Never -> DPoPUsage.Never
+                    }
+                }
+                DPoPCtx.createForServer(dPoPUsage, authorizationServerMetadata).getOrThrow()
+            }
+
+            CredentialOffer(
+                credentialIssuerId,
+                credentialIssuerMetadata,
+                authorizationServerMetadata,
+                credentials,
+                grants,
+                exchangeEncryptionSpecification,
+                dPoPCtx,
+            )
+        }
 
     private suspend fun fetchOffer(request: CredentialOfferRequest): CredentialOfferRequestTO {
         val credentialOfferRequestObjectString: String = when (request) {
@@ -140,7 +170,10 @@ internal class DefaultCredentialOfferRequestResolver(
         }
     }
 
-    private suspend fun fetchIssuerMetaData(credentialIssuerId: CredentialIssuerId): CredentialIssuerMetadata =
+    private suspend fun fetchIssuerMetaData(
+        issuerMetadataPolicy: IssuerMetadataPolicy,
+        credentialIssuerId: CredentialIssuerId,
+    ): CredentialIssuerMetadata =
         with(DefaultCredentialIssuerMetadataResolver(httpClient)) {
             resolve(credentialIssuerId, issuerMetadataPolicy)
                 .getOrElse { throw UnableToResolveCredentialIssuerMetadata(it).toException() }
@@ -214,4 +247,4 @@ private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata
         maybeAuthorizationCodeGrant != null -> maybeAuthorizationCodeGrant
         else -> maybePreAuthorizedCodeGrant
     }
-}.getOrElse { throw InvalidGrants(it).toException() }
+}.getOrElse { throw CredentialOfferRequestValidationError.InvalidGrants(it).toException() }

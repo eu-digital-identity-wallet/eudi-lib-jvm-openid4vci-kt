@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.internal.CredentialOfferRequestResolver
 import kotlinx.coroutines.test.runTest
 import org.apache.http.client.utils.URIBuilder
 import kotlin.test.*
@@ -48,13 +49,16 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
                 Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", TxCode()),
             ),
+            TODO(),
+            null,
         )
 
         val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
             .addParameter("credential_offer", credentialOffer)
             .build()
+        val config = OpenId4VCIConfiguration.copy(issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned)
 
-        val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+        val offer = resolver.resolve(config, credentialEndpointUrl.toString()).getOrThrow()
         assertEquals(expected, offer)
     }
 
@@ -75,7 +79,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .build()
 
         val exception = assertFailsWith<CredentialOfferRequestException> {
-            resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+            resolver.resolve(uri = credentialEndpointUrl.toString()).getOrThrow()
         }
         assertIs<CredentialOfferRequestValidationError.InvalidCredentials>(exception.error)
     }
@@ -97,7 +101,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .build()
 
         val exception = assertFailsWith<CredentialOfferRequestException> {
-            resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+            resolver.resolve(uri = credentialEndpointUrl.toString()).getOrThrow()
         }
         assertIs<CredentialOfferRequestValidationError>(exception.error)
     }
@@ -120,7 +124,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .build()
 
         val exception = assertFailsWith<CredentialOfferRequestException> {
-            resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+            resolver.resolve(uri = credentialEndpointUrl.toString()).getOrThrow()
         }
         assertIs<CredentialOfferRequestValidationError.InvalidGrants>(exception.error)
     }
@@ -143,7 +147,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             .build()
 
         val exception = assertFailsWith<CredentialOfferRequestException> {
-            resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+            resolver.resolve(uri = credentialEndpointUrl.toString()).getOrThrow()
         }
         assertIs<CredentialOfferRequestValidationError.InvalidGrants>(exception.error)
     }
@@ -181,9 +185,12 @@ internal class DefaultCredentialOfferRequestResolverTest {
                 Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
                 Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", TxCode()),
             ),
+            TODO(),
+            TODO(),
+
         )
 
-        val offer = resolver.resolve(credentialEndpointUrl.toString()).getOrThrow()
+        val offer = resolver.resolve(uri = credentialEndpointUrl.toString()).getOrThrow()
         assertEquals(expected, offer)
     }
 
@@ -208,7 +215,7 @@ internal class DefaultCredentialOfferRequestResolverTest {
             val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
                 .addParameter("credential_offer_uri", credentialOfferUri.value.toString())
                 .build()
-            val result = resolver.resolve(credentialEndpointUrl.toString())
+            val result = resolver.resolve(uri = credentialEndpointUrl.toString())
             val exception = assertIs<CredentialOfferRequestException>(result.exceptionOrNull())
             val error = assertIs<CredentialOfferRequestValidationError.InvalidGrants>(exception.error)
             val cause = assertIs<IllegalArgumentException>(error.reason)
@@ -240,5 +247,15 @@ private var oauthMetaDataHandler =
 private fun resolver(vararg request: RequestMocker): CredentialOfferRequestResolver =
     CredentialOfferRequestResolver(
         mockedHttpClient(requestMockers = request),
-        IssuerMetadataPolicy.IgnoreSigned,
     )
+
+private val defaultCfg = OpenId4VCIConfiguration.copy(issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned)
+
+private suspend fun CredentialOfferRequestResolver.resolve(
+    config: OpenId4VCIConfig = defaultCfg,
+    uri: String,
+): Result<CredentialOffer> = runCatching {
+    val request = CredentialOfferRequest(uri).getOrThrow()
+
+    resolve(config, request).getOrThrow()
+}

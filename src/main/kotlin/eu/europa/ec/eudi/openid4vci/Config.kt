@@ -18,31 +18,49 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDHEncrypter
-import com.nimbusds.jose.crypto.RSAEncrypter
 import com.nimbusds.jose.crypto.impl.ContentCryptoProvider
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
+import eu.europa.ec.eudi.openid4vci.internal.requireIsNotMAC
+import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
 import java.net.URI
 import java.time.Clock
 
 typealias ClientId = String
 
 /**
- * Provisions a [Client Attestation][ClientAttestationJWT], alongside a [specification][ClientAttestationPoPJWTSpec]
- * and [builder][ClientAttestationPoPBuilder] to produce a [ClientAttestationPoPJWT], in the context of an Authorization Server.
+ * [Provisions][Provisioned] a client attestation JWT and a singer for its PoP
  */
 interface ProvisionClientAttestation {
-    val algorithm: JWSAlgorithm
+    val algorithm: JwsAlgorithm
+    val popAlgorithm: JwsAlgorithm
 
-    suspend operator fun invoke(authorizationServer: HttpsUrl): Provisioned
+    suspend operator fun invoke(authorizationServer: HttpsUrl): Provisioned {
+        val provisioned = provision(authorizationServer)
+        val clientAttestationAlgorithm = provisioned.clientAttestation.header.algorithm
+        check(algorithm.toNimbus() == clientAttestationAlgorithm) {
+            "Client attestation algorithm mismatch: expected $algorithm, got $clientAttestationAlgorithm"
+        }
+        // TODO
+        //  1. Not expired JWT
+        //  2. Cnf.jwk matches PoP algorithm
+        check(popAlgorithm.toNimbus() == provisioned.popSigner.javaAlgorithm.toJoseAlg()) {
+            "Client attestation POP algorithm mismatch: expected $popAlgorithm, got ${provisioned.popSigner.javaAlgorithm.toJoseAlg()}"
+        }
+        return provisioned
+    }
+
+    suspend fun provision(authorizationServer: HttpsUrl): Provisioned
 
     data class Provisioned(
         val clientAttestation: ClientAttestationJWT,
-        val clientAttestationPoPSpec: ClientAttestationPoPJWTSpec,
-        val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
-    )
+        val popSigner: Signer<JWK>,
+    ) {
+        init {
+            requireIsNotMAC(popSigner.javaAlgorithm.toJoseAlg())
+        }
+    }
 }
 
 /**
@@ -58,7 +76,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
     /**
      * None, i.e. a Public Client.
      */
-    data class None(override val id: ClientId) : ClientAuthentication
+    data class None(override val id: ClientId, val dPoPUsage: DPoPUsage<Signer<JWK>> = DPoPUsage.Never) : ClientAuthentication
 
     /**
      * Attestation-Based Client Authentication.
@@ -78,7 +96,6 @@ sealed interface ClientAuthentication : java.io.Serializable {
  * @param authorizeIssuanceConfig Instruction on how to assemble the authorization request. If scopes are supported
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
- * @param dPoPUsage whether to use DPoP or not
  * @param parUsage whether to use PAR in case of authorization code grant
  * @param clock Wallet's clock
  * @param issuerMetadataPolicy policy concerning signed metadata usage
@@ -89,7 +106,6 @@ data class OpenId4VCIConfig(
     val authFlowRedirectionURI: URI,
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-    val dPoPUsage: DPoPUsage = DPoPUsage.Never,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
@@ -104,81 +120,21 @@ data class OpenId4VCIConfig(
         authFlowRedirectionURI: URI,
         encryptionSupportConfig: EncryptionSupportConfig,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-        dPoPUsage: DPoPUsage = DPoPUsage.Never,
+        dPoPUsage: DPoPUsage<Signer<JWK>> = DPoPUsage.Never,
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     ) : this(
-        ClientAuthentication.None(clientId),
+        ClientAuthentication.None(clientId, dPoPUsage),
         authFlowRedirectionURI,
         encryptionSupportConfig,
         authorizeIssuanceConfig,
-        dPoPUsage,
         parUsage,
         clock,
         issuerMetadataPolicy,
         supportedCredentialReusePolicies,
     )
-
-    /**
-     * Creates a new [OpenId4VCIConfig] instance for a Wallet.
-     */
-    @Deprecated(message = "Replace with the constructor that uses DPoPUsage.")
-    constructor (
-        clientAuthentication: ClientAuthentication,
-        authFlowRedirectionURI: URI,
-        encryptionSupportConfig: EncryptionSupportConfig,
-        authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-        dPoPSigner: Signer<JWK>? = null,
-        parUsage: ParUsage = ParUsage.IfSupported,
-        clock: Clock = Clock.systemDefaultZone(),
-        issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
-        supportedCredentialReusePolicies: CredentialReusePolicies? = null,
-    ) : this (
-        clientAuthentication,
-        authFlowRedirectionURI,
-        encryptionSupportConfig,
-        authorizeIssuanceConfig,
-        dPoPSigner?.let { DPoPUsage.IfSupported(it) } ?: DPoPUsage.Never,
-        parUsage,
-        clock,
-        issuerMetadataPolicy,
-        supportedCredentialReusePolicies,
-    )
-
-    /**
-     * Creates a new [OpenId4VCIConfig] instance for a Wallet that uses [a Public OAuth 2.0 Client][ClientAuthentication.None].
-     */
-    @Deprecated(message = "Replace with the constructor that uses DPoPUsage.")
-    constructor(
-        clientId: ClientId,
-        authFlowRedirectionURI: URI,
-        encryptionSupportConfig: EncryptionSupportConfig,
-        authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-        dPoPSigner: Signer<JWK>? = null,
-        parUsage: ParUsage = ParUsage.IfSupported,
-        clock: Clock = Clock.systemDefaultZone(),
-        issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
-        supportedCredentialReusePolicies: CredentialReusePolicies? = null,
-    ) : this(
-        ClientAuthentication.None(clientId),
-        authFlowRedirectionURI,
-        encryptionSupportConfig,
-        authorizeIssuanceConfig,
-        dPoPSigner?.let { DPoPUsage.IfSupported(it) } ?: DPoPUsage.Never,
-        parUsage,
-        clock,
-        issuerMetadataPolicy,
-        supportedCredentialReusePolicies,
-    )
-
-    @Deprecated(
-        message = "Deprecated in favor of openId4VCIConfig clientAuthentication.id",
-        replaceWith = ReplaceWith("clientAuthentication.id"),
-    )
-    val clientId: ClientId
-        get() = clientAuthentication.id
 }
 
 /**
@@ -215,25 +171,23 @@ sealed interface CredentialReusePolicies {
 /**
  * Wallet's policy regarding DPoP usage.
  */
-sealed interface DPoPUsage {
+sealed interface DPoPUsage<out C : Any> {
     /**
      * DPoP is never used.
      */
-    data object Never : DPoPUsage
+    data object Never : DPoPUsage<Nothing>
 
     /**
      * DPoP is used if supported by the Authorization Server.
      *
-     * @property dPoPSigner a signer that will be used to sign the DPoP Proof JWT
      */
-    data class IfSupported(val dPoPSigner: Signer<JWK>) : DPoPUsage
+    data class IfSupported<C : Any>(val value: C) : DPoPUsage<C>
 
     /**
      * DPoP usage is required. If the Authorization Server doesn't support DPoP, issuance does not proceed.
      *
-     * @property dPoPSigner a signer that will be used to sign the DPoP Proof JWT
      */
-    data class Required(val dPoPSigner: Signer<JWK>) : DPoPUsage
+    data class Required<C : Any>(val value: C) : DPoPUsage<C>
 }
 
 /**
@@ -325,9 +279,7 @@ data class RsaConfig(
 
     companion object {
         val SUPPORTED_ENCRYPTION_ALGORITHMS: Set<JWEAlgorithm> get() =
-            RSAEncrypter.SUPPORTED_ALGORITHMS -
-                JWEAlgorithm.RSA1_5 -
-                JWEAlgorithm.RSA_OAEP
+            setOf(JWEAlgorithm.RSA_OAEP_256, JWEAlgorithm.RSA_OAEP_384, JWEAlgorithm.RSA_OAEP_512)
     }
 }
 

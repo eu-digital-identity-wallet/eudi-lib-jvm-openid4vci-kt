@@ -85,22 +85,24 @@ val CredentialOfferMixedDocTypes_AUTH_GRANT = """
 """.trimIndent()
 
 val OpenId4VCIConfiguration = OpenId4VCIConfig(
-    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
+    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId", DPoPUsage.Never),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    dPoPUsage = DPoPUsage.Never,
 )
 
 val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
-    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
-    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-    encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    dPoPUsage = DPoPUsage.IfSupported(
-        ecSigner(
-            curve = Curve.P_256,
-            alg = JWSAlgorithm.ES256,
+    clientAuthentication = ClientAuthentication.None(
+        "MyWallet_ClientId",
+        DPoPUsage.IfSupported(
+            ecSigner(
+                curve = Curve.P_256,
+                alg = JWSAlgorithm.ES256,
+            ),
         ),
     ),
+    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+    encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+
 )
 
 suspend fun authorizeRequestForCredentialOffer(

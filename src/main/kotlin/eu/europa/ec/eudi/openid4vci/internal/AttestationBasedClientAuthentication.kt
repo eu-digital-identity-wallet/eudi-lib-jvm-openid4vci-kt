@@ -29,14 +29,14 @@ import java.time.Clock
  * Populates only the mandatory claims : `iss`, `exp`, `jit`, `aud` and the optional `iat`
  * In regard to JOSE header, only `alg` claim is being populated
  */
-internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder {
+internal class ClientAttestationPoPBuilder(
+    private val clock: Clock,
+    private val clientId: ClientId,
+    private val authorizationServerId: URL,
+    private val signer: Signer<JWK>,
+) {
 
-    override suspend fun ClientAttestationPoPJWTSpec.attestationPoPJWT(
-        clock: Clock,
-        clientId: ClientId,
-        authorizationServerId: URL,
-        challenge: Nonce?,
-    ): ClientAttestationPoPJWT {
+    suspend fun attestationPoPJWT(challenge: Nonce?): ClientAttestationPoPJWT {
         val now = clock.instant()
         val claimSet = ClientAttestationPOPClaims(
             issuer = clientId,

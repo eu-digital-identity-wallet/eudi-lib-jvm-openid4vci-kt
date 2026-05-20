@@ -143,58 +143,13 @@ data class ClientAttestationPOPClaims(
     @SerialName(RFC7519.NOT_BEFORE) val notBefore: InstantAsEpochSecond? = null,
 )
 
-//
-// Creation of ClientAttestationPoPJWT
-//
-
-data class ClientAttestationPoPJWTSpec(
-    val signer: Signer<JWK>,
-) {
-    init {
-        requireIsNotMAC(signer.javaAlgorithm.toJoseAlg())
-    }
-}
-
-/**
- * A function for building a [ClientAttestationPoPJWT]
- * in the context of a [ClientAuthentication.AttestationBased] client
- */
-fun interface ClientAttestationPoPBuilder {
-
-    /**
-     * Builds a PoP JWT
-     *
-     * @param clock wallet's clock
-     * @param authorizationServerId the issuer claim of the OAuth 2.0 authorization server to which
-     * the attestation will be presented for authentication.
-     * @receiver the client for which to create the PoP
-     *
-     * @return the PoP JWT
-     */
-    suspend fun ClientAttestationPoPJWTSpec.attestationPoPJWT(
-        clock: Clock,
-        clientId: ClientId,
-        authorizationServerId: URL,
-        challenge: Nonce?,
-    ): ClientAttestationPoPJWT
-
-    companion object {
-        val Default: ClientAttestationPoPBuilder = DefaultClientAttestationPoPBuilder
-    }
-}
-
 internal suspend fun ProvisionClientAttestation.Provisioned.generateClientAttestation(
     clock: Clock,
     clientId: ClientId,
     authorizationServerId: URL,
     challenge: Nonce?,
 ): ClientAttestation =
-    with(clientAttestationPoPBuilder) {
-        val popJWT = clientAttestationPoPSpec.attestationPoPJWT(
-            clock,
-            clientId,
-            authorizationServerId,
-            challenge,
-        )
+    with(ClientAttestationPoPBuilder(clock, clientId, authorizationServerId, popSigner)) {
+        val popJWT = attestationPoPJWT(challenge)
         ClientAttestation(clientAttestation, popJWT)
     }

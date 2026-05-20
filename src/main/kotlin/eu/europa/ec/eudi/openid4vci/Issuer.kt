@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod
 import eu.europa.ec.eudi.openid4vci.internal.*
 import eu.europa.ec.eudi.openid4vci.internal.http.*
@@ -34,7 +35,7 @@ import java.net.URI
  * - [QueryForDeferredCredential]
  * - [NotifyIssuer]
  *
- * [Issuer] lifecycle is bound to serve a single [Issuer.credentialOffer]
+ * [Issuer] lifecycle is bound to serve a single [credentialOffer]
  *
  * Typically, one of the factory methods found on the companion object can be used to get an instance of [Issuer].
  *
@@ -115,22 +116,31 @@ interface Issuer :
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<Issuer> = runCatching {
-            val dPoPJwtFactory = DPoPJwtFactory.createForServer(
-                dPoPUsage = config.dPoPUsage,
-                clock = config.clock,
-                oauthServerMetadata = credentialOffer.authorizationServerMetadata,
-            ).getOrThrow()
-
-            val provisionedClientAttestation =
+            val (provisionedClientAttestation, dPoPSigner) =
                 when (val clientAuthentication = config.clientAuthentication) {
                     is ClientAuthentication.AttestationBased -> {
-                        val authorizationServer = HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
-                        val provisionedClientAttestation = clientAuthentication.provisionClientAttestation(authorizationServer)
+                        val authorizationServer =
+                            HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
+                        val provisionedClientAttestation =
+                            clientAuthentication.provisionClientAttestation(authorizationServer)
                         provisionedClientAttestation.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
-                        provisionedClientAttestation
+                        provisionedClientAttestation to provisionedClientAttestation.popSigner
                     }
-                    else -> null
+
+                    is ClientAuthentication.None -> {
+                        val signer = when (val dPoPUsage = clientAuthentication.dPoPUsage) {
+                            is DPoPUsage.IfSupported<Signer<JWK>> -> dPoPUsage.value
+                            DPoPUsage.Never -> null
+                            is DPoPUsage.Required -> dPoPUsage.value
+                        }
+                        null to signer
+                    }
                 }
+
+            val dPoPJwtFactory = credentialOffer.dPoPCtx?.let {
+                checkNotNull(dPoPSigner) { "dPoPSigner is required when using DPoP" }
+                DPoPJwtFactory(clock = config.clock, dPoPCtx = it, signer = dPoPSigner)
+            }
 
             val authorizationEndpointClient =
                 credentialOffer.authorizationServerMetadata
@@ -164,13 +174,6 @@ interface Issuer :
                     tokenEndpointClient,
                 )
 
-            val issuanceEncryptionSpecs = issuanceEncryptionSpecs(
-                issuerMetadata = credentialOffer.credentialIssuerMetadata,
-                encryptionSupportConfig = config.encryptionSupportConfig,
-                requestEncryptionSpecFactory = requestEncryptionSpecFactory,
-                responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-            ).getOrThrow()
-
             val requestIssuance = run {
                 val credentialEndpointClient =
                     CredentialEndpointClient(
@@ -190,7 +193,7 @@ interface Issuer :
                     credentialEndpointClient,
                     nonceEndpointClient,
                     credentialOffer.credentialIssuerMetadata.batchCredentialIssuance,
-                    issuanceEncryptionSpecs,
+                    credentialOffer.exchangeEncryptionSpecification,
                 )
             }
 
@@ -202,7 +205,12 @@ interface Issuer :
                     else -> {
                         val deferredEndPointClient =
                             DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, httpClient)
-                        QueryForDeferredCredential(config.clock, refreshAccessToken, deferredEndPointClient, issuanceEncryptionSpecs)
+                        QueryForDeferredCredential(
+                            config.clock,
+                            refreshAccessToken,
+                            deferredEndPointClient,
+                            credentialOffer.exchangeEncryptionSpecification,
+                        )
                     }
                 }
 
@@ -255,11 +263,11 @@ interface Issuer :
                             authorizationServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
                             challengeEndpoint = challengeEndpoint,
                             tokenEndpoint = tokenEndpoint,
-                            requestEncryptionSpec = issuanceEncryptionSpecs.requestEncryptionSpec,
-                            responseEncryptionParams = issuanceEncryptionSpecs.responseEncryptionSpec?.let {
+                            requestEncryptionSpec = credentialOffer.exchangeEncryptionSpecification.requestEncryptionSpec,
+                            responseEncryptionParams = credentialOffer.exchangeEncryptionSpecification.responseEncryptionSpec?.let {
                                 it.encryptionMethod to it.compressionAlgorithm
                             },
-                            dPoPSigner = dPoPJwtFactory?.signer,
+                            dPoPSigner = dPoPSigner,
                             clock = config.clock,
                         ),
                         AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
@@ -288,9 +296,20 @@ interface Issuer :
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<Issuer> = runCatchingCancellable {
-            val credentialOfferRequestResolver = CredentialOfferRequestResolver(httpClient, config.issuerMetadataPolicy)
-            val credentialOffer = credentialOfferRequestResolver.resolve(credentialOfferUri).getOrThrow()
-            make(config, credentialOffer, httpClient, requestEncryptionSpecFactory, responseEncryptionSpecFactory).getOrThrow()
+            val credentialOffer = CredentialOffer.resolve(
+                requestEncryptionSpecFactory,
+                responseEncryptionSpecFactory,
+                httpClient,
+                config,
+                credentialOfferUri,
+            ).getOrThrow()
+            make(
+                config,
+                credentialOffer,
+                httpClient,
+                requestEncryptionSpecFactory,
+                responseEncryptionSpecFactory,
+            ).getOrThrow()
         }
 
         /**
@@ -318,23 +337,22 @@ interface Issuer :
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<Issuer> = runCatchingCancellable {
-            require(credentialConfigurationIdentifiers.isNotEmpty()) {
-                "At least one credential configuration identifier must be specified"
-            }
+            val credentialOffer = CredentialOffer.walletInitiated(
+                requestEncryptionSpecFactory,
+                responseEncryptionSpecFactory,
+                httpClient,
+                config,
+                credentialIssuerId,
+                credentialConfigurationIdentifiers,
+            ).getOrThrow()
 
-            val (credentialIssuerMetadata, authServersMetadata) =
-                metaData(httpClient, credentialIssuerId, config.issuerMetadataPolicy)
-
-            val credentialOffer =
-                CredentialOffer(
-                    credentialIssuerId,
-                    credentialIssuerMetadata,
-                    authServersMetadata.first(),
-                    credentialConfigurationIdentifiers,
-                    Grants.AuthorizationCode(issuerState = null),
-                )
-
-            make(config, credentialOffer, httpClient, requestEncryptionSpecFactory, responseEncryptionSpecFactory).getOrThrow()
+            make(
+                config,
+                credentialOffer,
+                httpClient,
+                requestEncryptionSpecFactory,
+                responseEncryptionSpecFactory,
+            ).getOrThrow()
         }
     }
 }
@@ -356,7 +374,7 @@ internal fun ProvisionClientAttestation.Provisioned.ensureSupportedByAuthorizati
     }
 
     val supportedClientAttestationPOPJWSAlgs = authorizationServerMetadata.clientAttestationPOPJWSAlgs.orEmpty()
-    val clientAttestationPOPJWSAlg = clientAttestationPoPSpec.signer.javaAlgorithm.toJoseAlg()
+    val clientAttestationPOPJWSAlg = popSigner.javaAlgorithm.toJoseAlg()
     require(clientAttestationPOPJWSAlg in supportedClientAttestationPOPJWSAlgs) {
         "${clientAttestationPOPJWSAlg.name} Client Attestation POP JWS Algorithm not supported by Authorization Server"
     }

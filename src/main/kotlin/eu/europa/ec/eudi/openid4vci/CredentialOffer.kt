@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialOfferRequestResolver
+import eu.europa.ec.eudi.openid4vci.internal.CredentialOfferRequestResolver
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.client.*
 import io.ktor.http.*
@@ -24,12 +24,15 @@ import java.io.Serializable
 /**
  * A Credential Offer.
  */
-data class CredentialOffer(
+@ConsistentCopyVisibility
+data class CredentialOffer internal constructor(
     val credentialIssuerIdentifier: CredentialIssuerId,
     val credentialIssuerMetadata: CredentialIssuerMetadata,
     val authorizationServerMetadata: CIAuthorizationServerMetadata,
     val credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
     val grants: Grants? = null,
+    val exchangeEncryptionSpecification: ExchangeEncryptionSpecification,
+    val dPoPCtx: DPoPCtx?,
 ) : Serializable {
     init {
         require(credentialConfigurationIdentifiers.isNotEmpty()) { "credentials must not be empty" }
@@ -37,6 +40,65 @@ data class CredentialOffer(
             requireNotNull(authorizationServerMetadata.authorizationEndpointURI) {
                 "Credential Offer requires Authorization Code Grant, but the Authorization Server does not support it"
             }
+        }
+    }
+
+    companion object {
+
+        suspend fun resolve(
+            requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
+            httpClient: HttpClient,
+            config: OpenId4VCIConfig,
+            uri: String,
+        ): Result<CredentialOffer> {
+            val request = CredentialOfferRequest(uri).getOrThrow()
+            val resolver = CredentialOfferRequestResolver(
+                httpClient,
+                requestEncryptionSpecFactory,
+                responseEncryptionSpecFactory,
+            )
+            return resolver.resolve(config, request)
+        }
+
+        suspend fun resolve(
+            requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
+            httpClient: HttpClient,
+            config: OpenId4VCIConfig,
+            request: CredentialOfferRequest,
+        ): Result<CredentialOffer> {
+            val resolver = CredentialOfferRequestResolver(
+                httpClient,
+                requestEncryptionSpecFactory,
+                responseEncryptionSpecFactory,
+            )
+            return resolver.resolve(config, request)
+        }
+
+        suspend fun walletInitiated(
+            requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
+            responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
+            httpClient: HttpClient,
+            config: OpenId4VCIConfig,
+            credentialIssuerId: CredentialIssuerId,
+            credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
+
+        ): Result<CredentialOffer> = runCatchingCancellable {
+            require(credentialConfigurationIdentifiers.isNotEmpty()) {
+                "At least one credential configuration identifier must be specified"
+            }
+
+            // TODO build the URI
+            val requestURI: String = ""
+            val request = CredentialOfferRequest.PassByValue(requestURI)
+            resolve(
+                requestEncryptionSpecFactory,
+                responseEncryptionSpecFactory,
+                httpClient,
+                config,
+                request,
+            ).getOrThrow()
         }
     }
 }
@@ -270,36 +332,3 @@ sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestE
  * An exception indicating a [CredentialOfferRequestError] occurred while trying to validate or resolve a [CredentialOfferRequest].
  */
 data class CredentialOfferRequestException(val error: CredentialOfferRequestError) : Exception()
-
-/**
- * Service for parsing, extracting and validating a [CredentialOfferRequest].
- */
-fun interface CredentialOfferRequestResolver {
-
-    /**
-     * Tries to parse a Credential Offer Endpoint [URL][uri], extract and validate a Credential Offer Request.
-     */
-    suspend fun resolve(uri: String): Result<CredentialOffer> = runCatchingCancellable {
-        val request = CredentialOfferRequest(uri).getOrThrow()
-        resolve(request).getOrThrow()
-    }
-
-    /**
-     * Tries to validate and resolve a [Credential Offer Request][request].
-     */
-    suspend fun resolve(request: CredentialOfferRequest): Result<CredentialOffer>
-
-    companion object {
-
-        /**
-         * Creates a new [CredentialOfferRequestResolver].
-         */
-        operator fun invoke(
-            httpClient: HttpClient,
-            issuerMetadataPolicy: IssuerMetadataPolicy,
-        ): CredentialOfferRequestResolver = CredentialOfferRequestResolver { request ->
-            val resolver = DefaultCredentialOfferRequestResolver(httpClient, issuerMetadataPolicy)
-            resolver.resolve(request)
-        }
-    }
-}

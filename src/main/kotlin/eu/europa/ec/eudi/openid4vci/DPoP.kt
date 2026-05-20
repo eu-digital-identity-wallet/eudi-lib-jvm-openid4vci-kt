@@ -20,11 +20,7 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.dpop.DPoPUtils
 import com.nimbusds.oauth2.sdk.id.JWTID
-import eu.europa.ec.eudi.openid4vci.internal.JWTClaimsSetSerializer
-import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
-import eu.europa.ec.eudi.openid4vci.internal.JwtSigner
-import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
-import eu.europa.ec.eudi.openid4vci.internal.use
+import eu.europa.ec.eudi.openid4vci.internal.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.serialization.json.JsonObjectBuilder
@@ -46,9 +42,9 @@ enum class Htm {
  * Factory class to generate DPoP JWTs to be added as a request header `DPoP` based on spec https://datatracker.ietf.org/doc/rfc9449/
  */
 class DPoPJwtFactory(
-    val signer: Signer<JWK>,
     private val jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
     private val clock: Clock,
+    private val signer: Signer<JWK>,
 ) {
 
     init {
@@ -92,56 +88,46 @@ class DPoPJwtFactory(
     private fun jti(): JWTID = JWTID(jtiByteLength)
 
     companion object {
+        operator fun invoke(
+            jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
+            clock: Clock,
+            dPoPCtx: DPoPCtx,
+            signer: Signer<JWK>,
+        ): DPoPJwtFactory {
+            check(dPoPCtx.algorithm.toNimbus() == signer.javaAlgorithm.toJoseAlg())
 
-        /**
-         * Tries to create a [DPoPJwtFactory] given a [dPoPUsage] and the [oauthServerMetadata]
-         * of the OAuth 2.0 authorization server.
-         *
-         * If the Wallet doesn't support DPoP, no factory is created.
-         *
-         * If the Wallet supports or requires DPoP, a factory is created when:
-         *   1. The Authorization Server supports DPoP (indicated by a non-empty array `dpop_signing_alg_values_supported`)
-         *   2. The DPoP signer provided by the Wallet uses a signing algorithm supported by the Authorization Server
-         *
-         * If the Wallet requires DPoP, but the Authorization Server doesn't support it, an error is raised.
-         */
+            return DPoPJwtFactory(
+                jtiByteLength = jtiByteLength,
+                clock = clock,
+                signer = signer,
+            )
+        }
+    }
+}
+
+@JvmInline
+value class DPoPCtx private constructor(val algorithm: JwsAlgorithm) {
+    companion object {
         fun createForServer(
-            dPoPUsage: DPoPUsage,
-            jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
-            clock: Clock,
+            dPoPUsage: DPoPUsage<JwsAlgorithm>,
             oauthServerMetadata: CIAuthorizationServerMetadata,
-        ): Result<DPoPJwtFactory?> =
-            create(dPoPUsage, jtiByteLength, clock, oauthServerMetadata.dPoPJWSAlgs.orEmpty())
+        ): Result<DPoPCtx?> =
+            create(dPoPUsage, oauthServerMetadata.dPoPJWSAlgs.orEmpty())
 
-        /**
-         * Tries to create a [DPoPJwtFactory] given a [dPoPUsage] and the
-         * [supportedDPopAlgorithms] of the OAuth 2.0 Authorization Server.
-         *
-         * If the Wallet doesn't support DPoP, no factory is created.
-         *
-         * If the Wallet supports or requires DPoP, a factory is created when:
-         *   1. The Authorization Server supports DPoP (indicated by a non-empty [supportedDPopAlgorithms])
-         *   2. The DPoP signer provided by the Wallet uses a signing algorithm supported by the Authorization Server
-         *
-         * If the Wallet requires DPoP, but the Authorization Server doesn't support it, an error is raised.
-         */
         fun create(
-            dPoPUsage: DPoPUsage,
-            jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
-            clock: Clock,
+            dPoPUsage: DPoPUsage<JwsAlgorithm>,
             supportedDPopAlgorithms: List<JWSAlgorithm>,
-        ): Result<DPoPJwtFactory?> = runCatching {
+        ): Result<DPoPCtx?> = runCatching {
             when (dPoPUsage) {
                 DPoPUsage.Never -> null
 
                 is DPoPUsage.IfSupported -> {
-                    val signer = dPoPUsage.dPoPSigner
-                    val signerAlg = signer.javaAlgorithm.toJoseAlg()
+                    val signerAlg = dPoPUsage.value.toNimbus()
                     if (supportedDPopAlgorithms.isNotEmpty()) {
                         require(signerAlg in supportedDPopAlgorithms) {
                             "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportedDPopAlgorithms"
                         }
-                        DPoPJwtFactory(signer, jtiByteLength, clock)
+                        DPoPCtx(dPoPUsage.value)
                     } else null
                 }
 
@@ -149,12 +135,11 @@ class DPoPJwtFactory(
                     require(supportedDPopAlgorithms.isNotEmpty()) {
                         "Wallet requires DPoP but the Authorization Server doesn't support it"
                     }
-                    val signer = dPoPUsage.dPoPSigner
-                    val signerAlg = signer.javaAlgorithm.toJoseAlg()
+                    val signerAlg = dPoPUsage.value.toNimbus()
                     require(signerAlg in supportedDPopAlgorithms) {
                         "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportedDPopAlgorithms"
                     }
-                    DPoPJwtFactory(signer, jtiByteLength, clock)
+                    DPoPCtx(dPoPUsage.value)
                 }
             }
         }
@@ -165,7 +150,11 @@ class DPoPJwtFactory(
  * Utility method to be used to set properly the DPoP header on the request under construction, targeted on the URL passed as.
  * Based on the passed [accessToken] DPoP header will be added if it is of type DPoP.
  */
-internal suspend fun HttpRequestBuilder.bearerOrDPoPAuth(accessToken: AccessToken, dPoPJwtFactory: DPoPJwtFactory?, dPoPNonce: Nonce?) {
+internal suspend fun HttpRequestBuilder.bearerOrDPoPAuth(
+    accessToken: AccessToken,
+    dPoPJwtFactory: DPoPJwtFactory?,
+    dPoPNonce: Nonce?,
+) {
     when (accessToken) {
         is AccessToken.Bearer -> {
             bearerAuth(accessToken)
@@ -173,9 +162,10 @@ internal suspend fun HttpRequestBuilder.bearerOrDPoPAuth(accessToken: AccessToke
 
         is AccessToken.DPoP -> {
             checkNotNull(dPoPJwtFactory) { "dPoPJwtFactory is required when using DPoP access tokens" }
-            val dPoPProof = dPoPJwtFactory.createDPoPJwt(method.htm, url.build().toURI().toURL(), accessToken, dPoPNonce)
-                .getOrThrow()
-                .serialize()
+            val dPoPProof =
+                dPoPJwtFactory.createDPoPJwt(method.htm, url.build().toURI().toURL(), accessToken, dPoPNonce)
+                    .getOrThrow()
+                    .serialize()
             dpopAuth(accessToken)
             header(DPoP, dPoPProof)
         }
