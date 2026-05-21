@@ -34,6 +34,7 @@ dependencies {
     api(libs.ktor.client.serialization)
     api(libs.kotlinx.serialization.json)
     api(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.uri.kmp)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.jsoup)
     testImplementation(kotlin("test"))

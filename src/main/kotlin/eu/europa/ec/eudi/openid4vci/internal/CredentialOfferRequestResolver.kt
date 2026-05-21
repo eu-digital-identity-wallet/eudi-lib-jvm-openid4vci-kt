@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
+import com.eygraber.uri.Uri
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.UnableToResolveAuthorizationServerMetadata
@@ -31,9 +32,9 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 private data class CredentialOfferRequestTO(
-    @SerialName("credential_issuer") @Required val credentialIssuerIdentifier: String,
-    @SerialName("credential_configuration_ids") @Required val credentialConfigurationIds: List<String>,
-    @SerialName("grants") val grants: GrantsTO? = null,
+    @SerialName(OpenId4VCISpec.CREDENTIAL_ISSUER) @Required val credentialIssuerIdentifier: String,
+    @SerialName(OpenId4VCISpec.CREDENTIAL_CONFIGURATION_IDS) @Required val credentialConfigurationIds: List<String>,
+    @SerialName(OpenId4VCISpec.GRANTS) val grants: GrantsTO? = null,
 )
 
 /**
@@ -41,8 +42,8 @@ private data class CredentialOfferRequestTO(
  */
 @Serializable
 private data class GrantsTO(
-    @SerialName("authorization_code") val authorizationCode: AuthorizationCodeTO? = null,
-    @SerialName("urn:ietf:params:oauth:grant-type:pre-authorized_code") val preAuthorizedCode: PreAuthorizedCodeTO? = null,
+    @SerialName(OpenId4VCISpec.AUTHORIZATION_CODE_GRANT) val authorizationCode: AuthorizationCodeTO? = null,
+    @SerialName(OpenId4VCISpec.PRE_AUTHORIZED_CODE_GRANT) val preAuthorizedCode: PreAuthorizedCodeTO? = null,
 )
 
 /**
@@ -50,8 +51,8 @@ private data class GrantsTO(
  */
 @Serializable
 private data class AuthorizationCodeTO(
-    @SerialName("issuer_state") val issuerState: String? = null,
-    @SerialName("authorization_server") val authorizationServer: String? = null,
+    @SerialName(OpenId4VCISpec.ISSUER_STATE) val issuerState: String? = null,
+    @SerialName(OpenId4VCISpec.AUTHORIZATION_SERVER) val authorizationServer: String? = null,
 )
 
 /**
@@ -59,24 +60,24 @@ private data class AuthorizationCodeTO(
  */
 @Serializable
 private data class PreAuthorizedCodeTO(
-    @SerialName("pre-authorized_code") @Required val preAuthorizedCode: String,
-    @SerialName("tx_code") val txCode: TxCodeTO? = null,
-    @SerialName("authorization_server") val authorizationServer: String? = null,
+    @SerialName(OpenId4VCISpec.PRE_AUTHORIZED_CODE) @Required val preAuthorizedCode: String,
+    @SerialName(OpenId4VCISpec.TRANSACTION_CODE) val txCode: TxCodeTO? = null,
+    @SerialName(OpenId4VCISpec.AUTHORIZATION_SERVER) val authorizationServer: String? = null,
 )
 
 @Serializable
 private data class TxCodeTO(
-    @SerialName("input_mode") val inputMode: InputModeTO? = InputModeTO.NUMERIC,
-    @SerialName("length") val length: Int? = null,
-    @SerialName("description") val description: String? = null,
+    @SerialName(OpenId4VCISpec.INPUT_MODE) val inputMode: InputModeTO? = InputModeTO.NUMERIC,
+    @SerialName(OpenId4VCISpec.LENGTH) val length: Int? = null,
+    @SerialName(OpenId4VCISpec.DESCRIPTION) val description: String? = null,
 )
 
 @Serializable
 private enum class InputModeTO {
-    @SerialName("text")
+    @SerialName(OpenId4VCISpec.INPUT_MODE_TEXT)
     TEXT,
 
-    @SerialName("numeric")
+    @SerialName(OpenId4VCISpec.INPUT_MODE_NUMERIC)
     NUMERIC,
 }
 
@@ -248,3 +249,38 @@ private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata
         else -> maybePreAuthorizedCodeGrant
     }
 }.getOrElse { throw CredentialOfferRequestValidationError.InvalidGrants(it).toException() }
+
+/**
+ * Creates a new Credential Offer URI using Authorization Code Grant.
+ *
+ * @param credentialIssuerId the Id of the Credential Issuer
+ * @param credentialConfigurationIdentifiers the Credential Configuration Identifiers for which to generate the Credential Offer URI; must not be empty
+ * @param authorizationServer the Authorization Server
+ */
+internal fun createAuthorizationCodeGrantCredentialOfferUri(
+    credentialIssuerId: CredentialIssuerId,
+    credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
+    authorizationServer: HttpsUrl,
+): String {
+    require(credentialConfigurationIdentifiers.isNotEmpty()) {
+        "At least one credential configuration identifier must be specified"
+    }
+
+    val credentialOfferRequest = CredentialOfferRequestTO(
+        credentialIssuerIdentifier = credentialIssuerId.toString(),
+        credentialConfigurationIds = credentialConfigurationIdentifiers.map { it.value },
+        grants = GrantsTO(
+            authorizationCode = AuthorizationCodeTO(
+                authorizationServer = authorizationServer.toString(),
+                issuerState = null,
+            ),
+            preAuthorizedCode = null,
+        ),
+    )
+
+    return Uri.parse(OpenId4VCISpec.CREDENTIAL_OFFER_URI_SCHEME)
+        .buildUpon()
+        .appendQueryParameter(OpenId4VCISpec.CREDENTIAL_OFFER, JsonSupport.encodeToString(credentialOfferRequest))
+        .build()
+        .toString()
+}

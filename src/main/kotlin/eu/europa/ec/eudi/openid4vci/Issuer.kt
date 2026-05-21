@@ -337,6 +337,9 @@ interface Issuer :
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<Issuer> = runCatchingCancellable {
+            val metadata = metaData(httpClient, credentialIssuerId, config.issuerMetadataPolicy)
+            val authorizationServer = metadata.first.authorizationServers.first()
+
             val credentialOffer = CredentialOffer.walletInitiated(
                 requestEncryptionSpecFactory,
                 responseEncryptionSpecFactory,
@@ -344,6 +347,7 @@ interface Issuer :
                 config,
                 credentialIssuerId,
                 credentialConfigurationIdentifiers,
+                authorizationServer,
             ).getOrThrow()
 
             make(

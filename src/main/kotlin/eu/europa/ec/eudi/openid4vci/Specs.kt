@@ -21,6 +21,25 @@ import com.nimbusds.jose.JWSAlgorithm
  * [OpenID for Verifiable Credential Issuance](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
  */
 object OpenId4VCISpec {
+    const val CREDENTIAL_OFFER_URI_SCHEME = "openid-credential-offer://"
+    const val CREDENTIAL_OFFER = "credential_offer"
+    const val CREDENTIAL_OFFER_URI = "credential_offer_uri"
+    const val CREDENTIAL_ISSUER = "credential_issuer"
+    const val CREDENTIAL_CONFIGURATION_IDS = "credential_configuration_ids"
+    const val GRANTS = "grants"
+
+    const val AUTHORIZATION_CODE_GRANT = "authorization_code"
+    const val ISSUER_STATE = "issuer_state"
+    const val AUTHORIZATION_SERVER = "authorization_server"
+
+    const val PRE_AUTHORIZED_CODE_GRANT = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+    const val PRE_AUTHORIZED_CODE = "pre-authorized_code"
+    const val TRANSACTION_CODE = "tx_code"
+    const val INPUT_MODE = "input_mode"
+    const val INPUT_MODE_TEXT = "text"
+    const val INPUT_MODE_NUMERIC = "numeric"
+    const val LENGTH = "length"
+    const val DESCRIPTION = "description"
 
     const val JWT_PROOF_TYPE = "openid4vci-proof+jwt"
 

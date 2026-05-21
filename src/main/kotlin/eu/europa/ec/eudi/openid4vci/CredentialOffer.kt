@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.CredentialOfferRequestResolver
+import eu.europa.ec.eudi.openid4vci.internal.createAuthorizationCodeGrantCredentialOfferUri
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.client.*
 import io.ktor.http.*
@@ -44,21 +45,20 @@ data class CredentialOffer internal constructor(
     }
 
     companion object {
-
         suspend fun resolve(
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
             httpClient: HttpClient,
             config: OpenId4VCIConfig,
             uri: String,
-        ): Result<CredentialOffer> {
+        ): Result<CredentialOffer> = runCatchingCancellable {
             val request = CredentialOfferRequest(uri).getOrThrow()
             val resolver = CredentialOfferRequestResolver(
                 httpClient,
                 requestEncryptionSpecFactory,
                 responseEncryptionSpecFactory,
             )
-            return resolver.resolve(config, request)
+            resolver.resolve(config, request).getOrThrow()
         }
 
         suspend fun resolve(
@@ -67,13 +67,13 @@ data class CredentialOffer internal constructor(
             httpClient: HttpClient,
             config: OpenId4VCIConfig,
             request: CredentialOfferRequest,
-        ): Result<CredentialOffer> {
+        ): Result<CredentialOffer> = runCatchingCancellable {
             val resolver = CredentialOfferRequestResolver(
                 httpClient,
                 requestEncryptionSpecFactory,
                 responseEncryptionSpecFactory,
             )
-            return resolver.resolve(config, request)
+            resolver.resolve(config, request).getOrThrow()
         }
 
         suspend fun walletInitiated(
@@ -83,14 +83,13 @@ data class CredentialOffer internal constructor(
             config: OpenId4VCIConfig,
             credentialIssuerId: CredentialIssuerId,
             credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
-
+            authorizationServer: HttpsUrl,
         ): Result<CredentialOffer> = runCatchingCancellable {
-            require(credentialConfigurationIdentifiers.isNotEmpty()) {
-                "At least one credential configuration identifier must be specified"
-            }
-
-            // TODO build the URI
-            val requestURI: String = ""
+            val requestURI = createAuthorizationCodeGrantCredentialOfferUri(
+                credentialIssuerId,
+                credentialConfigurationIdentifiers,
+                authorizationServer,
+            )
             val request = CredentialOfferRequest.PassByValue(requestURI)
             resolve(
                 requestEncryptionSpecFactory,
@@ -233,8 +232,8 @@ sealed interface CredentialOfferRequest : Serializable {
             }.getOrElse { CredentialOfferRequestError.NonParsableCredentialOfferEndpointUrl(it).raise() }
 
             val parameters = builder.parameters
-            val maybeByValue = parameters["credential_offer"]
-            val maybeByReference = parameters["credential_offer_uri"]
+            val maybeByValue = parameters[OpenId4VCISpec.CREDENTIAL_OFFER]
+            val maybeByReference = parameters[OpenId4VCISpec.CREDENTIAL_OFFER_URI]
 
             when {
                 !maybeByValue.isNullOrBlank() && !maybeByReference.isNullOrBlank() ->
