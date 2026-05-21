@@ -15,6 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod
 import eu.europa.ec.eudi.openid4vci.internal.*
@@ -24,6 +27,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import java.net.URI
+import java.time.Instant
 
 /**
  * Entry point to the issuance library
@@ -123,15 +127,18 @@ interface Issuer :
                             HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
                         val provisionedClientAttestation =
                             clientAuthentication.provisionClientAttestation(authorizationServer)
+
+                        clientAuthentication.provisionClientAttestation.ensureValid(config.clock.instant(), provisionedClientAttestation)
                         provisionedClientAttestation.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
+
                         provisionedClientAttestation to provisionedClientAttestation.popSigner
                     }
 
                     is ClientAuthentication.None -> {
                         val signer = when (val dPoPUsage = clientAuthentication.dPoPUsage) {
-                            is DPoPUsage.IfSupported<Signer<JWK>> -> dPoPUsage.value
                             DPoPUsage.Never -> null
-                            is DPoPUsage.Required -> dPoPUsage.value
+                            is DPoPUsage.IfSupported<Signer<JWK>> -> dPoPUsage.value
+                            is DPoPUsage.Required<Signer<JWK>> -> dPoPUsage.value
                         }
                         null to signer
                     }
@@ -267,7 +274,7 @@ interface Issuer :
                             responseEncryptionParams = credentialOffer.exchangeEncryptionSpecification.responseEncryptionSpec?.let {
                                 it.encryptionMethod to it.compressionAlgorithm
                             },
-                            dPoPSigner = dPoPSigner,
+                            dPoPCtx = credentialOffer.dPoPCtx,
                             clock = config.clock,
                         ),
                         AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
@@ -381,5 +388,34 @@ internal fun ProvisionClientAttestation.Provisioned.ensureSupportedByAuthorizati
     val clientAttestationPOPJWSAlg = popSigner.javaAlgorithm.toJoseAlg()
     require(clientAttestationPOPJWSAlg in supportedClientAttestationPOPJWSAlgs) {
         "${clientAttestationPOPJWSAlg.name} Client Attestation POP JWS Algorithm not supported by Authorization Server"
+    }
+}
+
+internal fun ProvisionClientAttestation.ensureValid(now: Instant, provisioned: ProvisionClientAttestation.Provisioned) {
+    val clientAttestation = provisioned.clientAttestation
+
+    check(algorithm.toNimbus() == clientAttestation.header.algorithm) {
+        "Client Attestation JWT algorithm mismatch: expected ${algorithm.name}, got ${clientAttestation.header.algorithm.name}"
+    }
+
+    if (null != clientAttestation.claimsSet.notBefore) {
+        check(now >= clientAttestation.claimsSet.notBefore) { "Client Attestation JWT is not active yet" }
+    }
+
+    check(now < clientAttestation.claimsSet.expirationTime) { "Client Attestation JWT is expired" }
+
+    val confirmationJwk = clientAttestation.publicKey
+    check(confirmationJwk is ECKey) { "Confirmation JWK must be an EC Key" }
+
+    when (popAlgorithm.toNimbus()) {
+        JWSAlgorithm.ES256 -> check(Curve.P_256 == confirmationJwk.curve) { "Confirmation JWK must be an EC Key with P-256 curve" }
+        JWSAlgorithm.ES384 -> check(Curve.P_384 == confirmationJwk.curve) { "Confirmation JWK must be an EC Key with P-384 curve" }
+        JWSAlgorithm.ES512 -> check(Curve.P_521 == confirmationJwk.curve) { "Confirmation JWK must be an EC Key with P-521 curve" }
+        else -> error("Unsupported Client Attestation POP JWT algorithm: ${popAlgorithm.name}")
+    }
+
+    val popSignerAlgorithm = provisioned.popSigner.javaAlgorithm.toJoseAlg()
+    check(popAlgorithm.toNimbus() == popSignerAlgorithm) {
+        "Client Attestation POP signer algorithm mismatch: expected ${popAlgorithm.name}, got ${popSignerAlgorithm.name}"
     }
 }

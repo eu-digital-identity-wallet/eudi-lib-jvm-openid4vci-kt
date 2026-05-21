@@ -99,7 +99,7 @@ internal fun selfSignedClient(
         override val algorithm: JwsAlgorithm = JwsAlgorithm(clientAttestationJWT.header.algorithm.name)
         override val popAlgorithm: JwsAlgorithm
             get() = JwsAlgorithm(popJwtSpec.javaAlgorithm.toJoseAlg().name)
-        override suspend fun provision(authorizationServer: HttpsUrl): ProvisionClientAttestation.Provisioned =
+        override suspend operator fun invoke(authorizationServer: HttpsUrl): ProvisionClientAttestation.Provisioned =
             ProvisionClientAttestation.Provisioned(clientAttestationJWT, popJwtSpec)
     }
     return ClientAuthentication.AttestationBased(clientId, provisionClientAttestation)

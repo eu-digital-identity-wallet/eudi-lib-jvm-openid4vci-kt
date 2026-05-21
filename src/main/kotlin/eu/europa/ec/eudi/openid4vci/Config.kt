@@ -22,8 +22,6 @@ import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.impl.ContentCryptoProvider
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
-import eu.europa.ec.eudi.openid4vci.internal.requireIsNotMAC
-import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
 import java.net.URI
 import java.time.Clock
 
@@ -36,31 +34,12 @@ interface ProvisionClientAttestation {
     val algorithm: JwsAlgorithm
     val popAlgorithm: JwsAlgorithm
 
-    suspend operator fun invoke(authorizationServer: HttpsUrl): Provisioned {
-        val provisioned = provision(authorizationServer)
-        val clientAttestationAlgorithm = provisioned.clientAttestation.header.algorithm
-        check(algorithm.toNimbus() == clientAttestationAlgorithm) {
-            "Client attestation algorithm mismatch: expected $algorithm, got $clientAttestationAlgorithm"
-        }
-        // TODO
-        //  1. Not expired JWT
-        //  2. Cnf.jwk matches PoP algorithm
-        check(popAlgorithm.toNimbus() == provisioned.popSigner.javaAlgorithm.toJoseAlg()) {
-            "Client attestation POP algorithm mismatch: expected $popAlgorithm, got ${provisioned.popSigner.javaAlgorithm.toJoseAlg()}"
-        }
-        return provisioned
-    }
-
-    suspend fun provision(authorizationServer: HttpsUrl): Provisioned
+    suspend operator fun invoke(authorizationServer: HttpsUrl): Provisioned
 
     data class Provisioned(
         val clientAttestation: ClientAttestationJWT,
         val popSigner: Signer<JWK>,
-    ) {
-        init {
-            requireIsNotMAC(popSigner.javaAlgorithm.toJoseAlg())
-        }
-    }
+    )
 }
 
 /**
@@ -84,7 +63,16 @@ sealed interface ClientAuthentication : java.io.Serializable {
     data class AttestationBased(
         override val id: ClientId,
         val provisionClientAttestation: ProvisionClientAttestation,
-    ) : ClientAuthentication
+    ) : ClientAuthentication {
+        init {
+            require(provisionClientAttestation.algorithm.toNimbus() in TS3.ALLOWED_SIGNATURE_ALGORITHMS) {
+                "Client Attestation JWT algorithm must be one of ${TS3.ALLOWED_SIGNATURE_ALGORITHMS.joinToString { it.name }}"
+            }
+            require(provisionClientAttestation.popAlgorithm.toNimbus() in TS3.ALLOWED_SIGNATURE_ALGORITHMS) {
+                "Client Attestation POP JWT algorithm must be one of ${TS3.ALLOWED_SIGNATURE_ALGORITHMS.joinToString { it.name }}"
+            }
+        }
+    }
 }
 
 /**

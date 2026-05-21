@@ -55,7 +55,7 @@ data class ClientAttestationJWT private constructor(val jwt: String, val header:
         operator fun invoke(jwt: SignedJWT): ClientAttestationJWT {
             jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
             jwt.ensureSignedOrVerified()
-            jwt.ensureSignedWithAllowedAlgorithm(TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS)
+            jwt.ensureSignedWithAllowedAlgorithm(TS3.ALLOWED_SIGNATURE_ALGORITHMS)
             val claimsSet = jwt.ensureValidClaimsSet<ClientAttestationJWTClaims>()
             return ClientAttestationJWT(jwt.serialize(), jwt.header, claimsSet)
         }
