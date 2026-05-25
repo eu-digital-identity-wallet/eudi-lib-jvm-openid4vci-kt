@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci.examples
 
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
+import io.ktor.http.Url
 
 private const val BASE_URL = "https://dev.issuer-backend.eudiw.dev"
 private val IssuerId = CredentialIssuerId(BASE_URL).getOrThrow()
@@ -28,12 +29,18 @@ internal object PidDevIssuer :
     CanBeUsedWithVciLib,
     CanRequestForCredentialOffer<KeycloakUser> by CanRequestForCredentialOffer.onlyStatelessAuthorizationCode(IssuerId) {
 
-    private const val WALLET_CLIENT_ID = "wallet-dev"
+    private const val WALLET_CLIENT_ID = "eudiw-abca"
 
     override val issuerId = IssuerId
     override val testUser = KeycloakUser("tneal", "password")
     override val cfg = OpenId4VCIConfig(
-        clientAuthentication = ClientAuthentication.None(WALLET_CLIENT_ID, DPoPUsage.Required(CryptoGenerator.ecSigner())),
+        clientAuthentication = ClientAuthentication.AttestationBased(
+            WALLET_CLIENT_ID,
+            WalletProviderProvisionClientAttestation(
+                createHttpClient(enableLogging = true),
+                Url("https://dev.wallet-provider.eudiw.dev/wallet-instance-attestation/jwk"),
+            ),
+        ),
         authFlowRedirectionURI = Keycloak.DebugRedirectUri,
         encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
         authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
