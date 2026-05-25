@@ -207,31 +207,53 @@ internal class TokenEndpointClient(
         params: Map<String, String>,
         dpopNonce: Nonce?,
     ): Pair<TokenResponse, Nonce?> {
+        suspend fun abcaChallengeAndDPoPNonce(
+            existingAbcaChallenge: Nonce?,
+            existingDpopNonce: Nonce?,
+        ): Pair<Nonce?, Nonce?> {
+            if (null == provisionedClientAttestation) {
+                check(null == existingAbcaChallenge) { "can't have abca challenge with non-attested client" }
+                return null to existingDpopNonce
+            }
+
+            if (null != existingAbcaChallenge) {
+                return existingAbcaChallenge to existingDpopNonce
+            }
+
+            return when (val challengeEndpointClient = challengeEndpointClient) {
+                null -> null to existingDpopNonce
+
+                else -> {
+                    val (newAbcaChallenge, newDPoPNonce) = challengeEndpointClient.getChallenge().getOrThrow()
+                    newAbcaChallenge to (newDPoPNonce ?: existingDpopNonce)
+                }
+            }
+        }
+
         tailrec suspend fun requestInternal(
             existingAbcaChallenge: Nonce?,
             existingDpopNonce: Nonce?,
             retriedAbcaChallenge: Boolean,
             retriedDPoPNonce: Boolean,
         ): Pair<TokenResponseTO, Nonce?> {
-            val abcaChallenge =
-                if (null != provisionedClientAttestation) existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
-                else null
-
+            val (abcaChallenge, dpopNonce) = abcaChallengeAndDPoPNonce(
+                existingAbcaChallenge = existingAbcaChallenge,
+                existingDpopNonce = existingDpopNonce,
+            )
             val clientAttestation = provisionedClientAttestation?.generateClientAttestation(
                 clock,
                 clientId,
                 authServerId,
                 abcaChallenge,
             )
+            val dpopProof = dPoPJwtFactory?.createDPoPJwt(Htm.POST, tokenEndpoint, null, dpopNonce)
+                ?.getOrThrow()
+                ?.serialize()
 
             val response = run {
                 val formParameters = Parameters.build {
                     params.entries.forEach { (k, v) -> append(k, v) }
                 }
-
-                val dpopProof =
-                    dPoPJwtFactory?.createDPoPJwt(Htm.POST, tokenEndpoint, null, existingDpopNonce)
-                        ?.getOrThrow()?.serialize()
 
                 httpClient.submitForm(tokenEndpoint.toString(), formParameters) {
                     dpopProof?.let { header(DPoP, it) }
@@ -243,7 +265,7 @@ internal class TokenEndpointClient(
                 response.status.isSuccess() -> {
                     val responseTO = response.body<TokenResponseTO.Success>()
                     val newDopNonce = response.dpopNonce()
-                    responseTO to (newDopNonce ?: existingDpopNonce)
+                    responseTO to (newDopNonce ?: dpopNonce)
                 }
 
                 response.status == HttpStatusCode.BadRequest -> {
@@ -271,13 +293,13 @@ internal class TokenEndpointClient(
 
                             requestInternal(
                                 existingAbcaChallenge = newAbcaChallenge,
-                                existingDpopNonce = newDopNonce ?: existingDpopNonce,
+                                existingDpopNonce = newDopNonce ?: dpopNonce,
                                 retriedAbcaChallenge = true,
                                 retriedDPoPNonce = retriedDPoPNonce,
                             )
                         }
 
-                        else -> errorTO to (newDopNonce ?: existingDpopNonce)
+                        else -> errorTO to (newDopNonce ?: dpopNonce)
                     }
                 }
 

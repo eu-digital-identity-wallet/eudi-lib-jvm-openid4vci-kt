@@ -15,12 +15,24 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
+import com.nimbusds.jose.proc.SecurityContext
+import com.nimbusds.jose.proc.SingleKeyJWSKeySelector
+import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
+import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.ecSigner
 import io.ktor.client.*
+import io.ktor.client.request.HttpRequestData
 import java.net.URI
 import java.util.*
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 const val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
 const val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
@@ -161,3 +173,20 @@ fun CredentialReusePolicy.effectiveBatchSize(supportedReusePolicies: CredentialR
 
         CredentialReusePolicy.None -> null
     }
+
+internal fun HttpRequestData.verifyDPoPProof(walletInstanceKey: ECKey, dpopNonce: Nonce) {
+    val dpopProof = SignedJWT.parse(assertNotNull(headers["DPoP"]))
+    val jwtProcessor = DefaultJWTProcessor<SecurityContext>()
+        .apply {
+            jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(setOf(JOSEObjectType("dpop+jwt")))
+            jwsKeySelector = SingleKeyJWSKeySelector(dpopProof.header.algorithm, walletInstanceKey.toPublicKey())
+            jwtClaimsSetVerifier = DefaultJWTClaimsVerifier(
+                JWTClaimsSet.Builder()
+                    .claim("nonce", dpopNonce.value)
+                    .build(),
+                setOf("jti", "htm", "htu", "iat", "nonce"),
+            )
+        }
+    jwtProcessor.process(dpopProof, null)
+    assertEquals(walletInstanceKey.toPublicJWK(), dpopProof.header.jwk)
+}
