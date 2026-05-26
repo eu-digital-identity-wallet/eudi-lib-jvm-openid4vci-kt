@@ -283,14 +283,8 @@ internal class TokenEndpointClient(
                         }
 
                         errorTO.error == AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR &&
+                            null != newAbcaChallenge &&
                             !retriedAbcaChallenge -> {
-                            check(null != newAbcaChallenge) {
-                                "Authorization Server replied with " +
-                                    "'${AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR}' " +
-                                    "error code, but hasn't provided a challenge using the " +
-                                    "'${AttestationBasedClientAuthenticationSpec.CHALLENGE_HEADER}' header"
-                            }
-
                             requestInternal(
                                 existingAbcaChallenge = newAbcaChallenge,
                                 existingDpopNonce = newDopNonce ?: dpopNonce,

@@ -1036,20 +1036,15 @@ class IssuanceSingleRequestTest {
 
             val config = OpenId4VCIConfiguration.copy(clientAuthentication = client)
 
-            val error = assertFailsWith<IllegalStateException> {
+            val error = assertFailsWith<CredentialIssuanceError.PushedAuthorizationRequestFailed> {
                 authorizeRequestForCredentialOffer(
                     config = config,
                     credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                     httpClient = mockedHttpClient,
                 )
             }
-            assertEquals(
-                "Authorization Server replied with " +
-                    "'${AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR}' " +
-                    "error code, but hasn't provided a challenge using the " +
-                    "'${AttestationBasedClientAuthenticationSpec.CHALLENGE_HEADER}' header",
-                error.message,
-            )
+            assertEquals(AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR, error.error)
+            assertNull(error.errorDescription)
         }
 
     @Test
