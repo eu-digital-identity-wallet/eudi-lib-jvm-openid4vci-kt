@@ -109,6 +109,10 @@ internal class AuthorizationEndpointClient(
         challengeEndpoint?.let { ChallengeEndpointClient(it, httpClient) }
     }
 
+    private val getAbcaChallengeAndDPoPNonce by lazy {
+        GetAbcaChallengeAndDPoPNonce(provisionedClientAttestation, challengeEndpointClient)
+    }
+
     suspend fun submitParOrCreateAuthorizationRequestUrl(
         scopes: List<Scope>,
         credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
@@ -266,36 +270,13 @@ internal class AuthorizationEndpointClient(
             }
         }
 
-        suspend fun abcaChallengeAndDPoPNonce(
-            existingAbcaChallenge: Nonce?,
-            existingDpopNonce: Nonce?,
-        ): Pair<Nonce?, Nonce?> {
-            if (null == provisionedClientAttestation) {
-                check(null == existingAbcaChallenge) { "can't have abca challenge with non-attested client" }
-                return null to existingDpopNonce
-            }
-
-            if (null != existingAbcaChallenge) {
-                return existingAbcaChallenge to existingDpopNonce
-            }
-
-            return when (val challengeEndpointClient = challengeEndpointClient) {
-                null -> null to existingDpopNonce
-
-                else -> {
-                    val (newAbcaChallenge, newDPoPNonce) = challengeEndpointClient.getChallenge().getOrThrow()
-                    newAbcaChallenge to (newDPoPNonce ?: existingDpopNonce)
-                }
-            }
-        }
-
         tailrec suspend fun requestInternal(
             existingAbcaChallenge: Nonce?,
             existingDpopNonce: Nonce?,
             abcaChallengeRetried: Boolean,
             dpopNonceRetried: Boolean,
         ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> {
-            val (abcaChallenge, dpopNonce) = abcaChallengeAndDPoPNonce(
+            val (abcaChallenge, dpopNonce) = getAbcaChallengeAndDPoPNonce(
                 existingAbcaChallenge = existingAbcaChallenge,
                 existingDpopNonce = existingDpopNonce,
             )
