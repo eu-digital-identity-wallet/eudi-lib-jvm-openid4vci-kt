@@ -29,17 +29,23 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URL
 
+internal data class ChallengeAndDPoPNonce(val challenge: Nonce, val dpopNonce: Nonce? = null)
+
 internal class ChallengeEndpointClient(
     private val challengeEndpoint: URL,
     private val httpClient: HttpClient,
 ) {
-    suspend fun getChallenge(): Result<Nonce> = runCatchingCancellable {
-        val challenge = httpClient.post(challengeEndpoint) {
+    suspend fun getChallenge(): Result<ChallengeAndDPoPNonce> = runCatchingCancellable {
+        val response = httpClient.post(challengeEndpoint) {
             expectSuccess = true
             accept(ContentType.Application.Json)
-        }.body<ChallengeTO>()
+        }
 
-        Nonce(challenge.challenge)
+        val responseBody = response.body<ChallengeTO>()
+        val challenge = Nonce(responseBody.challenge)
+        val dpopNonce = response.dpopNonce()
+
+        ChallengeAndDPoPNonce(challenge = challenge, dpopNonce = dpopNonce)
     }
 }
 

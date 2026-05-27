@@ -133,7 +133,12 @@ internal fun authServerWellKnownMocker(
     },
 )
 
-internal fun challengePostMocker(challenge: Nonce? = null, validator: (request: HttpRequestData) -> Unit = {}): RequestMocker =
+internal fun challengePostMocker(
+    challenge: Nonce? = null,
+    dpopNonce: Nonce? = null,
+    validator: (request: HttpRequestData) -> Unit = {
+    },
+): RequestMocker =
     RequestMocker(
         requestMatcher = endsWith("/ext/challenge", HttpMethod.Post),
         responseBuilder = {
@@ -145,9 +150,12 @@ internal fun challengePostMocker(challenge: Nonce? = null, validator: (request: 
                     }
                     """.trimIndent(),
                 status = HttpStatusCode.OK,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
-                ),
+                headers = headers {
+                    append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    if (null != dpopNonce) {
+                        append("DPoP-Nonce", dpopNonce.value)
+                    }
+                },
             )
         },
         requestValidator = validator,

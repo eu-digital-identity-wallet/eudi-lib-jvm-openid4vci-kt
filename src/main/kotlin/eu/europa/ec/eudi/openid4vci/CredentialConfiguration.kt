@@ -248,6 +248,7 @@ data class MsoMdocCredential(
 value class JwsAlgorithm(val name: String) : Serializable {
     override fun toString(): String = name
 }
+internal fun JwsAlgorithm.toNimbus(): JWSAlgorithm = JWSAlgorithm(name)
 
 /**
  * The data of a Verifiable Credentials issued as an SD-JWT VC.
