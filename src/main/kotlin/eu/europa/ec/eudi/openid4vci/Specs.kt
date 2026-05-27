@@ -21,6 +21,25 @@ import com.nimbusds.jose.JWSAlgorithm
  * [OpenID for Verifiable Credential Issuance](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
  */
 object OpenId4VCISpec {
+    const val CREDENTIAL_OFFER_URI_SCHEME = "openid-credential-offer://"
+    const val CREDENTIAL_OFFER = "credential_offer"
+    const val CREDENTIAL_OFFER_URI = "credential_offer_uri"
+    const val CREDENTIAL_ISSUER = "credential_issuer"
+    const val CREDENTIAL_CONFIGURATION_IDS = "credential_configuration_ids"
+    const val GRANTS = "grants"
+
+    const val AUTHORIZATION_CODE_GRANT = "authorization_code"
+    const val ISSUER_STATE = "issuer_state"
+    const val AUTHORIZATION_SERVER = "authorization_server"
+
+    const val PRE_AUTHORIZED_CODE_GRANT = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+    const val PRE_AUTHORIZED_CODE = "pre-authorized_code"
+    const val TRANSACTION_CODE = "tx_code"
+    const val INPUT_MODE = "input_mode"
+    const val INPUT_MODE_TEXT = "text"
+    const val INPUT_MODE_NUMERIC = "numeric"
+    const val LENGTH = "length"
+    const val DESCRIPTION = "description"
 
     const val JWT_PROOF_TYPE = "openid4vci-proof+jwt"
 
@@ -127,8 +146,7 @@ object RFC7519 {
  * [Specification of Wallet Unit Attestations (WUA) used in issuance of PID and Attestations](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/main/docs/technical-specifications/ts3-wallet-unit-attestation.md)
  */
 object TS3 {
-    val WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS: Set<JWSAlgorithm> =
-        setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
+    val ALLOWED_SIGNATURE_ALGORITHMS: Set<JWSAlgorithm> = setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
 
     const val WALLET_VERSION: String = "wallet_version"
     const val WALLET_SOLUTION_CERTIFICATION_INFORMATION: String = "wallet_solution_certification_information"

@@ -110,5 +110,6 @@ private fun tokenEndpointClient(httpClient: HttpClient) = TokenEndpointClient(
     oauthAuthorizationServerMetadata(),
     OpenId4VCIConfiguration,
     null,
+    null,
     httpClient,
 )

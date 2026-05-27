@@ -21,7 +21,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import parPostApplyAssertionsAndGetFormData
 import tokenPostApplyAuthFlowAssertionsAndGetFormData
@@ -55,7 +54,7 @@ class IssuanceAuthorizationTest {
             },
         )
 
-        val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+        val offer = credentialOffer(OpenId4VCIConfiguration, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
         val issuer = Issuer.make(
             config = OpenId4VCIConfiguration,
             credentialOffer = offer,
@@ -91,7 +90,7 @@ class IssuanceAuthorizationTest {
                 },
             )
 
-            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val offer = credentialOffer(OpenId4VCIConfiguration, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -120,7 +119,7 @@ class IssuanceAuthorizationTest {
                     with(request) { tokenPostApplyPreAuthFlowAssertionsAndGetFormData() }
                 },
             )
-            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
+            val offer = credentialOffer(OpenId4VCIConfiguration, mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -139,7 +138,7 @@ class IssuanceAuthorizationTest {
                 credentialIssuerMetadataWellKnownMocker(),
             )
 
-            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
+            val offer = credentialOffer(OpenId4VCIConfiguration, mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -169,7 +168,7 @@ class IssuanceAuthorizationTest {
                 credentialIssuerMetadataWellKnownMocker(),
             )
 
-            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
+            val offer = credentialOffer(OpenId4VCIConfiguration, mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -215,7 +214,7 @@ class IssuanceAuthorizationTest {
                     },
                 ),
             )
-            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_AUTH_GRANT)
+            val offer = credentialOffer(OpenId4VCIConfiguration, mockedHttpClient, CredentialOfferMixedDocTypes_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -260,7 +259,7 @@ class IssuanceAuthorizationTest {
                     },
                 ),
             )
-            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_AUTH_GRANT)
+            val offer = credentialOffer(OpenId4VCIConfiguration, mockedHttpClient, CredentialOfferMixedDocTypes_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -309,7 +308,7 @@ class IssuanceAuthorizationTest {
                     },
                 ),
             )
-            val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
+            val offer = credentialOffer(OpenId4VCIConfiguration, mockedHttpClient, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
             val issuer = Issuer.make(
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
@@ -346,9 +345,10 @@ class IssuanceAuthorizationTest {
             },
         )
 
-        val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+        val config = OpenId4VCIConfigurationWithDpopSigner.copy(parUsage = ParUsage.Required(authorizationCodeDPoPBinding = false))
+        val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
         val issuer = Issuer.make(
-            config = OpenId4VCIConfigurationWithDpopSigner.copy(parUsage = ParUsage.Required(authorizationCodeDPoPBinding = false)),
+            config = config,
             credentialOffer = offer,
             httpClient = mockedHttpClient,
         ).getOrThrow()
@@ -377,9 +377,10 @@ class IssuanceAuthorizationTest {
             },
         )
 
-        val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+        val config = OpenId4VCIConfigurationWithDpopSigner.copy(parUsage = ParUsage.Required(authorizationCodeDPoPBinding = true))
+        val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
         val issuer = Issuer.make(
-            config = OpenId4VCIConfigurationWithDpopSigner.copy(parUsage = ParUsage.Required(authorizationCodeDPoPBinding = true)),
+            config = config,
             credentialOffer = offer,
             httpClient = mockedHttpClient,
         ).getOrThrow()
@@ -394,11 +395,14 @@ class IssuanceAuthorizationTest {
     }
 
     private suspend fun credentialOffer(
+        config: OpenId4VCIConfig,
         httpClient: HttpClient,
         credentialOfferStr: String,
-    ): CredentialOffer {
-        return CredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.IgnoreSigned)
-            .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
-            .getOrThrow()
-    }
+    ): CredentialOffer = CredentialOffer
+        .resolve(
+            httpClient = httpClient,
+            config = config,
+            uri = "https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr",
+        )
+        .getOrThrow()
 }

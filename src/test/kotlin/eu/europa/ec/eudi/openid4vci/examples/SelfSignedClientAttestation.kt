@@ -32,6 +32,7 @@ import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import eu.europa.ec.eudi.openid4vci.internal.requireIsNotMAC
+import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
 import io.ktor.client.request.*
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
@@ -93,8 +94,15 @@ internal fun selfSignedClient(
         val builder = ClientAttestationJwtBuilder(algorithm, signer, claims, headerCustomization)
         builder.build()
     }
-    val popJwtSpec = ClientAttestationPoPJWTSpec(Signer.fromNimbusEcKey(walletInstanceKey, walletInstanceKey.toPublicJWK(), null, null))
-    return ClientAuthentication.AttestationBased(clientAttestationJWT, popJwtSpec)
+    val popJwtSpec = Signer.fromNimbusEcKey(walletInstanceKey, walletInstanceKey.toPublicJWK(), null, null)
+    val provisionClientAttestation = object : ProvisionClientAttestation {
+        override val algorithm: JwsAlgorithm = JwsAlgorithm(clientAttestationJWT.header.algorithm.name)
+        override val popAlgorithm: JwsAlgorithm
+            get() = JwsAlgorithm(popJwtSpec.javaAlgorithm.toJoseAlg().name)
+        override suspend operator fun invoke(authorizationServer: HttpsUrl): ProvisionClientAttestation.Provisioned =
+            ProvisionClientAttestation.Provisioned(clientAttestationJWT, popJwtSpec)
+    }
+    return ClientAuthentication.AttestationBased(clientId, provisionClientAttestation)
 }
 
 private class ClientAttestationJwtBuilder(

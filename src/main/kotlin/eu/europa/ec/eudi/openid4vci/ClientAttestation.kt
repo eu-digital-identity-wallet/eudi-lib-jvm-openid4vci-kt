@@ -55,7 +55,7 @@ data class ClientAttestationJWT private constructor(val jwt: String, val header:
         operator fun invoke(jwt: SignedJWT): ClientAttestationJWT {
             jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
             jwt.ensureSignedOrVerified()
-            jwt.ensureSignedWithAllowedAlgorithm(TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS)
+            jwt.ensureSignedWithAllowedAlgorithm(TS3.ALLOWED_SIGNATURE_ALGORITHMS)
             val claimsSet = jwt.ensureValidClaimsSet<ClientAttestationJWTClaims>()
             return ClientAttestationJWT(jwt.serialize(), jwt.header, claimsSet)
         }
@@ -143,41 +143,13 @@ data class ClientAttestationPOPClaims(
     @SerialName(RFC7519.NOT_BEFORE) val notBefore: InstantAsEpochSecond? = null,
 )
 
-//
-// Creation of ClientAttestationPoPJWT
-//
-
-data class ClientAttestationPoPJWTSpec(
-    val signer: Signer<JWK>,
-) {
-    init {
-        requireIsNotMAC(signer.javaAlgorithm.toJoseAlg())
+internal suspend fun ProvisionClientAttestation.Provisioned.generateClientAttestation(
+    clock: Clock,
+    clientId: ClientId,
+    authorizationServerId: URL,
+    challenge: Nonce?,
+): ClientAttestation =
+    with(ClientAttestationPoPBuilder(clock, clientId, authorizationServerId, popSigner)) {
+        val popJWT = attestationPoPJWT(challenge)
+        ClientAttestation(clientAttestation, popJWT)
     }
-}
-
-/**
- * A function for building a [ClientAttestationPoPJWT]
- * in the context of a [ClientAuthentication.AttestationBased] client
- */
-fun interface ClientAttestationPoPBuilder {
-
-    /**
-     * Builds a PoP JWT
-     *
-     * @param clock wallet's clock
-     * @param authorizationServerId the issuer claim of the OAuth 2.0 authorization server to which
-     * the attestation will be presented for authentication.
-     * @receiver the client for which to create the PoP
-     *
-     * @return the PoP JWT
-     */
-    suspend fun ClientAuthentication.AttestationBased.attestationPoPJWT(
-        clock: Clock,
-        authorizationServerId: URL,
-        challenge: Nonce?,
-    ): ClientAttestationPoPJWT
-
-    companion object {
-        val Default: ClientAttestationPoPBuilder = DefaultClientAttestationPoPBuilder
-    }
-}

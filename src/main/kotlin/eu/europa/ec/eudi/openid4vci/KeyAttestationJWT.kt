@@ -40,7 +40,7 @@ data class KeyAttestationJWT private constructor(val jwt: String, val header: JW
         operator fun invoke(jwt: SignedJWT): KeyAttestationJWT {
             jwt.ensureType(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
             jwt.ensureSignedOrVerified()
-            jwt.ensureSignedWithAllowedAlgorithm(TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS)
+            jwt.ensureSignedWithAllowedAlgorithm(TS3.ALLOWED_SIGNATURE_ALGORITHMS)
             val claimsSet = jwt.ensureValidClaimsSet<KeyAttestationJWTClaims>()
             return KeyAttestationJWT(jwt.serialize(), jwt.header, claimsSet)
         }
