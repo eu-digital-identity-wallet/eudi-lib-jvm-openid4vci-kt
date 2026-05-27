@@ -422,4 +422,10 @@ value class PositiveDuration(val value: Duration) {
     init {
         require(value > Duration.ZERO) { "Duration must be positive" }
     }
+
+    override fun toString(): String = value.toString()
+
+    companion object {
+        fun of(value: Duration): Result<PositiveDuration> = runCatching { PositiveDuration(value) }
+    }
 }
