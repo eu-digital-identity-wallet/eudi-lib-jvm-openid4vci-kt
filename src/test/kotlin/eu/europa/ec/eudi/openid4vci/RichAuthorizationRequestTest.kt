@@ -280,8 +280,13 @@ class RichAuthorizationRequestTest {
         httpClient: HttpClient,
         credentialOfferStr: String,
     ): CredentialOffer {
-        return CredentialOfferRequestResolver(httpClient, IssuerMetadataPolicy.IgnoreSigned)
-            .resolve("https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr")
+        val config = OpenId4VCIConfiguration.copy(issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned)
+        return CredentialOffer
+            .resolve(
+                httpClient = httpClient,
+                config = config,
+                uri = "https://$CREDENTIAL_ISSUER_PUBLIC_URL/credentialoffer?credential_offer=$credentialOfferStr",
+            )
             .getOrThrow()
     }
 }

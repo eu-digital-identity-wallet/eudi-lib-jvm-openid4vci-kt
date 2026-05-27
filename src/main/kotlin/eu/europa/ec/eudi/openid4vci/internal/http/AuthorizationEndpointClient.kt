@@ -27,7 +27,6 @@ import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
 import eu.europa.ec.eudi.openid4vci.internal.clientAttestationHeaders
-import eu.europa.ec.eudi.openid4vci.internal.generateClientAttestationIfNeeded
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -77,6 +76,7 @@ internal class AuthorizationEndpointClient(
     private val challengeEndpoint: URL?,
     private val config: OpenId4VCIConfig,
     private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
     private val httpClient: HttpClient,
 ) {
 
@@ -85,6 +85,7 @@ internal class AuthorizationEndpointClient(
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
         dPoPJwtFactory: DPoPJwtFactory?,
+        provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
         httpClient: HttpClient,
     ) : this(
         credentialIssuerId,
@@ -94,6 +95,7 @@ internal class AuthorizationEndpointClient(
         challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL(),
         config,
         dPoPJwtFactory,
+        provisionedClientAttestation,
         httpClient,
     )
 
@@ -105,6 +107,10 @@ internal class AuthorizationEndpointClient(
 
     private val challengeEndpointClient: ChallengeEndpointClient? by lazy {
         challengeEndpoint?.let { ChallengeEndpointClient(it, httpClient) }
+    }
+
+    private val getAbcaChallengeAndDPoPNonce by lazy {
+        GetAbcaChallengeAndDPoPNonce(provisionedClientAttestation, challengeEndpointClient)
     }
 
     suspend fun submitParOrCreateAuthorizationRequestUrl(
@@ -278,25 +284,26 @@ internal class AuthorizationEndpointClient(
             abcaChallengeRetried: Boolean,
             dpopNonceRetried: Boolean,
         ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> {
+            val (abcaChallenge, dpopNonce) = getAbcaChallengeAndDPoPNonce(
+                existingAbcaChallenge = existingAbcaChallenge,
+                existingDpopNonce = existingDpopNonce,
+            )
             val dpopProof =
                 if (authorizationCodeDPoPBinding)
                     dPoPJwtFactory
-                        ?.createDPoPJwt(Htm.POST, url, null, existingDpopNonce)
+                        ?.createDPoPJwt(Htm.POST, url, null, dpopNonce)
                         ?.getOrThrow()
                         ?.serialize()
                 else null
-
-            val abcaChallenge = when (config.clientAuthentication) {
-                is ClientAuthentication.AttestationBased ->
-                    existingAbcaChallenge ?: challengeEndpointClient?.getChallenge()?.getOrThrow()
-                else -> null
-            }
-            val clientAttestation = config.generateClientAttestationIfNeeded(URI(authorizationIssuer).toURL(), abcaChallenge)
+            val clientAttestation = provisionedClientAttestation?.generateClientAttestation(
+                config.clock,
+                config.clientAuthentication.id,
+                URI(authorizationIssuer).toURL(),
+                abcaChallenge,
+            )
 
             val response = httpClient.submitForm(url.toString(), formParameters) {
-                clientAttestation?.let {
-                    clientAttestationHeaders(it)
-                }
+                clientAttestation?.let { clientAttestationHeaders(it) }
                 dpopProof?.let { header(DPoP, dpopProof) }
             }
 
@@ -304,7 +311,7 @@ internal class AuthorizationEndpointClient(
                 response.status.isSuccess() -> {
                     val responseTO = response.body<PushedAuthorizationRequestResponseTO.Success>()
                     val newDopNonce = response.dpopNonce()
-                    responseTO to (newDopNonce ?: existingDpopNonce)
+                    responseTO to (newDopNonce ?: dpopNonce)
                 }
 
                 response.status == HttpStatusCode.BadRequest -> {
@@ -323,23 +330,17 @@ internal class AuthorizationEndpointClient(
                         }
 
                         errorTO.error == AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR &&
+                            null != newAbcaChallenge &&
                             !abcaChallengeRetried -> {
-                            check(null != newAbcaChallenge) {
-                                "Authorization Server replied with " +
-                                    "'${AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR}' " +
-                                    "error code, but hasn't provided a challenge using the " +
-                                    "'${AttestationBasedClientAuthenticationSpec.CHALLENGE_HEADER}' header"
-                            }
-
                             requestInternal(
                                 existingAbcaChallenge = newAbcaChallenge,
-                                existingDpopNonce = newDopNonce ?: existingDpopNonce,
+                                existingDpopNonce = newDopNonce ?: dpopNonce,
                                 abcaChallengeRetried = true,
                                 dpopNonceRetried = dpopNonceRetried,
                             )
                         }
 
-                        else -> errorTO to (newDopNonce ?: existingDpopNonce)
+                        else -> errorTO to (newDopNonce ?: dpopNonce)
                     }
                 }
 
