@@ -126,7 +126,10 @@ interface Issuer :
                         val authorizationServer =
                             HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
                         val provisionedClientAttestation =
-                            clientAuthentication.provisionClientAttestation(authorizationServer)
+                            clientAuthentication.provisionClientAttestation(
+                                authorizationServer,
+                                credentialOffer.credentialIssuerMetadata.preferredClientStatusPeriod,
+                            )
 
                         clientAuthentication.provisionClientAttestation.ensureValid(config.clock.instant(), provisionedClientAttestation)
                         provisionedClientAttestation.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
