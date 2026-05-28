@@ -134,7 +134,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         assertTrue("Unexpected proofs for UniversityDegree_JWT") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_JWT")
-            proofs != null && proofs.all { it.keyAttestationConstraints == KeyAttestationConstraints.None }
+            proofs != null && proofs.all { it.keyAttestationConstraints == KeyAttestationConstraints(null, null, null) }
         }
 
         assertTrue("Unexpected proofs for MobileDrivingLicense_msoMdoc") {

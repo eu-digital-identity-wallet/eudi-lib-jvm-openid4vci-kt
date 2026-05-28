@@ -107,9 +107,7 @@ data class KeyAttestationConstraints(
     val hasConstrains: Boolean
         get() = userAuthentication != null || keyStorage != null
 
-    companion object {
-        val None: KeyAttestationConstraints get() = KeyAttestationConstraints(null, null, null)
-    }
+    companion object
 }
 
 val KeyAttestationConstraints.keyStorageOrDefault: List<AttackPotentialResistance>
