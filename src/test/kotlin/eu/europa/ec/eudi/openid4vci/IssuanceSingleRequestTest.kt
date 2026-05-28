@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
@@ -1091,6 +1092,85 @@ class IssuanceSingleRequestTest {
                     assertEquals(1.days.toJavaDuration(), preferredKeyStorageStatusPeriod?.value)
                 }
                 authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
+            }
+        }
+
+    @Test
+    fun `when wallet does not support atestations that require not proofs, issuance fails`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            config = OpenId4VCIConfiguration.copy(proofs = ProofsConfig(false, null, null)),
+            credentialOfferStr = CredentialOfferWithMDLMdoc_NO_GRANTS,
+            httpClient = mockedHttpClient,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            val exception = assertFailsWith<IllegalArgumentException> {
+                authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
+            }
+            assertEquals("Wallet doesn't support attestations that require no proofs", exception.message)
+        }
+    }
+
+    @Test
+    fun `when wallet does not support attestations that require proofs, issuance fails`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            config = OpenId4VCIConfiguration.copy(proofs = ProofsConfig(false, null, null)),
+            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+            httpClient = mockedHttpClient,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            val exception = assertFailsWith<IllegalArgumentException> {
+                authorizedRequest.request(requestPayload, jwtProofSpec()).getOrThrow()
+            }
+            assertEquals("Wallet doesn't support any of the advertised Proofs", exception.message)
+        }
+    }
+
+    @Test
+    fun `when wallet does supports attestations that require proofs, but none of the advertised algorithms, issuance fails`() =
+        runTest {
+            val mockedHttpClient = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+            )
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                config = OpenId4VCIConfiguration.copy(
+                    proofs = ProofsConfig(
+                        isNoProofSupported = false,
+                        jwtProof = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES512)),
+                        attestationProof = null,
+                    ),
+                ),
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                httpClient = mockedHttpClient,
+            )
+
+            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val exception = assertFailsWith<IllegalArgumentException> {
+                    authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_521)).getOrThrow()
+                }
+                assertEquals("Wallet doesn't support any of the advertised Proofs", exception.message)
             }
         }
 }

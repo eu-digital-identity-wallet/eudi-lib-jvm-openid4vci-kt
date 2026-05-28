@@ -321,6 +321,7 @@ internal class CredentialReusePolicyTest {
                     CredentialResponseEncryptionPolicy.SUPPORTED,
                 ),
                 supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.RotatingBatch)),
+                proofs = ProofsConfig.EC,
             )
         }
     }
@@ -337,6 +338,7 @@ internal class CredentialReusePolicyTest {
                     CredentialResponseEncryptionPolicy.SUPPORTED,
                 ),
                 supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
+                proofs = ProofsConfig.EC,
             )
         }
     }

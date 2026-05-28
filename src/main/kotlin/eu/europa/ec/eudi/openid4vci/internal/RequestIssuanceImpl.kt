@@ -57,13 +57,13 @@ internal class RequestIssuanceImpl(
         val credentialConfiguration = credentialSupportedById(requestPayload.credentialConfigurationIdentifier)
         val selectedCredentialReusePolicy = selectCredentialReusePolicy(credentialConfiguration)
 
-        val (proofs, proofsDpopNonce) = buildProofs(
+        val (proof, proofsDpopNonce) = buildProof(
             proofsSpecification,
             selectedCredentialReusePolicy,
             requestPayload.credentialConfigurationIdentifier,
             grant,
         )
-        val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
+        val credentialRequest = buildRequest(requestPayload, proof, credentialIdentifiers.orEmpty())
 
         // Place the request
         val proofsOrAuthRequestDpopNonce = proofsDpopNonce ?: resourceServerDpopNonce
@@ -102,43 +102,40 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private suspend fun buildProofs(
+    private suspend fun buildProof(
         proofsSpecification: ProofsSpecification,
         selectedReusePolicy: EudiReusePolicy?,
         credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
-    ): Pair<List<Proof>, Nonce?> {
+    ): Pair<Proof?, Nonce?> {
         val credentialConfiguration = credentialSupportedById(credentialConfigId)
+        config.proofs.ensureCompatibleWith(credentialConfiguration.proofTypesSupported)
         val proofRequirement = proofsSpecification.ensureCompatibleWith(credentialConfiguration)
 
         return when (proofsSpecification) {
-            is ProofsSpecification.NoProofs -> emptyList<Proof>() to null
+            is ProofsSpecification.NoProofs -> null to null
 
             is ProofsSpecification.JwtProof -> {
                 val cNonceAndDPoPNonce = cNonce()
-                val proofs = listOf(
-                    jwtProof(
-                        proofRequirement as ProofTypeMeta.Jwt,
-                        proofsSpecification,
-                        selectedReusePolicy,
-                        grant,
-                        cNonceAndDPoPNonce?.cnonce,
-                    ),
+                val proof = jwtProof(
+                    proofRequirement as ProofTypeMeta.Jwt,
+                    proofsSpecification,
+                    selectedReusePolicy,
+                    grant,
+                    cNonceAndDPoPNonce?.cnonce,
                 )
-                proofs to cNonceAndDPoPNonce?.dpopNonce
+                proof to cNonceAndDPoPNonce?.dpopNonce
             }
 
             is ProofsSpecification.AttestationProof -> {
                 val cNonceAndDPoPNonce = cNonce()
-                val proofs = listOf(
-                    attestationProof(
-                        proofRequirement as ProofTypeMeta.Attestation,
-                        proofsSpecification,
-                        selectedReusePolicy,
-                        cNonceAndDPoPNonce?.cnonce,
-                    ),
+                val proof = attestationProof(
+                    proofRequirement as ProofTypeMeta.Attestation,
+                    proofsSpecification,
+                    selectedReusePolicy,
+                    cNonceAndDPoPNonce?.cnonce,
                 )
-                proofs to cNonceAndDPoPNonce?.dpopNonce
+                proof to cNonceAndDPoPNonce?.dpopNonce
             }
         }
     }
@@ -370,13 +367,13 @@ internal class RequestIssuanceImpl(
 
     private fun buildRequest(
         requestPayload: IssuanceRequestPayload,
-        proofs: List<Proof>,
+        proof: Proof?,
         authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
     ): CredentialIssuanceRequest = when (requestPayload) {
         is IssuanceRequestPayload.ConfigurationBased -> {
             CredentialIssuanceRequest.byCredentialConfigurationId(
                 requestPayload.credentialConfigurationIdentifier,
-                proofs,
+                proof,
                 exchangeEncryptionSpecification,
             )
         }
@@ -385,7 +382,7 @@ internal class RequestIssuanceImpl(
             requestPayload.ensureAuthorized(authorizationDetails)
             CredentialIssuanceRequest.byCredentialId(
                 requestPayload.credentialIdentifier,
-                proofs,
+                proof,
                 exchangeEncryptionSpecification,
             )
         }
@@ -440,3 +437,26 @@ internal sealed interface SubmissionOutcomeInternal {
             is Deferred, is Failed -> this
         }
 }
+
+private fun ProofsConfig.ensureCompatibleWith(issuerSupportedProofTypes: ProofTypesSupported) {
+    when (issuerSupportedProofTypes) {
+        ProofTypesSupported.Empty -> {
+            require(isNoProofSupported) { "Wallet doesn't support attestations that require no proofs" }
+        }
+
+        else -> {
+            val supportsJwtProof = null != jwtProof &&
+                jwtProof.supportedAlgorithms.intersect(issuerSupportedProofTypes.jwtProof.algorithms.toSet()).isNotEmpty()
+            val supportsAttestationProof = null != attestationProof &&
+                attestationProof.supportedAlgorithms.intersect(issuerSupportedProofTypes.attestationProof.algorithms.toSet()).isNotEmpty()
+
+            require(supportsJwtProof || supportsAttestationProof) { "Wallet doesn't support any of the advertised Proofs" }
+        }
+    }
+}
+
+private val ProofTypesSupported.jwtProof: ProofTypeMeta.Jwt
+    get() = this[ProofType.JWT] as ProofTypeMeta.Jwt
+
+private val ProofTypesSupported.attestationProof: ProofTypeMeta.Attestation
+    get() = this[ProofType.ATTESTATION] as ProofTypeMeta.Attestation
