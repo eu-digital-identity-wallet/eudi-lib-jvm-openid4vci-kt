@@ -32,6 +32,8 @@ import kotlinx.serialization.json.*
 import java.net.URI
 import java.time.Duration
 import java.util.*
+import kotlin.collections.component1
+import kotlin.collections.component2
 import kotlin.time.Duration.Companion.seconds
 
 internal object CredentialIssuerMetadataJsonParser {

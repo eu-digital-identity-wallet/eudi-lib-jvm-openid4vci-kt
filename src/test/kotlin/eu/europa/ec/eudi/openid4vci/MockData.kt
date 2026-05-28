@@ -73,6 +73,10 @@ internal fun universityDegreeJwt() = W3CSignedJwtCredential(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
                 KeyAttestationConstraints(null, null, null),
             ),
+            ProofTypeMeta.Attestation(
+                listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
+                KeyAttestationConstraints(null, null, null),
+            ),
         ),
     ),
     CredentialMetadata(
@@ -133,6 +137,10 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
                     null,
                     null,
                 ),
+            ),
+            ProofTypeMeta.Attestation(
+                listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
+                KeyAttestationConstraints(null, null, null),
             ),
         ),
     ),
@@ -195,6 +203,10 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
                     listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
                     null,
                 ),
+            ),
+            ProofTypeMeta.Attestation(
+                listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
+                KeyAttestationConstraints(null, null, null),
             ),
         ),
     ),
@@ -260,6 +272,10 @@ internal fun mobileDrivingLicense() = MsoMdocCredential(
                     userAuthentication = listOf(AttackPotentialResistance.Iso18045High),
                     null,
                 ),
+            ),
+            ProofTypeMeta.Attestation(
+                listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
+                KeyAttestationConstraints(null, null, null),
             ),
         ),
     ),
