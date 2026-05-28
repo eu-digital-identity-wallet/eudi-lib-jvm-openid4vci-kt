@@ -59,4 +59,14 @@ class CredentialIssuerMetadataJsonParserTest {
         val cause = assertIs<IllegalArgumentException>(exception.cause)
         assertEquals("Duration must be positive", cause.message)
     }
+
+    @Test
+    fun `fails when jwt proof does not require key attestation`() {
+        val json = getResourceAsText("well-known/openid-credential-issuer_jwt_proof_no_keyattestation.json")
+        val exception = assertFailsWith<CredentialIssuerMetadataValidationError.InvalidCredentialsSupported> {
+            CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
+        }
+        val cause = assertIs<IllegalArgumentException>(exception.cause)
+        assertEquals("jwt proof must contain 'key_attestations_required'", cause.message)
+    }
 }

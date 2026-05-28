@@ -631,21 +631,22 @@ private data class DisplayTO(
 }
 
 private fun Map<String, ProofTypeSupportedMetaTO>.toProofTypes(): ProofTypesSupported? =
-    mapNotNull { (type, meta) -> proofTypeMeta(type, meta) }
+    map { (type, meta) -> proofTypeMeta(type, meta) }
         .toSet()
         .takeIf { it.isNotEmpty() }
         ?.let { ProofTypesSupported(it) }
 
 private fun ProofTypesSupported?.orEmpty(): ProofTypesSupported = this ?: ProofTypesSupported.Empty
 
-private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTypeMeta? =
+private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTypeMeta =
     when (type) {
         "jwt" -> {
             val algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
             val keyAttestationConstraints = meta.keyAttestationConstraints?.toDomain()
-            keyAttestationConstraints?.let {
-                ProofTypeMeta.Jwt(algorithms, it)
+            requireNotNull(keyAttestationConstraints) {
+                "jwt proof must contain 'key_attestations_required'"
             }
+            ProofTypeMeta.Jwt(algorithms, keyAttestationConstraints)
         }
 
         "attestation" -> {
@@ -657,7 +658,7 @@ private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTy
             ProofTypeMeta.Attestation(algorithms, keyAttestationConstraints)
         }
 
-        else -> null
+        else -> ProofTypeMeta.Unsupported(type)
     }
 
 private fun KeyAttestationConstraintsTO.toDomain(): KeyAttestationConstraints =

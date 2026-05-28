@@ -79,6 +79,8 @@ sealed interface ProofTypeMeta : Serializable {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of Attestation cannot be empty" }
         }
     }
+
+    data class Unsupported(val type: String) : ProofTypeMeta
 }
 
 /**
@@ -116,16 +118,18 @@ val KeyAttestationConstraints.keyStorageOrDefault: List<AttackPotentialResistanc
 val KeyAttestationConstraints.userAuthenticationOrDefault: List<AttackPotentialResistance>
     get() = userAuthentication.orEmpty()
 
-val ProofTypeMeta.type: ProofType
+val ProofTypeMeta.type: ProofType?
     get() = when (this) {
         is ProofTypeMeta.Jwt -> ProofType.JWT
         is ProofTypeMeta.Attestation -> ProofType.ATTESTATION
+        is ProofTypeMeta.Unsupported -> null
     }
 
 val ProofTypeMeta.algorithms: List<JWSAlgorithm>
     get() = when (this) {
         is ProofTypeMeta.Jwt -> algorithms
         is ProofTypeMeta.Attestation -> algorithms
+        is ProofTypeMeta.Unsupported -> emptyList()
     }
 
 @JvmInline
