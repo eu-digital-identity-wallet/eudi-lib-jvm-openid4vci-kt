@@ -31,7 +31,7 @@ internal object PidDevIssuer :
     CanAuthorizeIssuance<KeycloakUser> by Keycloak,
     CanBeUsedWithVciLib,
     CanRequestForCredentialOffer<KeycloakUser> by CanRequestForCredentialOffer.onlyStatelessAuthorizationCode(IssuerId),
-    CanRequestKeyAttestation by CanRequestKeyAttestation.usingWalletProviderService(KeyAttestationServiceUrl, enableLogging = true) {
+    CanRequestKeyAttestation by CanRequestKeyAttestation.usingWalletProviderService(KeyAttestationServiceUrl, enableLogging = false) {
 
     private const val WALLET_CLIENT_ID = "eudiw-abca"
 
@@ -40,7 +40,7 @@ internal object PidDevIssuer :
     override val cfg = OpenId4VCIConfig(
         clientAuthentication = ClientAuthentication.AttestationBased(
             WALLET_CLIENT_ID,
-            WalletProviderProvisionClientAttestation(createHttpClient(enableLogging = true), WalletInstanceAttestationServiceUrl),
+            WalletProviderProvisionClientAttestation(createHttpClient(enableLogging = false), WalletInstanceAttestationServiceUrl),
         ),
         dPoPUsage = DPoPUsage.Required(DPoPConfig(ProvisionDPoPSigner(CryptoGenerator.ecSigner(Curve.P_256, JWSAlgorithm.ES256)))),
         authFlowRedirectionURI = Keycloak.DebugRedirectUri,
