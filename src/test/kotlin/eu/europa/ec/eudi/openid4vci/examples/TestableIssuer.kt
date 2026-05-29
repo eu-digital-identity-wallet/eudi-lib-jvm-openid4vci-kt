@@ -148,7 +148,7 @@ fun interface CanRequestKeyAttestation {
         fun usingWalletProviderService(
             url: Url,
             enableLogging: Boolean = false,
-        ): CanRequestKeyAttestation = RequestKeyAttestationFromWalletProviderService(url)
+        ): CanRequestKeyAttestation = RequestKeyAttestationFromWalletProviderService(url, enableLogging)
     }
 
     private class RequestKeyAttestationFromWalletProviderService(
