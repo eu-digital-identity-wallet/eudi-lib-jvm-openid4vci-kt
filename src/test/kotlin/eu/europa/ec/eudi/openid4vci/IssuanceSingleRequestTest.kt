@@ -15,8 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseUnparsable
@@ -955,7 +957,14 @@ class IssuanceSingleRequestTest {
 
         val config = OpenId4VCIConfiguration.copy(
             clientAuthentication = client,
-            provisionDPoPUsage = { DPoPUsage.Required(Signer.fromNimbusEcKey(dPoPSigningKey, dPoPSigningKey.toPublicJWK(), null, null)) },
+            dPoPUsage = DPoPUsage.Required(
+                object : ProvisionDPoPSigner {
+                    override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(JWSAlgorithm.ES256.name)
+                    override suspend fun invoke(
+                        authorizationServer: HttpsUrl,
+                    ): Signer<JWK> = Signer.fromNimbusEcKey(dPoPSigningKey, dPoPSigningKey.toPublicJWK(), null, null)
+                },
+            ),
         )
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
@@ -1006,7 +1015,14 @@ class IssuanceSingleRequestTest {
 
         val config = OpenId4VCIConfiguration.copy(
             clientAuthentication = client,
-            provisionDPoPUsage = { DPoPUsage.Required(Signer.fromNimbusEcKey(dPoPSigningKey, dPoPSigningKey.toPublicJWK(), null, null)) },
+            dPoPUsage = DPoPUsage.Required(
+                object : ProvisionDPoPSigner {
+                    override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(JWSAlgorithm.ES256.name)
+                    override suspend fun invoke(
+                        authorizationServer: HttpsUrl,
+                    ): Signer<JWK> = Signer.fromNimbusEcKey(dPoPSigningKey, dPoPSigningKey.toPublicJWK(), null, null)
+                },
+            ),
         )
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(

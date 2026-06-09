@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod
 import eu.europa.ec.eudi.openid4vci.internal.*
 import eu.europa.ec.eudi.openid4vci.internal.http.*
@@ -138,12 +139,18 @@ interface Issuer :
                     is ClientAuthentication.None -> null
                 }
 
-            val dPoPSigner = when (val dPoPUsage = config.provisionDPoPUsage(authorizationServer)) {
+            val dPoPSigner = when (val dPoPUsage = config.dPoPUsage) {
                 DPoPUsage.Never -> null
-                is DPoPUsage.IfSupported -> dPoPUsage.value
+                is DPoPUsage.IfSupported -> {
+                    val dPoPSigner = dPoPUsage.value(authorizationServer)
+                    dPoPUsage.ensureValid(dPoPSigner)
+                    dPoPSigner
+                }
                 is DPoPUsage.Required -> {
                     checkNotNull(credentialOffer.dPoPCtx) { "dPoPCtx is required when DPoPUsage is required" }
-                    dPoPUsage.value
+                    val dPoPSigner = dPoPUsage.value(authorizationServer)
+                    dPoPUsage.ensureValid(dPoPSigner)
+                    dPoPSigner
                 }
             }
 
@@ -278,7 +285,7 @@ interface Issuer :
                                 it.encryptionMethod to it.compressionAlgorithm
                             },
                             dPoPCtx = credentialOffer.dPoPCtx,
-                            provisionDPoPUsage = config.provisionDPoPUsage,
+                            dPoPUsage = config.dPoPUsage,
                             clock = config.clock,
                         ),
                         AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
@@ -421,5 +428,23 @@ internal fun ProvisionClientAttestation.ensureValid(now: Instant, provisioned: P
     val popSignerAlgorithm = provisioned.popSigner.javaAlgorithm.toJoseAlg()
     check(popAlgorithm.toNimbus() == popSignerAlgorithm) {
         "Client Attestation POP signer algorithm mismatch: expected ${popAlgorithm.name}, got ${popSignerAlgorithm.name}"
+    }
+}
+
+internal fun DPoPUsageOption.ensureValid(signer: Signer<JWK>) {
+    when (this) {
+        DPoPUsage.Never -> error("DPoP Signer was provisioned when DPoP is not to be used")
+        is DPoPUsage.IfSupported -> {
+            val signerAlgorithm = JwsAlgorithm(signer.javaAlgorithm.toJoseAlg().name)
+            check(this.value.popAlgorithm == signerAlgorithm) {
+                "DPoP Signer algorithm mismatch: expected ${this.value.popAlgorithm.name}, got ${signerAlgorithm.name}"
+            }
+        }
+        is DPoPUsage.Required -> {
+            val signerAlgorithm = JwsAlgorithm(signer.javaAlgorithm.toJoseAlg().name)
+            check(this.value.popAlgorithm == signerAlgorithm) {
+                "DPoP Signer algorithm mismatch: expected ${this.value.popAlgorithm.name}, got ${signerAlgorithm.name}"
+            }
+        }
     }
 }

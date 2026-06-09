@@ -40,7 +40,7 @@ import java.time.Clock
  * @param requestEncryptionSpec the request encryption spec. Must be provided only if request encryption was used in the initial request.
  * @param responseEncryptionParams encryption method and compression algorithm as/if used in the initial request.
  * @param dPoPCtx the negotiated DPoP context. Must be provided only if DPoP was used.
- * @param provisionDPoPUsage a way to provision [DPoPUsage] for an Authorization Server
+ * @param dPoPUsage an indication about whether DPoP is never to be used, supported, or required.
  * @param clock Wallet's clock
  * @param preferredClientStatusPeriod PID or Attestation Provider's preference for the remaining status maintenance period
  */
@@ -54,7 +54,7 @@ data class DeferredIssuerConfig(
     val requestEncryptionSpec: EncryptionSpec?,
     val responseEncryptionParams: Pair<EncryptionMethod, CompressionAlgorithm?>?,
     val dPoPCtx: DPoPCtx? = null,
-    val provisionDPoPUsage: ProvisionDPoPUsage,
+    val dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
     val clock: Clock = Clock.systemDefaultZone(),
     val preferredClientStatusPeriod: PositiveDuration? = null,
 )
@@ -185,12 +185,18 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                     is ClientAuthentication.None -> null
                 }
 
-            val dPoPSigner = when (val dPoPUsage = config.provisionDPoPUsage(authorizationServer)) {
+            val dPoPSigner = when (val dPoPUsage = config.dPoPUsage) {
                 DPoPUsage.Never -> null
-                is DPoPUsage.IfSupported -> dPoPUsage.value
+                is DPoPUsage.IfSupported -> {
+                    val dPoPSigner = dPoPUsage.value(authorizationServer)
+                    dPoPUsage.ensureValid(dPoPSigner)
+                    dPoPSigner
+                }
                 is DPoPUsage.Required -> {
                     checkNotNull(config.dPoPCtx) { "dPoPCtx is required when DPoPUsage is required" }
-                    dPoPUsage.value
+                    val dPoPSigner = dPoPUsage.value(authorizationServer)
+                    dPoPUsage.ensureValid(dPoPSigner)
+                    dPoPSigner
                 }
             }
 

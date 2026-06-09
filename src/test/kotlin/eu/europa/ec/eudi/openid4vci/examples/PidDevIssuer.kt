@@ -15,7 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.http.Url
 
@@ -33,7 +35,6 @@ internal object PidDevIssuer :
 
     override val issuerId = IssuerId
     override val testUser = KeycloakUser("tneal", "password")
-    private val dPoPUsage by lazy { DPoPUsage.Required(CryptoGenerator.ecSigner()) }
     override val cfg = OpenId4VCIConfig(
         clientAuthentication = ClientAuthentication.AttestationBased(
             WALLET_CLIENT_ID,
@@ -42,7 +43,14 @@ internal object PidDevIssuer :
                 Url("https://dev.wallet-provider.eudiw.dev/wallet-instance-attestation/jwk"),
             ),
         ),
-        provisionDPoPUsage = { dPoPUsage },
+        dPoPUsage = DPoPUsage.Required(
+            object : ProvisionDPoPSigner {
+                override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(JWSAlgorithm.ES256.name)
+                override suspend fun invoke(
+                    authorizationServer: HttpsUrl,
+                ): Signer<JWK> = CryptoGenerator.ecSigner(Curve.P_256, JWSAlgorithm.ES256)
+            },
+        ),
         authFlowRedirectionURI = Keycloak.DebugRedirectUri,
         encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
         authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,

@@ -43,9 +43,15 @@ interface ProvisionClientAttestation {
 }
 
 /**
- * Provisions a signer for DPoP.
+ * Provisions a [Signer] for signing DPoP Proofs.
  */
-typealias ProvisionDPoPUsage = suspend (HttpsUrl) -> DPoPUsage<Signer<JWK>>
+interface ProvisionDPoPSigner {
+    val popAlgorithm: JwsAlgorithm
+
+    suspend operator fun invoke(authorizationServer: HttpsUrl): Signer<JWK>
+}
+
+typealias DPoPUsageOption = DPoPUsage<ProvisionDPoPSigner>
 
 /**
  * The Client Authentication Method used by the Wallet.
@@ -84,7 +90,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
  * Configuration object to pass configuration properties to the issuance components.
  *
  * @param clientAuthentication the OAuth 2.0 Client Authentication Method of the Wallet
- * @param provisionDPoPUsage a way to provision [DPoPUsage] for an Authorization Server
+ * @param dPoPUsage an indication about whether DPoP is never to be used, supported, or required
  * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
  * @param encryptionSupportConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
  * @param authorizeIssuanceConfig Instruction on how to assemble the authorization request. If scopes are supported
@@ -97,7 +103,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
  */
 data class OpenId4VCIConfig(
     val clientAuthentication: ClientAuthentication,
-    val provisionDPoPUsage: ProvisionDPoPUsage,
+    val dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
     val authFlowRedirectionURI: URI,
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
@@ -112,7 +118,7 @@ data class OpenId4VCIConfig(
      */
     constructor(
         clientId: ClientId,
-        provisionDPoPUsage: ProvisionDPoPUsage,
+        dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
         authFlowRedirectionURI: URI,
         encryptionSupportConfig: EncryptionSupportConfig,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
@@ -122,7 +128,7 @@ data class OpenId4VCIConfig(
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     ) : this(
         ClientAuthentication.None(clientId),
-        provisionDPoPUsage,
+        dPoPUsage,
         authFlowRedirectionURI,
         encryptionSupportConfig,
         authorizeIssuanceConfig,

@@ -19,6 +19,7 @@ import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
 import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jose.proc.SingleKeyJWSKeySelector
@@ -98,21 +99,18 @@ val CredentialOfferMixedDocTypes_AUTH_GRANT = """
 
 val OpenId4VCIConfiguration = OpenId4VCIConfig(
     clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
-    provisionDPoPUsage = { DPoPUsage.Never },
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
 )
 
 val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
     clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
-    provisionDPoPUsage = {
-        DPoPUsage.IfSupported(
-            ecSigner(
-                curve = Curve.P_256,
-                alg = JWSAlgorithm.ES256,
-            ),
-        )
-    },
+    dPoPUsage = DPoPUsage.IfSupported(
+        object : ProvisionDPoPSigner {
+            override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(JWSAlgorithm.ES256.name)
+            override suspend fun invoke(authorizationServer: HttpsUrl): Signer<JWK> = ecSigner(Curve.P_256, JWSAlgorithm.ES256)
+        },
+    ),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
 

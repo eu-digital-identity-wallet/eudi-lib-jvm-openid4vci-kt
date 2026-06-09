@@ -314,7 +314,6 @@ internal class CredentialReusePolicyTest {
         assertFailsWith<IllegalArgumentException> {
             OpenId4VCIConfig(
                 clientAuthentication = ClientAuthentication.None("wallet"),
-                provisionDPoPUsage = { DPoPUsage.Never },
                 authFlowRedirectionURI = URI("eudi-openid4vci://cb"),
                 encryptionSupportConfig = EncryptionSupportConfig.invoke(
                     Curve.P_256,
@@ -331,7 +330,6 @@ internal class CredentialReusePolicyTest {
         assertDoesNotThrow {
             OpenId4VCIConfig(
                 clientAuthentication = ClientAuthentication.None("wallet"),
-                provisionDPoPUsage = { DPoPUsage.Never },
                 authFlowRedirectionURI = URI("eudi-openid4vci://cb"),
                 encryptionSupportConfig = EncryptionSupportConfig.invoke(
                     Curve.P_256,
