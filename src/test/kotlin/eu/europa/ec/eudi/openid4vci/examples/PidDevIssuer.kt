@@ -33,6 +33,7 @@ internal object PidDevIssuer :
 
     override val issuerId = IssuerId
     override val testUser = KeycloakUser("tneal", "password")
+    private val dPoPUsage by lazy { DPoPUsage.Required(CryptoGenerator.ecSigner()) }
     override val cfg = OpenId4VCIConfig(
         clientAuthentication = ClientAuthentication.AttestationBased(
             WALLET_CLIENT_ID,
@@ -41,6 +42,7 @@ internal object PidDevIssuer :
                 Url("https://dev.wallet-provider.eudiw.dev/wallet-instance-attestation/jwk"),
             ),
         ),
+        provisionDPoPUsage = { dPoPUsage },
         authFlowRedirectionURI = Keycloak.DebugRedirectUri,
         encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
         authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,

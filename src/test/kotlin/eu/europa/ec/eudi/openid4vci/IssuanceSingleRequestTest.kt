@@ -26,6 +26,7 @@ import eu.europa.ec.eudi.openid4vci.CryptoGenerator.noKeyAttestationJwtProofsSpe
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
 import eu.europa.ec.eudi.openid4vci.examples.selfSignedClient
 import eu.europa.ec.eudi.openid4vci.examples.verifySelfSignedClientAttestation
+import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -925,6 +926,7 @@ class IssuanceSingleRequestTest {
 
     @Test
     fun `issuance success with attested client`() = runTest {
+        val dPoPSigningKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
         val walletInstanceKey = ECKeyGenerator(Curve.P_521).keyID(UUID.randomUUID().toString()).generate()
         val client = selfSignedClient(
             walletInstanceKey = walletInstanceKey,
@@ -940,18 +942,21 @@ class IssuanceSingleRequestTest {
             challengePostMocker(challenge = abcaChallenge, dpopNonce = dpopNonce),
             parPostMocker {
                 it.verifySelfSignedClientAttestation(walletInstanceKey, abcaChallenge)
-                it.verifyDPoPProof(walletInstanceKey, dpopNonce)
+                it.verifyDPoPProof(dPoPSigningKey.toPublicJWK(), dpopNonce)
             },
             challengePostMocker(challenge = updatedAbcaChallenge),
             tokenPostMocker {
                 it.verifySelfSignedClientAttestation(walletInstanceKey, updatedAbcaChallenge)
-                it.verifyDPoPProof(walletInstanceKey, dpopNonce)
+                it.verifyDPoPProof(dPoPSigningKey.toPublicJWK(), dpopNonce)
             },
             nonceEndpointMocker(),
             singleIssuanceRequestMocker(),
         )
 
-        val config = OpenId4VCIConfiguration.copy(clientAuthentication = client)
+        val config = OpenId4VCIConfiguration.copy(
+            clientAuthentication = client,
+            provisionDPoPUsage = { DPoPUsage.Required(Signer.fromNimbusEcKey(dPoPSigningKey, dPoPSigningKey.toPublicJWK(), null, null)) },
+        )
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             config = config,
@@ -971,6 +976,7 @@ class IssuanceSingleRequestTest {
 
     @Test
     fun `attested client considers dpop nonce returned by challenge endpoint`() = runTest {
+        val dPoPSigningKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
         val walletInstanceKey = ECKeyGenerator(Curve.P_521).keyID(UUID.randomUUID().toString()).generate()
         val client = selfSignedClient(
             walletInstanceKey = walletInstanceKey,
@@ -987,18 +993,21 @@ class IssuanceSingleRequestTest {
             challengePostMocker(challenge = abcaChallenge, dpopNonce = dpopNonce),
             parPostMocker {
                 it.verifySelfSignedClientAttestation(walletInstanceKey, abcaChallenge)
-                it.verifyDPoPProof(walletInstanceKey, dpopNonce)
+                it.verifyDPoPProof(dPoPSigningKey.toPublicJWK(), dpopNonce)
             },
             challengePostMocker(challenge = updatedAbcaChallenge, dpopNonce = updatedDpopNonce),
             tokenPostMocker {
                 it.verifySelfSignedClientAttestation(walletInstanceKey, updatedAbcaChallenge)
-                it.verifyDPoPProof(walletInstanceKey, updatedDpopNonce)
+                it.verifyDPoPProof(dPoPSigningKey.toPublicJWK(), updatedDpopNonce)
             },
             nonceEndpointMocker(),
             singleIssuanceRequestMocker(),
         )
 
-        val config = OpenId4VCIConfiguration.copy(clientAuthentication = client)
+        val config = OpenId4VCIConfiguration.copy(
+            clientAuthentication = client,
+            provisionDPoPUsage = { DPoPUsage.Required(Signer.fromNimbusEcKey(dPoPSigningKey, dPoPSigningKey.toPublicJWK(), null, null)) },
+        )
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             config = config,

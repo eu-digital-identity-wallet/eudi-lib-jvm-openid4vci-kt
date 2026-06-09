@@ -43,6 +43,11 @@ interface ProvisionClientAttestation {
 }
 
 /**
+ * Provisions a signer for DPoP.
+ */
+typealias ProvisionDPoPUsage = suspend (HttpsUrl) -> DPoPUsage<Signer<JWK>>
+
+/**
  * The Client Authentication Method used by the Wallet.
  */
 sealed interface ClientAuthentication : java.io.Serializable {
@@ -55,7 +60,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
     /**
      * None, i.e. a Public Client.
      */
-    data class None(override val id: ClientId, val dPoPUsage: DPoPUsage<Signer<JWK>> = DPoPUsage.Never) : ClientAuthentication
+    data class None(override val id: ClientId) : ClientAuthentication
 
     /**
      * Attestation-Based Client Authentication.
@@ -79,6 +84,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
  * Configuration object to pass configuration properties to the issuance components.
  *
  * @param clientAuthentication the OAuth 2.0 Client Authentication Method of the Wallet
+ * @param provisionDPoPUsage a way to provision [DPoPUsage] for an Authorization Server
  * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
  * @param encryptionSupportConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
  * @param authorizeIssuanceConfig Instruction on how to assemble the authorization request. If scopes are supported
@@ -91,6 +97,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
  */
 data class OpenId4VCIConfig(
     val clientAuthentication: ClientAuthentication,
+    val provisionDPoPUsage: ProvisionDPoPUsage,
     val authFlowRedirectionURI: URI,
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
@@ -105,16 +112,17 @@ data class OpenId4VCIConfig(
      */
     constructor(
         clientId: ClientId,
+        provisionDPoPUsage: ProvisionDPoPUsage,
         authFlowRedirectionURI: URI,
         encryptionSupportConfig: EncryptionSupportConfig,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-        dPoPUsage: DPoPUsage<Signer<JWK>> = DPoPUsage.Never,
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     ) : this(
-        ClientAuthentication.None(clientId, dPoPUsage),
+        ClientAuthentication.None(clientId),
+        provisionDPoPUsage,
         authFlowRedirectionURI,
         encryptionSupportConfig,
         authorizeIssuanceConfig,

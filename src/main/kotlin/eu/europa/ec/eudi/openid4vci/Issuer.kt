@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod
 import eu.europa.ec.eudi.openid4vci.internal.*
 import eu.europa.ec.eudi.openid4vci.internal.http.*
@@ -120,11 +119,11 @@ interface Issuer :
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<Issuer> = runCatching {
-            val (provisionedClientAttestation, dPoPSigner) =
+            val authorizationServer = HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
+
+            val provisionedClientAttestation =
                 when (val clientAuthentication = config.clientAuthentication) {
                     is ClientAuthentication.AttestationBased -> {
-                        val authorizationServer =
-                            HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
                         val provisionedClientAttestation =
                             clientAuthentication.provisionClientAttestation(
                                 authorizationServer,
@@ -133,19 +132,20 @@ interface Issuer :
 
                         clientAuthentication.provisionClientAttestation.ensureValid(config.clock.instant(), provisionedClientAttestation)
                         provisionedClientAttestation.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
-
-                        provisionedClientAttestation to provisionedClientAttestation.popSigner
+                        provisionedClientAttestation
                     }
 
-                    is ClientAuthentication.None -> {
-                        val signer = when (val dPoPUsage = clientAuthentication.dPoPUsage) {
-                            DPoPUsage.Never -> null
-                            is DPoPUsage.IfSupported<Signer<JWK>> -> dPoPUsage.value
-                            is DPoPUsage.Required<Signer<JWK>> -> dPoPUsage.value
-                        }
-                        null to signer
-                    }
+                    is ClientAuthentication.None -> null
                 }
+
+            val dPoPSigner = when (val dPoPUsage = config.provisionDPoPUsage(authorizationServer)) {
+                DPoPUsage.Never -> null
+                is DPoPUsage.IfSupported -> dPoPUsage.value
+                is DPoPUsage.Required -> {
+                    checkNotNull(credentialOffer.dPoPCtx) { "dPoPCtx is required when DPoPUsage is required" }
+                    dPoPUsage.value
+                }
+            }
 
             val dPoPJwtFactory = credentialOffer.dPoPCtx?.let {
                 checkNotNull(dPoPSigner) { "dPoPSigner is required when using DPoP" }
@@ -278,6 +278,7 @@ interface Issuer :
                                 it.encryptionMethod to it.compressionAlgorithm
                             },
                             dPoPCtx = credentialOffer.dPoPCtx,
+                            provisionDPoPUsage = config.provisionDPoPUsage,
                             clock = config.clock,
                         ),
                         AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),

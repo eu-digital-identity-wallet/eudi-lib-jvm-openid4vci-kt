@@ -40,6 +40,7 @@ import java.time.Clock
  * @param requestEncryptionSpec the request encryption spec. Must be provided only if request encryption was used in the initial request.
  * @param responseEncryptionParams encryption method and compression algorithm as/if used in the initial request.
  * @param dPoPCtx the negotiated DPoP context. Must be provided only if DPoP was used.
+ * @param provisionDPoPUsage a way to provision [DPoPUsage] for an Authorization Server
  * @param clock Wallet's clock
  * @param preferredClientStatusPeriod PID or Attestation Provider's preference for the remaining status maintenance period
  */
@@ -53,6 +54,7 @@ data class DeferredIssuerConfig(
     val requestEncryptionSpec: EncryptionSpec?,
     val responseEncryptionParams: Pair<EncryptionMethod, CompressionAlgorithm?>?,
     val dPoPCtx: DPoPCtx? = null,
+    val provisionDPoPUsage: ProvisionDPoPUsage,
     val clock: Clock = Clock.systemDefaultZone(),
     val preferredClientStatusPeriod: PositiveDuration? = null,
 )
@@ -167,27 +169,30 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
             responseEncryptionKey: JWK?,
             httpClient: HttpClient,
         ): Result<DeferredIssuer> = runCatching {
-            val (provisionedClientAttestation, dPoPSigner) =
+            val authorizationServer = HttpsUrl(config.authorizationServerId.toString()).getOrThrow()
+
+            val provisionedClientAttestation =
                 when (val clientAuthentication = config.clientAuthentication) {
                     is ClientAuthentication.AttestationBased -> {
-                        val authorizationServer = HttpsUrl(config.authorizationServerId.toString()).getOrThrow()
                         val provisionedClientAttestation = clientAuthentication.provisionClientAttestation(
                             authorizationServer,
                             config.preferredClientStatusPeriod,
                         )
                         clientAuthentication.provisionClientAttestation.ensureValid(config.clock.instant(), provisionedClientAttestation)
-                        provisionedClientAttestation to provisionedClientAttestation.popSigner
+                        provisionedClientAttestation
                     }
 
-                    is ClientAuthentication.None -> {
-                        val signer = when (val dPoPUsage = clientAuthentication.dPoPUsage) {
-                            DPoPUsage.Never -> null
-                            is DPoPUsage.IfSupported<Signer<JWK>> -> dPoPUsage.value
-                            is DPoPUsage.Required<Signer<JWK>> -> dPoPUsage.value
-                        }
-                        null to signer
-                    }
+                    is ClientAuthentication.None -> null
                 }
+
+            val dPoPSigner = when (val dPoPUsage = config.provisionDPoPUsage(authorizationServer)) {
+                DPoPUsage.Never -> null
+                is DPoPUsage.IfSupported -> dPoPUsage.value
+                is DPoPUsage.Required -> {
+                    checkNotNull(config.dPoPCtx) { "dPoPCtx is required when DPoPUsage is required" }
+                    dPoPUsage.value
+                }
+            }
 
             val dPoPJwtFactory = config.dPoPCtx?.let {
                 checkNotNull(dPoPSigner) { "dPoPSigner is required when using DPoP" }

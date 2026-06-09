@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.eygraber.uri.Uri
-import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.UnableToResolveAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.UnableToResolveCredentialIssuerMetadata
@@ -126,20 +125,7 @@ internal class CredentialOfferRequestResolver(
             ).getOrThrow()
 
             val dPoPCtx = run {
-                val dPoPUsage = when (val clientAuthentication = config.clientAuthentication) {
-                    is ClientAuthentication.AttestationBased -> DPoPUsage.Required(
-                        clientAuthentication.provisionClientAttestation.popAlgorithm,
-                    )
-                    is ClientAuthentication.None -> when (val u = clientAuthentication.dPoPUsage) {
-                        is DPoPUsage.IfSupported<Signer<JWK>> -> {
-                            DPoPUsage.IfSupported(JwsAlgorithm(u.value.javaAlgorithm.toJoseAlg().name))
-                        }
-                        is DPoPUsage.Required<Signer<JWK>> -> {
-                            DPoPUsage.Required(JwsAlgorithm(u.value.javaAlgorithm.toJoseAlg().name))
-                        }
-                        DPoPUsage.Never -> DPoPUsage.Never
-                    }
-                }
+                val dPoPUsage = config.provisionDPoPUsage(authorizationServer).map { JwsAlgorithm(it.javaAlgorithm.toJoseAlg().name) }
                 DPoPCtx.createForServer(dPoPUsage, authorizationServerMetadata).getOrThrow()
             }
 
@@ -284,3 +270,10 @@ internal fun createAuthorizationCodeGrantCredentialOfferUri(
         .build()
         .toString()
 }
+
+internal fun <A : Any, B : Any> DPoPUsage<A>.map(convert: (A) -> B): DPoPUsage<B> =
+    when (this) {
+        DPoPUsage.Never -> DPoPUsage.Never
+        is DPoPUsage.IfSupported -> DPoPUsage.IfSupported(convert(value))
+        is DPoPUsage.Required -> DPoPUsage.Required(convert(value))
+    }

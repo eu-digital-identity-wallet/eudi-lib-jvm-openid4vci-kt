@@ -97,21 +97,22 @@ val CredentialOfferMixedDocTypes_AUTH_GRANT = """
 """.trimIndent()
 
 val OpenId4VCIConfiguration = OpenId4VCIConfig(
-    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId", DPoPUsage.Never),
+    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
+    provisionDPoPUsage = { DPoPUsage.Never },
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
 )
 
 val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
-    clientAuthentication = ClientAuthentication.None(
-        "MyWallet_ClientId",
+    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
+    provisionDPoPUsage = {
         DPoPUsage.IfSupported(
             ecSigner(
                 curve = Curve.P_256,
                 alg = JWSAlgorithm.ES256,
             ),
-        ),
-    ),
+        )
+    },
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
 
@@ -174,12 +175,12 @@ fun CredentialReusePolicy.effectiveBatchSize(supportedReusePolicies: CredentialR
         CredentialReusePolicy.None -> null
     }
 
-internal fun HttpRequestData.verifyDPoPProof(walletInstanceKey: ECKey, dpopNonce: Nonce) {
+internal fun HttpRequestData.verifyDPoPProof(dPoPSigningKey: ECKey, dpopNonce: Nonce) {
     val dpopProof = SignedJWT.parse(assertNotNull(headers["DPoP"]))
     val jwtProcessor = DefaultJWTProcessor<SecurityContext>()
         .apply {
             jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(setOf(JOSEObjectType("dpop+jwt")))
-            jwsKeySelector = SingleKeyJWSKeySelector(dpopProof.header.algorithm, walletInstanceKey.toPublicKey())
+            jwsKeySelector = SingleKeyJWSKeySelector(dpopProof.header.algorithm, dPoPSigningKey.toPublicKey())
             jwtClaimsSetVerifier = DefaultJWTClaimsVerifier(
                 JWTClaimsSet.Builder()
                     .claim("nonce", dpopNonce.value)
@@ -188,5 +189,5 @@ internal fun HttpRequestData.verifyDPoPProof(walletInstanceKey: ECKey, dpopNonce
             )
         }
     jwtProcessor.process(dpopProof, null)
-    assertEquals(walletInstanceKey.toPublicJWK(), dpopProof.header.jwk)
+    assertEquals(dPoPSigningKey.toPublicJWK().computeThumbprint(), dpopProof.header.jwk.computeThumbprint())
 }
