@@ -19,10 +19,11 @@ import eu.europa.ec.eudi.openid4vci.Nonce
 import eu.europa.ec.eudi.openid4vci.ProvisionClientAttestation
 
 internal class GetAbcaChallengeAndDPoPNonce(
-    private val provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
+    private val provisionClientAttestation: suspend () -> ProvisionClientAttestation.Provisioned?,
     private val challengeEndpointClient: ChallengeEndpointClient?,
 ) {
     suspend operator fun invoke(existingAbcaChallenge: Nonce?, existingDpopNonce: Nonce?): Pair<Nonce?, Nonce?> {
+        val provisionedClientAttestation = provisionClientAttestation()
         if (null == provisionedClientAttestation) {
             return null to existingDpopNonce
         }
