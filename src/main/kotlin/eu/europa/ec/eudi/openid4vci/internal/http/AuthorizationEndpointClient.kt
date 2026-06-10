@@ -76,7 +76,7 @@ internal class AuthorizationEndpointClient(
     private val challengeEndpoint: URL?,
     private val config: OpenId4VCIConfig,
     private val dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
-    private val provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
+    private val provisionedClientAttestation: suspend () -> ProvisionClientAttestation.Provisioned?,
     private val httpClient: HttpClient,
 ) {
 
@@ -85,7 +85,7 @@ internal class AuthorizationEndpointClient(
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
         dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
-        provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
+        provisionedClientAttestation: suspend () -> ProvisionClientAttestation.Provisioned?,
         httpClient: HttpClient,
     ) : this(
         credentialIssuerId,
@@ -284,7 +284,7 @@ internal class AuthorizationEndpointClient(
                 dPoPJwtFactory()?.createDPoPJwt(Htm.POST, url, null, dpopNonce)
                     ?.getOrThrow()
                     ?.serialize()
-            val clientAttestation = provisionedClientAttestation?.generateClientAttestation(
+            val clientAttestation = provisionedClientAttestation()?.generateClientAttestation(
                 config.clock,
                 config.clientAuthentication.id,
                 URI(authorizationIssuer).toURL(),
