@@ -28,6 +28,8 @@ import tokenPostApplyAuthFlowAssertionsAndGetFormData
 import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
 import java.util.*
 import kotlin.test.Test
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -328,6 +330,68 @@ class IssuanceAuthorizationTest {
                     )
             }
         }
+
+    @Test
+    fun `ensure not dpop proof is sent to par endpoint when authorization code binding is disabled`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker { request ->
+                val headers = request.headers
+                val dpopProof = headers[DPoP]
+                assertNull(dpopProof, "got dpop proof when authorization code binding was disabled")
+            },
+            tokenPostMocker { request ->
+                with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
+            },
+        )
+
+        val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+        val issuer = Issuer.make(
+            config = OpenId4VCIConfigurationWithDpopSigner.copy(parUsage = ParUsage.Required(authorizationCodeDPoPBinding = false)),
+            credentialOffer = offer,
+            httpClient = mockedHttpClient,
+        ).getOrThrow()
+        with(issuer) {
+            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
+            val authorizationCode = UUID.randomUUID().toString()
+            val serverState = authRequestPrepared.state
+            authRequestPrepared
+                .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
+                .also { println(it) }
+        }
+    }
+
+    @Test
+    fun `ensure dpop proof is sent to par endpoint when authorization code binding is enabled`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker { request ->
+                val headers = request.headers
+                val dpopProof = headers[DPoP]
+                assertNotNull(dpopProof, "no dpop proof sent when authorization code binding was enabled")
+            },
+            tokenPostMocker { request ->
+                with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
+            },
+        )
+
+        val offer = credentialOffer(mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+        val issuer = Issuer.make(
+            config = OpenId4VCIConfigurationWithDpopSigner.copy(parUsage = ParUsage.Required(authorizationCodeDPoPBinding = true)),
+            credentialOffer = offer,
+            httpClient = mockedHttpClient,
+        ).getOrThrow()
+        with(issuer) {
+            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
+            val authorizationCode = UUID.randomUUID().toString()
+            val serverState = authRequestPrepared.state
+            authRequestPrepared
+                .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
+                .also { println(it) }
+        }
+    }
 
     private suspend fun credentialOffer(
         httpClient: HttpClient,
