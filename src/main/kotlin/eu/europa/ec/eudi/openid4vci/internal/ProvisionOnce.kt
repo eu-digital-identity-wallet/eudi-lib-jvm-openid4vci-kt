@@ -26,24 +26,28 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
 
-internal class ProvisionOnce<V : Any>(private val provision: suspend () -> V?) : suspend () -> V? {
+internal class ProvisionOnce<V : Any>(private val provision: suspend () -> V) : suspend () -> V {
 
+    @Volatile
     private var provisioned = false
+
     private val mutex = Mutex()
     private var value: V? = null
 
-    override suspend fun invoke(): V? =
-        if (!provisioned)
-            mutex.withLock {
-                if (!provisioned) {
-                    value = provision()
-                    provisioned = true
+    override suspend fun invoke(): V {
+        val value =
+            if (!provisioned)
+                mutex.withLock {
+                    if (!provisioned) {
+                        val provisioned = provision()
+                        value = provisioned
+                        this.provisioned = true
+                    }
+                    value
                 }
-                value
-            }
-        else value
-
-    companion object
+            else value
+        return checkNotNull(value)
+    }
 }
 
 internal fun dPoPJwtFactory(
@@ -59,9 +63,8 @@ internal fun dPoPJwtFactory(
             }
         }
 
-        config?.let { (provisionDPoPSigner) ->
-            val dPoPSigner = provisionDPoPSigner(authorizationServer)
-            provisionDPoPSigner.ensureValid(dPoPSigner)
-            DPoPJwtFactory(clock = clock, signer = dPoPSigner)
-        }
+        val provisionDPoPSigner = config.provisionDPoPSigner
+        val dPoPSigner = provisionDPoPSigner(authorizationServer)
+        provisionDPoPSigner.ensureValid(dPoPSigner)
+        DPoPJwtFactory(clock = clock, signer = dPoPSigner)
     }
