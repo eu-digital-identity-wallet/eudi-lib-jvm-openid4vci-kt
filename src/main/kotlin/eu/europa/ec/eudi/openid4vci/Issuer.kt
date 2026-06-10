@@ -285,7 +285,9 @@ interface Issuer :
                             responseEncryptionParams = credentialOffer.exchangeEncryptionSpecification.responseEncryptionSpec?.let {
                                 it.encryptionMethod to it.compressionAlgorithm
                             },
-                            dPoPConfig = dPoPConfig,
+                            dPoPConfig =
+                                if (null != credentialOffer.dPoPCtx) dPoPConfig
+                                else null,
                             clock = config.clock,
                         ),
                         AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
