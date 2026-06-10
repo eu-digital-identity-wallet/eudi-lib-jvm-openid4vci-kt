@@ -43,6 +43,25 @@ interface ProvisionClientAttestation {
 }
 
 /**
+ * Provisions a [Signer] for signing DPoP Proofs.
+ */
+interface ProvisionDPoPSigner {
+    val popAlgorithm: JwsAlgorithm
+
+    suspend operator fun invoke(authorizationServer: HttpsUrl): Signer<JWK>
+}
+
+/**
+ * Configuration options for DPoP.
+ */
+data class DPoPConfig(val provisionDPoPSigner: ProvisionDPoPSigner)
+
+/**
+ * An indication about the Client's preference for DPoP.
+ */
+typealias DPoPUsageOption = DPoPUsage<DPoPConfig>
+
+/**
  * The Client Authentication Method used by the Wallet.
  */
 sealed interface ClientAuthentication : java.io.Serializable {
@@ -55,7 +74,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
     /**
      * None, i.e. a Public Client.
      */
-    data class None(override val id: ClientId, val dPoPUsage: DPoPUsage<Signer<JWK>> = DPoPUsage.Never) : ClientAuthentication
+    data class None(override val id: ClientId) : ClientAuthentication
 
     /**
      * Attestation-Based Client Authentication.
@@ -84,6 +103,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
  * @param authorizeIssuanceConfig Instruction on how to assemble the authorization request. If scopes are supported
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
+ * @param dPoPUsage an indication about whether DPoP is never to be used, supported, or required
  * @param parUsage whether to use PAR in case of authorization code grant
  * @param clock Wallet's clock
  * @param issuerMetadataPolicy policy concerning signed metadata usage
@@ -94,6 +114,7 @@ data class OpenId4VCIConfig(
     val authFlowRedirectionURI: URI,
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+    val dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
@@ -108,16 +129,17 @@ data class OpenId4VCIConfig(
         authFlowRedirectionURI: URI,
         encryptionSupportConfig: EncryptionSupportConfig,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-        dPoPUsage: DPoPUsage<Signer<JWK>> = DPoPUsage.Never,
+        dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     ) : this(
-        ClientAuthentication.None(clientId, dPoPUsage),
+        ClientAuthentication.None(clientId),
         authFlowRedirectionURI,
         encryptionSupportConfig,
         authorizeIssuanceConfig,
+        dPoPUsage,
         parUsage,
         clock,
         issuerMetadataPolicy,
