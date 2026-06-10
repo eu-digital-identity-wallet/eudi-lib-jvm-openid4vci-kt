@@ -16,14 +16,10 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.util.JSONObjectUtils
-import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.JWTID
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.client.request.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.put
 import java.net.URL
 import java.time.Clock
@@ -33,26 +29,27 @@ import java.time.Clock
  * Populates only the mandatory claims : `iss`, `exp`, `jit`, `aud` and the optional `iat`
  * In regard to JOSE header, only `alg` claim is being populated
  */
-internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder {
+internal class ClientAttestationPoPBuilder(
+    private val clock: Clock,
+    private val clientId: ClientId,
+    private val authorizationServerId: URL,
+    private val signer: Signer<JWK>,
+) {
 
-    override suspend fun ClientAuthentication.AttestationBased.attestationPoPJWT(
-        clock: Clock,
-        authorizationServerId: URL,
-        challenge: Nonce?,
-    ): ClientAttestationPoPJWT {
+    suspend fun attestationPoPJWT(challenge: Nonce?): ClientAttestationPoPJWT {
         val now = clock.instant()
         val claimSet = ClientAttestationPOPClaims(
-            issuer = id,
+            issuer = clientId,
             audience = authorizationServerId,
             jwtId = JwtId(JWTID().value),
             issuedAt = now,
             challenge = challenge,
             notBefore = now,
         )
-        val signedJwt = popJwtSpec.signer.use { signOperation ->
+        val signedJwt = signer.use { signOperation ->
             JwtSigner<ClientAttestationPOPClaims, JWK>(
                 signOperation = signOperation,
-                algorithm = popJwtSpec.signer.javaAlgorithm.toJoseAlg(),
+                algorithm = signer.javaAlgorithm.toJoseAlg(),
                 customizeHeader = {
                     put(RFC7519.TYPE, AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE)
                 },
@@ -62,54 +59,10 @@ internal object DefaultClientAttestationPoPBuilder : ClientAttestationPoPBuilder
     }
 }
 
-internal fun JsonObject.cnfJwk(): JWK? {
-    return this["jwk"]?.let {
-        val jsonString = Json.encodeToString(it)
-        JWK.parse(jsonString)
-    }
-}
-
-internal fun Map<String, Any?>.toJsonObject(): JsonObject {
-    val jsonString = JSONObjectUtils.toJSONString(this)
-    return Json.decodeFromString(jsonString)
-}
-
-internal fun JWTClaimsSet.cnf(): JsonObject? {
-    return getJSONObjectClaim("cnf")?.toJsonObject()
-}
-
 internal fun HttpRequestBuilder.clientAttestationHeaders(
     clientAttestation: ClientAttestation,
 ) {
     val (attestation, pop) = clientAttestation
-    header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_HEADER, attestation.jwt.serialize())
+    header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_HEADER, attestation.jwt)
     header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_POP_HEADER, pop.jwt.serialize())
 }
-
-internal suspend fun OpenId4VCIConfig.generateClientAttestationIfNeeded(
-    authorizationServerId: URL,
-    challenge: Nonce?,
-): ClientAttestation? =
-    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(
-        clock,
-        clientAuthentication,
-        authorizationServerId,
-        challenge,
-    )
-
-internal suspend fun DeferredIssuerConfig.generateClientAttestationIfNeeded(challenge: Nonce?): ClientAttestation? =
-    clientAttestationPoPBuilder.generateClientAttestationIfNeeded(clock, clientAuthentication, authorizationServerId, challenge)
-
-private suspend fun ClientAttestationPoPBuilder.generateClientAttestationIfNeeded(
-    clock: Clock,
-    clientAuthentication: ClientAuthentication,
-    authorizationServerId: URL,
-    challenge: Nonce?,
-): ClientAttestation? =
-    when (clientAuthentication) {
-        is ClientAuthentication.AttestationBased -> {
-            val clientAttestationPoPJwt = clientAuthentication.attestationPoPJWT(clock, authorizationServerId, challenge)
-            clientAuthentication.attestationJWT to clientAttestationPoPJwt
-        }
-        else -> null
-    }

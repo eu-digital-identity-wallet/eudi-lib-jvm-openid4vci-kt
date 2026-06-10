@@ -22,6 +22,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.*
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
+import eu.europa.ec.eudi.openid4vci.internal.DurationSecondsSerializer
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
@@ -29,6 +30,7 @@ import eu.europa.ec.eudi.openid4vci.internal.ensureSuccess
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import java.net.URI
+import java.time.Duration
 import java.util.*
 import kotlin.time.Duration.Companion.seconds
 
@@ -63,10 +65,10 @@ private sealed interface CredentialSupportedTO {
 
 @Serializable
 private data class ArfAnnex2CredentialReusePolicyOptionTO(
-    @SerialName(ETSI4723.REUSE_POLICY_OPTION_DETAILS) @Required val details: List<String>,
-    @SerialName(ETSI4723.REUSE_POLICY_OPTION_BATCH_SIZE) val batchSize: Int? = null,
-    @SerialName(ETSI4723.REUSE_POLICY_OPTION_TRIGGER_UNUSED) val reissueTriggerUnused: Int? = null,
-    @SerialName(ETSI4723.REUSE_POLICY_OPTION_TRIGGER_LIFETIME) val reissueTriggerLifetimeLeft: Long? = null,
+    @SerialName(ETSI119472Part3.REUSE_POLICY_OPTION_DETAILS) @Required val details: List<String>,
+    @SerialName(ETSI119472Part3.REUSE_POLICY_OPTION_BATCH_SIZE) val batchSize: Int? = null,
+    @SerialName(ETSI119472Part3.REUSE_POLICY_OPTION_TRIGGER_UNUSED) val reissueTriggerUnused: Int? = null,
+    @SerialName(ETSI119472Part3.REUSE_POLICY_OPTION_TRIGGER_LIFETIME) val reissueTriggerLifetimeLeft: Long? = null,
 ) {
     fun toDomain(): List<EudiReusePolicy> =
         EudiReusePolicy.fromDetails(
@@ -79,12 +81,12 @@ private data class ArfAnnex2CredentialReusePolicyOptionTO(
 
 @Serializable
 private data class CredentialReusePolicyTO(
-    @SerialName(ETSI4723.CREDENTIAL_REUSE_POLICY_ID) @Required val id: String,
-    @SerialName(ETSI4723.CREDENTIAL_REUSE_POLICY_OPTIONS) val options: List<JsonElement>? = null,
+    @SerialName(ETSI119472Part3.CREDENTIAL_REUSE_POLICY_ID) @Required val id: String,
+    @SerialName(ETSI119472Part3.CREDENTIAL_REUSE_POLICY_OPTIONS) val options: List<JsonElement>? = null,
 ) {
     fun toDomain(): CredentialReusePolicy =
         when (id) {
-            ETSI4723.REUSE_POLICY_ARF_ANNEX_II -> {
+            ETSI119472Part3.REUSE_POLICY_ARF_ANNEX_II -> {
                 val parsed = options?.flatMap {
                     JsonSupport.decodeFromJsonElement<ArfAnnex2CredentialReusePolicyOptionTO>(it).toDomain()
                 }.orEmpty()
@@ -99,7 +101,7 @@ private data class CredentialMetadataTO(
     @SerialName("display") val display: List<CredentialSupportedDisplayTO>? = null,
     @SerialName("claims") val claims: List<ClaimTO>? = null,
     @Serializable(with = KeepKnownReusePolicies::class)
-    @SerialName(ETSI4723.CREDENTIAL_REUSE_POLICY) val credentialReusePolicy: CredentialReusePolicyTO? = null,
+    @SerialName(ETSI119472Part3.CREDENTIAL_REUSE_POLICY) val credentialReusePolicy: CredentialReusePolicyTO? = null,
 ) {
     fun toDomain(): CredentialMetadata {
         val display = display?.map { it.toDomain() }.orEmpty()
@@ -118,7 +120,7 @@ private object KeepKnownReusePolicies : JsonTransformingSerializer<CredentialReu
         else buildJsonObject { put("id", "unknown") }
     }
 
-    private val knownPolicies = setOf(ETSI4723.REUSE_POLICY_ARF_ANNEX_II)
+    private val knownPolicies = setOf(ETSI119472Part3.REUSE_POLICY_ARF_ANNEX_II)
 
     private fun JsonElement.isKnown(): Boolean =
         when (this) {
@@ -139,8 +141,9 @@ private data class ProofTypeSupportedMetaTO(
 
 @Serializable
 private data class KeyAttestationRequirementTO(
-    @SerialName("key_storage") val keyStorage: List<String>? = null,
-    @SerialName("user_authentication") val userAuthentication: List<String>? = null,
+    @SerialName(OpenId4VCISpec.KEY_ATTESTATION_KEY_STORAGE) val keyStorage: List<AttackPotentialResistance>? = null,
+    @SerialName(OpenId4VCISpec.KEY_ATTESTATION_USER_AUTHENTICATION) val userAuthentication: List<AttackPotentialResistance>? = null,
+    @SerialName(TS3.PREFERRED_KEY_STORAGE_STATUS_PERIOD) val preferredKeyStorageStatusPeriod: DurationAsSeconds? = null,
 )
 
 /**
@@ -434,6 +437,8 @@ private data class CredentialIssuerMetadataTO(
     @Serializable(with = KeepKnownConfigurations::class)
     @SerialName("credential_configurations_supported") val credentialConfigurationsSupported: Map<String, CredentialSupportedTO>? = null,
     @SerialName("display") val display: List<DisplayTO>? = null,
+    @SerialName(TS3.PREFERRED_CLIENT_STATUS_PERIOD)
+    @Serializable(with = DurationSecondsSerializer::class) val preferredClientStatusPeriod: Duration? = null,
 )
 
 private object KeepKnownConfigurations : JsonTransformingSerializer<Map<String, CredentialSupportedTO>>(serializer()) {
@@ -660,7 +665,11 @@ private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTy
 
 private fun KeyAttestationRequirementTO?.toDomain(): KeyAttestationRequirement = when {
     this == null -> KeyAttestationRequirement.NotRequired
-    else -> KeyAttestationRequirement.Required(keyStorage, userAuthentication)
+    else -> KeyAttestationRequirement.Required(
+        keyStorage,
+        userAuthentication,
+        preferredKeyStorageStatusPeriod?.let { PositiveDuration(it) },
+    )
 }
 
 /**
@@ -741,6 +750,10 @@ private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuer
         }
     }
 
+    val preferredClientStatusPeriod = preferredClientStatusPeriod?.let {
+        PositiveDuration.of(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidPreferredClientStatusPeriod)
+    }
+
     return CredentialIssuerMetadata(
         credentialIssuerIdentifier,
         authorizationServers,
@@ -753,5 +766,6 @@ private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuer
         batchIssuance,
         credentialsSupported,
         display,
+        preferredClientStatusPeriod,
     )
 }

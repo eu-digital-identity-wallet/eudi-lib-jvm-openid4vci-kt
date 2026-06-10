@@ -37,10 +37,14 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.assertDoesNotThrow
+import org.junit.jupiter.api.assertNull
 import org.junit.jupiter.api.assertThrows
 import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
+import java.time.Duration
 import java.util.*
 import kotlin.test.*
+import kotlin.time.Duration.Companion.days
+import kotlin.time.toJavaDuration
 
 class IssuanceSingleRequestTest {
 
@@ -836,7 +840,10 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
+            val proofSpec = attestationProofSpec { _, preferredKeyStorageStatusPeriod ->
+                assertEquals(1.days.toJavaDuration(), preferredKeyStorageStatusPeriod?.value)
+            }
+            authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
         }
     }
 
@@ -858,7 +865,10 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, attestationProofSpec(curve = Curve.P_384)).getOrThrow()
+            val proofSpec = attestationProofSpec(curve = Curve.P_384) { _, preferredKeyStorageStatusPeriod ->
+                assertEquals(1.days.toJavaDuration(), preferredKeyStorageStatusPeriod?.value)
+            }
+            authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
         }
     }
 
@@ -915,30 +925,37 @@ class IssuanceSingleRequestTest {
 
     @Test
     fun `issuance success with attested client`() = runTest {
+        val dPoPSigningKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
         val walletInstanceKey = ECKeyGenerator(Curve.P_521).keyID(UUID.randomUUID().toString()).generate()
         val client = selfSignedClient(
             walletInstanceKey = walletInstanceKey,
             clientId = "MyWallet_ClientId",
         )
         val abcaChallenge = Nonce(UUID.randomUUID().toString())
+        val dpopNonce = Nonce(UUID.randomUUID().toString())
         val updatedAbcaChallenge = Nonce(UUID.randomUUID().toString())
 
         val mockedHttpClient = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
             authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
-            challengePostMocker(abcaChallenge),
+            challengePostMocker(challenge = abcaChallenge, dpopNonce = dpopNonce),
             parPostMocker {
                 it.verifySelfSignedClientAttestation(walletInstanceKey, abcaChallenge)
+                it.verifyDPoPProof(dPoPSigningKey.toPublicJWK(), dpopNonce)
             },
-            challengePostMocker(updatedAbcaChallenge),
+            challengePostMocker(challenge = updatedAbcaChallenge),
             tokenPostMocker {
                 it.verifySelfSignedClientAttestation(walletInstanceKey, updatedAbcaChallenge)
+                it.verifyDPoPProof(dPoPSigningKey.toPublicJWK(), dpopNonce)
             },
             nonceEndpointMocker(),
             singleIssuanceRequestMocker(),
         )
 
-        val config = OpenId4VCIConfiguration.copy(clientAuthentication = client)
+        val config = OpenId4VCIConfiguration.copy(
+            clientAuthentication = client,
+            dPoPUsage = DPoPUsage.Required(DPoPConfig(ProvisionDPoPSigner(dPoPSigningKey))),
+        )
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
             config = config,
@@ -949,8 +966,112 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
+            val proofSpec = attestationProofSpec { _, preferredKeyStorageStatusPeriod ->
+                assertEquals(1.days.toJavaDuration(), preferredKeyStorageStatusPeriod?.value)
+            }
+            authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
         }
+    }
+
+    @Test
+    fun `attested client considers dpop nonce returned by challenge endpoint`() = runTest {
+        val dPoPSigningKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
+        val walletInstanceKey = ECKeyGenerator(Curve.P_521).keyID(UUID.randomUUID().toString()).generate()
+        val client = selfSignedClient(
+            walletInstanceKey = walletInstanceKey,
+            clientId = "MyWallet_ClientId",
+        )
+        val abcaChallenge = Nonce(UUID.randomUUID().toString())
+        val dpopNonce = Nonce(UUID.randomUUID().toString())
+        val updatedAbcaChallenge = Nonce(UUID.randomUUID().toString())
+        val updatedDpopNonce = Nonce(UUID.randomUUID().toString())
+
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED),
+            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+            challengePostMocker(challenge = abcaChallenge, dpopNonce = dpopNonce),
+            parPostMocker {
+                it.verifySelfSignedClientAttestation(walletInstanceKey, abcaChallenge)
+                it.verifyDPoPProof(dPoPSigningKey.toPublicJWK(), dpopNonce)
+            },
+            challengePostMocker(challenge = updatedAbcaChallenge, dpopNonce = updatedDpopNonce),
+            tokenPostMocker {
+                it.verifySelfSignedClientAttestation(walletInstanceKey, updatedAbcaChallenge)
+                it.verifyDPoPProof(dPoPSigningKey.toPublicJWK(), updatedDpopNonce)
+            },
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(),
+        )
+
+        val config = OpenId4VCIConfiguration.copy(
+            clientAuthentication = client,
+            dPoPUsage = DPoPUsage.Required(DPoPConfig(ProvisionDPoPSigner(dPoPSigningKey))),
+        )
+
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            config = config,
+            credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+            httpClient = mockedHttpClient,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            val proofSpec = attestationProofSpec { _, preferredKeyStorageStatusPeriod ->
+                assertEquals(1.days.toJavaDuration(), preferredKeyStorageStatusPeriod?.value)
+            }
+            authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
+        }
+    }
+
+    @Test
+    fun `preferred_client_status_period is provided to wallet during client attestation provisioning if present`() = runTest {
+        suspend fun test(issuerMetadataVersion: IssuerMetadataVersion, expectedPreferredClientStatusPeriod: PositiveDuration?) {
+            val walletInstanceKey = ECKeyGenerator(Curve.P_521).keyID(UUID.randomUUID().toString()).generate()
+            val client = selfSignedClient(
+                walletInstanceKey = walletInstanceKey,
+                clientId = "MyWallet_ClientId",
+            ) { _, preferredClientStatusPeriod ->
+                when (expectedPreferredClientStatusPeriod) {
+                    null -> assertNull(preferredClientStatusPeriod)
+                    else -> assertEquals(expectedPreferredClientStatusPeriod, preferredClientStatusPeriod)
+                }
+            }
+            val abcaChallenge = Nonce(UUID.randomUUID().toString())
+            val updatedAbcaChallenge = Nonce(UUID.randomUUID().toString())
+
+            val mockedHttpClient = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion),
+                authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+                challengePostMocker(abcaChallenge),
+                parPostMocker {
+                    it.verifySelfSignedClientAttestation(walletInstanceKey, abcaChallenge)
+                },
+                challengePostMocker(updatedAbcaChallenge),
+                tokenPostMocker {
+                    it.verifySelfSignedClientAttestation(walletInstanceKey, updatedAbcaChallenge)
+                },
+                nonceEndpointMocker(),
+                singleIssuanceRequestMocker(),
+            )
+
+            val config = OpenId4VCIConfiguration.copy(clientAuthentication = client)
+
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                config = config,
+                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+                httpClient = mockedHttpClient,
+            )
+
+            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
+            }
+        }
+
+        test(IssuerMetadataVersion.ATTESTATION_PROOF_SUPPORTED, null)
+        test(IssuerMetadataVersion.WITH_PREFERRED_CLIENT_STATUS_PERIOD, PositiveDuration(Duration.ofDays(30L)))
     }
 
     @Test
@@ -974,20 +1095,15 @@ class IssuanceSingleRequestTest {
 
             val config = OpenId4VCIConfiguration.copy(clientAuthentication = client)
 
-            val error = assertFailsWith<IllegalStateException> {
+            val error = assertFailsWith<CredentialIssuanceError.PushedAuthorizationRequestFailed> {
                 authorizeRequestForCredentialOffer(
                     config = config,
                     credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
                     httpClient = mockedHttpClient,
                 )
             }
-            assertEquals(
-                "Authorization Server replied with " +
-                    "'${AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR}' " +
-                    "error code, but hasn't provided a challenge using the " +
-                    "'${AttestationBasedClientAuthenticationSpec.CHALLENGE_HEADER}' header",
-                error.message,
-            )
+            assertEquals(AttestationBasedClientAuthenticationSpec.USE_ATTESTATION_CHALLENGE_ERROR, error.error)
+            assertNull(error.errorDescription)
         }
 
     @Test
@@ -1040,7 +1156,10 @@ class IssuanceSingleRequestTest {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             with(issuer) {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
+                val proofSpec = attestationProofSpec { _, preferredKeyStorageStatusPeriod ->
+                    assertEquals(1.days.toJavaDuration(), preferredKeyStorageStatusPeriod?.value)
+                }
+                authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
             }
         }
 }

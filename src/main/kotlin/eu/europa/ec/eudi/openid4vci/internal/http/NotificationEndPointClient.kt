@@ -24,7 +24,7 @@ import io.ktor.http.*
 
 internal class NotificationEndPointClient(
     private val notificationEndpoint: CredentialIssuerEndpoint,
-    private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
     private val httpClient: HttpClient,
 ) {
 
@@ -48,7 +48,7 @@ internal class NotificationEndPointClient(
                 .apply {
                     method = HttpMethod.Post
                     url.takeFrom(notificationEndpoint.value)
-                    bearerOrDPoPAuth(accessToken, dPoPJwtFactory, resourceServerDpopNonce)
+                    bearerOrDPoPAuth(accessToken, dPoPJwtFactory(), resourceServerDpopNonce)
                     contentType(ContentType.Application.Json)
                     setBody(NotificationTO.from(event))
                 },

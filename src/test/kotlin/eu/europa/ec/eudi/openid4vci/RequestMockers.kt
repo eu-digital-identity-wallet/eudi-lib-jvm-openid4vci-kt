@@ -89,6 +89,7 @@ enum class IssuerMetadataVersion {
     CONTAINS_DEPRECATED_METHOD,
     KEY_ATTESTATION_REQUIRED,
     ATTESTATION_PROOF_SUPPORTED,
+    WITH_PREFERRED_CLIENT_STATUS_PERIOD,
 }
 
 internal fun issuerMetadataJsonContent(issuerMetadataVersion: IssuerMetadataVersion): String = when (issuerMetadataVersion) {
@@ -101,6 +102,7 @@ internal fun issuerMetadataJsonContent(issuerMetadataVersion: IssuerMetadataVers
     CONTAINS_DEPRECATED_METHOD -> getResourceAsText("well-known/openid-credential-issuer_contains_invalid_configuration.json")
     KEY_ATTESTATION_REQUIRED -> getResourceAsText("well-known/openid-credential-issuer_key_attestation_required.json")
     ATTESTATION_PROOF_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_attestation_proof_supported.json")
+    WITH_PREFERRED_CLIENT_STATUS_PERIOD -> getResourceAsText("well-known/openid-credential-issuer_with_preferred_client_status_period.json")
 }
 
 enum class AuthServerMetadataVersion {
@@ -133,7 +135,12 @@ internal fun authServerWellKnownMocker(
     },
 )
 
-internal fun challengePostMocker(challenge: Nonce? = null, validator: (request: HttpRequestData) -> Unit = {}): RequestMocker =
+internal fun challengePostMocker(
+    challenge: Nonce? = null,
+    dpopNonce: Nonce? = null,
+    validator: (request: HttpRequestData) -> Unit = {
+    },
+): RequestMocker =
     RequestMocker(
         requestMatcher = endsWith("/ext/challenge", HttpMethod.Post),
         responseBuilder = {
@@ -145,9 +152,12 @@ internal fun challengePostMocker(challenge: Nonce? = null, validator: (request: 
                     }
                     """.trimIndent(),
                 status = HttpStatusCode.OK,
-                headers = headersOf(
-                    HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
-                ),
+                headers = headers {
+                    append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    if (null != dpopNonce) {
+                        append("DPoP-Nonce", dpopNonce.value)
+                    }
+                },
             )
         },
         requestValidator = validator,

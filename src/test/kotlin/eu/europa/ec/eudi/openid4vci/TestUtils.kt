@@ -15,12 +15,27 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
+import com.nimbusds.jose.proc.SecurityContext
+import com.nimbusds.jose.proc.SingleKeyJWSKeySelector
+import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
+import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.ecSigner
+import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
+import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
 import io.ktor.client.*
+import io.ktor.client.request.HttpRequestData
 import java.net.URI
 import java.util.*
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 const val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
 const val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
@@ -88,19 +103,14 @@ val OpenId4VCIConfiguration = OpenId4VCIConfig(
     clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    dPoPUsage = DPoPUsage.Never,
 )
 
 val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
     clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
+    dPoPUsage = DPoPUsage.IfSupported(DPoPConfig(ProvisionDPoPSigner(ecSigner(Curve.P_256, JWSAlgorithm.ES256)))),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    dPoPUsage = DPoPUsage.IfSupported(
-        ecSigner(
-            curve = Curve.P_256,
-            alg = JWSAlgorithm.ES256,
-        ),
-    ),
+
 )
 
 suspend fun authorizeRequestForCredentialOffer(
@@ -159,3 +169,31 @@ fun CredentialReusePolicy.effectiveBatchSize(supportedReusePolicies: CredentialR
 
         CredentialReusePolicy.None -> null
     }
+
+internal fun HttpRequestData.verifyDPoPProof(dPoPSigningKey: ECKey, dpopNonce: Nonce) {
+    val dpopProof = SignedJWT.parse(assertNotNull(headers["DPoP"]))
+    val jwtProcessor = DefaultJWTProcessor<SecurityContext>()
+        .apply {
+            jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(setOf(JOSEObjectType("dpop+jwt")))
+            jwsKeySelector = SingleKeyJWSKeySelector(dpopProof.header.algorithm, dPoPSigningKey.toPublicKey())
+            jwtClaimsSetVerifier = DefaultJWTClaimsVerifier(
+                JWTClaimsSet.Builder()
+                    .claim("nonce", dpopNonce.value)
+                    .build(),
+                setOf("jti", "htm", "htu", "iat", "nonce"),
+            )
+        }
+    jwtProcessor.process(dpopProof, null)
+    assertEquals(dPoPSigningKey.toPublicJWK().computeThumbprint(), dpopProof.header.jwk.computeThumbprint())
+}
+
+internal fun ProvisionDPoPSigner(signer: Signer<JWK>): ProvisionDPoPSigner =
+    object : ProvisionDPoPSigner {
+        override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(signer.javaAlgorithm.toJoseAlg().name)
+        override suspend fun invoke(authorizationServer: HttpsUrl): Signer<JWK> = signer
+    }
+
+internal fun ProvisionDPoPSigner(signingKey: ECKey): ProvisionDPoPSigner {
+    require(signingKey.isPrivate)
+    return ProvisionDPoPSigner(Signer.fromNimbusEcKey(signingKey, signingKey.toPublicJWK(), secureRandom = null, provider = null))
+}

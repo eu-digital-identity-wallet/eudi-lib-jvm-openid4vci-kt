@@ -33,6 +33,7 @@ import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import eu.europa.ec.eudi.openid4vci.internal.wellKnownUrl
 import io.ktor.http.*
 import java.net.URI
+import java.time.Duration
 import java.util.*
 
 object SampleIssuer {
@@ -128,7 +129,8 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
             ProofTypeMeta.Jwt(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
                 KeyAttestationRequirement.Required(
-                    listOf("iso_18045_high", "iso_18045_enhanced-basic"),
+                    listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
+                    null,
                     null,
                 ),
             ),
@@ -189,8 +191,9 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
             ProofTypeMeta.Jwt(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
                 KeyAttestationRequirement.Required(
-                    listOf("iso_18045_high", "iso_18045_enhanced-basic"),
-                    listOf("iso_18045_high", "iso_18045_enhanced-basic"),
+                    listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
+                    listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
+                    null,
                 ),
             ),
         ),
@@ -352,6 +355,7 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
             logo = Display.Logo(URI.create("https://credential-issuer.example.com/logo.png"), "Credential Issuer Logo"),
         ),
     ),
+    PositiveDuration(Duration.ofDays(30L)),
 )
 
 /**

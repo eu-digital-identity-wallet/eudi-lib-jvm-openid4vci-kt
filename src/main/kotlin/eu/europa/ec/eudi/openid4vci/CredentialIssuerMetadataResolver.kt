@@ -160,6 +160,7 @@ data class CredentialIssuerMetadata(
     val batchCredentialIssuance: BatchCredentialIssuance = BatchCredentialIssuance.NotSupported,
     val credentialConfigurationsSupported: Map<CredentialConfigurationIdentifier, CredentialConfiguration>,
     val display: List<Display> = emptyList(),
+    val preferredClientStatusPeriod: PositiveDuration? = null,
 ) : Serializable {
 
     init {
@@ -338,6 +339,11 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
 
     class InvalidBatchSize :
         CredentialIssuerMetadataValidationError(IllegalArgumentException("batch_size should be greater than zero"))
+
+    /**
+     * `preferred_client_status_period` advertised by Credential Issuer is invalid.
+     */
+    class InvalidPreferredClientStatusPeriod(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 }
 
 /**

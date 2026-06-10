@@ -25,7 +25,12 @@ import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.oauth2.sdk.`as`.ReadOnlyAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.MissingRequiredRequestEncryptionSpecification
+import eu.europa.ec.eudi.openid4vci.internal.DurationSecondsSerializer
+import eu.europa.ec.eudi.openid4vci.internal.InstantEpochSecondSerializer
+import eu.europa.ec.eudi.openid4vci.internal.URISerializer
 import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
 import java.net.URL
@@ -391,4 +396,36 @@ value class JwtId(val value: String) {
         require(value.isNotBlank()) { "value cannot be blank" }
     }
     override fun toString(): String = value
+}
+
+typealias InstantAsEpochSecond =
+    @Serializable(with = InstantEpochSecondSerializer::class)
+    Instant
+
+@Serializable
+data class StatusClaim(
+    @Required @SerialName(TokenStatusListSpec.STATUS_LIST) val statusList: StatusListTokenClaim,
+)
+
+@Serializable
+data class StatusListTokenClaim(
+    @Required @SerialName(TokenStatusListSpec.INDEX) val index: UInt,
+    @Required @SerialName(TokenStatusListSpec.URI) @Serializable(with = URISerializer::class) val uri: URI,
+)
+
+typealias DurationAsSeconds =
+    @Serializable(with = DurationSecondsSerializer::class)
+    Duration
+
+@JvmInline
+value class PositiveDuration(val value: Duration) {
+    init {
+        require(value > Duration.ZERO) { "Duration must be positive" }
+    }
+
+    override fun toString(): String = value.toString()
+
+    companion object {
+        fun of(value: Duration): Result<PositiveDuration> = runCatching { PositiveDuration(value) }
+    }
 }

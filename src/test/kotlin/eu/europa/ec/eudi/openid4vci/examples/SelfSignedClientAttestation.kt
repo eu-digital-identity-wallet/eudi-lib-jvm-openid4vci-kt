@@ -29,12 +29,13 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
-import io.ktor.client.request.HttpRequestData
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import eu.europa.ec.eudi.openid4vci.internal.requireIsNotMAC
+import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
+import io.ktor.client.request.*
+import kotlinx.serialization.json.JsonPrimitive
+import java.net.URI
 import java.security.Key
 import java.time.Clock
 import java.util.*
@@ -43,7 +44,9 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.toJavaDuration
 
 internal val ECKey.jwsAlgorithm: JWSAlgorithm
     get() = when (curve) {
@@ -59,159 +62,66 @@ internal fun selfSignedClient(
     walletInstanceKey: ECKey,
     clientId: String,
     duration: Duration = 10.minutes,
-    keyType: KeyType? = null,
-    userAuthentication: UserAuthentication? = null,
-    headerCustomization: JWSHeader.Builder.() -> Unit = {},
+    assertions: (HttpsUrl, PositiveDuration?) -> Unit = { _, _ -> },
 ): ClientAuthentication.AttestationBased {
     val algorithm = walletInstanceKey.jwsAlgorithm
     val signer = DefaultJWSSignerFactory().createJWSSigner(walletInstanceKey, algorithm)
     val clientAttestationJWT = run {
-        val claims = ClientAttestationClaims(
-            issuer = clientId,
-            clientId = clientId,
-            cnf = Cnf(
-                walletInstancePubKey = walletInstanceKey.toPublicJWK(),
-                keyType = keyType,
-                userAuthentication = userAuthentication,
+        val now = clock.instant()
+        val exp = now + duration.toJavaDuration()
+        val claims = ClientAttestationJWTClaims(
+            issuer = NonBlankString(clientId),
+            subject = NonBlankString(clientId),
+            expirationTime = exp,
+            confirmation = ConfirmationClaim(jwk = walletInstanceKey.toPublicJWK()),
+            issuedAt = now,
+            notBefore = now,
+            walletName = NonBlankString("SmartWallet-mobile"),
+            walletLink = NonBlankString("https://example.org/wallets/SmartWallet-mobile/info"),
+            status = null,
+            walletVersion = NonBlankString("1.0.1"),
+            walletSolutionCertificationInformation = JsonPrimitive("https://example.org/certification/SmartWalletMobile/1-0-1/"),
+            clientStatus = ClientStatusClaim(
+                status = StatusClaim(
+                    statusList = StatusListTokenClaim(
+                        index = 1337u,
+                        uri = URI.create("https://revocation_url/wia-statuslists/42"),
+                    ),
+                ),
+                expiresAt = now + 90.days.toJavaDuration(),
             ),
         )
-        val builder = ClientAttestationJwtBuilder(clock, duration, algorithm, signer, claims, headerCustomization)
+        val builder = ClientAttestationJwtBuilder(algorithm, signer, claims)
         builder.build()
     }
-    val popJwtSpec = ClientAttestationPoPJWTSpec(Signer.fromNimbusEcKey(walletInstanceKey, walletInstanceKey.toPublicJWK(), null, null))
-    return ClientAuthentication.AttestationBased(clientAttestationJWT, popJwtSpec)
-}
-
-/**
- * Asserts the security mechanism the Wallet uses to manage the private key associated
- * with the public key given in the cnf claim.
- * This mechanism is based on the capabilities of the execution environment of the Wallet,
- * this might be a secure element (in case of a wallet residing on a smartphone)
- * or a Cloud-HSM (in case of a cloud Wallet)
- */
-@Suppress("UNUSED")
-@Serializable
-enum class KeyType {
-    /**
-     * Wallet uses software-based key management
-     */
-    @SerialName("software")
-    Software,
-
-    /**
-     * Wallet uses hardware-based key management
-     */
-    @SerialName("hardware")
-    Hardware,
-
-    /**
-     * Wallet uses the Trusted Execution Environment for key management
-     */
-    @SerialName("tee")
-    TEE,
-
-    /**
-     * Wallet uses the Secure Enclave for key management
-     */
-    @SerialName("secure_enclave")
-    SecureEnclave,
-
-    /**
-     * Wallet uses the Strongbox for key management
-     */
-    @SerialName("strong_box")
-    StrongBox,
-
-    /**
-     * Wallet uses a Secure Element for key management
-     */
-    @SerialName("secure_element")
-    SecureElement,
-
-    /**
-     * Wallet uses Hardware Security Module (HSM)
-     */
-    @SerialName("hsm")
-    HSM,
-}
-
-/**
- *  Asserts the security mechanism the Wallet uses to authenticate the user
- *  to authorize access to the private key associated with the public key given in the cnf claim.
- *
- */
-@Suppress("UNUSED")
-@Serializable
-enum class UserAuthentication {
-    /**
-     * The key usage is authorized by the mobile operating system using a biometric factor
-     */
-    @SerialName("system_biometry")
-    SystemBiometry,
-
-    /**
-     * The key usage is authorized by the mobile operating system using personal identification number (PIN).
-     */
-    @SerialName("system_pin")
-    SystemPin,
-
-    /**
-     * The key usage is authorized by the Wallet using a biometric factor.
-     */
-    @SerialName("internal_biometry")
-    InternalBiometry,
-
-    /**
-     * The key usage is authorized by the Wallet using PIN.
-     */
-    @SerialName("internal_pin")
-    InternalPin,
-
-    /**
-     * The key usage is authorized by the secure element managing the key itself using PIN
-     */
-    @SerialName("secure_element_pin")
-    SecureElementPin,
-}
-
-data class Cnf(
-    val walletInstancePubKey: JWK,
-    val keyType: KeyType? = null,
-    val userAuthentication: UserAuthentication? = null,
-    val aal: String? = null,
-) {
-    init {
-        require(!walletInstancePubKey.isPrivate) { "InstanceKey should be public" }
+    val popJwtSpec = Signer.fromNimbusEcKey(walletInstanceKey, walletInstanceKey.toPublicJWK(), null, null)
+    val provisionClientAttestation = object : ProvisionClientAttestation {
+        override val algorithm: JwsAlgorithm = JwsAlgorithm(clientAttestationJWT.header.algorithm.name)
+        override val popAlgorithm: JwsAlgorithm
+            get() = JwsAlgorithm(popJwtSpec.javaAlgorithm.toJoseAlg().name)
+        override suspend operator fun invoke(
+            authorizationServer: HttpsUrl,
+            preferredClientStatusPeriod: PositiveDuration?,
+        ): ProvisionClientAttestation.Provisioned {
+            assertions(authorizationServer, preferredClientStatusPeriod)
+            return ProvisionClientAttestation.Provisioned(clientAttestationJWT, popJwtSpec)
+        }
     }
-}
-
-data class ClientAttestationClaims(
-    val issuer: String,
-    val clientId: ClientId,
-    val cnf: Cnf,
-) {
-
-    init {
-        require(clientId.isNotBlank() && clientId.isNotEmpty()) { "clientId cannot be blank" }
-    }
+    return ClientAuthentication.AttestationBased(clientId, provisionClientAttestation)
 }
 
 private class ClientAttestationJwtBuilder(
-    private val clock: Clock,
-    private val duration: Duration,
     private val algorithm: JWSAlgorithm,
     private val signer: JWSSigner,
-    private val claims: ClientAttestationClaims,
-    private val headerCustomization: JWSHeader.Builder.() -> Unit = {},
+    private val claims: ClientAttestationJWTClaims,
 ) {
     init {
-        require(duration.isPositive()) { "Duration must be positive" }
         requireIsNotMAC(algorithm)
     }
 
     fun build(): ClientAttestationJWT {
         val header = jwsHeader()
-        val jwtClaimSet = claimSetForm(claims)
+        val jwtClaimSet = claimsSetFrom(claims)
         val jwt =
             SignedJWT(header, jwtClaimSet).apply {
                 sign(signer)
@@ -221,46 +131,24 @@ private class ClientAttestationJwtBuilder(
     }
 
     private fun jwsHeader(): JWSHeader =
-        JWSHeader.Builder(algorithm).apply {
-            headerCustomization()
-            type(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
-        }.build()
+        JWSHeader.Builder(algorithm)
+            .type(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
+            .build()
 
-    private fun claimSetForm(claims: ClientAttestationClaims): JWTClaimsSet =
-        JWTClaimsSet.Builder().apply {
-            val now = clock.instant()
-            val exp = now.plusSeconds(duration.inWholeSeconds)
-            issuer(claims.issuer)
-            subject(claims.clientId)
-            expirationTime(Date.from(exp))
-            claim("cnf", cnf(claims.cnf))
-            issueTime(Date.from(now))
-            notBeforeTime(Date.from(now))
-        }.build()
+    private fun claimsSetFrom(claims: ClientAttestationJWTClaims): JWTClaimsSet = JWTClaimsSet.parse(JsonSupport.encodeToString(claims))
 
     companion object {
         fun ecKey256(
-            clock: Clock,
-            duration: Duration,
-            claims: ClientAttestationClaims,
-            headerCustomization: JWSHeader.Builder.() -> Unit = {},
+            claims: ClientAttestationJWTClaims,
             privateKey: ECKey,
         ): ClientAttestationJwtBuilder {
             require(privateKey.curve == Curve.P_256)
             val algorithm = JWSAlgorithm.ES256
             val signer = DefaultJWSSignerFactory().createJWSSigner(privateKey, algorithm)
-            return ClientAttestationJwtBuilder(clock, duration, algorithm, signer, claims, headerCustomization)
+            return ClientAttestationJwtBuilder(algorithm, signer, claims)
         }
     }
 }
-
-private fun cnf(cnf: Cnf): Map<String, Any> =
-    buildMap {
-        put("jwk", cnf.walletInstancePubKey.toJSONObject())
-        cnf.keyType?.let { put("key_type", Json.encodeToString(it)) }
-        cnf.userAuthentication?.let { put("user_authentication", Json.encodeToString(it)) }
-        cnf.aal?.let { put("aal", it) }
-    }
 
 internal val JWK.publicKey: Key
     get() = when (this) {

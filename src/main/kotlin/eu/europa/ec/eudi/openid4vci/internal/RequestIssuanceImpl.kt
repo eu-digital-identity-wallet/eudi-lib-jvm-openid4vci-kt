@@ -16,12 +16,8 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.crypto.RSASSAVerifier
-import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CNonceAndDPoPNonce
@@ -112,7 +108,8 @@ internal class RequestIssuanceImpl(
         credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
     ): Pair<List<Proof>, Nonce?> {
-        proofsSpecification.ensureCompatibleWith(credentialConfigId)
+        val credentialConfiguration = credentialSupportedById(credentialConfigId)
+        val proofRequirement = proofsSpecification.ensureCompatibleWith(credentialConfiguration)
 
         return when (proofsSpecification) {
             is ProofsSpecification.NoProofs -> emptyList<Proof>() to null
@@ -121,9 +118,9 @@ internal class RequestIssuanceImpl(
                 val cNonceAndDPoPNonce = cNonce()
                 val proofs = listOf(
                     jwtProofWithKeyAttestation(
+                        proofRequirement as ProofTypeMeta.Jwt,
                         proofsSpecification,
                         selectedReusePolicy,
-                        credentialConfigId,
                         grant,
                         cNonceAndDPoPNonce?.cnonce,
                     ),
@@ -134,9 +131,9 @@ internal class RequestIssuanceImpl(
             is ProofsSpecification.JwtProofs.NoKeyAttestation -> {
                 val cNonceAndDPoPNonce = cNonce()
                 val proofs = jwtProofsWithoutKeyAttestation(
+                    proofRequirement as ProofTypeMeta.Jwt,
                     proofsSpecification,
                     selectedReusePolicy,
-                    credentialConfigId,
                     grant,
                     cNonceAndDPoPNonce?.cnonce,
                 )
@@ -147,9 +144,9 @@ internal class RequestIssuanceImpl(
                 val cNonceAndDPoPNonce = cNonce()
                 val proofs = listOf(
                     attestationProof(
+                        proofRequirement as ProofTypeMeta.Attestation,
                         proofsSpecification,
                         selectedReusePolicy,
-                        credentialConfigId,
                         cNonceAndDPoPNonce?.cnonce,
                     ),
                 )
@@ -159,16 +156,16 @@ internal class RequestIssuanceImpl(
     }
 
     private fun ProofsSpecification.ensureCompatibleWith(
-        credentialConfigId: CredentialConfigurationIdentifier,
-    ) {
-        val credentialConfiguration = credentialSupportedById(credentialConfigId)
+        credentialConfiguration: CredentialConfiguration,
+    ): ProofTypeMeta? {
         val proofTypesSupported = credentialConfiguration.proofTypesSupported
 
-        when (this) {
+        return when (this) {
             is ProofsSpecification.NoProofs -> {
                 require(proofTypesSupported == ProofTypesSupported.Empty) {
                     "Credential configuration requires proofs."
                 }
+                null
             }
 
             is ProofsSpecification.JwtProofs -> {
@@ -191,12 +188,16 @@ internal class RequestIssuanceImpl(
                         }
                     }
                 }
+                proofRequirement
             }
 
             is ProofsSpecification.AttestationProof -> {
-                requireNotNull(proofTypesSupported[ProofType.ATTESTATION]) {
+                val proofRequirement = proofTypesSupported[ProofType.ATTESTATION]
+                requireNotNull(proofRequirement) {
                     "Credential configuration doesn't support attestation proofs."
                 }
+                check(proofRequirement is ProofTypeMeta.Attestation)
+                proofRequirement
             }
         }
     }
@@ -251,23 +252,27 @@ internal class RequestIssuanceImpl(
     }
 
     private suspend fun jwtProofWithKeyAttestation(
+        proofRequirement: ProofTypeMeta.Jwt,
         proofsSpecification: ProofsSpecification.JwtProofs.WithKeyAttestation,
         selectedReusePolicy: EudiReusePolicy?,
-        credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
         cNonce: Nonce?,
     ): Proof.Jwt {
-        val (proofSignerProvider, keyIndex) = proofsSpecification
-        val proofSigner = proofSignerProvider(cNonce)
+        check(proofRequirement.keyAttestationRequirement is KeyAttestationRequirement.Required)
+
+        val proofSigner = proofsSpecification.proofSignerProvider(
+            cNonce,
+            proofRequirement.keyAttestationRequirement.preferredKeyStorageStatusPeriod,
+        )
         val joseAlg = run {
             val javaSigningAlgorithm = proofSigner.javaAlgorithm
-            javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
+            javaSigningAlgorithm.toSupportedJoseAlgorithm(proofRequirement)
         }
         val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
         val jwtProof = proofSigner.use { operation ->
-            operation.publicMaterial.ensureKeyAttestationJwtAlgIsSupported(credentialConfigId, ProofType.JWT)
+            operation.publicMaterial.ensureKeyAttestationJwtAlgIsSupported(proofRequirement)
             operation.publicMaterial.attestedKeys.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
-            val signer = KeyAttestationJwtProofSigner(joseAlg, operation, keyIndex)
+            val signer = KeyAttestationJwtProofSigner(joseAlg, operation, ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX)
             val signedJwt = signer.sign(claims)
             SignedJWT.parse(signedJwt)
         }
@@ -276,27 +281,26 @@ internal class RequestIssuanceImpl(
     }
 
     private fun KeyAttestationJWT.ensureKeyAttestationJwtAlgIsSupported(
-        credentialConfigId: CredentialConfigurationIdentifier,
-        proofType: ProofType,
+        spec: ProofTypeMeta,
     ) {
-        val attestationJwtAlg = SignedJWT.parse(value).header.algorithm
-        val proofTypesSupported = credentialSupportedById(credentialConfigId).proofTypesSupported
-        val spec = proofTypesSupported.values.firstOrNull { it.type() == proofType }
-        ensure(spec != null && attestationJwtAlg in spec.algorithms()) {
+        val attestationJwtAlg = header.algorithm
+        ensure(attestationJwtAlg in spec.algorithms()) {
             CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported()
         }
     }
 
     private suspend fun jwtProofsWithoutKeyAttestation(
+        proofRequirement: ProofTypeMeta.Jwt,
         proofsSpecification: ProofsSpecification.JwtProofs.NoKeyAttestation,
         selectedReusePolicy: EudiReusePolicy?,
-        credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
         cNonce: Nonce?,
     ): List<Proof.Jwt> {
+        check(proofRequirement.keyAttestationRequirement is KeyAttestationRequirement.NotRequired)
+
         val joseAlg = run {
             val javaSigningAlgorithm = proofsSpecification.proofsSigner.javaAlgorithm
-            javaSigningAlgorithm.toSupportedJoseAlgorithm(credentialConfigId)
+            javaSigningAlgorithm.toSupportedJoseAlgorithm(proofRequirement)
         }
         return proofsSpecification.proofsSigner.use { operation ->
             operation.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
@@ -309,13 +313,16 @@ internal class RequestIssuanceImpl(
     }
 
     private suspend fun attestationProof(
+        proofRequirement: ProofTypeMeta.Attestation,
         proofsSpecification: ProofsSpecification.AttestationProof,
         selectedReusePolicy: EudiReusePolicy?,
-        credentialConfigId: CredentialConfigurationIdentifier,
         cNonce: Nonce?,
     ): Proof.Attestation {
-        val keyAttestationJwt = proofsSpecification.attestationProvider(cNonce)
-        keyAttestationJwt.ensureKeyAttestationJwtAlgIsSupported(credentialConfigId, ProofType.ATTESTATION)
+        val keyAttestationJwt = proofsSpecification.attestationProvider(
+            cNonce,
+            proofRequirement.keyAttestationRequirement.preferredKeyStorageStatusPeriod,
+        )
+        keyAttestationJwt.ensureKeyAttestationJwtAlgIsSupported(proofRequirement)
         keyAttestationJwt.attestedKeys.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
         return Proof.Attestation(keyAttestationJwt)
     }
@@ -362,13 +369,8 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private fun String.toSupportedJoseAlgorithm(credentialConfigId: CredentialConfigurationIdentifier): JWSAlgorithm {
-        val proofTypesSupported = credentialSupportedById(credentialConfigId).proofTypesSupported
-        val spec = proofTypesSupported.values.filterIsInstance<ProofTypeMeta.Jwt>().firstOrNull()
-        ensureNotNull(spec) {
-            CredentialIssuanceError.ProofGenerationError.ProofTypeNotSupported()
-        }
-        return spec.let {
+    private fun String.toSupportedJoseAlgorithm(spec: ProofTypeMeta.Jwt): JWSAlgorithm =
+        spec.let {
             val joseSigningAlgorithm = this.toJoseAlg()
             val proofTypeSigningAlgorithmsSupported = spec.algorithms
             ensure(joseSigningAlgorithm in proofTypeSigningAlgorithmsSupported) {
@@ -376,7 +378,6 @@ internal class RequestIssuanceImpl(
             }
             joseSigningAlgorithm
         }
-    }
 
     private suspend fun cNonce(): CNonceAndDPoPNonce? = nonceEndpointClient?.getNonce()?.getOrThrow()
 
@@ -408,20 +409,15 @@ internal class RequestIssuanceImpl(
             ?: throw IllegalArgumentException("Missing 'key_attestation' in JWT header")
         val keyAttestation = KeyAttestationJWT(keyAttestationJwt)
         val attestedKeys = keyAttestation.attestedKeys
-        val jwk = attestedKeys.firstOrNull { jwk: JWK ->
-            try {
-                val verifier: JWSVerifier? = when (jwk) {
-                    is RSAKey -> RSASSAVerifier(jwk)
-                    is ECKey -> ECDSAVerifier(jwk)
-                    else -> null
-                }
-                verifier != null && jwtProof.verify(verifier)
-            } catch (_: Exception) {
-                false
-            }
+        val signatureVerified = try {
+            val signingKey = attestedKeys[ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX].toECKey()
+            val verifier = ECDSAVerifier(signingKey)
+            jwtProof.verify(verifier)
+        } catch (_: Exception) {
+            false
         }
-        requireNotNull(jwk) {
-            "Signed JWT is not signed by any of the attested keys in key_attestation."
+        require(signatureVerified) {
+            "Signed JWT is not signed by the first attested key in key_attestation."
         }
     }
 

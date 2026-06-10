@@ -16,9 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSObject
-import com.nimbusds.jose.crypto.MACSigner
+import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.SignedJWT
@@ -26,10 +24,9 @@ import eu.europa.ec.eudi.openid4vci.internal.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 import java.net.URL
 import java.time.Clock
-import java.time.Instant
 
 /**
  * These JWTs are transmitted via HTTP headers in an HTTP request from a Client Instance
@@ -46,25 +43,68 @@ typealias ClientAttestation = Pair<ClientAttestationJWT, ClientAttestationPoPJWT
  * which is bound to a key managed by a Client Instance which can then
  * be used by the instance for client authentication
  */
-@JvmInline
-value class ClientAttestationJWT(val jwt: SignedJWT) {
-    init {
-        jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
-        requireNotNull(jwt.jwtClaimsSet.issuer) { "Invalid Attestation JWT. Misses `iss` claim" }
-        requireNotNull(jwt.jwtClaimsSet.subject) { "Invalid Attestation JWT. Misses `sub` claim" }
-        requireNotNull(jwt.jwtClaimsSet.expirationTime) { "Invalid Attestation JWT. Misses `exp` claim" }
-        val cnf = requireNotNull(jwt.jwtClaimsSet.cnf()) { "Invalid Attestation JWT. Misses `cnf` claim" }
-        requireNotNull(cnf.cnfJwk()) { "Invalid Attestation JWT. Misses `jwk` claim from `cnf`" }
-        jwt.ensureSignedOrVerified()
-        require(jwt.header.algorithm in TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS) {
-            "Invalid Attestation JWT. Signature algorithm must be one of ${TS3.WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS}"
+@ConsistentCopyVisibility
+data class ClientAttestationJWT private constructor(val jwt: String, val header: JWSHeader, val claimsSet: ClientAttestationJWTClaims) {
+    val clientId: ClientId get() = claimsSet.subject.value
+    val cnf: ConfirmationClaim get() = claimsSet.confirmation
+    val publicKey: JWK get() = cnf.jwk
+
+    companion object {
+        operator fun invoke(jwt: String): ClientAttestationJWT = invoke(SignedJWT.parse(jwt))
+
+        operator fun invoke(jwt: SignedJWT): ClientAttestationJWT {
+            jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_TYPE))
+            jwt.ensureSignedOrVerified()
+            jwt.ensureSignedWithAllowedAlgorithm(TS3.ALLOWED_SIGNATURE_ALGORITHMS)
+            val claimsSet = jwt.ensureValidClaimsSet<ClientAttestationJWTClaims>()
+            return ClientAttestationJWT(jwt.serialize(), jwt.header, claimsSet)
         }
     }
-
-    val clientId: ClientId get() = checkNotNull(jwt.jwtClaimsSet.subject)
-    val cnf: JsonObject get() = checkNotNull(jwt.jwtClaimsSet.cnf())
-    val publicKey: JWK get() = checkNotNull(cnf.cnfJwk())
 }
+
+@Serializable
+data class ClientAttestationJWTClaims(
+    @Required @SerialName(RFC7519.ISSUER) val issuer: NonBlankString,
+    @Required @SerialName(RFC7519.SUBJECT) val subject: NonBlankString,
+    @Required @SerialName(RFC7519.EXPIRATION_TIME) val expirationTime: InstantAsEpochSecond,
+    @Required @SerialName(RFC7800.CONFIRMATION) val confirmation: ConfirmationClaim,
+    @SerialName(RFC7519.ISSUED_AT) val issuedAt: InstantAsEpochSecond? = null,
+    @SerialName(RFC7519.NOT_BEFORE) val notBefore: InstantAsEpochSecond? = null,
+    @Required @SerialName(OpenId4VCISpec.WALLET_ATTESTATION_WALLET_NAME) val walletName: NonBlankString,
+    @SerialName(OpenId4VCISpec.WALLET_ATTESTATION_WALLET_LINK) val walletLink: NonBlankString? = null,
+    @SerialName(TokenStatusListSpec.STATUS) val status: StatusClaim? = null,
+    @Required @SerialName(TS3.WALLET_VERSION) val walletVersion: NonBlankString,
+    @Required @SerialName(TS3.WALLET_SOLUTION_CERTIFICATION_INFORMATION) val walletSolutionCertificationInformation:
+        WalletSolutionCertificationInformation,
+    @Required @SerialName(TS3.CLIENT_STATUS) val clientStatus: ClientStatusClaim,
+)
+
+@Serializable
+@JvmInline
+value class NonBlankString(val value: String) {
+    init {
+        require(value.isNotBlank()) { "value must not be blank" }
+    }
+
+    override fun toString(): String = value
+}
+
+@Serializable
+data class ConfirmationClaim(
+    @Required @SerialName(RFC7800.JWK) @Serializable(with = JWKJsonObjectSerializer::class) val jwk: JWK,
+) {
+    init {
+        require(!jwk.isPrivate) { "jwk must be public" }
+    }
+}
+
+typealias WalletSolutionCertificationInformation = JsonElement
+
+@Serializable
+data class ClientStatusClaim(
+    @Required @SerialName(TokenStatusListSpec.STATUS) val status: StatusClaim,
+    @Required @SerialName(RFC7519.EXPIRATION_TIME) val expiresAt: InstantAsEpochSecond,
+)
 
 /**
  * Qualification of a JWT that adheres to client attestation PoP JWT
@@ -98,69 +138,18 @@ data class ClientAttestationPOPClaims(
     @SerialName(RFC7519.ISSUER) @Required val issuer: ClientId,
     @SerialName(RFC7519.AUDIENCE) @Required @Serializable(with = URLSerializer::class) val audience: URL,
     @SerialName(RFC7519.JWT_ID) @Required val jwtId: JwtId,
-    @SerialName(RFC7519.ISSUED_AT) @Required @Serializable(with = NumericInstantSerializer::class) val issuedAt: Instant,
+    @SerialName(RFC7519.ISSUED_AT) @Required val issuedAt: InstantAsEpochSecond,
     @SerialName(AttestationBasedClientAuthenticationSpec.CHALLENGE_CLAIM) val challenge: Nonce? = null,
-    @SerialName(RFC7519.NOT_BEFORE) @Serializable(with = NumericInstantSerializer::class) val notBefore: Instant? = null,
+    @SerialName(RFC7519.NOT_BEFORE) val notBefore: InstantAsEpochSecond? = null,
 )
 
-//
-// Creation of ClientAttestationPoPJWT
-//
-
-data class ClientAttestationPoPJWTSpec(
-    val signer: Signer<JWK>,
-) {
-    init {
-        requireIsNotMAC(signer.javaAlgorithm.toJoseAlg())
+internal suspend fun ProvisionClientAttestation.Provisioned.generateClientAttestation(
+    clock: Clock,
+    clientId: ClientId,
+    authorizationServerId: URL,
+    challenge: Nonce?,
+): ClientAttestation =
+    with(ClientAttestationPoPBuilder(clock, clientId, authorizationServerId, popSigner)) {
+        val popJWT = attestationPoPJWT(challenge)
+        ClientAttestation(clientAttestation, popJWT)
     }
-}
-
-/**
- * A function for building a [ClientAttestationPoPJWT]
- * in the context of a [ClientAuthentication.AttestationBased] client
- */
-fun interface ClientAttestationPoPBuilder {
-
-    /**
-     * Builds a PoP JWT
-     *
-     * @param clock wallet's clock
-     * @param authorizationServerId the issuer claim of the OAuth 2.0 authorization server to which
-     * the attestation will be presented for authentication.
-     * @receiver the client for which to create the PoP
-     *
-     * @return the PoP JWT
-     */
-    suspend fun ClientAuthentication.AttestationBased.attestationPoPJWT(
-        clock: Clock,
-        authorizationServerId: URL,
-        challenge: Nonce?,
-    ): ClientAttestationPoPJWT
-
-    companion object {
-        val Default: ClientAttestationPoPBuilder = DefaultClientAttestationPoPBuilder
-    }
-}
-
-internal fun SignedJWT.ensureSignedOrVerified() {
-    require(state == JWSObject.State.SIGNED || state == JWSObject.State.VERIFIED) {
-        "Provided JWT is not signed"
-    }
-}
-
-internal fun SignedJWT.ensureSignedNotMAC() {
-    ensureSignedOrVerified()
-    val alg = requireNotNull(header.algorithm) { "Invalid JWT misses header alg" }
-    requireIsNotMAC(alg)
-}
-
-internal fun requireIsNotMAC(alg: JWSAlgorithm) =
-    require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
-
-internal fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
-
-private fun SignedJWT.ensureType(expectedType: JOSEObjectType) {
-    require(expectedType == header.type) {
-        "Expected SignedJWT `typ` to be '${expectedType.type}', but found '${header.type?.type}' instead"
-    }
-}

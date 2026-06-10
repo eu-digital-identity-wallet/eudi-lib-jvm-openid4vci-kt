@@ -208,12 +208,6 @@ internal class CredentialReusePolicyTest {
     }
 
     @Test
-    fun `CredentialReusePolicy None has no effective batch size`() {
-        val policy = CredentialReusePolicy.None
-        // There is no effectiveBatchSize in None
-    }
-
-    @Test
     fun `ArfAnnex2ReusePolicy fails with overlapping details across options`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialReusePolicy.EUDI(
@@ -263,13 +257,21 @@ internal class CredentialReusePolicyTest {
             ),
         )
         // If ROTATING_BATCH is not supported, it should pick the second one
-        assertEquals(10, policy.effectiveBatchSize(CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly))))
+        assertEquals(
+            10,
+            policy.effectiveBatchSize(CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly))),
+        )
 
         // If ROTATING_BATCH is supported, it should pick the first one
         assertEquals(
             5,
             policy.effectiveBatchSize(
-                CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.LimitedTime, EudiReusePolicyType.RotatingBatch)),
+                CredentialReusePolicies.Supported(
+                    setOf(
+                        EudiReusePolicyType.LimitedTime,
+                        EudiReusePolicyType.RotatingBatch,
+                    ),
+                ),
             ),
         )
     }
@@ -304,7 +306,7 @@ internal class CredentialReusePolicyTest {
             EudiReusePolicyType.fromJsonValue("unknown_method")
         }
 
-        assertTrue(exception.message?.contains("unknown_method") == true)
+        assertEquals(true, exception.message?.contains("unknown_method"))
     }
 
     @Test
@@ -313,8 +315,11 @@ internal class CredentialReusePolicyTest {
             OpenId4VCIConfig(
                 clientAuthentication = ClientAuthentication.None("wallet"),
                 authFlowRedirectionURI = URI("eudi-openid4vci://cb"),
-                encryptionSupportConfig = EncryptionSupportConfig.invoke(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-                dPoPUsage = DPoPUsage.Never,
+                encryptionSupportConfig = EncryptionSupportConfig.invoke(
+                    Curve.P_256,
+                    2048,
+                    CredentialResponseEncryptionPolicy.SUPPORTED,
+                ),
                 supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.RotatingBatch)),
             )
         }
@@ -326,8 +331,11 @@ internal class CredentialReusePolicyTest {
             OpenId4VCIConfig(
                 clientAuthentication = ClientAuthentication.None("wallet"),
                 authFlowRedirectionURI = URI("eudi-openid4vci://cb"),
-                encryptionSupportConfig = EncryptionSupportConfig.invoke(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-                dPoPUsage = DPoPUsage.Never,
+                encryptionSupportConfig = EncryptionSupportConfig.invoke(
+                    Curve.P_256,
+                    2048,
+                    CredentialResponseEncryptionPolicy.SUPPORTED,
+                ),
                 supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
             )
         }

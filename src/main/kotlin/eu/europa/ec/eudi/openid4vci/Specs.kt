@@ -21,6 +21,25 @@ import com.nimbusds.jose.JWSAlgorithm
  * [OpenID for Verifiable Credential Issuance](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
  */
 object OpenId4VCISpec {
+    const val CREDENTIAL_OFFER_URI_SCHEME = "openid-credential-offer://"
+    const val CREDENTIAL_OFFER = "credential_offer"
+    const val CREDENTIAL_OFFER_URI = "credential_offer_uri"
+    const val CREDENTIAL_ISSUER = "credential_issuer"
+    const val CREDENTIAL_CONFIGURATION_IDS = "credential_configuration_ids"
+    const val GRANTS = "grants"
+
+    const val AUTHORIZATION_CODE_GRANT = "authorization_code"
+    const val ISSUER_STATE = "issuer_state"
+    const val AUTHORIZATION_SERVER = "authorization_server"
+
+    const val PRE_AUTHORIZED_CODE_GRANT = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+    const val PRE_AUTHORIZED_CODE = "pre-authorized_code"
+    const val TRANSACTION_CODE = "tx_code"
+    const val INPUT_MODE = "input_mode"
+    const val INPUT_MODE_TEXT = "text"
+    const val INPUT_MODE_NUMERIC = "numeric"
+    const val LENGTH = "length"
+    const val DESCRIPTION = "description"
 
     const val JWT_PROOF_TYPE = "openid4vci-proof+jwt"
 
@@ -37,6 +56,20 @@ object OpenId4VCISpec {
     const val CREDENTIAL_ISSUER_WELL_KNOWN_PATH = "/.well-known/openid-credential-issuer"
 
     const val SIGNED_METADATA_JWT_TYPE = "openidvci-issuer-metadata+jwt"
+
+    const val WALLET_ATTESTATION_WALLET_NAME: String = "wallet_name"
+    const val WALLET_ATTESTATION_WALLET_LINK: String = "wallet_link"
+
+    const val ATTESTED_KEYS: String = "attested_keys"
+    const val KEY_STORAGE: String = "key_storage"
+    const val USER_AUTHENTICATION: String = "user_authentication"
+    const val CERTIFICATION: String = "certification"
+    const val NONCE: String = "nonce"
+
+    const val ATTACK_POTENTIAL_RESISTANCE_ISO_18045_HIGH: String = "iso_18045_high"
+    const val ATTACK_POTENTIAL_RESISTANCE_ISO_18045_MODERATE: String = "iso_18045_moderate"
+    const val ATTACK_POTENTIAL_RESISTANCE_ISO_18045_ENHANCED_BASIC: String = "iso_18045_enhanced-basic"
+    const val ATTACK_POTENTIAL_RESISTANCE_ISO_18045_BASIC: String = "iso_18045_basic"
 }
 
 /**
@@ -113,11 +146,21 @@ object RFC7519 {
  * [Specification of Wallet Unit Attestations (WUA) used in issuance of PID and Attestations](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/main/docs/technical-specifications/ts3-wallet-unit-attestation.md)
  */
 object TS3 {
-    val WALLET_INSTANCE_ATTESTATION_ALLOWED_SIGNATURE_ALGORITHMS: Set<JWSAlgorithm> =
-        setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
+    val ALLOWED_SIGNATURE_ALGORITHMS: Set<JWSAlgorithm> = setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
+
+    const val WALLET_VERSION: String = "wallet_version"
+    const val WALLET_SOLUTION_CERTIFICATION_INFORMATION: String = "wallet_solution_certification_information"
+    const val CLIENT_STATUS: String = "client_status"
+    const val PREFERRED_CLIENT_STATUS_PERIOD: String = "preferred_client_status_period"
+    const val KEY_STORAGE_STATUS: String = "key_storage_status"
+    const val PREFERRED_KEY_STORAGE_STATUS_PERIOD: String = "preferred_key_storage_status_period"
 }
 
-object ETSI4723 {
+/**
+ * [Electronic Signatures and Trust Infrastructures (ESI); Profiles for Electronic Attestation of Attributes;
+ * Part 3: Profiles for issuance of EAA or PID](https://www.etsi.org/deliver/etsi_ts/119400_119499/11947203/01.01.01_60/ts_11947203v010101p.pdf)
+ */
+object ETSI119472Part3 {
     const val REUSE_POLICY_ARF_ANNEX_II = "arf_annex_ii"
     const val CREDENTIAL_REUSE_POLICY = "credential_reuse_policy"
     const val CREDENTIAL_REUSE_POLICY_ID = "id"
@@ -126,4 +169,23 @@ object ETSI4723 {
     const val REUSE_POLICY_OPTION_BATCH_SIZE = "batch_size"
     const val REUSE_POLICY_OPTION_TRIGGER_UNUSED = "reissue_trigger_unused"
     const val REUSE_POLICY_OPTION_TRIGGER_LIFETIME = "reissue_trigger_lifetime_left"
+    const val KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX: Int = 0
+}
+
+/**
+ * [Proof-of-Possession Key Semantics for JSON Web Tokens (JWTs)](https://www.rfc-editor.org/rfc/rfc7800)
+ */
+object RFC7800 {
+    const val CONFIRMATION: String = "cnf"
+    const val JWK: String = "jwk"
+}
+
+/**
+ * [Token Status List](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-status-list]
+ */
+object TokenStatusListSpec {
+    const val STATUS: String = "status"
+    const val STATUS_LIST: String = "status_list"
+    const val INDEX: String = "idx"
+    const val URI: String = "uri"
 }
