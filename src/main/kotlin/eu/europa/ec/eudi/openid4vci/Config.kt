@@ -82,7 +82,7 @@ data class OpenId4VCIConfig(
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPUsage: DPoPUsage = DPoPUsage.Never,
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
-    val parUsage: ParUsage = ParUsage.IfSupported,
+    val parUsage: ParUsage = ParUsage.IfSupported(),
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
@@ -98,7 +98,7 @@ data class OpenId4VCIConfig(
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         dPoPUsage: DPoPUsage = DPoPUsage.Never,
         clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
-        parUsage: ParUsage = ParUsage.IfSupported,
+        parUsage: ParUsage = ParUsage.IfSupported(),
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
@@ -126,7 +126,7 @@ data class OpenId4VCIConfig(
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         dPoPSigner: Signer<JWK>? = null,
         clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
-        parUsage: ParUsage = ParUsage.IfSupported,
+        parUsage: ParUsage = ParUsage.IfSupported(),
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
@@ -154,7 +154,7 @@ data class OpenId4VCIConfig(
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         dPoPSigner: Signer<JWK>? = null,
         clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
-        parUsage: ParUsage = ParUsage.IfSupported,
+        parUsage: ParUsage = ParUsage.IfSupported(),
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
@@ -236,16 +236,20 @@ sealed interface DPoPUsage {
 
 /**
  * Wallet's policy in regard to using PAR, during a authorization code grant.
+ * - [Never]: Disables PAR. Wallet will use the usual authorization code flow
  * - [IfSupported]: If authorization server advertises PAR endpoint it will be used. Otherwise, falls back
  *   to usual authorization code flow
- * - [Never]: Disables PAR. Wallet will use the usual authorization code flow
  * - [Required]: Wallet always will place PAR request, regardless what if authorization server advertises the PAR
  *   endpoint. If PAR endpoint is not being advertised, the issuance will fail.
  */
-enum class ParUsage {
-    IfSupported,
-    Never,
-    Required,
+sealed interface ParUsage : java.io.Serializable {
+    data object Never : ParUsage {
+        private fun readResolve(): Any = Never
+    }
+
+    data class IfSupported(val authorizationCodeDPoPBinding: Boolean = true) : ParUsage
+
+    data class Required(val authorizationCodeDPoPBinding: Boolean = true) : ParUsage
 }
 
 /**

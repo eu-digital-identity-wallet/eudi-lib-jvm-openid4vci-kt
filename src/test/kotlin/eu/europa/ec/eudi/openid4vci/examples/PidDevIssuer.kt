@@ -38,7 +38,7 @@ internal object PidDevIssuer :
         encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
         authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         dPoPUsage = DPoPUsage.Required(CryptoGenerator.ecSigner()),
-        parUsage = ParUsage.Required,
+        parUsage = ParUsage.Required(),
         supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
     )
 

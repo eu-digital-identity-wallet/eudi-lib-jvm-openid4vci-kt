@@ -114,9 +114,9 @@ internal class AuthorizationEndpointClient(
         issuerState: String?,
     ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> {
         val usePar = when (config.parUsage) {
-            ParUsage.IfSupported -> supportsPar
             ParUsage.Never -> false
-            ParUsage.Required -> {
+            is ParUsage.IfSupported -> supportsPar
+            is ParUsage.Required -> {
                 require(supportsPar) {
                     "PAR uses is required, yet authorization server doesn't advertise PAR endpoint"
                 }
@@ -124,7 +124,12 @@ internal class AuthorizationEndpointClient(
             }
         }
         return if (usePar) {
-            submitPushedAuthorizationRequest(scopes, credentialsConfigurationIds, state, issuerState)
+            val authorizationCodeDPoPBinding = when (config.parUsage) {
+                ParUsage.Never -> error("cannot happen")
+                is ParUsage.IfSupported -> config.parUsage.authorizationCodeDPoPBinding
+                is ParUsage.Required -> config.parUsage.authorizationCodeDPoPBinding
+            }
+            submitPushedAuthorizationRequest(scopes, credentialsConfigurationIds, state, issuerState, authorizationCodeDPoPBinding)
         } else {
             authorizationRequestUrl(scopes, credentialsConfigurationIds, state, issuerState).map { (a, b) ->
                 Triple(a, b, null)
@@ -138,6 +143,7 @@ internal class AuthorizationEndpointClient(
      * @param scopes    The scopes of the authorization request.
      * @param state     The oauth2 specific 'state' request parameter.
      * @param issuerState   The state passed from credential issuer during the negotiation phase of the issuance.
+     * @param authorizationCodeDPoPBinding Whether the Authorization Code will be bound using a DPoP Proof.
      * @return The result of the request as a pair of the PKCE verifier used during the request and the authorization code
      *      url that caller will need to follow to retrieve the authorization code.
      *
@@ -149,6 +155,7 @@ internal class AuthorizationEndpointClient(
         credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
         state: String,
         issuerState: String?,
+        authorizationCodeDPoPBinding: Boolean,
     ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> = runCatchingCancellable {
         require(scopes.isNotEmpty() || credentialsConfigurationIds.isNotEmpty()) {
             "No scopes or authorization details provided. Cannot submit par."
@@ -183,7 +190,7 @@ internal class AuthorizationEndpointClient(
             }.build()
             PushedAuthorizationRequest(parEndpoint, request)
         }
-        val (response, dpopNonce) = pushAuthorizationRequest(parEndpoint, pushedAuthorizationRequest)
+        val (response, dpopNonce) = pushAuthorizationRequest(parEndpoint, pushedAuthorizationRequest, authorizationCodeDPoPBinding)
         val (pkceVerifier, url) = response.authorizationCodeUrlOrFail(clientID, codeVerifier, state)
         Triple(pkceVerifier, url, dpopNonce)
     }
@@ -255,6 +262,7 @@ internal class AuthorizationEndpointClient(
     private suspend fun pushAuthorizationRequest(
         parEndpoint: URI,
         pushedAuthorizationRequest: PushedAuthorizationRequest,
+        authorizationCodeDPoPBinding: Boolean,
     ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> {
         val url = parEndpoint.toURL()
         val formParameters = run {
@@ -271,8 +279,12 @@ internal class AuthorizationEndpointClient(
             dpopNonceRetried: Boolean,
         ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> {
             val dpopProof =
-                dPoPJwtFactory?.createDPoPJwt(Htm.POST, url, null, existingDpopNonce)
-                    ?.getOrThrow()?.serialize()
+                if (authorizationCodeDPoPBinding)
+                    dPoPJwtFactory
+                        ?.createDPoPJwt(Htm.POST, url, null, existingDpopNonce)
+                        ?.getOrThrow()
+                        ?.serialize()
+                else null
 
             val abcaChallenge = when (config.clientAuthentication) {
                 is ClientAuthentication.AttestationBased ->
