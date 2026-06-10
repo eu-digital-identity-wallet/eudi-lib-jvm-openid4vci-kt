@@ -90,12 +90,12 @@ sealed interface ClientAuthentication : java.io.Serializable {
  * Configuration object to pass configuration properties to the issuance components.
  *
  * @param clientAuthentication the OAuth 2.0 Client Authentication Method of the Wallet
- * @param dPoPUsage an indication about whether DPoP is never to be used, supported, or required
  * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
  * @param encryptionSupportConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
  * @param authorizeIssuanceConfig Instruction on how to assemble the authorization request. If scopes are supported
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
+ * @param dPoPUsage an indication about whether DPoP is never to be used, supported, or required
  * @param parUsage whether to use PAR in case of authorization code grant
  * @param clock Wallet's clock
  * @param issuerMetadataPolicy policy concerning signed metadata usage
@@ -103,10 +103,10 @@ sealed interface ClientAuthentication : java.io.Serializable {
  */
 data class OpenId4VCIConfig(
     val clientAuthentication: ClientAuthentication,
-    val dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
     val authFlowRedirectionURI: URI,
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+    val dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
     val parUsage: ParUsage = ParUsage.IfSupported,
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
@@ -118,20 +118,20 @@ data class OpenId4VCIConfig(
      */
     constructor(
         clientId: ClientId,
-        dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
         authFlowRedirectionURI: URI,
         encryptionSupportConfig: EncryptionSupportConfig,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+        dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
         parUsage: ParUsage = ParUsage.IfSupported,
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     ) : this(
         ClientAuthentication.None(clientId),
-        dPoPUsage,
         authFlowRedirectionURI,
         encryptionSupportConfig,
         authorizeIssuanceConfig,
+        dPoPUsage,
         parUsage,
         clock,
         issuerMetadataPolicy,
