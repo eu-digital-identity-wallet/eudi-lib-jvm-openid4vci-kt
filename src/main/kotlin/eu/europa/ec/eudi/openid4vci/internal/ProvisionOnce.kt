@@ -16,12 +16,16 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.jwk.JWK
+import eu.europa.ec.eudi.openid4vci.ClientAuthentication
 import eu.europa.ec.eudi.openid4vci.DPoPConfig
 import eu.europa.ec.eudi.openid4vci.DPoPJwtFactory
 import eu.europa.ec.eudi.openid4vci.HttpsUrl
 import eu.europa.ec.eudi.openid4vci.JwsAlgorithm
+import eu.europa.ec.eudi.openid4vci.PositiveDuration
+import eu.europa.ec.eudi.openid4vci.ProvisionClientAttestation
 import eu.europa.ec.eudi.openid4vci.ProvisionDPoPSigner
 import eu.europa.ec.eudi.openid4vci.Signer
+import eu.europa.ec.eudi.openid4vci.ensureValid
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
@@ -48,6 +52,13 @@ internal class ProvisionOnce<V : Any>(private val provision: suspend () -> V) : 
             else value
         return checkNotNull(value)
     }
+
+    fun verifying(verify: suspend(V) -> Unit): ProvisionOnce<V> =
+        ProvisionOnce {
+            val provisioned = provision()
+            verify(provisioned)
+            provisioned
+        }
 }
 
 internal fun dPoPJwtFactory(
@@ -67,4 +78,16 @@ internal fun dPoPJwtFactory(
         val dPoPSigner = provisionDPoPSigner(authorizationServer)
         provisionDPoPSigner.ensureValid(dPoPSigner)
         DPoPJwtFactory(clock = clock, signer = dPoPSigner)
+    }
+
+internal fun clientAttestation(
+    clock: Clock,
+    authorizationServer: HttpsUrl,
+    preferredClientStatusPeriod: PositiveDuration?,
+    clientAuthentication: ClientAuthentication.AttestationBased,
+): ProvisionOnce<ProvisionClientAttestation.Provisioned> =
+    ProvisionOnce {
+        val provisionedClientAttestation = clientAuthentication.provisionClientAttestation(authorizationServer, preferredClientStatusPeriod)
+        clientAuthentication.provisionClientAttestation.ensureValid(clock.instant(), provisionedClientAttestation)
+        provisionedClientAttestation
     }

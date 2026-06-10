@@ -90,7 +90,7 @@ internal class TokenEndpointClient(
     private val credentialIssuerId: CredentialIssuerId,
     private val clock: Clock,
     private val clientId: ClientId,
-    private val provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
+    private val provisionedClientAttestation: suspend () -> ProvisionClientAttestation.Provisioned?,
     private val authFlowRedirectionURI: URI,
     private val authServerId: URL,
     private val challengeEndpoint: URL?,
@@ -115,7 +115,7 @@ internal class TokenEndpointClient(
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
         dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
-        provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
+        provisionedClientAttestation: suspend () -> ProvisionClientAttestation.Provisioned?,
         httpClient: HttpClient,
     ) : this(
         credentialIssuerId,
@@ -221,7 +221,7 @@ internal class TokenEndpointClient(
                 existingAbcaChallenge = existingAbcaChallenge,
                 existingDpopNonce = existingDpopNonce,
             )
-            val clientAttestation = provisionedClientAttestation?.generateClientAttestation(
+            val clientAttestation = provisionedClientAttestation()?.generateClientAttestation(
                 clock,
                 clientId,
                 authServerId,
