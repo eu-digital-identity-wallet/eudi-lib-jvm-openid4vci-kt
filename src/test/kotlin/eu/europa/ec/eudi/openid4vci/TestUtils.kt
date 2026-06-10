@@ -28,6 +28,8 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.ecSigner
+import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
+import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
 import io.ktor.client.*
 import io.ktor.client.request.HttpRequestData
 import java.net.URI
@@ -190,4 +192,15 @@ internal fun HttpRequestData.verifyDPoPProof(dPoPSigningKey: ECKey, dpopNonce: N
         }
     jwtProcessor.process(dpopProof, null)
     assertEquals(dPoPSigningKey.toPublicJWK().computeThumbprint(), dpopProof.header.jwk.computeThumbprint())
+}
+
+internal fun ProvisionDPoPSigner(signer: Signer<JWK>): ProvisionDPoPSigner =
+    object : ProvisionDPoPSigner {
+        override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(signer.javaAlgorithm.toJoseAlg().name)
+        override suspend fun invoke(authorizationServer: HttpsUrl): Signer<JWK> = signer
+    }
+
+internal fun ProvisionDPoPSigner(signingKey: ECKey): ProvisionDPoPSigner {
+    require(signingKey.isPrivate)
+    return ProvisionDPoPSigner(Signer.fromNimbusEcKey(signingKey, signingKey.toPublicJWK(), secureRandom = null, provider = null))
 }

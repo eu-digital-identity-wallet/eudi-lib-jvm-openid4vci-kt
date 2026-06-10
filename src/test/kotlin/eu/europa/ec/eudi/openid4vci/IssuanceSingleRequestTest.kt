@@ -15,10 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseUnparsable
@@ -28,7 +26,6 @@ import eu.europa.ec.eudi.openid4vci.CryptoGenerator.noKeyAttestationJwtProofsSpe
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
 import eu.europa.ec.eudi.openid4vci.examples.selfSignedClient
 import eu.europa.ec.eudi.openid4vci.examples.verifySelfSignedClientAttestation
-import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -957,16 +954,7 @@ class IssuanceSingleRequestTest {
 
         val config = OpenId4VCIConfiguration.copy(
             clientAuthentication = client,
-            dPoPUsage = DPoPUsage.Required(
-                DPoPConfig(
-                    object : ProvisionDPoPSigner {
-                        override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(JWSAlgorithm.ES256.name)
-                        override suspend fun invoke(
-                            authorizationServer: HttpsUrl,
-                        ): Signer<JWK> = Signer.fromNimbusEcKey(dPoPSigningKey, dPoPSigningKey.toPublicJWK(), null, null)
-                    },
-                ),
-            ),
+            dPoPUsage = DPoPUsage.Required(DPoPConfig(ProvisionDPoPSigner(dPoPSigningKey))),
         )
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
@@ -1017,16 +1005,7 @@ class IssuanceSingleRequestTest {
 
         val config = OpenId4VCIConfiguration.copy(
             clientAuthentication = client,
-            dPoPUsage = DPoPUsage.Required(
-                DPoPConfig(
-                    object : ProvisionDPoPSigner {
-                        override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(JWSAlgorithm.ES256.name)
-                        override suspend fun invoke(
-                            authorizationServer: HttpsUrl,
-                        ): Signer<JWK> = Signer.fromNimbusEcKey(dPoPSigningKey, dPoPSigningKey.toPublicJWK(), null, null)
-                    },
-                ),
-            ),
+            dPoPUsage = DPoPUsage.Required(DPoPConfig(ProvisionDPoPSigner(dPoPSigningKey))),
         )
 
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
