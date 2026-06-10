@@ -44,7 +44,7 @@ import io.ktor.http.*
 
 internal class CredentialEndpointClient(
     private val credentialEndpoint: CredentialIssuerEndpoint,
-    private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
     private val httpClient: HttpClient,
 ) {
     /**
@@ -75,7 +75,7 @@ internal class CredentialEndpointClient(
                 .apply {
                     method = HttpMethod.Post
                     url.takeFrom(credentialEndpoint.value)
-                    bearerOrDPoPAuth(accessToken, dPoPJwtFactory, resourceServerDpopNonce)
+                    bearerOrDPoPAuth(accessToken, dPoPJwtFactory(), resourceServerDpopNonce)
                     encryptRequest(
                         requestTO = CredentialRequestTO.from(request),
                         requestEncryptionSpec = request.encryptionSpecs.requestEncryptionSpec,
@@ -110,7 +110,7 @@ internal class CredentialEndpointClient(
 
 internal class DeferredEndPointClient(
     private val deferredCredentialEndpoint: CredentialIssuerEndpoint,
-    private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
     private val httpClient: HttpClient,
 ) {
     /**
@@ -157,7 +157,7 @@ internal class DeferredEndPointClient(
                 .apply {
                     method = HttpMethod.Post
                     url.takeFrom(deferredCredentialEndpoint.value)
-                    bearerOrDPoPAuth(accessToken, dPoPJwtFactory, resourceServerDpopNonce)
+                    bearerOrDPoPAuth(accessToken, dPoPJwtFactory(), resourceServerDpopNonce)
                     encryptRequest(
                         requestTO = deferredRequestTO,
                         requestEncryptionSpec = exchangeEncryptionSpecification.requestEncryptionSpec,

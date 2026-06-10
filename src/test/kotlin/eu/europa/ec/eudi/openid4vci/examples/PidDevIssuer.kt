@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.http.Url
@@ -41,6 +42,7 @@ internal object PidDevIssuer :
                 Url("https://dev.wallet-provider.eudiw.dev/wallet-instance-attestation/jwk"),
             ),
         ),
+        dPoPUsage = DPoPUsage.Required(DPoPConfig(ProvisionDPoPSigner(CryptoGenerator.ecSigner(Curve.P_256, JWSAlgorithm.ES256)))),
         authFlowRedirectionURI = Keycloak.DebugRedirectUri,
         encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
         authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,

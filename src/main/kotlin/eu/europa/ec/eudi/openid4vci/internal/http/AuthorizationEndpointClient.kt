@@ -75,7 +75,7 @@ internal class AuthorizationEndpointClient(
     private val pushedAuthorizationRequestEndpoint: URL?,
     private val challengeEndpoint: URL?,
     private val config: OpenId4VCIConfig,
-    private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
     private val provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
     private val httpClient: HttpClient,
 ) {
@@ -84,7 +84,7 @@ internal class AuthorizationEndpointClient(
         credentialIssuerId: CredentialIssuerId,
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
-        dPoPJwtFactory: DPoPJwtFactory?,
+        dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
         provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
         httpClient: HttpClient,
     ) : this(
@@ -290,7 +290,7 @@ internal class AuthorizationEndpointClient(
             )
             val dpopProof =
                 if (authorizationCodeDPoPBinding)
-                    dPoPJwtFactory
+                    dPoPJwtFactory()
                         ?.createDPoPJwt(Htm.POST, url, null, dpopNonce)
                         ?.getOrThrow()
                         ?.serialize()

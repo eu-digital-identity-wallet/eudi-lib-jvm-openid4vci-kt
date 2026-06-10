@@ -313,7 +313,7 @@ internal class CredentialReusePolicyTest {
     fun `fails when supportedCredentialReusePolicies is provided but doesn't contain a base method`() {
         assertFailsWith<IllegalArgumentException> {
             OpenId4VCIConfig(
-                clientAuthentication = ClientAuthentication.None("wallet", DPoPUsage.Never),
+                clientAuthentication = ClientAuthentication.None("wallet"),
                 authFlowRedirectionURI = URI("eudi-openid4vci://cb"),
                 encryptionSupportConfig = EncryptionSupportConfig.invoke(
                     Curve.P_256,
@@ -329,7 +329,7 @@ internal class CredentialReusePolicyTest {
     fun `succeeds when supportedCredentialReusePolicies is provided and contains a base method`() {
         assertDoesNotThrow {
             OpenId4VCIConfig(
-                clientAuthentication = ClientAuthentication.None("wallet", DPoPUsage.Never),
+                clientAuthentication = ClientAuthentication.None("wallet"),
                 authFlowRedirectionURI = URI("eudi-openid4vci://cb"),
                 encryptionSupportConfig = EncryptionSupportConfig.invoke(
                     Curve.P_256,

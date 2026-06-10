@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod
 import eu.europa.ec.eudi.openid4vci.internal.*
 import eu.europa.ec.eudi.openid4vci.internal.http.*
@@ -52,7 +51,6 @@ interface Issuer :
     NotifyIssuer {
 
     val credentialOffer: CredentialOffer
-    val dPoPJwtFactory: DPoPJwtFactory?
 
     /**
      * A convenient method for obtaining a [DeferredIssuanceContext], in case of a deferred issuance
@@ -120,11 +118,11 @@ interface Issuer :
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<Issuer> = runCatching {
-            val (provisionedClientAttestation, dPoPSigner) =
+            val authorizationServer = HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
+
+            val provisionedClientAttestation =
                 when (val clientAuthentication = config.clientAuthentication) {
                     is ClientAuthentication.AttestationBased -> {
-                        val authorizationServer =
-                            HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
                         val provisionedClientAttestation =
                             clientAuthentication.provisionClientAttestation(
                                 authorizationServer,
@@ -133,24 +131,31 @@ interface Issuer :
 
                         clientAuthentication.provisionClientAttestation.ensureValid(config.clock.instant(), provisionedClientAttestation)
                         provisionedClientAttestation.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
-
-                        provisionedClientAttestation to provisionedClientAttestation.popSigner
+                        provisionedClientAttestation
                     }
 
-                    is ClientAuthentication.None -> {
-                        val signer = when (val dPoPUsage = clientAuthentication.dPoPUsage) {
-                            DPoPUsage.Never -> null
-                            is DPoPUsage.IfSupported<Signer<JWK>> -> dPoPUsage.value
-                            is DPoPUsage.Required<Signer<JWK>> -> dPoPUsage.value
-                        }
-                        null to signer
-                    }
+                    is ClientAuthentication.None -> null
                 }
 
-            val dPoPJwtFactory = credentialOffer.dPoPCtx?.let {
-                checkNotNull(dPoPSigner) { "dPoPSigner is required when using DPoP" }
-                DPoPJwtFactory(clock = config.clock, dPoPCtx = it, signer = dPoPSigner)
+            val dPoPConfig = when (val dPoPUsage = config.dPoPUsage) {
+                DPoPUsage.Never -> null
+                is DPoPUsage.IfSupported -> dPoPUsage.value
+                is DPoPUsage.Required -> {
+                    checkNotNull(credentialOffer.dPoPCtx) {
+                        "Client requires the usage of DPoP, but the Authorization Server does not support DPoP " +
+                            "or the signing algorithm supported by the Client"
+                    }
+                    dPoPUsage.value
+                }
             }
+
+            val provisionDPoPJwtFactory =
+                if (null != credentialOffer.dPoPCtx) {
+                    checkNotNull(dPoPConfig) { "dPoPConfig is required when using DPoP" }
+                    dPoPJwtFactory(config.clock, authorizationServer, dPoPConfig)
+                } else {
+                    { null }
+                }
 
             val authorizationEndpointClient =
                 credentialOffer.authorizationServerMetadata
@@ -160,7 +165,7 @@ interface Issuer :
                             credentialOffer.credentialIssuerIdentifier,
                             credentialOffer.authorizationServerMetadata,
                             config,
-                            dPoPJwtFactory,
+                            provisionDPoPJwtFactory,
                             provisionedClientAttestation,
                             httpClient,
                         )
@@ -171,7 +176,7 @@ interface Issuer :
                     credentialOffer.credentialIssuerIdentifier,
                     credentialOffer.authorizationServerMetadata,
                     config,
-                    dPoPJwtFactory,
+                    provisionDPoPJwtFactory,
                     provisionedClientAttestation,
                     httpClient,
                 )
@@ -188,7 +193,7 @@ interface Issuer :
                 val credentialEndpointClient =
                     CredentialEndpointClient(
                         credentialOffer.credentialIssuerMetadata.credentialEndpoint,
-                        dPoPJwtFactory,
+                        provisionDPoPJwtFactory,
                         httpClient,
                     )
                 val nonceEndpointClient = credentialOffer.credentialIssuerMetadata.nonceEndpoint?.let {
@@ -214,7 +219,7 @@ interface Issuer :
                     null -> QueryForDeferredCredential.NotSupported
                     else -> {
                         val deferredEndPointClient =
-                            DeferredEndPointClient(deferredEndpoint, dPoPJwtFactory, httpClient)
+                            DeferredEndPointClient(deferredEndpoint, provisionDPoPJwtFactory, httpClient)
                         QueryForDeferredCredential(
                             config.clock,
                             refreshAccessToken,
@@ -229,7 +234,7 @@ interface Issuer :
                     null -> NotifyIssuer.NoOp
                     else -> {
                         val notificationEndPointClient =
-                            NotificationEndPointClient(notificationEndpoint, dPoPJwtFactory, httpClient)
+                            NotificationEndPointClient(notificationEndpoint, provisionDPoPJwtFactory, httpClient)
                         NotifyIssuer(notificationEndPointClient)
                     }
                 }
@@ -243,9 +248,6 @@ interface Issuer :
                 NotifyIssuer by notifyIssuer {
                 override val credentialOffer: CredentialOffer
                     get() = credentialOffer
-
-                override val dPoPJwtFactory: DPoPJwtFactory?
-                    get() = dPoPJwtFactory
 
                 override fun AuthorizedRequest.deferredContext(
                     deferredCredential: SubmissionOutcome.Deferred,
@@ -277,7 +279,9 @@ interface Issuer :
                             responseEncryptionParams = credentialOffer.exchangeEncryptionSpecification.responseEncryptionSpec?.let {
                                 it.encryptionMethod to it.compressionAlgorithm
                             },
-                            dPoPCtx = credentialOffer.dPoPCtx,
+                            dPoPConfig =
+                                if (null != credentialOffer.dPoPCtx) dPoPConfig
+                                else null,
                             clock = config.clock,
                         ),
                         AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
