@@ -95,7 +95,7 @@ internal class TokenEndpointClient(
     private val authServerId: URL,
     private val challengeEndpoint: URL?,
     private val tokenEndpoint: URL,
-    private val dPoPJwtFactory: DPoPJwtFactory?,
+    private val dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
     private val httpClient: HttpClient,
 ) {
 
@@ -114,7 +114,7 @@ internal class TokenEndpointClient(
         credentialIssuerId: CredentialIssuerId,
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         config: OpenId4VCIConfig,
-        dPoPJwtFactory: DPoPJwtFactory?,
+        dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
         provisionedClientAttestation: ProvisionClientAttestation.Provisioned?,
         httpClient: HttpClient,
     ) : this(
@@ -227,7 +227,7 @@ internal class TokenEndpointClient(
                 authServerId,
                 abcaChallenge,
             )
-            val dpopProof = dPoPJwtFactory?.createDPoPJwt(Htm.POST, tokenEndpoint, null, dpopNonce)
+            val dpopProof = dPoPJwtFactory()?.createDPoPJwt(Htm.POST, tokenEndpoint, null, dpopNonce)
                 ?.getOrThrow()
                 ?.serialize()
 

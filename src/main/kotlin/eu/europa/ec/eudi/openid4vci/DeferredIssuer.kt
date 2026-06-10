@@ -19,6 +19,7 @@ import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessTokenImpl
+import eu.europa.ec.eudi.openid4vci.internal.dPoPJwtFactory
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
 import io.ktor.client.*
@@ -39,7 +40,7 @@ import java.time.Clock
  *   Must be provided only if client was of Client.Attested kind.
  * @param requestEncryptionSpec the request encryption spec. Must be provided only if request encryption was used in the initial request.
  * @param responseEncryptionParams encryption method and compression algorithm as/if used in the initial request.
- * @param dPoPCtx the negotiated DPoP context. Must be provided only if DPoP was used.
+ * @param dPoPConfig DPoP configuration. Must be provided only if DPoP was used.
  * @param clock Wallet's clock
  * @param preferredClientStatusPeriod PID or Attestation Provider's preference for the remaining status maintenance period
  */
@@ -52,7 +53,7 @@ data class DeferredIssuerConfig(
     val tokenEndpoint: URL,
     val requestEncryptionSpec: EncryptionSpec?,
     val responseEncryptionParams: Pair<EncryptionMethod, CompressionAlgorithm?>?,
-    val dPoPCtx: DPoPCtx? = null,
+    val dPoPConfig: DPoPConfig?,
     val clock: Clock = Clock.systemDefaultZone(),
     val preferredClientStatusPeriod: PositiveDuration? = null,
 )
@@ -78,9 +79,9 @@ data class DeferredIssuanceContext(
     val authorizedTransaction: AuthorizedTransaction,
 ) {
     init {
-        if (authorizedTransaction.authorizedRequest.accessToken !is AccessToken.DPoP) {
-            requireNotNull(config.dPoPCtx) {
-                "config.dPoPCtx is required when DPoP access tokens are used"
+        if (authorizedTransaction.authorizedRequest.accessToken is AccessToken.DPoP) {
+            requireNotNull(config.dPoPConfig) {
+                "config.dPoPConfig is required when DPoP access tokens are used"
             }
         }
     }
@@ -167,32 +168,23 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
             responseEncryptionKey: JWK?,
             httpClient: HttpClient,
         ): Result<DeferredIssuer> = runCatching {
-            val (provisionedClientAttestation, dPoPSigner) =
+            val authorizationServer = HttpsUrl(config.authorizationServerId.toString()).getOrThrow()
+
+            val provisionedClientAttestation =
                 when (val clientAuthentication = config.clientAuthentication) {
                     is ClientAuthentication.AttestationBased -> {
-                        val authorizationServer = HttpsUrl(config.authorizationServerId.toString()).getOrThrow()
                         val provisionedClientAttestation = clientAuthentication.provisionClientAttestation(
                             authorizationServer,
                             config.preferredClientStatusPeriod,
                         )
                         clientAuthentication.provisionClientAttestation.ensureValid(config.clock.instant(), provisionedClientAttestation)
-                        provisionedClientAttestation to provisionedClientAttestation.popSigner
+                        provisionedClientAttestation
                     }
 
-                    is ClientAuthentication.None -> {
-                        val signer = when (val dPoPUsage = clientAuthentication.dPoPUsage) {
-                            DPoPUsage.Never -> null
-                            is DPoPUsage.IfSupported<Signer<JWK>> -> dPoPUsage.value
-                            is DPoPUsage.Required<Signer<JWK>> -> dPoPUsage.value
-                        }
-                        null to signer
-                    }
+                    is ClientAuthentication.None -> null
                 }
 
-            val dPoPJwtFactory = config.dPoPCtx?.let {
-                checkNotNull(dPoPSigner) { "dPoPSigner is required when using DPoP" }
-                DPoPJwtFactory(clock = config.clock, dPoPCtx = it, signer = dPoPSigner)
-            }
+            val provisionDPoPJwtFactory = config.dPoPConfig?.let { dPoPJwtFactory(config.clock, authorizationServer, it) } ?: { null }
 
             val tokenEndpointClient = TokenEndpointClient(
                 config.credentialIssuerId,
@@ -203,7 +195,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                 config.authorizationServerId,
                 challengeEndpoint = config.challengeEndpoint,
                 tokenEndpoint = config.tokenEndpoint,
-                dPoPJwtFactory,
+                provisionDPoPJwtFactory,
                 httpClient,
             )
 
@@ -211,7 +203,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
 
             val deferredEndPointClient = DeferredEndPointClient(
                 CredentialIssuerEndpoint.invoke(config.deferredEndpoint.toString()).getOrThrow(),
-                dPoPJwtFactory,
+                provisionDPoPJwtFactory,
                 httpClient,
             )
 
