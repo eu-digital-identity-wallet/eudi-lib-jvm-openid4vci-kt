@@ -111,7 +111,7 @@ interface Issuer :
          * @return if wallet's [config] can satisfy the requirements of [credentialOffer] an [Issuer] will be
          * created. Otherwise, there would be a failed result
          */
-        suspend fun make(
+        fun make(
             config: OpenId4VCIConfig,
             credentialOffer: CredentialOffer,
             httpClient: HttpClient,
@@ -120,21 +120,21 @@ interface Issuer :
         ): Result<Issuer> = runCatching {
             val authorizationServer = HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
 
-            val provisionedClientAttestation =
+            val provisionClientAttestation =
                 when (val clientAuthentication = config.clientAuthentication) {
-                    is ClientAuthentication.AttestationBased -> {
-                        val provisionedClientAttestation =
-                            clientAuthentication.provisionClientAttestation(
-                                authorizationServer,
-                                credentialOffer.credentialIssuerMetadata.preferredClientStatusPeriod,
-                            )
+                    is ClientAuthentication.AttestationBased ->
+                        clientAttestation(
+                            config.clock,
+                            authorizationServer,
+                            credentialOffer.credentialIssuerMetadata.preferredClientStatusPeriod,
+                            clientAuthentication,
+                        ).verifying {
+                            it.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
+                        }
 
-                        clientAuthentication.provisionClientAttestation.ensureValid(config.clock.instant(), provisionedClientAttestation)
-                        provisionedClientAttestation.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
-                        provisionedClientAttestation
+                    is ClientAuthentication.None -> {
+                        { null }
                     }
-
-                    is ClientAuthentication.None -> null
                 }
 
             val dPoPConfig = when (val dPoPUsage = config.dPoPUsage) {
@@ -166,7 +166,7 @@ interface Issuer :
                             credentialOffer.authorizationServerMetadata,
                             config,
                             provisionDPoPJwtFactory,
-                            provisionedClientAttestation,
+                            provisionClientAttestation,
                             httpClient,
                         )
                     }
@@ -177,7 +177,7 @@ interface Issuer :
                     credentialOffer.authorizationServerMetadata,
                     config,
                     provisionDPoPJwtFactory,
-                    provisionedClientAttestation,
+                    provisionClientAttestation,
                     httpClient,
                 )
 

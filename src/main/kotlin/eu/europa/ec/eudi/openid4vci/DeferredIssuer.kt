@@ -19,6 +19,7 @@ import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessTokenImpl
+import eu.europa.ec.eudi.openid4vci.internal.clientAttestation
 import eu.europa.ec.eudi.openid4vci.internal.dPoPJwtFactory
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
@@ -163,25 +164,26 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
          *
          * @return the deferred issuer instance
          */
-        suspend fun make(
+        fun make(
             config: DeferredIssuerConfig,
             responseEncryptionKey: JWK?,
             httpClient: HttpClient,
         ): Result<DeferredIssuer> = runCatching {
             val authorizationServer = HttpsUrl(config.authorizationServerId.toString()).getOrThrow()
 
-            val provisionedClientAttestation =
+            val provisionClientAttestation =
                 when (val clientAuthentication = config.clientAuthentication) {
-                    is ClientAuthentication.AttestationBased -> {
-                        val provisionedClientAttestation = clientAuthentication.provisionClientAttestation(
+                    is ClientAuthentication.AttestationBased ->
+                        clientAttestation(
+                            config.clock,
                             authorizationServer,
                             config.preferredClientStatusPeriod,
+                            clientAuthentication,
                         )
-                        clientAuthentication.provisionClientAttestation.ensureValid(config.clock.instant(), provisionedClientAttestation)
-                        provisionedClientAttestation
-                    }
 
-                    is ClientAuthentication.None -> null
+                    is ClientAuthentication.None -> {
+                        { null }
+                    }
                 }
 
             val provisionDPoPJwtFactory = config.dPoPConfig?.let { dPoPJwtFactory(config.clock, authorizationServer, it) } ?: { null }
@@ -190,7 +192,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                 config.credentialIssuerId,
                 config.clock,
                 config.clientAuthentication.id,
-                provisionedClientAttestation,
+                provisionClientAttestation,
                 URI.create("https://willNotBeUsed"), // this will not be used
                 config.authorizationServerId,
                 challengeEndpoint = config.challengeEndpoint,
