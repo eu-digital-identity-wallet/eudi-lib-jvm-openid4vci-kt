@@ -39,8 +39,7 @@ import java.time.Clock
  *   Must be provided only if client was of Client.Attested kind.
  * @param requestEncryptionSpec the request encryption spec. Must be provided only if request encryption was used in the initial request.
  * @param responseEncryptionParams encryption method and compression algorithm as/if used in the initial request.
- * @param dPoPCtx the negotiated DPoP context. Must be provided only if DPoP was used.
- * @param dPoPUsage an indication about whether DPoP is never to be used, supported, or required.
+ * @param dPoPConfig DPoP configuration. Must be provided only if DPoP was used.
  * @param clock Wallet's clock
  * @param preferredClientStatusPeriod PID or Attestation Provider's preference for the remaining status maintenance period
  */
@@ -53,8 +52,7 @@ data class DeferredIssuerConfig(
     val tokenEndpoint: URL,
     val requestEncryptionSpec: EncryptionSpec?,
     val responseEncryptionParams: Pair<EncryptionMethod, CompressionAlgorithm?>?,
-    val dPoPCtx: DPoPCtx? = null,
-    val dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
+    val dPoPConfig: DPoPConfig?,
     val clock: Clock = Clock.systemDefaultZone(),
     val preferredClientStatusPeriod: PositiveDuration? = null,
 )
@@ -80,9 +78,9 @@ data class DeferredIssuanceContext(
     val authorizedTransaction: AuthorizedTransaction,
 ) {
     init {
-        if (authorizedTransaction.authorizedRequest.accessToken !is AccessToken.DPoP) {
-            requireNotNull(config.dPoPCtx) {
-                "config.dPoPCtx is required when DPoP access tokens are used"
+        if (authorizedTransaction.authorizedRequest.accessToken is AccessToken.DPoP) {
+            requireNotNull(config.dPoPConfig) {
+                "config.dPoPConfig is required when DPoP access tokens are used"
             }
         }
     }
@@ -185,25 +183,12 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                     is ClientAuthentication.None -> null
                 }
 
-            val dPoPSigner = when (val dPoPUsage = config.dPoPUsage) {
-                DPoPUsage.Never -> null
-                is DPoPUsage.IfSupported -> {
-                    val dPoPSigner = dPoPUsage.value(authorizationServer)
-                    dPoPUsage.ensureValid(dPoPSigner)
-                    dPoPSigner
-                }
-                is DPoPUsage.Required -> {
-                    checkNotNull(config.dPoPCtx) { "dPoPCtx is required when DPoPUsage is required" }
-                    val dPoPSigner = dPoPUsage.value(authorizationServer)
-                    dPoPUsage.ensureValid(dPoPSigner)
-                    dPoPSigner
-                }
+            val dPoPSigner = config.dPoPConfig?.let {
+                val dPoPSigner = it.provisionDPoPSigner(authorizationServer)
+                it.provisionDPoPSigner.ensureValid(dPoPSigner)
+                dPoPSigner
             }
-
-            val dPoPJwtFactory = config.dPoPCtx?.let {
-                checkNotNull(dPoPSigner) { "dPoPSigner is required when using DPoP" }
-                DPoPJwtFactory(clock = config.clock, dPoPCtx = it, signer = dPoPSigner)
-            }
+            val dPoPJwtFactory = dPoPSigner?.let { DPoPJwtFactory(clock = config.clock, signer = dPoPSigner) }
 
             val tokenEndpointClient = TokenEndpointClient(
                 config.credentialIssuerId,

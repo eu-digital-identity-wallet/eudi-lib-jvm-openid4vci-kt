@@ -51,7 +51,15 @@ interface ProvisionDPoPSigner {
     suspend operator fun invoke(authorizationServer: HttpsUrl): Signer<JWK>
 }
 
-typealias DPoPUsageOption = DPoPUsage<ProvisionDPoPSigner>
+/**
+ * Configuration options for DPoP.
+ */
+data class DPoPConfig(val provisionDPoPSigner: ProvisionDPoPSigner)
+
+/**
+ * An indication about the Client's preference for DPoP.
+ */
+typealias DPoPUsageOption = DPoPUsage<DPoPConfig>
 
 /**
  * The Client Authentication Method used by the Wallet.

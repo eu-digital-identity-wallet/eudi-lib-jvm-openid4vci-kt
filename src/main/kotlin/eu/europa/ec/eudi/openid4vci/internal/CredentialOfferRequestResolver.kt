@@ -125,7 +125,7 @@ internal class CredentialOfferRequestResolver(
             ).getOrThrow()
 
             val dPoPCtx = run {
-                val dPoPUsage = config.dPoPUsage.map { it.popAlgorithm }
+                val dPoPUsage = config.dPoPUsage.map { it.provisionDPoPSigner.popAlgorithm }
                 DPoPCtx.createForServer(dPoPUsage, authorizationServerMetadata).getOrThrow()
             }
 

@@ -139,21 +139,22 @@ interface Issuer :
                     is ClientAuthentication.None -> null
                 }
 
-            val dPoPSigner = when (val dPoPUsage = config.dPoPUsage) {
+            val dPoPConfig = when (val dPoPUsage = config.dPoPUsage) {
                 DPoPUsage.Never -> null
-                is DPoPUsage.IfSupported -> {
-                    val dPoPSigner = dPoPUsage.value(authorizationServer)
-                    dPoPUsage.ensureValid(dPoPSigner)
-                    dPoPSigner
-                }
+                is DPoPUsage.IfSupported -> dPoPUsage.value
                 is DPoPUsage.Required -> {
-                    checkNotNull(credentialOffer.dPoPCtx) { "dPoPCtx is required when DPoPUsage is required" }
-                    val dPoPSigner = dPoPUsage.value(authorizationServer)
-                    dPoPUsage.ensureValid(dPoPSigner)
-                    dPoPSigner
+                    checkNotNull(credentialOffer.dPoPCtx) {
+                        "Client requires the usage of DPoP, but the Authorization Server does not support DPoP " +
+                            "or the signing algorithm supported by the Client"
+                    }
+                    dPoPUsage.value
                 }
             }
-
+            val dPoPSigner = dPoPConfig?.let {
+                val dPoPSigner = dPoPConfig.provisionDPoPSigner(authorizationServer)
+                dPoPConfig.provisionDPoPSigner.ensureValid(dPoPSigner)
+                dPoPSigner
+            }
             val dPoPJwtFactory = credentialOffer.dPoPCtx?.let {
                 checkNotNull(dPoPSigner) { "dPoPSigner is required when using DPoP" }
                 DPoPJwtFactory(clock = config.clock, dPoPCtx = it, signer = dPoPSigner)
@@ -284,8 +285,7 @@ interface Issuer :
                             responseEncryptionParams = credentialOffer.exchangeEncryptionSpecification.responseEncryptionSpec?.let {
                                 it.encryptionMethod to it.compressionAlgorithm
                             },
-                            dPoPCtx = credentialOffer.dPoPCtx,
-                            dPoPUsage = config.dPoPUsage,
+                            dPoPConfig = dPoPConfig,
                             clock = config.clock,
                         ),
                         AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
@@ -431,20 +431,9 @@ internal fun ProvisionClientAttestation.ensureValid(now: Instant, provisioned: P
     }
 }
 
-internal fun DPoPUsageOption.ensureValid(signer: Signer<JWK>) {
-    when (this) {
-        DPoPUsage.Never -> error("DPoP Signer was provisioned when DPoP is not to be used")
-        is DPoPUsage.IfSupported -> {
-            val signerAlgorithm = JwsAlgorithm(signer.javaAlgorithm.toJoseAlg().name)
-            check(this.value.popAlgorithm == signerAlgorithm) {
-                "DPoP Signer algorithm mismatch: expected ${this.value.popAlgorithm.name}, got ${signerAlgorithm.name}"
-            }
-        }
-        is DPoPUsage.Required -> {
-            val signerAlgorithm = JwsAlgorithm(signer.javaAlgorithm.toJoseAlg().name)
-            check(this.value.popAlgorithm == signerAlgorithm) {
-                "DPoP Signer algorithm mismatch: expected ${this.value.popAlgorithm.name}, got ${signerAlgorithm.name}"
-            }
-        }
+internal fun ProvisionDPoPSigner.ensureValid(signer: Signer<JWK>) {
+    val signerAlgorithm = JwsAlgorithm(signer.javaAlgorithm.toJoseAlg().name)
+    check(popAlgorithm == signerAlgorithm) {
+        "DPoP Signer algorithm mismatch: expected ${popAlgorithm.name}, got ${signerAlgorithm.name}"
     }
 }

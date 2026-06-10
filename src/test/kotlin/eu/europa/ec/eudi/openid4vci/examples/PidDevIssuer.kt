@@ -44,12 +44,14 @@ internal object PidDevIssuer :
             ),
         ),
         dPoPUsage = DPoPUsage.Required(
-            object : ProvisionDPoPSigner {
-                override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(JWSAlgorithm.ES256.name)
-                override suspend fun invoke(
-                    authorizationServer: HttpsUrl,
-                ): Signer<JWK> = CryptoGenerator.ecSigner(Curve.P_256, JWSAlgorithm.ES256)
-            },
+            DPoPConfig(
+                object : ProvisionDPoPSigner {
+                    override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(JWSAlgorithm.ES256.name)
+                    override suspend fun invoke(
+                        authorizationServer: HttpsUrl,
+                    ): Signer<JWK> = CryptoGenerator.ecSigner(Curve.P_256, JWSAlgorithm.ES256)
+                },
+            ),
         ),
         authFlowRedirectionURI = Keycloak.DebugRedirectUri,
         encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),

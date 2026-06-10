@@ -958,12 +958,14 @@ class IssuanceSingleRequestTest {
         val config = OpenId4VCIConfiguration.copy(
             clientAuthentication = client,
             dPoPUsage = DPoPUsage.Required(
-                object : ProvisionDPoPSigner {
-                    override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(JWSAlgorithm.ES256.name)
-                    override suspend fun invoke(
-                        authorizationServer: HttpsUrl,
-                    ): Signer<JWK> = Signer.fromNimbusEcKey(dPoPSigningKey, dPoPSigningKey.toPublicJWK(), null, null)
-                },
+                DPoPConfig(
+                    object : ProvisionDPoPSigner {
+                        override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(JWSAlgorithm.ES256.name)
+                        override suspend fun invoke(
+                            authorizationServer: HttpsUrl,
+                        ): Signer<JWK> = Signer.fromNimbusEcKey(dPoPSigningKey, dPoPSigningKey.toPublicJWK(), null, null)
+                    },
+                ),
             ),
         )
 
@@ -1016,12 +1018,14 @@ class IssuanceSingleRequestTest {
         val config = OpenId4VCIConfiguration.copy(
             clientAuthentication = client,
             dPoPUsage = DPoPUsage.Required(
-                object : ProvisionDPoPSigner {
-                    override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(JWSAlgorithm.ES256.name)
-                    override suspend fun invoke(
-                        authorizationServer: HttpsUrl,
-                    ): Signer<JWK> = Signer.fromNimbusEcKey(dPoPSigningKey, dPoPSigningKey.toPublicJWK(), null, null)
-                },
+                DPoPConfig(
+                    object : ProvisionDPoPSigner {
+                        override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(JWSAlgorithm.ES256.name)
+                        override suspend fun invoke(
+                            authorizationServer: HttpsUrl,
+                        ): Signer<JWK> = Signer.fromNimbusEcKey(dPoPSigningKey, dPoPSigningKey.toPublicJWK(), null, null)
+                    },
+                ),
             ),
         )
 
