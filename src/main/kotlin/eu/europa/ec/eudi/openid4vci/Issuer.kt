@@ -150,9 +150,9 @@ interface Issuer :
                     dPoPUsage.value
                 }
             }
-            val dPoPSigner = dPoPConfig?.let {
-                val dPoPSigner = dPoPConfig.provisionDPoPSigner(authorizationServer)
-                dPoPConfig.provisionDPoPSigner.ensureValid(dPoPSigner)
+            val dPoPSigner = dPoPConfig?.let { (provisionDPoPSigner) ->
+                val dPoPSigner = provisionDPoPSigner(authorizationServer)
+                provisionDPoPSigner.ensureValid(dPoPSigner)
                 dPoPSigner
             }
             val dPoPJwtFactory = credentialOffer.dPoPCtx?.let {

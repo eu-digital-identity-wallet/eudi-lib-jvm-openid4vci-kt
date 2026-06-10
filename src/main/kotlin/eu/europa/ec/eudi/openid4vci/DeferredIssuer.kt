@@ -183,12 +183,12 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                     is ClientAuthentication.None -> null
                 }
 
-            val dPoPSigner = config.dPoPConfig?.let {
-                val dPoPSigner = it.provisionDPoPSigner(authorizationServer)
-                it.provisionDPoPSigner.ensureValid(dPoPSigner)
+            val dPoPSigner = config.dPoPConfig?.let { (provisionDPoPSigner) ->
+                val dPoPSigner = provisionDPoPSigner(authorizationServer)
+                provisionDPoPSigner.ensureValid(dPoPSigner)
                 dPoPSigner
             }
-            val dPoPJwtFactory = dPoPSigner?.let { DPoPJwtFactory(clock = config.clock, signer = dPoPSigner) }
+            val dPoPJwtFactory = dPoPSigner?.let { DPoPJwtFactory(clock = config.clock, signer = it) }
 
             val tokenEndpointClient = TokenEndpointClient(
                 config.credentialIssuerId,
