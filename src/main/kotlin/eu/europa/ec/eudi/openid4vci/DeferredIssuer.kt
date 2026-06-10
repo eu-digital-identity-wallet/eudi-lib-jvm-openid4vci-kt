@@ -18,7 +18,9 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.jwk.JWK
+import eu.europa.ec.eudi.openid4vci.internal.ProvisionOnce
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessTokenImpl
+import eu.europa.ec.eudi.openid4vci.internal.dPoPJwtFactory
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
 import io.ktor.client.*
@@ -183,12 +185,10 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                     is ClientAuthentication.None -> null
                 }
 
-            val dPoPSigner = config.dPoPConfig?.let { (provisionDPoPSigner) ->
-                val dPoPSigner = provisionDPoPSigner(authorizationServer)
-                provisionDPoPSigner.ensureValid(dPoPSigner)
-                dPoPSigner
-            }
-            val dPoPJwtFactory = dPoPSigner?.let { DPoPJwtFactory(clock = config.clock, signer = it) }
+            val provisionDPoPJwtFactory =
+                config.dPoPConfig?.let {
+                    ProvisionOnce.dPoPJwtFactory(config.clock, authorizationServer, it)
+                } ?: { null }
 
             val tokenEndpointClient = TokenEndpointClient(
                 config.credentialIssuerId,
@@ -199,7 +199,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                 config.authorizationServerId,
                 challengeEndpoint = config.challengeEndpoint,
                 tokenEndpoint = config.tokenEndpoint,
-                dPoPJwtFactory,
+                provisionDPoPJwtFactory,
                 httpClient,
             )
 
@@ -207,7 +207,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
 
             val deferredEndPointClient = DeferredEndPointClient(
                 CredentialIssuerEndpoint.invoke(config.deferredEndpoint.toString()).getOrThrow(),
-                dPoPJwtFactory,
+                provisionDPoPJwtFactory,
                 httpClient,
             )
 
