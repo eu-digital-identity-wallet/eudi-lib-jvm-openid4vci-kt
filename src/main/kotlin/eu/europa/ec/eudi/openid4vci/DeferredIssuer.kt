@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.jwk.JWK
-import eu.europa.ec.eudi.openid4vci.internal.ProvisionOnce
 import eu.europa.ec.eudi.openid4vci.internal.RefreshAccessTokenImpl
 import eu.europa.ec.eudi.openid4vci.internal.dPoPJwtFactory
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredEndPointClient
@@ -185,10 +184,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                     is ClientAuthentication.None -> null
                 }
 
-            val provisionDPoPJwtFactory =
-                config.dPoPConfig?.let {
-                    ProvisionOnce.dPoPJwtFactory(config.clock, authorizationServer, it)
-                } ?: { null }
+            val provisionDPoPJwtFactory = config.dPoPConfig?.let { dPoPJwtFactory(config.clock, authorizationServer, it) } ?: { null }
 
             val tokenEndpointClient = TokenEndpointClient(
                 config.credentialIssuerId,

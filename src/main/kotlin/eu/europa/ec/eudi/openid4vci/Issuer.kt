@@ -152,7 +152,7 @@ interface Issuer :
             val provisionDPoPJwtFactory =
                 if (null != credentialOffer.dPoPCtx) {
                     checkNotNull(dPoPConfig) { "dPoPConfig is required when using DPoP" }
-                    ProvisionOnce.dPoPJwtFactory(config.clock, authorizationServer, dPoPConfig)
+                    dPoPJwtFactory(config.clock, authorizationServer, dPoPConfig)
                 } else {
                     { null }
                 }

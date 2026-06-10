@@ -46,7 +46,7 @@ internal class ProvisionOnce<V : Any>(private val provision: suspend () -> V?) :
     companion object
 }
 
-internal fun ProvisionOnce.Companion.dPoPJwtFactory(
+internal fun dPoPJwtFactory(
     clock: Clock,
     authorizationServer: HttpsUrl,
     config: DPoPConfig,
