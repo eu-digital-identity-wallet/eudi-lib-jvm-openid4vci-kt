@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JWSAlgorithm
-import eu.europa.ec.eudi.openid4vci.BatchSignOperation
 import eu.europa.ec.eudi.openid4vci.SignOperation
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -53,39 +52,6 @@ internal interface JwtSigner<in Claims, out PUB> {
             algorithm: JWSAlgorithm,
             noinline customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
         ): JwtSigner<Claims, PUB> = invoke(serializer(), signOperation, algorithm, customizeHeader)
-    }
-}
-
-/**
- * An interface for performing batch JWT signing operations. This interface allows signing multiple claims
- * using a batch of signing operations, producing a list of signed JWTs paired with their corresponding public materials.
- *
- * @param Claims The type of the claims to be signed.
- * @param PUB The type of the public material associated with the signed JWT.
- */
-internal fun interface JwtBatchSigner<in Claims, out PUB> {
-    suspend fun sign(claims: Claims): List<Pair<PUB, String>>
-
-    companion object {
-
-        operator fun <Claims, PUB> invoke(
-            serializer: KSerializer<Claims>,
-            batchSignOperation: BatchSignOperation<PUB>,
-            algorithm: JWSAlgorithm,
-            customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-        ): JwtBatchSigner<Claims, PUB> = JwtBatchSigner { claims ->
-            batchSignOperation.operations.map { signOperation ->
-                val jwtSigner = JwtSigner(serializer, signOperation, algorithm, customizeHeader)
-                val jwt = jwtSigner.sign(claims)
-                jwtSigner.publicMaterial to jwt
-            }
-        }
-
-        inline operator fun <reified Claims, PUB> invoke(
-            batchSignOperation: BatchSignOperation<PUB>,
-            algorithm: JWSAlgorithm,
-            noinline customizeHeader: JsonObjectBuilder.(PUB) -> Unit = {},
-        ): JwtBatchSigner<Claims, PUB> = invoke(serializer(), batchSignOperation, algorithm, customizeHeader)
     }
 }
 
