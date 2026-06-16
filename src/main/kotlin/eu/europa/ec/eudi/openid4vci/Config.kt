@@ -121,7 +121,7 @@ data class OpenId4VCIConfig(
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
-    val proofs: ProofsConfig = ProofsConfig.ETSI119472Part3,
+    val proofs: ProofsConfig = ProofsConfig.Default,
 ) {
 
     /**
@@ -137,7 +137,7 @@ data class OpenId4VCIConfig(
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
-        proofs: ProofsConfig = ProofsConfig.ETSI119472Part3,
+        proofs: ProofsConfig = ProofsConfig.Default,
     ) : this(
         ClientAuthentication.None(clientId),
         authFlowRedirectionURI,
@@ -377,11 +377,19 @@ data class ProofsConfig(
     data class SupportedAttestationProof(val supportedAlgorithms: Set<JWSAlgorithm>)
 
     companion object {
-        val ETSI119472Part3: ProofsConfig = ProofsConfig(
-            true,
-            SupportedJwtProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)),
-            SupportedAttestationProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)),
-        )
+        /**
+         * A [ProofsConfig] instance for Wallets that support issuance of attestations that require no proofs, and attestations that
+         * require either JWT Proofs or Attestation Proofs signed with either ES256, ES384, or ES512.
+         */
+        val Default: ProofsConfig
+            get() {
+                val supportedAlgorithms = setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
+                return ProofsConfig(
+                    true,
+                    SupportedJwtProof(supportedAlgorithms),
+                    SupportedAttestationProof(supportedAlgorithms),
+                )
+            }
 
         /**
          * Creates a [ProofsConfig] instance for a Wallet that supports issueance of attestations that require
