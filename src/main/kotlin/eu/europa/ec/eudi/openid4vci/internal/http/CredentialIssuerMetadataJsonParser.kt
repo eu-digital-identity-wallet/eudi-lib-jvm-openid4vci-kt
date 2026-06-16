@@ -138,11 +138,11 @@ private object KeepKnownReusePolicies : JsonTransformingSerializer<CredentialReu
 @Serializable
 private data class ProofTypeSupportedMetaTO(
     @SerialName("proof_signing_alg_values_supported") val algorithms: List<String> = emptyList(),
-    @SerialName("key_attestations_required") val keyAttestationConstraints: KeyAttestationConstraintsTO? = null,
+    @SerialName("key_attestations_required") val keyAttestationRequirement: KeyAttestationRequirementTO? = null,
 )
 
 @Serializable
-private data class KeyAttestationConstraintsTO(
+private data class KeyAttestationRequirementTO(
     @SerialName(OpenId4VCISpec.KEY_ATTESTATION_KEY_STORAGE) val keyStorage: List<AttackPotentialResistance>? = null,
     @SerialName(OpenId4VCISpec.KEY_ATTESTATION_USER_AUTHENTICATION) val userAuthentication: List<AttackPotentialResistance>? = null,
     @SerialName(TS3.PREFERRED_KEY_STORAGE_STATUS_PERIOD) val preferredKeyStorageStatusPeriod: DurationAsSeconds? = null,
@@ -644,27 +644,25 @@ private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTy
     when (type) {
         "jwt" -> {
             val algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
-            val keyAttestationConstraints = meta.keyAttestationConstraints?.toDomain()
-            requireNotNull(keyAttestationConstraints) {
+            val keyAttestationRequirement = requireNotNull(meta.keyAttestationRequirement?.toDomain()) {
                 "jwt proof must contain 'key_attestations_required'"
             }
-            ProofTypeMeta.Jwt(algorithms, keyAttestationConstraints)
+            ProofTypeMeta.Jwt(algorithms, keyAttestationRequirement)
         }
 
         "attestation" -> {
             val algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
-            val keyAttestationConstraints = meta.keyAttestationConstraints?.toDomain()
-            requireNotNull(keyAttestationConstraints) {
+            val keyAttestationRequirement = requireNotNull(meta.keyAttestationRequirement?.toDomain()) {
                 "attestation proof must contain 'key_attestations_required'"
             }
-            ProofTypeMeta.Attestation(algorithms, keyAttestationConstraints)
+            ProofTypeMeta.Attestation(algorithms, keyAttestationRequirement)
         }
 
         else -> ProofTypeMeta.Unsupported(type)
     }
 
-private fun KeyAttestationConstraintsTO.toDomain(): KeyAttestationConstraints =
-    KeyAttestationConstraints(
+private fun KeyAttestationRequirementTO.toDomain(): KeyAttestationRequirement =
+    KeyAttestationRequirement(
         keyStorage,
         userAuthentication,
         preferredKeyStorageStatusPeriod?.let { PositiveDuration(it) },

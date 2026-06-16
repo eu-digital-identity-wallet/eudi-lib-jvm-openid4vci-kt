@@ -134,14 +134,14 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         assertTrue("Unexpected proofs for UniversityDegree_JWT") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_JWT")
-            proofs != null && proofs.all { it.keyAttestationConstraints == KeyAttestationConstraints(null, null, null) }
+            proofs != null && proofs.all { it.keyAttestationRequirement == KeyAttestationRequirement(null, null, null) }
         }
 
         assertTrue("Unexpected proofs for MobileDrivingLicense_msoMdoc") {
             val proofs = credentialConfigs.jwtProofTypeSupported("MobileDrivingLicense_msoMdoc")
             proofs != null && proofs.all {
-                val proof = it.keyAttestationConstraints
-                proof == KeyAttestationConstraints(
+                val proof = it.keyAttestationRequirement
+                proof == KeyAttestationRequirement(
                     keyStorage = listOf(AttackPotentialResistance.Iso18045High),
                     userAuthentication = listOf(AttackPotentialResistance.Iso18045High),
                     null,
@@ -152,8 +152,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         assertTrue("Unexpected proofs for UniversityDegree_LDP_VC") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_LDP_VC")
             proofs != null && proofs.all {
-                val proof = it.keyAttestationConstraints
-                proof == KeyAttestationConstraints(
+                val proof = it.keyAttestationRequirement
+                proof == KeyAttestationRequirement(
                     keyStorage = listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
                     userAuthentication = null,
                     null,
@@ -164,8 +164,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         assertTrue("Unexpected proofs for UniversityDegree_JWT_VC_JSON-LD") {
             val proofs = credentialConfigs.jwtProofTypeSupported("UniversityDegree_JWT_VC_JSON-LD")
             proofs != null && proofs.all {
-                val proof = it.keyAttestationConstraints
-                proof == KeyAttestationConstraints(
+                val proof = it.keyAttestationRequirement
+                proof == KeyAttestationRequirement(
                     keyStorage = listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
                     userAuthentication = listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
                     preferredKeyStorageStatusPeriod = null,

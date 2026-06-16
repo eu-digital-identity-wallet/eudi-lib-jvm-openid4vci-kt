@@ -231,7 +231,7 @@ internal class RequestIssuanceImpl(
     ): Proof.Jwt {
         val proofSigner = proofsSpecification.proofSignerProvider(
             cNonce,
-            proofRequirement.keyAttestationConstraints.preferredKeyStorageStatusPeriod,
+            proofRequirement.keyAttestationRequirement.preferredKeyStorageStatusPeriod,
         )
         val joseAlg = run {
             val javaSigningAlgorithm = proofSigner.javaAlgorithm
@@ -266,7 +266,7 @@ internal class RequestIssuanceImpl(
     ): Proof.Attestation {
         val keyAttestationJwt = proofsSpecification.attestationProvider(
             cNonce,
-            proofRequirement.keyAttestationConstraints.preferredKeyStorageStatusPeriod,
+            proofRequirement.keyAttestationRequirement.preferredKeyStorageStatusPeriod,
         )
         keyAttestationJwt.ensureKeyAttestationJwtAlgIsSupported(proofRequirement)
         keyAttestationJwt.attestedKeys.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)

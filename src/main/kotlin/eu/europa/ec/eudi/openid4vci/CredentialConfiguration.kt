@@ -64,7 +64,7 @@ enum class ProofType : Serializable {
 sealed interface ProofTypeMeta : Serializable {
     data class Jwt(
         val algorithms: List<JWSAlgorithm>,
-        val keyAttestationConstraints: KeyAttestationConstraints,
+        val keyAttestationRequirement: KeyAttestationRequirement,
     ) : ProofTypeMeta {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of JWT cannot be empty" }
@@ -73,7 +73,7 @@ sealed interface ProofTypeMeta : Serializable {
 
     data class Attestation(
         val algorithms: List<JWSAlgorithm>,
-        val keyAttestationConstraints: KeyAttestationConstraints,
+        val keyAttestationRequirement: KeyAttestationRequirement,
     ) : ProofTypeMeta {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of Attestation cannot be empty" }
@@ -84,9 +84,9 @@ sealed interface ProofTypeMeta : Serializable {
 }
 
 /**
- * The constraints of the Key Attestation of a JWT Proof, or Attestation Proof.
+ * The Credential Issuer's requirements for the Key Attestation of a JWT Proof, or the Attestation Proof.
  */
-data class KeyAttestationConstraints(
+data class KeyAttestationRequirement(
     val keyStorage: List<AttackPotentialResistance>?,
     val userAuthentication: List<AttackPotentialResistance>?,
     val preferredKeyStorageStatusPeriod: PositiveDuration?,
@@ -94,12 +94,12 @@ data class KeyAttestationConstraints(
     init {
         if (keyStorage != null) {
             require(keyStorage.isNotEmpty()) {
-                "Key storage constraints, if provided, should be non-empty"
+                "keyStorage, if provided, must be non-empty"
             }
         }
         if (userAuthentication != null) {
             require(userAuthentication.isNotEmpty()) {
-                "User authentication constraints, if provided, should be non-empty"
+                "userAuthentication, if provided, must be non-empty"
             }
         }
     }
@@ -110,10 +110,10 @@ data class KeyAttestationConstraints(
     companion object
 }
 
-val KeyAttestationConstraints.keyStorageOrDefault: List<AttackPotentialResistance>
+val KeyAttestationRequirement.keyStorageOrDefault: List<AttackPotentialResistance>
     get() = keyStorage.orEmpty()
 
-val KeyAttestationConstraints.userAuthenticationOrDefault: List<AttackPotentialResistance>
+val KeyAttestationRequirement.userAuthenticationOrDefault: List<AttackPotentialResistance>
     get() = userAuthentication.orEmpty()
 
 val ProofTypeMeta.type: ProofType?

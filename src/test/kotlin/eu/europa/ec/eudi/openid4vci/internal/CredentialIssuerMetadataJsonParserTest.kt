@@ -43,11 +43,11 @@ class CredentialIssuerMetadataJsonParserTest {
 
         val jwtProof = assertNotNull(credentialConfiguration.proofTypesSupported[ProofType.JWT])
         check(jwtProof is ProofTypeMeta.Jwt)
-        assertEquals(1.days.toJavaDuration(), jwtProof.keyAttestationConstraints.preferredKeyStorageStatusPeriod?.value)
+        assertEquals(1.days.toJavaDuration(), jwtProof.keyAttestationRequirement.preferredKeyStorageStatusPeriod?.value)
 
         val attestationProof = assertNotNull(credentialConfiguration.proofTypesSupported[ProofType.ATTESTATION])
         check(attestationProof is ProofTypeMeta.Attestation)
-        assertEquals(1.days.toJavaDuration(), attestationProof.keyAttestationConstraints.preferredKeyStorageStatusPeriod?.value)
+        assertEquals(1.days.toJavaDuration(), attestationProof.keyAttestationRequirement.preferredKeyStorageStatusPeriod?.value)
     }
 
     @Test

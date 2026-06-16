@@ -71,11 +71,11 @@ internal fun universityDegreeJwt() = W3CSignedJwtCredential(
         setOf(
             ProofTypeMeta.Jwt(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
-                KeyAttestationConstraints(null, null, null),
+                KeyAttestationRequirement(null, null, null),
             ),
             ProofTypeMeta.Attestation(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
-                KeyAttestationConstraints(null, null, null),
+                KeyAttestationRequirement(null, null, null),
             ),
         ),
     ),
@@ -132,7 +132,7 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
         setOf(
             ProofTypeMeta.Jwt(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
-                KeyAttestationConstraints(
+                KeyAttestationRequirement(
                     listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
                     null,
                     null,
@@ -140,7 +140,7 @@ internal fun universityDegreeLdpVc() = W3CJsonLdDataIntegrityCredential(
             ),
             ProofTypeMeta.Attestation(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
-                KeyAttestationConstraints(null, null, null),
+                KeyAttestationRequirement(null, null, null),
             ),
         ),
     ),
@@ -198,7 +198,7 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
         setOf(
             ProofTypeMeta.Jwt(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
-                KeyAttestationConstraints(
+                KeyAttestationRequirement(
                     listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
                     listOf(AttackPotentialResistance.Iso18045High, AttackPotentialResistance.Iso18045EnhancedBasic),
                     null,
@@ -206,7 +206,7 @@ internal fun universityDegreeJwtVcJsonLD() = W3CJsonLdSignedJwtCredential(
             ),
             ProofTypeMeta.Attestation(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
-                KeyAttestationConstraints(null, null, null),
+                KeyAttestationRequirement(null, null, null),
             ),
         ),
     ),
@@ -267,7 +267,7 @@ internal fun mobileDrivingLicense() = MsoMdocCredential(
         setOf(
             ProofTypeMeta.Jwt(
                 listOf(JWSAlgorithm.ES256),
-                KeyAttestationConstraints(
+                KeyAttestationRequirement(
                     keyStorage = listOf(AttackPotentialResistance.Iso18045High),
                     userAuthentication = listOf(AttackPotentialResistance.Iso18045High),
                     null,
@@ -275,7 +275,7 @@ internal fun mobileDrivingLicense() = MsoMdocCredential(
             ),
             ProofTypeMeta.Attestation(
                 listOf(JWSAlgorithm.RS256, JWSAlgorithm.ES256),
-                KeyAttestationConstraints(null, null, null),
+                KeyAttestationRequirement(null, null, null),
             ),
         ),
     ),
