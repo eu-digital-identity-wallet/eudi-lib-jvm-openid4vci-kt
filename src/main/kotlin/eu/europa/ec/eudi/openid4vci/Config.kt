@@ -378,11 +378,14 @@ data class ProofsConfig(
          * require either JWT Proofs or Attestation Proofs signed with either ES256, ES384, or ES512.
          */
         val Default: ProofsConfig
-            get() = ProofsConfig(
-                true,
-                SupportedJwtProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)),
-                SupportedAttestationProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)),
-            )
+            get() {
+                val supportedAlgorithms = setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
+                return ProofsConfig(
+                    true,
+                    SupportedJwtProof(supportedAlgorithms),
+                    SupportedAttestationProof(supportedAlgorithms),
+                )
+            }
 
         /**
          * Creates a [ProofsConfig] instance for a Wallet that supports issueance of attestations that require
