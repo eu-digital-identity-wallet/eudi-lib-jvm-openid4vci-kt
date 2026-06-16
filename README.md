@@ -42,7 +42,7 @@ In particular, the library focuses on the wallet's role in and provides the foll
 | Credential request encryption                                                                   | ✅                                                                                                                                                                                                                                                                                                           |
 | Credential response encryption                                                                  | ✅                                                                                                                                                                                                                                                                                                           |
 | [Pushed authorization requests](#pushed-authorization-requests)                                 | ✅ Used by default, if supported by issuer                                                                                                                                                                                                                                                                   |
-| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)             | ✅                                                                                                                                                                                                                                                                                                           |
+| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)             | ✅ Including Authorization Code binding when using Pushed Authorization Requests (enabled by default)                                                                                                                                                                                                        |
 | [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                               | ✅                                                                                                                                                                                                                                                                                                           |
 | Wallet authentication                                                                           | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth-20-attestation-based-client-authentication)                                                                                                                                                                                        |
 | Use issuer's nonce endpoint to get c_nonce for proofs                                           | ✅                                                                                                                                                                                                                                                                                                           |
@@ -594,7 +594,7 @@ data class OpenId4VCIConfig(
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPUsage: DPoPUsage = DPoPUsage.Never,
     val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
-    val parUsage: ParUsage = ParUsage.IfSupported,
+    val parUsage: ParUsage = ParUsage.IfSupported(authorizationCodeDPoPBinding = true),
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     val supportedReuseMethods: Set<ReuseMethod> = emptySet(),
@@ -611,7 +611,7 @@ Options available:
 - authorizeIssuanceConfig: Preference on using `scope` or `authorization_details` during authorization code flow.
 - dPoPUsage: An indication about whether DPoP is never to be used, supported, or required. If Wallet requires DPoP but Credential Issuer doesn't advertise this feature, issuance does not proceed.
 - clientAttestationPoPBuilder: Wallet supported mechanism for creating Client Attestation POP JWTs when using [Attestation-Based Client Authentication](#oauth-20-attestation-based-client-authentication). 
-- parUsage: An indication to not use PAR endpoint or use it if advertised by the credential issuer
+- parUsage: An indication to not use PAR endpoint or use it if advertised by the credential issuer. Additionally, allows configuring whether Authorization Code DPoP binding should be performed.
 - clock: Wallet/Caller clock.
 - issuerMetadataPolicy: Wallet policy concerning Credential Issuer metadata. Possible options:
   - `IssuerMetadataPolicy.RequireSigned`: require the presence of signed metadata and use only values from signed metadata
