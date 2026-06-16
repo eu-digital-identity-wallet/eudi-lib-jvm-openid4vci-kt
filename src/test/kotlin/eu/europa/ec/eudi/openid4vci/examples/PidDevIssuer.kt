@@ -22,13 +22,16 @@ import io.ktor.http.Url
 
 private const val BASE_URL = "https://dev.issuer-backend.eudiw.dev"
 private val IssuerId = CredentialIssuerId(BASE_URL).getOrThrow()
+private val WalletInstanceAttestationServiceUrl = Url("https://dev.wallet-provider.eudiw.dev/wallet-instance-attestation/jwk")
+private val KeyAttestationServiceUrl = Url("https://dev.wallet-provider.eudiw.dev/key-attestation/jwk-set")
 
 internal object PidDevIssuer :
     HasIssuerId,
     HasTestUser<KeycloakUser>,
     CanAuthorizeIssuance<KeycloakUser> by Keycloak,
     CanBeUsedWithVciLib,
-    CanRequestForCredentialOffer<KeycloakUser> by CanRequestForCredentialOffer.onlyStatelessAuthorizationCode(IssuerId) {
+    CanRequestForCredentialOffer<KeycloakUser> by CanRequestForCredentialOffer.onlyStatelessAuthorizationCode(IssuerId),
+    CanRequestKeyAttestation by CanRequestKeyAttestation.usingWalletProviderService(KeyAttestationServiceUrl, enableLogging = false) {
 
     private const val WALLET_CLIENT_ID = "eudiw-abca"
 
@@ -37,10 +40,7 @@ internal object PidDevIssuer :
     override val cfg = OpenId4VCIConfig(
         clientAuthentication = ClientAuthentication.AttestationBased(
             WALLET_CLIENT_ID,
-            WalletProviderProvisionClientAttestation(
-                createHttpClient(enableLogging = true),
-                Url("https://dev.wallet-provider.eudiw.dev/wallet-instance-attestation/jwk"),
-            ),
+            WalletProviderProvisionClientAttestation(createHttpClient(enableLogging = false), WalletInstanceAttestationServiceUrl),
         ),
         dPoPUsage = DPoPUsage.Required(DPoPConfig(ProvisionDPoPSigner(CryptoGenerator.ecSigner(Curve.P_256, JWSAlgorithm.ES256)))),
         authFlowRedirectionURI = Keycloak.DebugRedirectUri,
@@ -48,6 +48,7 @@ internal object PidDevIssuer :
         authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         parUsage = ParUsage.Required,
         supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
+        proofs = ProofsConfig.ETSI119472Part3,
     )
 
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_vc_sd_jwt")

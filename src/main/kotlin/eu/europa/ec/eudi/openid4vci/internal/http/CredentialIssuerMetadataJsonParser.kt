@@ -32,6 +32,8 @@ import kotlinx.serialization.json.*
 import java.net.URI
 import java.time.Duration
 import java.util.*
+import kotlin.collections.component1
+import kotlin.collections.component2
 import kotlin.time.Duration.Companion.seconds
 
 internal object CredentialIssuerMetadataJsonParser {
@@ -172,7 +174,7 @@ private data class MsdMdocCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
 
-        val proofTypesSupported = proofTypesSupported.toProofTypes()
+        val proofTypesSupported = proofTypesSupported?.toProofTypes().orEmpty()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { CoseAlgorithm(it) }
 
         if (bindingMethods.isNotEmpty()) {
@@ -219,7 +221,7 @@ private data class SdJwtVcCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
 
-        val proofTypesSupported = proofTypesSupported.toProofTypes()
+        val proofTypesSupported = proofTypesSupported?.toProofTypes().orEmpty()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { JwsAlgorithm(it) }
 
         if (bindingMethods.isNotEmpty()) {
@@ -280,7 +282,7 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
     override fun toDomain(): W3CJsonLdDataIntegrityCredential {
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
-        val proofTypesSupported = proofTypesSupported.toProofTypes()
+        val proofTypesSupported = proofTypesSupported?.toProofTypes().orEmpty()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { LinkedDataAlgorithm(it) }
 
         if (bindingMethods.isNotEmpty()) {
@@ -330,7 +332,7 @@ private data class W3CJsonLdSignedJwtCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
 
-        val proofTypesSupported = proofTypesSupported.toProofTypes()
+        val proofTypesSupported = proofTypesSupported?.toProofTypes().orEmpty()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { LinkedDataAlgorithm(it) }
 
         if (bindingMethods.isNotEmpty()) {
@@ -391,7 +393,7 @@ private data class W3CSignedJwtCredentialTO(
         val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
             .map { cryptographicBindingMethodOf(it) }
 
-        val proofTypesSupported = proofTypesSupported.toProofTypes()
+        val proofTypesSupported = proofTypesSupported?.toProofTypes().orEmpty()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { JwsAlgorithm(it) }
 
         if (bindingMethods.isNotEmpty()) {
@@ -630,47 +632,41 @@ private data class DisplayTO(
         Claim.Display(name, locale?.let { languageTag -> Locale.forLanguageTag(languageTag) })
 }
 
-private fun Map<String, ProofTypeSupportedMetaTO>?.toProofTypes(): ProofTypesSupported =
-    when (this) {
-        null -> ProofTypesSupported.Empty
-        else -> {
-            val values = map { (type, meta) -> proofTypeMeta(type, meta) }.toSet()
-            ProofTypesSupported(values)
-        }
-    }
+private fun Map<String, ProofTypeSupportedMetaTO>.toProofTypes(): ProofTypesSupported? =
+    map { (type, meta) -> proofTypeMeta(type, meta) }
+        .toSet()
+        .takeIf { it.isNotEmpty() }
+        ?.let { ProofTypesSupported(it) }
+
+private fun ProofTypesSupported?.orEmpty(): ProofTypesSupported = this ?: ProofTypesSupported.Empty
 
 private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTypeMeta =
     when (type) {
-        "jwt" -> ProofTypeMeta.Jwt(
-            algorithms = meta.algorithms.map {
-                JWSAlgorithm.parse(it)
-            },
-            keyAttestationRequirement = meta.keyAttestationRequirement.toDomain(),
-        )
+        "jwt" -> {
+            val algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
+            val keyAttestationRequirement = requireNotNull(meta.keyAttestationRequirement?.toDomain()) {
+                "jwt proof must contain 'key_attestations_required'"
+            }
+            ProofTypeMeta.Jwt(algorithms, keyAttestationRequirement)
+        }
 
-        "di_vp" -> ProofTypeMeta.DiVp
+        "attestation" -> {
+            val algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
+            val keyAttestationRequirement = requireNotNull(meta.keyAttestationRequirement?.toDomain()) {
+                "attestation proof must contain 'key_attestations_required'"
+            }
+            ProofTypeMeta.Attestation(algorithms, keyAttestationRequirement)
+        }
 
-        "attestation" -> ProofTypeMeta.Attestation(
-            algorithms = meta.algorithms.map {
-                JWSAlgorithm.parse(it)
-            },
-            keyAttestationRequirement = run {
-                val req = meta.keyAttestationRequirement.toDomain()
-                require(req is KeyAttestationRequirement.Required)
-                req
-            },
-        )
         else -> ProofTypeMeta.Unsupported(type)
     }
 
-private fun KeyAttestationRequirementTO?.toDomain(): KeyAttestationRequirement = when {
-    this == null -> KeyAttestationRequirement.NotRequired
-    else -> KeyAttestationRequirement.Required(
+private fun KeyAttestationRequirementTO.toDomain(): KeyAttestationRequirement =
+    KeyAttestationRequirement(
         keyStorage,
         userAuthentication,
         preferredKeyStorageStatusPeriod?.let { PositiveDuration(it) },
     )
-}
 
 /**
  * Utility method to convert a list of string to a list of [CryptographicBindingMethod].

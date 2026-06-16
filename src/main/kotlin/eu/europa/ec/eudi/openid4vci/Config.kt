@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.impl.ContentCryptoProvider
 import com.nimbusds.jose.jwk.Curve
@@ -108,6 +109,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
  * @param clock Wallet's clock
  * @param issuerMetadataPolicy policy concerning signed metadata usage
  * @param supportedCredentialReusePolicies the reuse policies supported by the wallet, used to validate against credential issuer metadata.
+ * @param proofs proofs supported by the Wallet
  */
 data class OpenId4VCIConfig(
     val clientAuthentication: ClientAuthentication,
@@ -119,6 +121,7 @@ data class OpenId4VCIConfig(
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
+    val proofs: ProofsConfig = ProofsConfig.ETSI119472Part3,
 ) {
 
     /**
@@ -134,6 +137,7 @@ data class OpenId4VCIConfig(
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
+        proofs: ProofsConfig = ProofsConfig.ETSI119472Part3,
     ) : this(
         ClientAuthentication.None(clientId),
         authFlowRedirectionURI,
@@ -144,6 +148,7 @@ data class OpenId4VCIConfig(
         clock,
         issuerMetadataPolicy,
         supportedCredentialReusePolicies,
+        proofs,
     )
 }
 
@@ -338,4 +343,53 @@ sealed interface IssuerMetadataPolicy {
      * Signed metadata are ignored. Only values conveyed using plain json elements are used.
      */
     data object IgnoreSigned : IssuerMetadataPolicy
+}
+
+/**
+ * Wallet supported proofs.
+ *
+ * @property isNoProofSupported whether the Wallet supports issuance of attestations that require no proofs
+ * @property jwtProof whether the Wallet supports JWT Proofs
+ * @property attestationProof whether the Wallet supports Attestation Proofs
+ */
+data class ProofsConfig(
+    val isNoProofSupported: Boolean,
+    val jwtProof: SupportedJwtProof?,
+    val attestationProof: SupportedAttestationProof?,
+) {
+
+    /**
+     * Indicates support for JWT Proofs.
+     *
+     * @property supportedAlgorithms the signing algorithms supported by the Wallet
+     */
+    data class SupportedJwtProof(val supportedAlgorithms: Set<JWSAlgorithm>)
+
+    /**
+     * Indicates support for Attestation Proofs.
+     *
+     * @property supportedAlgorithms the signing algorithms supported by the Wallet
+     */
+    data class SupportedAttestationProof(val supportedAlgorithms: Set<JWSAlgorithm>)
+
+    companion object {
+        val ETSI119472Part3: ProofsConfig = ProofsConfig(
+            true,
+            SupportedJwtProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)),
+            SupportedAttestationProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)),
+        )
+
+        /**
+         * Creates a [ProofsConfig] instance for a Wallet that supports issueance of attestations that require
+         * either JWT Proofs or Attestation Proofs signed with one of the provided JWS Algorithms.
+         */
+        operator fun invoke(first: JWSAlgorithm, vararg remaining: JWSAlgorithm): ProofsConfig {
+            val supportedAlgorithms = setOf(first, *remaining)
+            return ProofsConfig(
+                isNoProofSupported = false,
+                jwtProof = SupportedJwtProof(supportedAlgorithms),
+                attestationProof = SupportedAttestationProof(supportedAlgorithms),
+            )
+        }
+    }
 }
