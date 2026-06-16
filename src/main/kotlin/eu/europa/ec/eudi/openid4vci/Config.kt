@@ -121,7 +121,7 @@ data class OpenId4VCIConfig(
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
-    val proofs: ProofsConfig,
+    val proofs: ProofsConfig = ProofsConfig.ETSI119472Part3,
 ) {
 
     /**
@@ -137,7 +137,7 @@ data class OpenId4VCIConfig(
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
-        proofs: ProofsConfig,
+        proofs: ProofsConfig = ProofsConfig.ETSI119472Part3,
     ) : this(
         ClientAuthentication.None(clientId),
         authFlowRedirectionURI,
@@ -372,5 +372,11 @@ data class ProofsConfig(
      */
     data class SupportedAttestationProof(val supportedAlgorithms: Set<JWSAlgorithm>)
 
-    companion object
+    companion object {
+        val ETSI119472Part3: ProofsConfig = ProofsConfig(
+            true,
+            SupportedJwtProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)),
+            SupportedAttestationProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)),
+        )
+    }
 }

@@ -103,7 +103,7 @@ val OpenId4VCIConfiguration = OpenId4VCIConfig(
     clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    proofs = ProofsConfig.EC,
+    proofs = ProofsConfig.ETSI119472Part3,
 )
 
 val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
@@ -111,7 +111,7 @@ val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
     dPoPUsage = DPoPUsage.IfSupported(DPoPConfig(ProvisionDPoPSigner(ecSigner(Curve.P_256, JWSAlgorithm.ES256)))),
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    proofs = ProofsConfig.EC,
+    proofs = ProofsConfig.ETSI119472Part3,
 )
 
 suspend fun authorizeRequestForCredentialOffer(
@@ -198,10 +198,3 @@ internal fun ProvisionDPoPSigner(signingKey: ECKey): ProvisionDPoPSigner {
     require(signingKey.isPrivate)
     return ProvisionDPoPSigner(Signer.fromNimbusEcKey(signingKey, signingKey.toPublicJWK(), secureRandom = null, provider = null))
 }
-
-internal val ProofsConfig.Companion.EC: ProofsConfig
-    get() = ProofsConfig(
-        true,
-        ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)),
-        ProofsConfig.SupportedAttestationProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)),
-    )
