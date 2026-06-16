@@ -43,8 +43,7 @@ class CredentialIssuerMetadataJsonParserTest {
 
         val jwtProof = assertNotNull(credentialConfiguration.proofTypesSupported[ProofType.JWT])
         check(jwtProof is ProofTypeMeta.Jwt)
-        val keyAttestationRequirement = assertIs<KeyAttestationRequirement.Required>(jwtProof.keyAttestationRequirement)
-        assertEquals(1.days.toJavaDuration(), keyAttestationRequirement.preferredKeyStorageStatusPeriod?.value)
+        assertEquals(1.days.toJavaDuration(), jwtProof.keyAttestationRequirement.preferredKeyStorageStatusPeriod?.value)
 
         val attestationProof = assertNotNull(credentialConfiguration.proofTypesSupported[ProofType.ATTESTATION])
         check(attestationProof is ProofTypeMeta.Attestation)
@@ -59,5 +58,30 @@ class CredentialIssuerMetadataJsonParserTest {
         }
         val cause = assertIs<IllegalArgumentException>(exception.cause)
         assertEquals("Duration must be positive", cause.message)
+    }
+
+    @Test
+    fun `fails when jwt proof does not require key attestation`() {
+        val json = getResourceAsText("well-known/openid-credential-issuer_jwt_proof_no_keyattestation.json")
+        val exception = assertFailsWith<CredentialIssuerMetadataValidationError.InvalidCredentialsSupported> {
+            CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
+        }
+        val cause = assertIs<IllegalArgumentException>(exception.cause)
+        assertEquals("jwt proof must contain 'key_attestations_required'", cause.message)
+    }
+
+    @Test
+    fun `fails when credential configuration does not support both jwt proofs and attestation proofs`() {
+        fun test(resource: String) {
+            val json = getResourceAsText(resource)
+            val exception = assertFailsWith<CredentialIssuerMetadataValidationError.InvalidCredentialsSupported> {
+                CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
+            }
+            val cause = assertIs<IllegalArgumentException>(exception.cause)
+            assertEquals("Both JWT Proofs and Attestation Proofs must be supported", cause.message)
+        }
+
+        test("well-known/openid-credential-issuer_only_jwt_proof.json")
+        test("well-known/openid-credential-issuer_only_attestation_proof.json")
     }
 }
