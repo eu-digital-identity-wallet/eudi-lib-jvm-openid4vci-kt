@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
+import com.eygraber.uri.Uri
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.util.JSONObjectUtils
@@ -23,7 +24,6 @@ import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.Dispatchers
@@ -38,11 +38,13 @@ import kotlinx.serialization.json.addAll
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
-import org.jsoup.Jsoup
-import org.jsoup.nodes.FormElement
+import org.openqa.selenium.By
+import org.openqa.selenium.chrome.ChromeDriver
+import org.openqa.selenium.chrome.ChromeOptions
 import java.net.URI
-import java.net.URL
 import java.net.URLEncoder
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toJavaDuration
 
 interface HasIssuerId {
     val issuerId: CredentialIssuerId
@@ -260,23 +262,41 @@ interface CanAuthorizeIssuance<in USER> {
 data class KeycloakUser(val username: String, val password: String)
 
 object Keycloak : CanAuthorizeIssuance<KeycloakUser> {
-    override suspend fun HttpClient.authorizeIssuance(loginResponse: HttpResponse, user: KeycloakUser): HttpResponse {
-        suspend fun extractASLoginUrl(): URL = withContext(Dispatchers.IO) {
-            val loginHtml = loginResponse.body<String>()
-            val form = Jsoup.parse(loginHtml).body().getElementById("kc-form-login") as FormElement
-            val action = form.attr("action")
-            URI(action).toURL()
+    override suspend fun loginUserAndGetAuthCode(
+        authorizationRequestPrepared: AuthorizationRequestPrepared,
+        user: KeycloakUser,
+        httpClient: HttpClient,
+    ): Pair<String, String> {
+        val driver = ChromeDriver(ChromeOptions().apply { addArguments("--ignore-certificate-errors") })
+            .apply {
+                with(manage().timeouts()) {
+                    implicitlyWait(10.seconds.toJavaDuration())
+                    scriptTimeout(10.seconds.toJavaDuration())
+                    pageLoadTimeout(10.seconds.toJavaDuration())
+                }
+            }
+
+        val redirectUri = withContext(Dispatchers.IO) {
+            try {
+                driver.get(authorizationRequestPrepared.authorizationCodeURL.toString())
+
+                driver.findElement(By.id("username")).sendKeys(user.username)
+                driver.findElement(By.id("password")).sendKeys(user.password)
+                driver.findElement(By.id("kc-login")).click()
+
+                Uri.parse(driver.currentUrl)
+            } finally {
+                driver.quit()
+            }
         }
 
-        fun formParameters() = Parameters.build {
-            append("username", user.username)
-            append("password", user.password)
-        }
-        return coroutineScope {
-            val loginUrl = extractASLoginUrl()
-            submitForm(url = loginUrl.toString(), formParameters = formParameters())
-        }
+        val authorizationCode = redirectUri.getQueryParameter("code") ?: error("Authorization code not found in redirect URI")
+        val state = redirectUri.getQueryParameter("state") ?: error("State not found in redirect URI")
+
+        return authorizationCode to state
     }
 
-    val DebugRedirectUri: URI = URI.create("urn:ietf:wg:oauth:2.0:oob")
+    override suspend fun HttpClient.authorizeIssuance(loginResponse: HttpResponse, user: KeycloakUser): HttpResponse = loginResponse
+
+    val DebugRedirectUri: URI = URI.create("https://oauthdebugger.com/debug")
 }
