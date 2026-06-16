@@ -29,7 +29,6 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
-import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
 import java.net.URI
 import java.security.KeyFactory
 import java.security.cert.CertificateFactory
@@ -61,22 +60,10 @@ object CryptoGenerator {
         )
     }
 
-    fun noKeyAttestationJwtProofsSpec(
-        curve: Curve = Curve.P_256,
-        keysNo: Int = 1,
-    ): ProofsSpecification {
-        val ecKeys = List(keysNo) { randomECSigningKey(curve) }
-        val batchSigner = BatchSigner.fromNimbusEcKeys(
-            ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
-            secureRandom = null,
-            provider = null,
-        )
-        return ProofsSpecification.JwtProofs.NoKeyAttestation(batchSigner)
-    }
-
-    fun keyAttestationJwtProofsSpec(
+    fun jwtProofSpec(
         curve: Curve = Curve.P_256,
         attestedKeysCount: Int = 3,
+        keyAttestationJwt: suspend (List<JWK>, Nonce?, PositiveDuration?) -> KeyAttestationJWT = CryptoGenerator::keyAttestationJwt,
         assertions: (Nonce?, PositiveDuration?) -> Unit = { _, _ -> },
     ): ProofsSpecification {
         val ecKeys = List(attestedKeysCount) { randomECSigningKey(curve) }
@@ -86,19 +73,21 @@ object CryptoGenerator {
                 ecPrivateKey = ecKeys[0],
                 keyInfo =
                     keyAttestationJwt(
-                        attestedKeys = ecKeys.map { it.toPublicJWK() },
+                        ecKeys.map { it.toPublicJWK() },
                         cNonce,
+                        preferredKeyStorageStatusPeriod,
                     ),
                 secureRandom = null,
                 provider = null,
             )
         }
-        return ProofsSpecification.JwtProofs.WithKeyAttestation(signerProvider)
+        return ProofsSpecification.JwtProof(signerProvider)
     }
 
     fun attestationProofSpec(
         curve: Curve = Curve.P_256,
         keysNo: Int = 3,
+        keyAttestationJwt: suspend (List<JWK>, Nonce?, PositiveDuration?) -> KeyAttestationJWT = CryptoGenerator::keyAttestationJwt,
         assertions: (Nonce?, PositiveDuration?) -> Unit = { _, _ -> },
     ) =
         ProofsSpecification.AttestationProof { nonce, preferredKeyStorageStatusPeriod ->
@@ -108,6 +97,7 @@ object CryptoGenerator {
                     randomECSigningKey(curve)
                 },
                 nonce,
+                preferredKeyStorageStatusPeriod,
             )
         }
 
@@ -138,6 +128,7 @@ object CryptoGenerator {
     fun keyAttestationJwt(
         attestedKeys: List<JWK>? = null,
         nonce: Nonce? = null,
+        preferredKeyStorageStatusPeriod: PositiveDuration? = null,
     ) = run {
         val privateKey = loadECPrivateKeyFromFile("eu/europa/ec/eudi/openid4vci/internal/key_attestation_jwt.key")
         val certificate = loadCertificateFromFile("eu/europa/ec/eudi/openid4vci/internal/key_attestation_jwt.cert")
@@ -146,6 +137,7 @@ object CryptoGenerator {
             certificate = certificate,
             signer = ECDSASigner(privateKey),
             nonce,
+            preferredKeyStorageStatusPeriod,
         )
         KeyAttestationJWT(jwt.serialize())
     }
@@ -155,10 +147,11 @@ object CryptoGenerator {
         certificate: X509Certificate,
         signer: JWSSigner,
         nonce: Nonce? = null,
+        preferredKeyStorageStatusPeriod: PositiveDuration? = null,
     ): SignedJWT {
         val keyAttestationJWTClaims = KeyAttestationJWTClaims(
             issuedAt = now(),
-            expiresAt = now() + 3600.seconds.toJavaDuration(),
+            expiresAt = now() + (preferredKeyStorageStatusPeriod?.value ?: 3600.seconds.toJavaDuration()),
             AttestedKeys(attestedKeys.map { it.toPublicJWK() }),
             keyStorage = listOf(AttackPotentialResistance.Iso18045High),
             userAuthentication = listOf(AttackPotentialResistance.Iso18045High),

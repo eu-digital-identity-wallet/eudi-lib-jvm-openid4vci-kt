@@ -598,6 +598,7 @@ data class OpenId4VCIConfig(
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     val supportedReuseMethods: Set<ReuseMethod> = emptySet(),
+    val proofs: ProofsConfig,
 )
 ```
 
@@ -618,6 +619,7 @@ Options available:
   - `IssuerMetadataPolicy.PreferSigned`: presence of signed metadata is optional, if present values from signed metadata take precedence
   - `IssuerMetadataPolicy.IgnoreSigned`: signed metadata are ignored
 - supportedReuseMethods: A set of `ReuseMethod`s supported by the wallet for credential reuse. Defaults to `emptySet()`.
+- proofs: Whether Wallet supports attestations that require not proofs, alongside the supports proof types and signing algorithms.
 
 Trust between the Wallet and the Signer of the signed metadata advertised by the Credential Issuer is established using one of the following ways:
 - `IssuerTrust.ByPublicKey`: trusting the public key used to sign the metadata
@@ -637,7 +639,12 @@ val openId4VCIConfig = OpenId4VCIConfig(
         rsaConfig =  RsaConfig(rcaKeySize = 4096, supportedJWEAlgorithms = RSAEncrypter.SUPPORTED_ALGORITHMS.toList()), // the RSA key size and JWE algorithms supported
         supportedEncryptionMethods = ContentCryptoProvider.SUPPORTED_ENCRYPTION_METHODS.toList() // which JWE encryption methods are supported
     ),
-    supportedReuseMethods = setOf(ReuseMethod.ONCE_ONLY, ReuseMethod.LIMITED_TIME) // which reuse methods are supported
+    supportedReuseMethods = setOf(ReuseMethod.ONCE_ONLY, ReuseMethod.LIMITED_TIME), // which reuse methods are supported
+    proofs = ProofsConfig(
+        isNoProofSupported = true, // whether attestations that require no proofs are supported
+        jwtProof = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)), // whether jwt proofs are supported
+        attestationProof = ProofsConfig.SupportedAttestationProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)), // whether attestation proofs are supported
+    )
 )
 val credentialOfferUri: String = "..." 
 val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()

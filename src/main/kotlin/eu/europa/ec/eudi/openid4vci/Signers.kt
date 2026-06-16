@@ -40,17 +40,6 @@ data class SignOperation<out PUB>(
 )
 
 /**
- * Represents a batch of signing operations that can be executed together.
- *
- * @param PUB The type of the public material used in the signing operations.
- * @property operations A list of [SignOperation] instances specifying the individual signing operations
- * to be performed in the batch.
- */
-data class BatchSignOperation<out PUB>(
-    val operations: List<SignOperation<PUB>>,
-)
-
-/**
  * Represents a generic Signer interface that manages signing operations.
  *
  * @param PUB The type of the public material used in the signing process.
@@ -79,51 +68,6 @@ interface Signer<out PUB> {
      *               no action will be performed.
      */
     suspend fun release(signOperation: SignOperation<@UnsafeVariance PUB>?)
-
-    companion object
-}
-
-/**
- * Defines an interface for batch signing operations.
- *
- * This interface is intended for managing batches of signing operations, allowing
- * for the authentication of a batch and the ability to release resources associated
- * with a batch. Implementations should provide the logic for authenticating signing
- * operations and releasing resources appropriately.
- *
- * @param PUB The type of the public material used in the signing operations.
- */
-interface BatchSigner<out PUB> {
-
-    /**
-     * The algorithm that will be used for signing
-     */
-    val javaAlgorithm: String
-
-    /**
-     * Authenticates a batch signing operation.
-     *
-     * The method initiates the process of authenticating signing operations that are
-     * structured as a batch. Authentication ensures that the signing operations
-     * meet the required security and validity conditions.
-     *
-     * @return A [BatchSignOperation] instance containing the authenticated batch of
-     * signing operations. The returned batch encapsulates the verified operations
-     * that can be securely executed.
-     */
-    suspend fun authenticate(): BatchSignOperation<PUB>
-
-    /**
-     * Releases the resources associated with a batch of signing operations.
-     *
-     * This method is intended to clean up and release any allocated resources corresponding
-     * to the provided batch of signing operations. It takes an optional `BatchSignOp` parameter
-     * and ensures that any necessary cleanup for the batch is performed.
-     *
-     * @param signOps An optional [BatchSignOperation] instance containing the batch of signing operations
-     *                to be released. If `null`, no operation is performed.
-     */
-    suspend fun release(signOps: BatchSignOperation<@UnsafeVariance PUB>?)
 
     companion object
 }

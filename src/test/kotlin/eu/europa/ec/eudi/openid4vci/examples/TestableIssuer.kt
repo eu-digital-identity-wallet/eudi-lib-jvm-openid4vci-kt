@@ -15,7 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.util.JSONObjectUtils
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -26,6 +30,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.addAll
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -121,6 +129,68 @@ interface CanRequestForCredentialOffer<in USER> {
                 return URI.create("$endPoint?credential_offer=$offerJson")
             }
         }
+    }
+}
+
+fun interface CanRequestKeyAttestation {
+    suspend fun requestKeyAttestation(
+        attestedKeys: List<JWK>,
+        nonce: Nonce?,
+        preferredKeyStorageStatusPeriod: PositiveDuration?,
+    ): KeyAttestationJWT
+
+    companion object {
+        fun usingCryptoGenerator(): CanRequestKeyAttestation =
+            CanRequestKeyAttestation { attestedKeys, nonce, preferredKeyStorageStatusPeriod ->
+                CryptoGenerator.keyAttestationJwt(attestedKeys, nonce, preferredKeyStorageStatusPeriod)
+            }
+
+        fun usingWalletProviderService(
+            url: Url,
+            enableLogging: Boolean = false,
+        ): CanRequestKeyAttestation = RequestKeyAttestationFromWalletProviderService(url, enableLogging)
+    }
+
+    private class RequestKeyAttestationFromWalletProviderService(
+        private val url: Url,
+        enableLogging: Boolean = false,
+    ) : CanRequestKeyAttestation {
+        private val httpClient by lazy { createHttpClient(enableLogging) }
+
+        override suspend fun requestKeyAttestation(
+            attestedKeys: List<JWK>,
+            nonce: Nonce?,
+            preferredKeyStorageStatusPeriod: PositiveDuration?,
+        ): KeyAttestationJWT {
+            val request = Request(attestedKeys, nonce, preferredKeyStorageStatusPeriod)
+            val response = httpClient.post(url) {
+                contentType(ContentType.Application.Json)
+                accept(ContentType.Application.Json)
+                setBody(request)
+            }.body<Response>()
+            return KeyAttestationJWT(response.keyAttestation)
+        }
+
+        @Serializable
+        private data class Request(
+            @SerialName("nonce") val nonce: String? = null,
+            @SerialName("jwkSet") @Required val jwkSet: JsonObject,
+            @SerialName("preferredKeyStorageStatusPeriod") val preferredKeyStorageStatusPeriod: DurationAsSeconds? = null,
+        ) {
+            companion object {
+                operator fun invoke(keys: List<JWK>, nonce: Nonce?, preferredKeyStorageStatusPeriod: PositiveDuration?): Request {
+                    val jwkSet = JsonSupport.decodeFromString<JsonObject>(
+                        JSONObjectUtils.toJSONString(JWKSet(keys).toJSONObject(true)),
+                    )
+                    return Request(nonce?.value, jwkSet, preferredKeyStorageStatusPeriod?.value)
+                }
+            }
+        }
+
+        @Serializable
+        private data class Response(
+            @SerialName("keyAttestation") @Required val keyAttestation: String,
+        )
     }
 }
 

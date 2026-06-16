@@ -33,7 +33,7 @@ class PidDevIssuerTest {
     fun `Issue PID in mso_mdoc using authorize code flow and JWT proofs`() = runTest {
         repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.PID_MsoMdoc_config_id,
-            ProofsType.JwtProofsNoKeyAttestation(BatchOption.Specific(2)),
+            ProofsType.JwtProof(BatchOption.Specific(2)),
         )
     }
 
@@ -42,7 +42,7 @@ class PidDevIssuerTest {
     fun `Issue PID in sd-jwt vc using authorize code flow and JWT proofs`() = runTest {
         repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.PID_SdJwtVC_config_id,
-            ProofsType.JwtProofsNoKeyAttestation(BatchOption.Specific(2)),
+            ProofsType.JwtProof(BatchOption.Specific(2)),
         )
     }
 
@@ -51,7 +51,7 @@ class PidDevIssuerTest {
     fun `Issue mDL in mso_mdoc using authorize code flow and JWT proofs`() = runTest {
         repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.MDL_config_id,
-            ProofsType.JwtProofsNoKeyAttestation(BatchOption.Specific(2)),
+            ProofsType.JwtProof(BatchOption.Specific(2)),
         )
     }
 
@@ -60,7 +60,7 @@ class PidDevIssuerTest {
     fun `Issue EHIC in sd-jwt vc jws json flattened using authorize code flow and JWT proofs`() = runTest {
         repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.EHIC_JwsJson_config_id,
-            ProofsType.JwtProofWithKeyAttestation(BatchOption.Specific(2)),
+            ProofsType.JwtProof(BatchOption.Specific(2)),
         )
     }
 
@@ -69,7 +69,7 @@ class PidDevIssuerTest {
     fun `Issue EHIC in sd-jwt vc compact using authorize code flow and JWT proofs`() = runTest {
         repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.EHIC_Compact_config_id,
-            ProofsType.JwtProofWithKeyAttestation(BatchOption.Specific(2)),
+            ProofsType.JwtProof(BatchOption.Specific(2)),
         )
     }
 
@@ -78,7 +78,7 @@ class PidDevIssuerTest {
     fun `Issue Learning Credential in sd-jwt vc compact using authorize code flow and JWT proofs`() = runTest {
         repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.LearningCredential_SdJwtVcCompact_Config_Id,
-            ProofsType.JwtProofsNoKeyAttestation(BatchOption.Specific(2)),
+            ProofsType.JwtProof(BatchOption.Specific(2)),
         )
     }
 }
