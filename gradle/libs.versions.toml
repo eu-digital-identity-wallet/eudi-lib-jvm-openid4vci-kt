@@ -17,6 +17,7 @@ tink = "1.21.0"
 bouncycastle = "1.83"
 serialization = "1.9.0"
 uri-kmp = "0.0.21"
+selenium = "4.44.0"
 
 [libraries]
 nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
@@ -37,6 +38,7 @@ tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 uri-kmp = { module = "com.eygraber:uri-kmp", version.ref = "uri-kmp" }
+selenium-java = { module = "org.seleniumhq.selenium:selenium-java", version.ref = "selenium" }
 
 [plugins]
 dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependency-check" }
