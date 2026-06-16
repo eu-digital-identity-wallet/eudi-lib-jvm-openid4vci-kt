@@ -20,8 +20,7 @@ import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.http.Url
 
-private const val BASE_URL = "https://dev.issuer-backend.eudiw.dev"
-private val IssuerId = CredentialIssuerId(BASE_URL).getOrThrow()
+private val IssuerId = CredentialIssuerId("https://dev.issuer-backend.eudiw.dev").getOrThrow()
 private val WalletInstanceAttestationServiceUrl = Url("https://dev.wallet-provider.eudiw.dev/wallet-instance-attestation/jwk")
 private val KeyAttestationServiceUrl = Url("https://dev.wallet-provider.eudiw.dev/key-attestation/jwk-set")
 

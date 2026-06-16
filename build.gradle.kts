@@ -47,6 +47,7 @@ dependencies {
     testImplementation(libs.cbor)
     testImplementation(libs.tink)
     testImplementation(libs.bouncycastle.pkix)
+    testImplementation(libs.selenium.java)
 }
 
 java {
