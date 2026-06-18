@@ -20,32 +20,35 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
 
 ## Overview
 
-This is a Kotlin library, targeting JVM, that supports
-the [OpenId4VCI 1.0](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) protocol.
+This is a Kotlin library, targeting JVM, that supports the [OpenId4VCI 1.0](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) 
+protocol, focusing on compliance with:
+
+* [ARF's Technical Specification 3](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/main/docs/technical-specifications/ts3-wallet-unit-attestation.md)
+* [ETSI TS 119 472-3 V1.1.1 (2026-03)](https://www.etsi.org/deliver/etsi_ts/119400_119499/11947203/01.01.01_60/ts_11947203v010101p.pdf)
 
 In particular, the library focuses on the wallet's role in and provides the following features:
 
-| Feature                                                                                         | Coverage                                                                                                                                                                                                                                                                                                    |
-|-------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [Wallet-initiated issuance](#wallet-initiated-issuance)                                         | ✅                                                                                                                                                                                                                                                                                                           |
-| [Resolve a credential offer](#resolve-a-credential-offer)                                       | ✅ Unsigned metadata ✅ signed metadata ❌ [accept-language](#issuer-metadata-accept-language)                                                                                                                                                                                                                 |
-| [Authorization code flow](#authorization-code-flow)                                             | ✅                                                                                                                                                                                                                                                                                                           |
-| [Pre-authorized code flow](#pre-authorized-code-flow)                                           | ✅                                                                                                                                                                                                                                                                                                           |
-| mso_mdoc format                                                                                 | ✅                                                                                                                                                                                                                                                                                                           |
-| SD-JWT-VC format                                                                                | ✅                                                                                                                                                                                                                                                                                                           |
-| W3C VC DM                                                                                       | VC Signed as a JWT, Not Using JSON-LD                                                                                                                                                                                                                                                                       |
-| [Place credential request](#place-credential-request)                                           | ✅ Including automatic handling of `invalid_proof` & multiple proofs                                                                                                                                                                                                                                         |
-| [Query for deferred credentials](#query-for-deferred-credentials)                               | ✅ Including automatic refresh of `access_token`                                                                                                                                                                                                                                                             |
-| [Query for deferred credentials at a later time](#query-for-deferred-credentials-at-later-time) | ✅ Including automatic refresh of `access_token`                                                                                                                                                                                                                                                             |
-| [Notify credential issuer](#notify-credential-issuer)                                           | ✅                                                                                                                                                                                                                                                                                                           | 
-| Proof                                                                                           | ✅ JWT, <br /> ✅ JWT with [Key Attestation](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-key-attestations) in JOSE Header (`key_attestation`), <br /> ✅ [Key Attestation](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-key-attestations) |
-| Credential request encryption                                                                   | ✅                                                                                                                                                                                                                                                                                                           |
-| Credential response encryption                                                                  | ✅                                                                                                                                                                                                                                                                                                           |
-| [Pushed authorization requests](#pushed-authorization-requests)                                 | ✅ Used by default, if supported by issuer                                                                                                                                                                                                                                                                   |
-| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)             | ✅ Including Authorization Code binding when using Pushed Authorization Requests (enabled by default)                                                                                                                                                                                                        |
-| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                               | ✅                                                                                                                                                                                                                                                                                                           |
-| Wallet authentication                                                                           | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth-20-attestation-based-client-authentication)                                                                                                                                                                                        |
-| Use issuer's nonce endpoint to get c_nonce for proofs                                           | ✅                                                                                                                                                                                                                                                                                                           |
+| Feature                                                                                         | Coverage                                                                                                                                                                                                                                                                                  |
+|-------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [Wallet-initiated issuance](#wallet-initiated-issuance)                                         | ✅                                                                                                                                                                                                                                                                                         |
+| [Resolve a credential offer](#resolve-a-credential-offer)                                       | ✅ Unsigned metadata ✅ signed metadata ❌ [accept-language](#issuer-metadata-accept-language)                                                                                                                                                                                               |
+| [Authorization code flow](#authorization-code-flow)                                             | ✅                                                                                                                                                                                                                                                                                         |
+| [Pre-authorized code flow](#pre-authorized-code-flow)                                           | ✅                                                                                                                                                                                                                                                                                         |
+| mso_mdoc format                                                                                 | ✅                                                                                                                                                                                                                                                                                         |
+| SD-JWT-VC format                                                                                | ✅                                                                                                                                                                                                                                                                                         |
+| W3C VC DM                                                                                       | VC Signed as a JWT, Not Using JSON-LD                                                                                                                                                                                                                                                     |
+| [Place credential request](#place-credential-request)                                           | ✅ Including automatic handling of `invalid_proof`                                                                                                                                                                                                                                         |
+| [Query for deferred credentials](#query-for-deferred-credentials)                               | ✅ Including automatic refresh of `access_token`                                                                                                                                                                                                                                           |
+| [Query for deferred credentials at a later time](#query-for-deferred-credentials-at-later-time) | ✅ Including automatic refresh of `access_token`                                                                                                                                                                                                                                           |
+| [Notify credential issuer](#notify-credential-issuer)                                           | ✅                                                                                                                                                                                                                                                                                         | 
+| Proof                                                                                           | ✅ JWT with [Key Attestation](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-key-attestations) in JOSE Header (`key_attestation`), <br /> ✅ [Attestation](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-key-attestations) |
+| Credential request encryption                                                                   | ✅                                                                                                                                                                                                                                                                                         |
+| Credential response encryption                                                                  | ✅                                                                                                                                                                                                                                                                                         |
+| [Pushed authorization requests](#pushed-authorization-requests)                                 | ✅ Used by default, if supported by issuer                                                                                                                                                                                                                                                 |
+| [Demonstrating Proof of Possession (DPoP)](#demonstrating-proof-of-possession-dpop)             | ✅ Including Authorization Code binding when using Pushed Authorization Requests (enabled by default)                                                                                                                                                                                      |
+| [PKCE](#proof-key-for-code-exchange-by-oauth-public-clients-pkce)                               | ✅                                                                                                                                                                                                                                                                                         |
+| Wallet authentication                                                                           | ✅ public client, <br/>✅ [Attestation-Based Client Authentication](#oauth-20-attestation-based-client-authentication)                                                                                                                                                                      |
+| Use issuer's nonce endpoint to get c_nonce for proofs                                           | ✅                                                                                                                                                                                                                                                                                         |
 
 
 ## Disclaimer
@@ -119,12 +122,14 @@ import eu.europa.ec.eudi.openid4vci.*
 val openId4VCIConfig = ...
 val credentialIssuerId: CredentialIssuerId = //known 
 val credentialConfigurationIds: List<CredentialConfigurationIdentifier> = // known
+val httpClient: HttpClient = ...
 
 val issuer = 
     Issuer.makeWalletInitiated(
         config,
         credentialIssuerId,
-        credentialConfigurationIds
+        credentialConfigurationIds,
+        httpClient,
     ).getOrThrow()
 ```
 #### Wallet-initiated issuance next steps
@@ -154,14 +159,14 @@ This resolution includes the following
 #### Resolve a credential offer successful outcome:
 
 An instance of the [Issuer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/Issuer.kt) interface (the main entry point to the library) will have been initiated.
-This instance includes the resolved [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOfferRequestResolver.kt) and the necessary methods to proceed.
+This instance includes the resolved [CredentialOffer](src/main/kotlin/eu/europa/ec/eudi/openid4vci/CredentialOffer.kt) and the necessary methods to proceed.
 The resolved offer contains the mandatory elements required for issuance.
 - The issuer's identifier
 - The selected authorization server that will authorize the issuance
 - The specific credentials that will be requested
 
 These elements can be used to populate a wallet view that 
-asks user's consensus to proceed with the issuance. This includes  the authorization
+asks user's consensus to proceed with the issuance. This includes the authorization
 flow to be used (either authorization code flow, or pre-authorized code)
 
 This concern, though, is out of the scope of the library
@@ -175,7 +180,8 @@ import eu.europa.ec.eudi.openid4vci.*
 
 val openId4VCIConfig = ...
 val credentialOfferUri: String = "..."
-val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()
+val httpClient: HttpClient = ...
+val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri, httpClient).getOrThrow()
 ```
 
 #### Resolve a credential offer next steps
@@ -265,7 +271,7 @@ val (authorizationCode, state) = ... // using url preparedAuthorizationRequest.a
 val authorizedRequest =
      with(issuer) {
          with(preparedAuthorizationRequest) {
-             authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode),state).getOrThrow()
+             authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), state).getOrThrow()
          }
      }
 ```
@@ -375,20 +381,17 @@ In case of an unexpected error, a runtime exception will be raised.
 ```kotlin
 import eu.europa.ec.eudi.openid4vci.*
 
-// Specifies the type of proof(s) to be included in the credential issuance request.
+// Specifies the type of proof to be included in the credential issuance request.
 // This can be one of the following, depending on the credential issuer's requirements and the wallet's capabilities:
-// - ProofsSpecification.NoProofs: No proof is included in the request.
-// - ProofsSpecification.JwtProofs.NoKeyAttestation: JWT-based proof(s) without key attestation, requires a BatchSigner for JWT binding keys.
-// - ProofsSpecification.JwtProofs.WithKeyAttestation: JWT-based proof with key attestation, requires a Signer for KeyAttestationJWT and a key index.
-// - ProofsSpecification.AttestationProof: Uses a pre-generated KeyAttestationJWT as proof.
-val proofSpecification: ProofsSpecification = ...
-
-val claimSetToRequest : ClaimSet? = null // null indicates that all claims will be requested    
+// - ProofSpecification.NoProof: No proof is included in the request.
+// - ProofSpecification.JwtProof: JWT-based proof with key attestation, requires a Signer for KeyAttestationJWT; Signer must correspond to the first attested key of the KeyAttestationJWT per ETSI TS 119 472-3 V1.1.1.
+// - ProofSpecification.AttestationProof: Uses a pre-generated KeyAttestationJWT as proof.
+val proofSpecification: ProofSpecification = ...
 
 // Step 1
 // Assemble the request    
 val request = 
-    IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId, claimSetToRequest)
+    IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
 
 // Place the request
 val (updatedAuthorizedRequest, outcome) =
@@ -401,17 +404,14 @@ val (updatedAuthorizedRequest, outcome) =
 ```
 
 > [!TIP]
-> If more than one `popSigner` are passed to function `request` 
-> multiple instances of the credential will be issued, provided that
-> credential issuer supports batch issuance. 
+> Provided that credential issuer supports batch issuance, to request the issuance of multiple instances of the credential, 
+> use a JWT-based proof or an Attestation proof that contains a KeyAttestationJWT with multiple attested keys. 
 
 > [!NOTE]
 > 
-> Library evaluates if proofs are needed to be sent   
-> - If pop signers are provided from caller.
-> - If the requested credential's configuration states so.
+> Library evaluates if proofs are needed to be sent based on the credential's configuration.
 > 
-> If issuer advertises a nonce endpoint library will use it to include a nonce in the generated proofs.  
+> If issuer advertises a nonce endpoint, library will use it to include a nonce in the generated proof.  
 
 
 #### Place credential request next steps
@@ -428,7 +428,7 @@ an `AuthorizedRequest` and an `Issuer` instance.
 
 #### Query for deferred credentials preconditions
 
-- Wallet/caller has [placed a credential request](#place-a-credential-request)
+- Wallet/caller has [placed a credential request](#place-credential-request)
 - Wallet/caller has received a [deferred outcome](#place-credential-request-outcome) carrying a `transaction_id`
 - Wallet/caller has an instance of `AuthorizedRequest` 
 
@@ -436,7 +436,7 @@ an `AuthorizedRequest` and an `Issuer` instance.
 
 1. Wallet/caller issuing the `Issuer` instance places the query providing `AuthorizedRequest` and `transaction_id`
 2. Library checks if `access_token`  in `AuthorizedRequest` is expired
-3. If `access_token` is expired it will automatically be refreshed, if credential issuer has given a `refresh_token`
+3. If `access_token` is expired, it will automatically be refreshed if credential issuer has given a `refresh_token`
 4. Library places the query against the Deferred Endpoint of the credential issuer
 5. Library gets credential issuer response and maps it into `DeferredCredentialQueryOutcome`
 6. Caller gets back an `AuthorizedRequest` and `DeferredCredentialQueryOutcome`
@@ -493,8 +493,8 @@ As per [query for deferred credentials](#query-for-deferred-credentials-precondi
 3. Wallet/caller loads the `DeferredIssuanceContext`. That's also outside the scope of the library
 4. Wallet/caller queries the credential issuer issuing `DeferredIssuer`
 5. Library performs all steps defined in [Query for deferred credentials](#query-for-deferred-credentials)
-6. Library returns to the caller the `DeferredIssuanceContxt?` and the `DeferredCredentialQueryOutcome`
-7. Depending on the outcome, wallet/caller may choose to store the new `DeferredIssuanceContxt` to query again, later on
+6. Library returns to the caller the `DeferredIssuanceContext` and the `DeferredCredentialQueryOutcome`
+7. Depending on the outcome, wallet/caller may choose to store the new `DeferredIssuanceContext` to query again, later on
 
 #### Query for deferred credentials at later time outcome
 
@@ -516,7 +516,7 @@ val deferredCredential = // has been retrieved in a previous step. Holds the tra
 val deferredCtx = 
     with(issuer) {
         with(authorizedRequest) {
-            deferredContext(deferredCredential).getOrThrough()    
+            deferredContext(deferredCredential).getOrThrow()    
         }
     }
 
@@ -526,16 +526,11 @@ val deferredCtx =
 
 // Step 4
 val (updatedDeferredCtx, outcome) = 
-    DeferredIssuer.queryForDeferredCredential(deferredCtx).getOrThrough()
+    DeferredIssuer.queryForDeferredCredential(deferredCtx).getOrThrow()
 ```
 #### Serializing `DeferredIssuanceContext`
 
-How waller/caller stores and loads the `DeferredIssuanceContext` is out of scope
-of the library. 
-
-There is though an [indicative implementation](src/test/kotlin/eu/europa/ec/eudi/openid4vci/examples/DeferredIssuerExtensions.kt) 
-that serializes the context as a JSON object.
-
+How waller/caller stores and loads the `DeferredIssuanceContext` is out of scope of the library.
 
 ### Notify Credential Issuer
 
@@ -592,13 +587,12 @@ data class OpenId4VCIConfig(
     val authFlowRedirectionURI: URI,
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-    val dPoPUsage: DPoPUsage = DPoPUsage.Never,
-    val clientAttestationPoPBuilder: ClientAttestationPoPBuilder = ClientAttestationPoPBuilder.Default,
+    val dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
     val parUsage: ParUsage = ParUsage.IfSupported(authorizationCodeDPoPBinding = true),
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
-    val supportedReuseMethods: Set<ReuseMethod> = emptySet(),
-    val proofs: ProofsConfig,
+    val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
+    val proofs: ProofsConfig = ProofsConfig.Default,
 )
 ```
 
@@ -610,16 +604,15 @@ Options available:
 - authFlowRedirectionURI: It is the `redirect_uri` parameter that will be included in a PAR or simple authorization request.
 - encryptionSupportConfig: Wallet supported encryption parameters to be used for Credential Request and Credential Response encryption.
 - authorizeIssuanceConfig: Preference on using `scope` or `authorization_details` during authorization code flow.
-- dPoPUsage: An indication about whether DPoP is never to be used, supported, or required. If Wallet requires DPoP but Credential Issuer doesn't advertise this feature, issuance does not proceed.
-- clientAttestationPoPBuilder: Wallet supported mechanism for creating Client Attestation POP JWTs when using [Attestation-Based Client Authentication](#oauth-20-attestation-based-client-authentication). 
-- parUsage: An indication to not use PAR endpoint or use it if advertised by the credential issuer. Additionally, allows configuring whether Authorization Code DPoP binding should be performed.
+- dPoPUsage: An indication about whether DPoP is never to be used, supported, or required. If Wallet requires DPoP but Credential Issuer doesn't advertise this feature, issuance does not proceed. 
+- parUsage: An indication to not use PAR endpoint or use it if advertised by the credential issuer. Additionally, allows configuring whether Authorization Code DPoP binding should be performed.  
 - clock: Wallet/Caller clock.
 - issuerMetadataPolicy: Wallet policy concerning Credential Issuer metadata. Possible options:
   - `IssuerMetadataPolicy.RequireSigned`: require the presence of signed metadata and use only values from signed metadata
   - `IssuerMetadataPolicy.PreferSigned`: presence of signed metadata is optional, if present values from signed metadata take precedence
   - `IssuerMetadataPolicy.IgnoreSigned`: signed metadata are ignored
-- supportedReuseMethods: A set of `ReuseMethod`s supported by the wallet for credential reuse. Defaults to `emptySet()`.
-- proofs: Whether Wallet supports attestations that require not proofs, alongside the supports proof types and signing algorithms.
+- supportedCredentialReusePolicies: A set of `EudiReusePolicyType`s supported by the wallet for credential reuse. Defaults to `null`.
+- proofs: Whether Wallet supports attestations that require no proofs, alongside the supports proof types and signing algorithms.
 
 Trust between the Wallet and the Signer of the signed metadata advertised by the Credential Issuer is established using one of the following ways:
 - `IssuerTrust.ByPublicKey`: trusting the public key used to sign the metadata
@@ -639,15 +632,16 @@ val openId4VCIConfig = OpenId4VCIConfig(
         rsaConfig =  RsaConfig(rcaKeySize = 4096, supportedJWEAlgorithms = RSAEncrypter.SUPPORTED_ALGORITHMS.toList()), // the RSA key size and JWE algorithms supported
         supportedEncryptionMethods = ContentCryptoProvider.SUPPORTED_ENCRYPTION_METHODS.toList() // which JWE encryption methods are supported
     ),
-    supportedReuseMethods = setOf(ReuseMethod.ONCE_ONLY, ReuseMethod.LIMITED_TIME), // which reuse methods are supported
+    supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly, EudiReusePolicyType.LimitedTime)), // which reuse methods are supported
     proofs = ProofsConfig(
         isNoProofSupported = true, // whether attestations that require no proofs are supported
         jwtProof = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)), // whether jwt proofs are supported
         attestationProof = ProofsConfig.SupportedAttestationProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)), // whether attestation proofs are supported
     )
 )
-val credentialOfferUri: String = "..." 
-val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri).getOrThrow()
+val credentialOfferUri: String = "..."
+val httpClient: HttpClient = ...
+val issuer = Issuer.make(openId4VCIConfig, credentialOfferUri, httpClient).getOrThrow()
 ```
 
 ### Supported Encryption Algorithms
@@ -692,7 +686,14 @@ otherwise it will fall back to a regular authorization request.
 
 ### Proof Types Supported
 
-The current version of the library supports JWT proofs and Key Attestations.
+The current version of the library supports JWT proofs that contain KeyAttestationJWTs and Attestation proofs.
+
+> [!IMPORTANT]
+>
+> Per ETSI TS 119 472-3 V1.1.1, Credential Requests may contain a single proof.
+> 
+> The KeyAttestationJWT used in a JWT proof, or as an Attestation proof, must be a valid Key Attestation per ARF's Technical Specification 3.
+
 
 ### Demonstrating Proof of Possession (DPoP)
 
@@ -703,7 +704,10 @@ that the authorization server, that protects the credential issuer, supports thi
 If wallet [configuration](#configuration-options) supports or requires, and if the credential issuer advertises DPoP with
 algorithms supported by wallet's DPoP Signer, then library will transparently request for a DPoP `access_token` instead of the default Bearer token.
 
-Furthermore, all further interactions will use the correct token type (Bearer or DPoP)
+Additionally, if the PAR endpoint is used and wallet [configuration](#configuration-options) has enabled Authorization Code DPoP binding,
+Authorization Code DPoP binding will be performed at the PAR endpoint using the `DPoP` header.
+
+All further interactions will use the correct token type (Bearer or DPoP)
 
 Library supports both
 [Authorization Server-Provided Nonce](https://datatracker.ietf.org/doc/html/rfc9449#name-authorization-server-provid) and
@@ -723,18 +727,25 @@ This feature cannot be disabled.
 
 Library supports [OAuth 2.0 Attestation-Based Client Authentication - Draft 07](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html)
 
-To enable this, caller must have obtained a [Client/Wallet Attestation JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html#name-client-attestation-jwt)
+To enable this, caller must provide a way to provision a [Client/Wallet Attestation JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html#name-client-attestation-jwt)
 How this is done, it is outside the scope of the library.
-
-Furthermore, caller must provide a specification on how to produce the [Client Attestation PoP JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html#name-client-attestation-pop-jwt)
 
 ```kotlin
 
-val clientAttestationJWT: ClientAttestationJWT("...")
-val popJwtSpec: ClientAttestationPoPJWTSpec = ClientAttestationPoPJWTSpec(
-    signer = ... // An implementation of Signer<JWK> which will be used to sign Client Attestation POP JWTs.
-)  
-val wallet = Client.Attested(clientAttestationJWT, popJwtSpec)
+val provisionClientAttestation = object : ProvisionClientAttestation {
+    override val algorithm: JwsAlgorithm = ...
+    override val popAlgorithm: JwsAlgorithm = ...
+
+    override suspend fun invoke(
+        authorizationServer: HttpsUrl, 
+        preferredClientStatusPeriod: PositiveDuration?,
+    ): Provisioned {
+        // call wallet provider to obtain a ClientAttestationJWT
+        ...
+    }
+}  
+val clientId = "..."
+val wallet = Client.AttestationBased(clientId, provisionClientAttestation)
 val openId4VCIConfig = OpenId4VCIConfig(
     client = wallet
     authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
@@ -754,6 +765,10 @@ Library will check that the authorization server of the issuer:
 Finally, library supports Client Attestation POP JWT [challenges](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html#name-challenge-retrieval) using: 
 * either the Challenge Endpoint, if advertised by the authorization server in claim `challenge_endpoint` of its metadata
 * or the `OAuth-Client-Attestation-Challenge` HTTP Header
+
+> [!NOTE]
+>
+> The provisioned ClientAttestationJWT must be a valid Wallet Instance Attestation per ARF's Technical Specification 3
 
 ## Features not supported
 

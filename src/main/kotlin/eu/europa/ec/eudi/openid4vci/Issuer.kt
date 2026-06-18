@@ -338,6 +338,7 @@ interface Issuer :
          * @param credentialIssuerId the id of the credential issuer
          * @param credentialConfigurationIdentifiers a list of credential configuration identifiers
          * @param httpClient an http client, used while interacting with issuer
+         * @param requestEncryptionSpecFactory a factory method to generate the issuance request encryption
          * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
          *
          * @return if wallet's [config] can satisfy the requirements of credential issuer, an [Issuer] will be
