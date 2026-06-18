@@ -727,7 +727,7 @@ This feature cannot be disabled.
 
 Library supports [OAuth 2.0 Attestation-Based Client Authentication - Draft 07](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html)
 
-To enable this, caller must provide a way to provision a [Client/Wallet Attestation JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html#name-client-attestation-jwt)
+To enable this, caller must provide a way to provision a [Client Attestation JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-attestation-based-client-auth-07.html#name-client-attestation-jwt)   
 How this is done, it is outside the scope of the library.
 
 ```kotlin
