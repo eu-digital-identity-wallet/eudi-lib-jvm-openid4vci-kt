@@ -766,7 +766,7 @@ Finally, library supports Client Attestation POP JWT [challenges](https://www.ie
 * either the Challenge Endpoint, if advertised by the authorization server in claim `challenge_endpoint` of its metadata
 * or the `OAuth-Client-Attestation-Challenge` HTTP Header
 
-> [!NOTE]
+> [!IMPORTANT]
 >
 > The provisioned ClientAttestationJWT must be a valid Wallet Instance Attestation per ARF's Technical Specification 3
 
