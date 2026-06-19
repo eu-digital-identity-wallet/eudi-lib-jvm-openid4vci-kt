@@ -65,7 +65,7 @@ object CryptoGenerator {
         attestedKeysCount: Int = 3,
         keyAttestationJwt: suspend (List<JWK>, Nonce?, PositiveDuration?) -> KeyAttestationJWT = CryptoGenerator::keyAttestationJwt,
         assertions: (Nonce?, PositiveDuration?) -> Unit = { _, _ -> },
-    ): ProofsSpecification {
+    ): ProofSpecification {
         val ecKeys = List(attestedKeysCount) { randomECSigningKey(curve) }
         val signerProvider: suspend (Nonce?, PositiveDuration?) -> Signer<KeyAttestationJWT> = { cNonce, preferredKeyStorageStatusPeriod ->
             assertions(cNonce, preferredKeyStorageStatusPeriod)
@@ -81,7 +81,7 @@ object CryptoGenerator {
                 provider = null,
             )
         }
-        return ProofsSpecification.JwtProof(signerProvider)
+        return ProofSpecification.JwtProof(signerProvider)
     }
 
     fun attestationProofSpec(
@@ -90,7 +90,7 @@ object CryptoGenerator {
         keyAttestationJwt: suspend (List<JWK>, Nonce?, PositiveDuration?) -> KeyAttestationJWT = CryptoGenerator::keyAttestationJwt,
         assertions: (Nonce?, PositiveDuration?) -> Unit = { _, _ -> },
     ) =
-        ProofsSpecification.AttestationProof { nonce, preferredKeyStorageStatusPeriod ->
+        ProofSpecification.AttestationProof { nonce, preferredKeyStorageStatusPeriod ->
             assertions(nonce, preferredKeyStorageStatusPeriod)
             keyAttestationJwt(
                 List(keysNo) {
