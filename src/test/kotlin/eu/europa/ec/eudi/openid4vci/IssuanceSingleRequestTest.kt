@@ -124,7 +124,7 @@ class IssuanceSingleRequestTest {
         assertFailsWith<IllegalArgumentException> {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
             with(issuer) {
-                authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
+                authorizedRequest.request(requestPayload, ProofSpecification.NoProof).getOrThrow()
             }
         }
     }
@@ -205,7 +205,7 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
+            authorizedRequest.request(requestPayload, ProofSpecification.NoProof).getOrThrow()
         }
     }
 
@@ -1113,7 +1113,7 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
             val exception = assertFailsWith<IllegalArgumentException> {
-                authorizedRequest.request(requestPayload, ProofsSpecification.NoProofs).getOrThrow()
+                authorizedRequest.request(requestPayload, ProofSpecification.NoProof).getOrThrow()
             }
             assertEquals("Wallet doesn't support attestations that require no proofs", exception.message)
         }

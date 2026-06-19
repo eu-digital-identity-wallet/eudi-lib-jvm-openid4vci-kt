@@ -111,7 +111,7 @@ suspend fun <ENV> Issuer.submitCredentialRequest(
             }
         }
 
-    val proofSpec: ProofsSpecification = when (proofsType) {
+    val proofSpec: ProofSpecification = when (proofsType) {
         is ProofsType.JwtProof -> jwtProofSpec(
             Curve.P_256,
             proofsNo,

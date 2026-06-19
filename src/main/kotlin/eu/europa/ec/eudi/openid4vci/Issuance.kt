@@ -134,17 +134,17 @@ sealed interface IssuanceRequestPayload {
 
 typealias AuthorizedRequestAnd<T> = Pair<AuthorizedRequest, T>
 
-sealed interface ProofsSpecification {
+sealed interface ProofSpecification {
 
-    data object NoProofs : ProofsSpecification
+    data object NoProof : ProofSpecification
 
     data class JwtProof(
         val proofSignerProvider: suspend (Nonce?, PositiveDuration?) -> Signer<KeyAttestationJWT>,
-    ) : ProofsSpecification
+    ) : ProofSpecification
 
     data class AttestationProof(
         val attestationProvider: suspend (Nonce?, PositiveDuration?) -> KeyAttestationJWT,
-    ) : ProofsSpecification
+    ) : ProofSpecification
 }
 
 /**
@@ -160,13 +160,13 @@ fun interface RequestIssuance {
      * [IssuanceRequestPayload.IdentifierBased] and the credential identifier must be one of the authorized identifiers.
      *
      * @param requestPayload the payload of the request
-     * @param proofsSpecification the specification of proofs to be included in the request
+     * @param proofSpecification the specification of proofs to be included in the request
      * @return the possibly updated [AuthorizedRequest] (if updated it will contain a fresh updated Resource-Server DPoP Nonce)
      * and the [SubmissionOutcome]
      */
     suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
-        proofsSpecification: ProofsSpecification,
+        proofSpecification: ProofSpecification,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 }
 
