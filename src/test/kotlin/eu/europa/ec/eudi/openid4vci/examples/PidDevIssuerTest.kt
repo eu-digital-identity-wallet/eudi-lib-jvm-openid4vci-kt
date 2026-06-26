@@ -57,24 +57,6 @@ class PidDevIssuerTest {
 
     @Test
     @Ignore
-    fun `Issue EHIC in sd-jwt vc jws json flattened using authorize code flow and JWT proofs`() = runTest {
-        repeatBatchIssuanceUsingAuthorizationCodeFlow(
-            PidDevIssuer.EHIC_JwsJson_config_id,
-            ProofsType.JwtProof(BatchOption.Specific(2)),
-        )
-    }
-
-    @Test
-    @Ignore
-    fun `Issue EHIC in sd-jwt vc compact using authorize code flow and JWT proofs`() = runTest {
-        repeatBatchIssuanceUsingAuthorizationCodeFlow(
-            PidDevIssuer.EHIC_Compact_config_id,
-            ProofsType.JwtProof(BatchOption.Specific(2)),
-        )
-    }
-
-    @Test
-    @Ignore
     fun `Issue Learning Credential in sd-jwt vc compact using authorize code flow and JWT proofs`() = runTest {
         repeatBatchIssuanceUsingAuthorizationCodeFlow(
             PidDevIssuer.LearningCredential_SdJwtVcCompact_Config_Id,
