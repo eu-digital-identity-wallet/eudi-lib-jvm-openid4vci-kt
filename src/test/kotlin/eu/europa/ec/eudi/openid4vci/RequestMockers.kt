@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWEHeader
 import com.nimbusds.jose.crypto.ECDHEncrypter
@@ -40,7 +39,6 @@ import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.util.*
@@ -426,7 +424,7 @@ fun MockRequestHandleScope.encryptionAwareResponseDataBuilder(
     return responseEncryption?.let {
         val (jwk, alg, enc) = responseEncryption
         respond(
-            content = encypt(JWTClaimsSet.parse(responseJson), jwk, alg, enc).getOrThrow(),
+            content = encrypt(JWTClaimsSet.parse(responseJson), jwk, alg, enc).getOrThrow(),
             status = HttpStatusCode.OK,
             headers = headersOf(
                 HttpHeaders.ContentType to listOf("application/jwt"),
@@ -478,13 +476,12 @@ private fun extractResponseEncryptionSpec(
     }
 }
 
-internal fun encypt(claimSet: JWTClaimsSet, jwk: JWK, alg: JWEAlgorithm, enc: EncryptionMethod): Result<String> =
+internal fun encrypt(claimSet: JWTClaimsSet, jwk: JWK, alg: JWEAlgorithm, enc: EncryptionMethod): Result<String> =
     runCatching {
         val header =
             JWEHeader.Builder(alg, enc)
                 .jwk(jwk.toPublicJWK())
                 .keyID(jwk.keyID)
-                .type(JOSEObjectType.JWT)
                 .build()
 
         val jwt = EncryptedJWT(header, claimSet)
@@ -573,8 +570,7 @@ internal class RequestDecrypter(
                 val spec = exchangeEncryptionSpecification.requestEncryptionSpec
                 assertNotNull(spec, "Request encryption spec expected")
                 val jwtClaimSet =
-                    decrypt(textContent.text, spec.algorithm, spec.encryptionMethod, loadKeySet())
-                        .getOrThrow()
+                    decrypt(textContent.text, spec.algorithm, spec.encryptionMethod, loadKeySet()).getOrThrow()
                 Json.decodeFromString<T>(JSONObjectUtils.toJSONString(jwtClaimSet.toJSONObject()))
             }
 
