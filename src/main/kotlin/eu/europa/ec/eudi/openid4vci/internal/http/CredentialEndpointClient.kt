@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal.http
 
-import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWEEncrypter
 import com.nimbusds.jose.JWEHeader
 import com.nimbusds.jose.crypto.ECDHEncrypter
@@ -222,7 +221,6 @@ private fun EncryptionSpec.encrypt(jwtClaimSet: JWTClaimsSet): String {
     fun EncryptionSpec.jweHeader() =
         JWEHeader.Builder(algorithm, encryptionMethod).apply {
             jwk(recipientKey)
-            type(JOSEObjectType.JWT)
             recipientKey.keyID?.let { keyID(it) }
             compressionAlgorithm?.let { compressionAlgorithm(it) }
         }.build()
