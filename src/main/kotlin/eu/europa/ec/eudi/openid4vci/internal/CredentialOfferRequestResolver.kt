@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.eygraber.uri.Uri
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.UnableToResolveAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.UnableToResolveCredentialIssuerMetadata
@@ -237,13 +236,13 @@ private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata
 }.getOrElse { throw CredentialOfferRequestValidationError.InvalidGrants(it).toException() }
 
 /**
- * Creates a new Credential Offer URI using Authorization Code Grant.
+ * Creates and returns serialized a new Credential Offer using Authorization Code Grant.
  *
  * @param credentialIssuerId the Id of the Credential Issuer
  * @param credentialConfigurationIdentifiers the Credential Configuration Identifiers for which to generate the Credential Offer URI; must not be empty
  * @param authorizationServer the Authorization Server
  */
-internal fun createAuthorizationCodeGrantCredentialOfferUri(
+internal fun createAuthorizationCodeGrantCredentialOffer(
     credentialIssuerId: CredentialIssuerId,
     credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
     authorizationServer: HttpsUrl,
@@ -264,11 +263,7 @@ internal fun createAuthorizationCodeGrantCredentialOfferUri(
         ),
     )
 
-    return Uri.parse(OpenId4VCISpec.CREDENTIAL_OFFER_URI_SCHEME)
-        .buildUpon()
-        .appendQueryParameter(OpenId4VCISpec.CREDENTIAL_OFFER, JsonSupport.encodeToString(credentialOfferRequest))
-        .build()
-        .toString()
+    return JsonSupport.encodeToString(credentialOfferRequest)
 }
 
 internal fun <A : Any, B : Any> DPoPUsage<A>.map(convert: (A) -> B): DPoPUsage<B> =

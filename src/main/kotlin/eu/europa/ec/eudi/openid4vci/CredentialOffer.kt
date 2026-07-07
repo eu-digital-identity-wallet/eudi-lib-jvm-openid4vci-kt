@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.CredentialOfferRequestResolver
-import eu.europa.ec.eudi.openid4vci.internal.createAuthorizationCodeGrantCredentialOfferUri
+import eu.europa.ec.eudi.openid4vci.internal.createAuthorizationCodeGrantCredentialOffer
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.client.*
 import io.ktor.http.*
@@ -85,12 +85,14 @@ data class CredentialOffer internal constructor(
             credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
             authorizationServer: HttpsUrl,
         ): Result<CredentialOffer> = runCatchingCancellable {
-            val requestURI = createAuthorizationCodeGrantCredentialOfferUri(
-                credentialIssuerId,
-                credentialConfigurationIdentifiers,
-                authorizationServer,
+            val request = CredentialOfferRequest.PassByValue(
+                createAuthorizationCodeGrantCredentialOffer(
+                    credentialIssuerId,
+                    credentialConfigurationIdentifiers,
+                    authorizationServer,
+                ),
             )
-            val request = CredentialOfferRequest.PassByValue(requestURI)
+
             resolve(
                 requestEncryptionSpecFactory,
                 responseEncryptionSpecFactory,
