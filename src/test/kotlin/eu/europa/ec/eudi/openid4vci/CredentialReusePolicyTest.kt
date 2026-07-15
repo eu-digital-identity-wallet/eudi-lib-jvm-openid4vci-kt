@@ -76,41 +76,6 @@ internal class CredentialReusePolicyTest {
     }
 
     @Test
-    fun `fails when rotating-batch is used without a base detail`() {
-        assertFailsWith<IllegalArgumentException> {
-            EudiReusePolicy.fromDetails(
-                details = listOf(EudiReusePolicyType.RotatingBatch),
-                batchSize = 10,
-                reissueTriggerLifetimeLeft = 100.seconds,
-            )
-        }
-    }
-
-    @Test
-    fun `fails when per-relying-party is used without a base detail`() {
-        assertFailsWith<IllegalArgumentException> {
-            EudiReusePolicy.fromDetails(
-                details = listOf(EudiReusePolicyType.PerRelyingParty),
-                batchSize = 10,
-                reissueTriggerUnused = 2,
-                reissueTriggerLifetimeLeft = 100.seconds,
-            )
-        }
-    }
-
-    @Test
-    fun `fails when details contains both once_only and limited_time`() {
-        assertFailsWith<IllegalArgumentException> {
-            EudiReusePolicy.fromDetails(
-                details = listOf(EudiReusePolicyType.OnceOnly, EudiReusePolicyType.LimitedTime),
-                batchSize = 10,
-                reissueTriggerUnused = 2,
-                reissueTriggerLifetimeLeft = 100.seconds,
-            )
-        }
-    }
-
-    @Test
     fun `fails when once_only is missing batch_size`() {
         assertFailsWith<IllegalArgumentException> {
             EudiReusePolicy.fromDetails(
@@ -283,9 +248,9 @@ internal class CredentialReusePolicyTest {
                 EudiReusePolicy.LimitedTime(
                     reissueTriggerLifetimeLeft = 885433.seconds,
                 ),
-                EudiReusePolicy.OnceOnly(
+                EudiReusePolicy.RotatingBatch(
                     batchSize = 10,
-                    reissueTriggerUnused = 4,
+                    reissueTriggerLifetimeLeft = 885433.seconds,
                 ),
             ),
         )

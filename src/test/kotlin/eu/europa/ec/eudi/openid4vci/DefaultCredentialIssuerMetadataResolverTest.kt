@@ -367,44 +367,131 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
     @Test
     internal fun `resolution succeeds with credential reuse policy`() = runTest {
-        val credentialIssuerId = SampleIssuer.Id
+        suspend fun test(resource: String) {
+            val credentialIssuerId = SampleIssuer.Id
 
-        val resolver = resolver(
-            credentialIssuerMetaDataHandler(
-                credentialIssuerId,
-                "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy.json",
-            ),
-        )
-        val metaData =
-            assertDoesNotThrow { resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow() }
+            val resolver = resolver(
+                credentialIssuerMetaDataHandler(
+                    credentialIssuerId,
+                    resource,
+                ),
+            )
 
-        val pidMsoMdoc = metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_msoMdoc")]
-        val msoMdocPolicy = pidMsoMdoc?.credentialMetadata?.credentialReusePolicy
-        assertTrue(msoMdocPolicy is CredentialReusePolicy.EUDI)
-        assertEquals(3, msoMdocPolicy.options.size)
-        assertIs<EudiReusePolicy.LimitedTime>(msoMdocPolicy.options[0])
-        val msoMdocRotatingBatch = assertIs<EudiReusePolicy.RotatingBatch>(msoMdocPolicy.options[1])
-        assertEquals(5, msoMdocRotatingBatch.batchSize)
-        assertEquals(655433.seconds, msoMdocRotatingBatch.reissueTriggerLifetimeLeft)
-        val msoMdocOption = assertIs<EudiReusePolicy.PerRelyingParty>(msoMdocPolicy.options[2])
-        assertEquals(5, msoMdocOption.batchSize)
-        assertEquals(655433.seconds, msoMdocOption.reissueTriggerLifetimeLeft)
+            val metaData = resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow()
 
-        val pidSdJwt = metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_SdJwtVc")]
-        val sdJwtPolicy = pidSdJwt?.credentialMetadata?.credentialReusePolicy
-        assertTrue(sdJwtPolicy is CredentialReusePolicy.EUDI)
-        assertEquals(4, sdJwtPolicy.options.size)
-        assertIs<EudiReusePolicy.LimitedTime>(sdJwtPolicy.options[0])
-        val sdJwtRotatingBatch = assertIs<EudiReusePolicy.RotatingBatch>(sdJwtPolicy.options[1])
-        assertEquals(40, sdJwtRotatingBatch.batchSize)
-        assertEquals(655433.seconds, sdJwtRotatingBatch.reissueTriggerLifetimeLeft)
-        val sdJwtOnceOnly = assertIs<EudiReusePolicy.OnceOnly>(sdJwtPolicy.options[2])
-        assertEquals(60, sdJwtOnceOnly.batchSize)
-        assertEquals(10, sdJwtOnceOnly.reissueTriggerUnused)
-        val sdJwtPerRelyingParty = assertIs<EudiReusePolicy.PerRelyingParty>(sdJwtPolicy.options[3])
-        assertEquals(60, sdJwtPerRelyingParty.batchSize)
-        assertEquals(10, sdJwtPerRelyingParty.reissueTriggerUnused)
-        assertEquals(777543.seconds, sdJwtPerRelyingParty.reissueTriggerLifetimeLeft)
+            val pidMsoMdoc = assertNotNull(metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_msoMdoc")])
+
+            val msoMdocPolicy = assertIs<CredentialReusePolicy.EUDI>(pidMsoMdoc.credentialMetadata?.credentialReusePolicy)
+            assertEquals(3, msoMdocPolicy.options.size)
+            assertNotNull(msoMdocPolicy.options.firstOrNull { it is EudiReusePolicy.LimitedTime })
+
+            val msoMdocRotatingBatch = assertNotNull(msoMdocPolicy.options.firstOrNull { it is EudiReusePolicy.RotatingBatch })
+            assertEquals(5, msoMdocRotatingBatch.batchSize)
+            assertEquals(655433.seconds, msoMdocRotatingBatch.reissueTriggerLifetimeLeft)
+
+            val msoMdocOption = assertNotNull(msoMdocPolicy.options.firstOrNull { it is EudiReusePolicy.PerRelyingParty })
+            assertEquals(5, msoMdocOption.batchSize)
+            assertEquals(655433.seconds, msoMdocOption.reissueTriggerLifetimeLeft)
+
+            val pidSdJwt = assertNotNull(metaData.credentialConfigurationsSupported[CredentialConfigurationIdentifier("PID_SdJwtVc")])
+
+            val sdJwtPolicy = assertIs<CredentialReusePolicy.EUDI>(pidSdJwt.credentialMetadata?.credentialReusePolicy)
+            assertEquals(3, sdJwtPolicy.options.size)
+            assertNotNull(sdJwtPolicy.options.firstOrNull { it is EudiReusePolicy.LimitedTime })
+
+            val sdJwtRotatingBatch = assertNotNull(sdJwtPolicy.options.firstOrNull { it is EudiReusePolicy.RotatingBatch })
+            assertEquals(40, sdJwtRotatingBatch.batchSize)
+            assertEquals(655433.seconds, sdJwtRotatingBatch.reissueTriggerLifetimeLeft)
+
+            val sdJwtPerRelyingParty = assertNotNull(sdJwtPolicy.options.firstOrNull { it is EudiReusePolicy.PerRelyingParty })
+            assertEquals(40, sdJwtPerRelyingParty.batchSize)
+            assertEquals(10, sdJwtPerRelyingParty.reissueTriggerUnused)
+            assertEquals(655433.seconds, sdJwtPerRelyingParty.reissueTriggerLifetimeLeft)
+        }
+
+        test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_compact.json")
+        test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_expanded.json")
+    }
+
+    @Test
+    internal fun `resolution fails with credential reuse policy both once only and limited time`() = runTest {
+        suspend fun test(resource: String) {
+            val credentialIssuerId = SampleIssuer.Id
+
+            val resolver = resolver(
+                credentialIssuerMetaDataHandler(
+                    credentialIssuerId,
+                    resource,
+                ),
+            )
+
+            val error =
+                assertFailsWith<InvalidCredentialsSupported> {
+                    resolver.resolve(
+                        credentialIssuerId,
+                        IssuerMetadataPolicy.IgnoreSigned,
+                    ).getOrThrow()
+                }
+            val cause = assertIs<IllegalArgumentException>(error.cause)
+            assertEquals("details must contain exactly one base method: once_only or limited_time", cause.message)
+        }
+
+        test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_both_once_only_limited_time_compact.json")
+        test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_both_once_only_limited_time_expanded.json")
+    }
+
+    @Test
+    internal fun `resolution fails with duplicate credential reuse policies`() = runTest {
+        suspend fun test(resource: String) {
+            val credentialIssuerId = SampleIssuer.Id
+
+            val resolver = resolver(
+                credentialIssuerMetaDataHandler(
+                    credentialIssuerId,
+                    resource,
+                ),
+            )
+
+            val error =
+                assertFailsWith<InvalidCredentialsSupported> {
+                    resolver.resolve(
+                        credentialIssuerId,
+                        IssuerMetadataPolicy.IgnoreSigned,
+                    ).getOrThrow()
+                }
+            val cause = assertIs<IllegalArgumentException>(error.cause)
+            assertEquals("When multiple policy options are defined, each option type must be unique", cause.message)
+        }
+
+        test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_duplicates_compact.json")
+        test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_duplicates_expanded.json")
+    }
+
+    @Test
+    internal fun `resolution fails when no base credential reuse policy is present`() = runTest {
+        suspend fun test(resource: String) {
+            val credentialIssuerId = SampleIssuer.Id
+
+            val resolver = resolver(
+                credentialIssuerMetaDataHandler(
+                    credentialIssuerId,
+                    resource,
+                ),
+            )
+
+            val error =
+                assertFailsWith<InvalidCredentialsSupported> {
+                    resolver.resolve(
+                        credentialIssuerId,
+                        IssuerMetadataPolicy.IgnoreSigned,
+                    ).getOrThrow()
+                }
+            val cause = assertIs<IllegalArgumentException>(error.cause)
+            assertEquals("details must contain exactly one base method: once_only or limited_time", cause.message)
+        }
+
+        test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_only_rotating_batch.json")
+        test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_only_per_relying_party.json")
     }
 
     @Test
