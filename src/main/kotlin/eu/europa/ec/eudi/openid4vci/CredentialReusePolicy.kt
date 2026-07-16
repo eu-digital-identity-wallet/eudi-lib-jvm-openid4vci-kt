@@ -125,6 +125,7 @@ sealed interface EudiReusePolicy {
             reissueTriggerLifetimeLeft: Duration? = null,
         ): List<EudiReusePolicy> {
             require(details.isNotEmpty()) { "details must not be empty" }
+            require(details.distinct().size == details.size) { "details must not contain duplicate values" }
 
             return details.map { detail ->
                 when (detail) {

@@ -468,6 +468,33 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
     }
 
     @Test
+    internal fun `resolution fails with duplicate details in credential reuse policies`() = runTest {
+        suspend fun test(resource: String) {
+            val credentialIssuerId = SampleIssuer.Id
+
+            val resolver = resolver(
+                credentialIssuerMetaDataHandler(
+                    credentialIssuerId,
+                    resource,
+                ),
+            )
+
+            val error =
+                assertFailsWith<InvalidCredentialsSupported> {
+                    resolver.resolve(
+                        credentialIssuerId,
+                        IssuerMetadataPolicy.IgnoreSigned,
+                    ).getOrThrow()
+                }
+            val cause = assertIs<IllegalArgumentException>(error.cause)
+            assertEquals("details must not contain duplicate values", cause.message)
+        }
+
+        test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_duplicate_details_compact.json")
+        test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_duplicate_details_expanded.json")
+    }
+
+    @Test
     internal fun `resolution fails when no base credential reuse policy is present`() = runTest {
         suspend fun test(resource: String) {
             val credentialIssuerId = SampleIssuer.Id

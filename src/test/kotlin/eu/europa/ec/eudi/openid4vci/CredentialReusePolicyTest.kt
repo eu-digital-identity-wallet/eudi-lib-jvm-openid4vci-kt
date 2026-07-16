@@ -146,6 +146,17 @@ internal class CredentialReusePolicyTest {
     }
 
     @Test
+    fun `fails when duplicate details are provided`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            EudiReusePolicy.fromDetails(
+                details = listOf(EudiReusePolicyType.LimitedTime, EudiReusePolicyType.LimitedTime),
+                reissueTriggerLifetimeLeft = 100.seconds,
+            )
+        }
+        assertEquals("details must not contain duplicate values", error.message)
+    }
+
+    @Test
     fun `fromDetails returns once_only and per_relying_party options for combined details`() {
         val options = EudiReusePolicy.fromDetails(
             details = listOf(
