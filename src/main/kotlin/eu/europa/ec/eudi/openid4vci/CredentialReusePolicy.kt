@@ -124,15 +124,10 @@ sealed interface EudiReusePolicy {
             reissueTriggerUnused: Int? = null,
             reissueTriggerLifetimeLeft: Duration? = null,
         ): List<EudiReusePolicy> {
-            val normalizedDetails = details.distinct()
+            require(details.isNotEmpty()) { "details must not be empty" }
+            require(details.distinct().size == details.size) { "details must not contain duplicate values" }
 
-            require(normalizedDetails.isNotEmpty()) { "details must not be empty" }
-            require(normalizedDetails.size == details.size) {
-                "details must not contain duplicate values"
-            }
-            validateBaseMethodCombination(normalizedDetails)
-
-            return normalizedDetails.map { detail ->
+            return details.map { detail ->
                 when (detail) {
                     EudiReusePolicyType.OnceOnly -> OnceOnly(
                         batchSize = requireNotNull(batchSize) {
@@ -177,15 +172,6 @@ sealed interface EudiReusePolicy {
             }
         }
 
-        private fun validateBaseMethodCombination(details: List<EudiReusePolicyType>) {
-            val hasOnceOnly = EudiReusePolicyType.OnceOnly in details
-            val hasLimitedTime = EudiReusePolicyType.LimitedTime in details
-
-            require(hasOnceOnly.xor(hasLimitedTime)) {
-                "details must contain exactly one base method: once_only or limited_time"
-            }
-        }
-
         private fun validateBatchSize(batchSize: Int) {
             require(batchSize > 1) { "batch_size must be greater than 1" }
         }
@@ -226,6 +212,7 @@ sealed interface CredentialReusePolicy : Serializable {
         init {
             require(options.isNotEmpty()) { "options must not be empty for arf_annex_ii policy" }
             validateNoOverlappingDetails(options)
+            validateBaseMethodCombination(options)
         }
 
         companion object {
@@ -235,6 +222,15 @@ sealed interface CredentialReusePolicy : Serializable {
                 val optionTypes = options.map { it::class }
                 require(optionTypes.size == optionTypes.toSet().size) {
                     "When multiple policy options are defined, each option type must be unique"
+                }
+            }
+
+            private fun validateBaseMethodCombination(options: List<EudiReusePolicy>) {
+                val hasOnceOnly = options.any { it is EudiReusePolicy.OnceOnly }
+                val hasLimitedTime = options.any { it is EudiReusePolicy.LimitedTime }
+
+                require(hasOnceOnly.xor(hasLimitedTime)) {
+                    "details must contain exactly one base method: once_only or limited_time"
                 }
             }
         }

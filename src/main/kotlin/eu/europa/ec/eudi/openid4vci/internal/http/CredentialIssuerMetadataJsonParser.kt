@@ -89,9 +89,10 @@ private data class CredentialReusePolicyTO(
     fun toDomain(): CredentialReusePolicy =
         when (id) {
             ETSI119472Part3.REUSE_POLICY_ARF_ANNEX_II -> {
-                val parsed = options?.flatMap {
-                    JsonSupport.decodeFromJsonElement<ArfAnnex2CredentialReusePolicyOptionTO>(it).toDomain()
-                }.orEmpty()
+                val parsed = options.orEmpty()
+                    .flatMap {
+                        JsonSupport.decodeFromJsonElement<ArfAnnex2CredentialReusePolicyOptionTO>(it).toDomain()
+                    }
                 CredentialReusePolicy.EUDI(parsed)
             }
             else -> CredentialReusePolicy.None
