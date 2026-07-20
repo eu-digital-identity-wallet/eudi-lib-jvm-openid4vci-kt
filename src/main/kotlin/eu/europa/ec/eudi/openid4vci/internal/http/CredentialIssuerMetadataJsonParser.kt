@@ -645,17 +645,18 @@ private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTy
     when (type) {
         "jwt" -> {
             val algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
-            val keyAttestationRequirement = requireNotNull(meta.keyAttestationRequirement?.toDomain()) {
-                "jwt proof must contain 'key_attestations_required'"
-            }
+            // 'key_attestations_required' is OPTIONAL per OpenID4VCI. When it is absent the issuer
+            // does not require a key attestation, so keep the requirement null rather than rejecting
+            // the metadata. (An absent value is distinct from an empty object, which would mean a
+            // key attestation is required without additional constraints.)
+            val keyAttestationRequirement = meta.keyAttestationRequirement?.toDomain()
             ProofTypeMeta.Jwt(algorithms, keyAttestationRequirement)
         }
 
         "attestation" -> {
             val algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
-            val keyAttestationRequirement = requireNotNull(meta.keyAttestationRequirement?.toDomain()) {
-                "attestation proof must contain 'key_attestations_required'"
-            }
+            // 'key_attestations_required' is OPTIONAL per OpenID4VCI; see the "jwt" branch above.
+            val keyAttestationRequirement = meta.keyAttestationRequirement?.toDomain()
             ProofTypeMeta.Attestation(algorithms, keyAttestationRequirement)
         }
 

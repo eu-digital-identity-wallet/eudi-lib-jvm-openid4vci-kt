@@ -64,7 +64,13 @@ enum class ProofType : Serializable {
 sealed interface ProofTypeMeta : Serializable {
     data class Jwt(
         val algorithms: List<JWSAlgorithm>,
-        val keyAttestationRequirement: KeyAttestationRequirement,
+        /**
+         * The issuer's key attestation requirement, or `null` when the metadata omits
+         * `key_attestations_required`. That parameter is OPTIONAL in OpenID4VCI; its absence means
+         * the issuer does not require a key attestation, which is distinct from an empty object
+         * (a key attestation is required, but without additional constraints).
+         */
+        val keyAttestationRequirement: KeyAttestationRequirement?,
     ) : ProofTypeMeta {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of JWT cannot be empty" }
@@ -73,7 +79,13 @@ sealed interface ProofTypeMeta : Serializable {
 
     data class Attestation(
         val algorithms: List<JWSAlgorithm>,
-        val keyAttestationRequirement: KeyAttestationRequirement,
+        /**
+         * The issuer's key attestation requirement, or `null` when the metadata omits
+         * `key_attestations_required`. That parameter is OPTIONAL in OpenID4VCI; its absence means
+         * the issuer does not require a key attestation, which is distinct from an empty object
+         * (a key attestation is required, but without additional constraints).
+         */
+        val keyAttestationRequirement: KeyAttestationRequirement?,
     ) : ProofTypeMeta {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of Attestation cannot be empty" }

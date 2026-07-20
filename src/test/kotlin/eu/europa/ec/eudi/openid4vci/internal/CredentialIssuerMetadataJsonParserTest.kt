@@ -22,6 +22,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.days
 import kotlin.time.toJavaDuration
 
@@ -43,11 +44,11 @@ class CredentialIssuerMetadataJsonParserTest {
 
         val jwtProof = assertNotNull(credentialConfiguration.proofTypesSupported[ProofType.JWT])
         check(jwtProof is ProofTypeMeta.Jwt)
-        assertEquals(1.days.toJavaDuration(), jwtProof.keyAttestationRequirement.preferredKeyStorageStatusPeriod?.value)
+        assertEquals(1.days.toJavaDuration(), jwtProof.keyAttestationRequirement?.preferredKeyStorageStatusPeriod?.value)
 
         val attestationProof = assertNotNull(credentialConfiguration.proofTypesSupported[ProofType.ATTESTATION])
         check(attestationProof is ProofTypeMeta.Attestation)
-        assertEquals(1.days.toJavaDuration(), attestationProof.keyAttestationRequirement.preferredKeyStorageStatusPeriod?.value)
+        assertEquals(1.days.toJavaDuration(), attestationProof.keyAttestationRequirement?.preferredKeyStorageStatusPeriod?.value)
     }
 
     @Test
@@ -61,13 +62,49 @@ class CredentialIssuerMetadataJsonParserTest {
     }
 
     @Test
-    fun `fails when jwt proof does not require key attestation`() {
-        val json = getResourceAsText("well-known/openid-credential-issuer_jwt_proof_no_keyattestation.json")
-        val exception = assertFailsWith<CredentialIssuerMetadataValidationError.InvalidCredentialsSupported> {
-            CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
-        }
-        val cause = assertIs<IllegalArgumentException>(exception.cause)
-        assertEquals("jwt proof must contain 'key_attestations_required'", cause.message)
+    fun `absent key_attestations_required is parsed as no key attestation requirement`() {
+        // 'key_attestations_required' is OPTIONAL in OpenID4VCI; when it is absent the issuer does
+        // not require a key attestation, so the parsed requirement is null.
+        val json = getResourceAsText("well-known/openid-credential-issuer_absent_key_attestations_required.json")
+        val credentialIssuerMetadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
+
+        val credentialConfiguration =
+            assertNotNull(
+                credentialIssuerMetadata.credentialConfigurationsSupported[
+                    CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
+                ],
+            )
+
+        val jwtProof = assertNotNull(credentialConfiguration.proofTypesSupported[ProofType.JWT])
+        check(jwtProof is ProofTypeMeta.Jwt)
+        assertNull(jwtProof.keyAttestationRequirement)
+
+        val attestationProof = assertNotNull(credentialConfiguration.proofTypesSupported[ProofType.ATTESTATION])
+        check(attestationProof is ProofTypeMeta.Attestation)
+        assertNull(attestationProof.keyAttestationRequirement)
+    }
+
+    @Test
+    fun `empty key_attestations_required is parsed as an unconstrained key attestation requirement`() {
+        // An empty 'key_attestations_required' object means a key attestation IS required but
+        // without additional constraints, which is distinct from the field being absent.
+        val json = getResourceAsText("well-known/openid-credential-issuer_empty_key_attestations_required.json")
+        val credentialIssuerMetadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
+
+        val credentialConfiguration =
+            assertNotNull(
+                credentialIssuerMetadata.credentialConfigurationsSupported[
+                    CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt"),
+                ],
+            )
+
+        val jwtProof = assertNotNull(credentialConfiguration.proofTypesSupported[ProofType.JWT])
+        check(jwtProof is ProofTypeMeta.Jwt)
+        assertEquals(KeyAttestationRequirement(null, null, null), jwtProof.keyAttestationRequirement)
+
+        val attestationProof = assertNotNull(credentialConfiguration.proofTypesSupported[ProofType.ATTESTATION])
+        check(attestationProof is ProofTypeMeta.Attestation)
+        assertEquals(KeyAttestationRequirement(null, null, null), attestationProof.keyAttestationRequirement)
     }
 
     @Test
