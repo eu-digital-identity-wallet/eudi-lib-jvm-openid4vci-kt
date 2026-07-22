@@ -31,7 +31,7 @@ import eu.europa.ec.eudi.openid4vci.CryptoGenerator.ecSigner
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
 import io.ktor.client.*
-import io.ktor.client.request.HttpRequestData
+import io.ktor.client.request.*
 import java.net.URI
 import java.util.*
 import kotlin.test.assertEquals
@@ -127,7 +127,7 @@ suspend fun authorizeRequestForCredentialOffer(
         httpClient = httpClient,
         responseEncryptionSpecFactory = responseEncryptionSpecFactory,
         requestEncryptionSpecFactory = requestEncryptionSpecFactory,
-    ).getOrThrow()
+    ).getIssuerOrThrow()
 
     val authorizedRequest =
         with(issuer) {
@@ -153,7 +153,7 @@ suspend fun preAuthorizeRequestForCredentialOffer(
         credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
         httpClient = httpClient,
         responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-    ).getOrThrow()
+    ).getIssuerOrThrow()
 
     val authorizedRequest = issuer.authorizeWithPreAuthorizationCode(txCode).getOrThrow()
 

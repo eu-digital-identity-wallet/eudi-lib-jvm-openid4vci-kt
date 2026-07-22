@@ -18,11 +18,11 @@ package eu.europa.ec.eudi.openid4vci.examples
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
-import io.ktor.http.Url
+import io.ktor.http.*
 
-private val IssuerId = CredentialIssuerId("https://dev.issuer-backend.eudiw.dev").getOrThrow()
-private val WalletInstanceAttestationServiceUrl = Url("https://dev.wallet-provider.eudiw.dev/wallet-instance-attestation/jwk")
-private val KeyAttestationServiceUrl = Url("https://dev.wallet-provider.eudiw.dev/key-attestation/jwk-set")
+private val IssuerId = CredentialIssuerId("https://issuer-backend.eudiw.dev").getOrThrow()
+private val WalletInstanceAttestationServiceUrl = Url("https://wallet-provider.eudiw.dev/wallet-instance-attestation/jwk")
+private val KeyAttestationServiceUrl = Url("https://wallet-provider.eudiw.dev/key-attestation/jwk-set")
 
 internal object PidDevIssuer :
     HasIssuerId,
@@ -48,6 +48,7 @@ internal object PidDevIssuer :
         parUsage = ParUsage.Required(),
         supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
         proofs = ProofsConfig.Default,
+        issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(IssuerTrust({ true })),
     )
 
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_vc_sd_jwt")

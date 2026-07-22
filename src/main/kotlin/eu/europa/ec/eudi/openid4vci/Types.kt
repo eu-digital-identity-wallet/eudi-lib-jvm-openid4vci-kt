@@ -370,17 +370,7 @@ fun interface CertificateChainTrust {
 /**
  * Mechanism a Wallet can establish trust with a JWT Issuer.
  */
-sealed interface IssuerTrust {
-
-    @Deprecated("Use IssuerTrust.ByCertificateChain instead")
-    data class ByPublicKey(val jwk: JWK) : IssuerTrust {
-        init {
-            require(!jwk.isPrivate) { "Only public JWKs are supported" }
-        }
-    }
-
-    data class ByCertificateChain(val certificateChainTrust: CertificateChainTrust) : IssuerTrust
-}
+data class IssuerTrust(val certificateChainTrust: CertificateChainTrust)
 
 private fun String.requireNotEmpty() {
     require(isNotEmpty()) { "Value cannot be empty" }

@@ -23,7 +23,10 @@ import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.impl.ContentCryptoProvider
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
+import eu.europa.ec.eudi.openid4vci.internal.ensure
+import kotlinx.serialization.json.JsonObject
 import java.net.URI
+import java.security.cert.X509Certificate
 import java.time.Clock
 
 typealias ClientId = String
@@ -95,6 +98,31 @@ sealed interface ClientAuthentication : java.io.Serializable {
     }
 }
 
+data class RegistrationCertificatePolicy(
+    val trust: IssuerTrust,
+    val apply: Authorize,
+) {
+    @JvmInline
+    value class PolicyViolation(val violation: String) {
+        init {
+            require(violation.isNotEmpty()) { "Violation must not be empty" }
+        }
+    }
+
+    sealed interface Authorization {
+        data class Granted(val warnings: List<PolicyViolation> = emptyList()) : Authorization
+        data class NotGranted(val error: PolicyViolation) : Authorization
+    }
+
+    fun interface Authorize {
+        suspend operator fun invoke(
+            accessCertificate: X509Certificate,
+            registrationCertificate: JsonObject,
+            issuanceContext: List<CredentialConfiguration>,
+        ): Authorization
+    }
+}
+
 /**
  * Configuration object to pass configuration properties to the issuance components.
  *
@@ -122,7 +150,20 @@ data class OpenId4VCIConfig(
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     val proofs: ProofsConfig = ProofsConfig.Default,
+    val registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
 ) {
+
+    init {
+        if (registrationCertificatePolicy != null) {
+            ensure(issuerMetadataPolicy is IssuerMetadataPolicy.RequireSigned) {
+                IllegalStateException(
+                    "Wrong configuration: " +
+                        "IssuerMetadataPolicy does not match RegistrationCertificatePolicy. " +
+                        "When RegistrationCertificatePolicy is provided IssuerMetadataPolicy must be RequireSigned",
+                )
+            }
+        }
+    }
 
     /**
      * Creates a new [OpenId4VCIConfig] instance for a Wallet that uses [a Public OAuth 2.0 Client][ClientAuthentication.None].
@@ -138,6 +179,7 @@ data class OpenId4VCIConfig(
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
         proofs: ProofsConfig = ProofsConfig.Default,
+        registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
     ) : this(
         ClientAuthentication.None(clientId),
         authFlowRedirectionURI,
@@ -149,6 +191,7 @@ data class OpenId4VCIConfig(
         issuerMetadataPolicy,
         supportedCredentialReusePolicies,
         proofs,
+        registrationCertificatePolicy,
     )
 }
 

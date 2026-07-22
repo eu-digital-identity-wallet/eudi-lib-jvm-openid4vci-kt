@@ -37,7 +37,7 @@ class IssuerTest {
             SampleIssuer.Id,
             listOf(CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
             mockedHttpClient,
-        ).getOrThrow()
+        ).getIssuerOrThrow()
 
         val credentialOffer = issuer.credentialOffer
         assertEquals(SampleIssuer.Id, credentialOffer.credentialIssuerIdentifier)

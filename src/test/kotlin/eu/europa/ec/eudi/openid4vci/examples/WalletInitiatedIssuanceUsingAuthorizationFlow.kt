@@ -38,7 +38,7 @@ fun runUseCase(
             credentialIssuerId,
             credentialConfigurationIds,
             httpClient,
-        ).getOrThrow()
+        ).getIssuerOrThrow()
 
         with(issuer) {
             authorizationLog("Using authorized code flow to authorize")

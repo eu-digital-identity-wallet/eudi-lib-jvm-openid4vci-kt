@@ -46,6 +46,16 @@ object SampleAuthServer {
     val OAuthWellKnownUrl = oauthAuthorizationServerMetadataUrl(Url)
 }
 
+object EUDIPidIssuer {
+    val Id: CredentialIssuerId = CredentialIssuerId("https://issuer-backend.eudiw.dev").getOrThrow()
+    val WellKnownUrl = Id.metaDataUrl()
+}
+
+object EUDIAuthServer {
+    val Url = HttpsUrl("https://authenticate.eudiw.dev/realms/pid-issuer-realm").getOrThrow()
+    val OAuthWellKnownUrl = oauthAuthorizationServerMetadataUrl(Url)
+}
+
 /**
  * Get the URL for fetching the metadata of the OAuth Authorization Server used throughout the tests.
  */
@@ -389,12 +399,12 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
  * Gets the [CredentialIssuerMetadata] used throughout the tests when signed metadata are used.
  */
 internal fun credentialIssuerSignedMetadata() = CredentialIssuerMetadata(
-    SampleIssuer.Id,
-    listOf(SampleAuthServer.Url),
-    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/credentials").getOrThrow(),
-    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/nonce").getOrThrow(),
-    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/credentials/deferred").getOrThrow(),
-    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/notification").getOrThrow(),
+    EUDIPidIssuer.Id,
+    listOf(EUDIAuthServer.Url),
+    CredentialIssuerEndpoint("https://issuer-backend.eudiw.dev/wallet/credentialEndpoint").getOrThrow(),
+    CredentialIssuerEndpoint("https://issuer-backend.eudiw.dev/wallet/nonceEndpoint").getOrThrow(),
+    CredentialIssuerEndpoint("https://issuer-backend.eudiw.dev/wallet/deferredEndpoint").getOrThrow(),
+    CredentialIssuerEndpoint("https://issuer-backend.eudiw.dev/wallet/notificationEndpoint").getOrThrow(),
     CredentialRequestEncryption.Required(
         SupportedRequestEncryptionParameters(
             encryptionKeys = JWKSet.parse(
@@ -403,29 +413,34 @@ internal fun credentialIssuerSignedMetadata() = CredentialIssuerMetadata(
                       "keys": [
                         {
                           "kty": "EC",
+                          "x5t#S256": "Pd5UaOLoKrkGimnsMU169RaNI_kM1nbQ0bYlpKLDaW8",
+                          "nbf": 1784285453,
                           "use": "enc",
                           "crv": "P-256",
-                          "alg": "ECDH-ES",
-                          "kid": "encKey-0",
-                          "x": "TmcsNF6JpWjP85wKfBXKybHaJNowtp6jCuToppDosdw",
-                          "y": "egzDuJuSxyypCE0qUoo1oKOnslpaw1Om-flQ4knafas",
-                          "iat": 1755352588
+                          "kid": "credential-request-encryption",
+                          "x5c": [
+                            "MIIBXTCCAQKgAwIBAgIEaloJDTAKBggqhkjOPQQDAjAoMSYwJAYDVQQDDB1jcmVkZW50aWFsLXJlcXVlc3QtZW5jcnlwdGlvbjAeFw0yNjA3MTcxMDUwNTNaFw0zMTA3MTcxMDUwNTNaMCgxJjAkBgNVBAMMHWNyZWRlbnRpYWwtcmVxdWVzdC1lbmNyeXB0aW9uMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsJ0Ybvj07MuxARt5OCwvVqTiFyPVd5j6FPYFWSyMhwl2+AJqlK2ghpzLZOgR40eVq7oIiPmHRDspaLI5oIllQ6MaMBgwCQYDVR0TBAIwADALBgNVHQ8EBAMCAwgwCgYIKoZIzj0EAwIDSQAwRgIhANJGr8cPBL11CXDZmuF3bK8GplezzYkFUSGfzNr/eXjlAiEAqjD6tQOWLq33WEkdznoKz9DZ4YkmogOZ4qwhaenZ0WQ="
+                          ],
+                          "x": "sJ0Ybvj07MuxARt5OCwvVqTiFyPVd5j6FPYFWSyMhwk",
+                          "y": "dvgCapStoIacy2ToEeNHlau6CIj5h0Q7KWiyOaCJZUM",
+                          "exp": 1942051853,
+                          "alg": "ECDH-ES"
                         }
                       ]
                     }
                 """,
             ),
-            encryptionMethods = listOf(EncryptionMethod.XC20P),
-            payloadCompression = PayloadCompression(listOf(CompressionAlgorithm.DEF)),
+            encryptionMethods = listOf(EncryptionMethod.A128GCM, EncryptionMethod.A256GCM),
+//            payloadCompression = PayloadCompression(listOf(CompressionAlgorithm.DEF)),
         ),
     ),
     CredentialResponseEncryption.Required(
         SupportedResponseEncryptionParameters(
-            listOf(JWEAlgorithm.RSA_OAEP_256),
-            listOf(EncryptionMethod.XC20P),
+            listOf(JWEAlgorithm.ECDH_ES),
+            listOf(EncryptionMethod.A128GCM, EncryptionMethod.A256GCM),
         ),
     ),
-    BatchCredentialIssuance.Supported(batchSize = 15),
+    BatchCredentialIssuance.Supported(batchSize = 20),
     mapOf(
         CredentialConfigurationIdentifier("UniversityDegree_JWT") to universityDegreeJwt(),
         CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc") to mobileDrivingLicense(),
