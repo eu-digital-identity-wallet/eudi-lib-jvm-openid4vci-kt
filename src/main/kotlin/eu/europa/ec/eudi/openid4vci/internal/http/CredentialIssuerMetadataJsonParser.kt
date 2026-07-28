@@ -748,7 +748,7 @@ private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuer
 
     val issuerInfo = issuerInfo?.let { json ->
         IssuerInfo.fromJson(json).getOrElse {
-            throw CredentialIssuerMetadataValidationError.InvalidVerifierInfo(it)
+            throw CredentialIssuerMetadataValidationError.InvalidIssuerInfo(it)
         }
     }
 

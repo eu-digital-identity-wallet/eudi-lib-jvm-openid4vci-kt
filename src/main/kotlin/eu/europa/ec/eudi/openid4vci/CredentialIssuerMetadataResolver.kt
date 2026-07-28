@@ -402,7 +402,7 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
      */
     class InvalidPreferredClientStatusPeriod(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 
-    class InvalidVerifierInfo(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+    class InvalidIssuerInfo(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 }
 
 /**

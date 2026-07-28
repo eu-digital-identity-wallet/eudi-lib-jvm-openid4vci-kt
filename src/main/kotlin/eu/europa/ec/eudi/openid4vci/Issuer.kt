@@ -26,13 +26,31 @@ import kotlinx.coroutines.coroutineScope
 import java.net.URI
 import java.time.Instant
 
+/**
+ * Represents the result of an issuer resolution process which can either be successful or a failure.
+ */
 sealed interface IssuerResolutionResult {
 
+    /**
+     * Represents a successful outcome of the issuer resolution process.
+     *
+     * @property issuer The resolved issuer from the process.
+     * @property policyViolationWarning A list of warnings related to policy violations
+     * during the registration certificate policy processing. Defaults to an empty list.
+     */
     data class Success(
         val issuer: Issuer,
         val policyViolationWarning: List<RegistrationCertificatePolicy.PolicyViolation> = emptyList(),
     ) : IssuerResolutionResult
 
+    /**
+     * Represents a failed outcome of the issuer resolution process.
+     *
+     * This class encapsulates details about the failure that occurred during the issuer resolution process.
+     * The failure is represented by an associated exception, providing additional context about the error.
+     *
+     * @property exception The exception encountered during the issuer resolution process.
+     */
     data class Failure(
         val exception: Throwable,
     ) : IssuerResolutionResult
@@ -263,7 +281,7 @@ interface Issuer :
                     when (authorization) {
                         is RegistrationCertificatePolicy.Authorization.Granted -> authorization.warnings
                         is RegistrationCertificatePolicy.Authorization.NotGranted ->
-                            throw IssuanceAuthorizationError.AuthorizationPolicyNotMet(authorization.error)
+                            throw AuthorizationPolicyValidationError.AuthorizationPolicyNotMet(authorization.error)
                     }
                 }
             }
@@ -462,4 +480,32 @@ fun ProvisionClientAttestation.ensureValid(now: Instant, provisioned: ProvisionC
     check(popAlgorithm.toNimbus() == popSignerAlgorithm) {
         "Client Attestation POP signer algorithm mismatch: expected ${popAlgorithm.name}, got ${popSignerAlgorithm.name}"
     }
+}
+
+sealed class AuthorizationPolicyValidationError(cause: Throwable) : Throwable(cause) {
+
+    class MissingIssuerInfo :
+        AuthorizationPolicyValidationError(IllegalArgumentException("Missing issuer info"))
+
+    class MissingRegistrationCertificate :
+        AuthorizationPolicyValidationError(IllegalArgumentException("Missing issuer registration certificate"))
+
+    class MultipleRegistrationCertificates :
+        AuthorizationPolicyValidationError(IllegalArgumentException("Multiple Registration Certificates provided while only one expected"))
+
+    class RegistrationCertificateNotTrusted :
+        AuthorizationPolicyValidationError(IllegalArgumentException("Registration certificate not trusted"))
+
+    class MissingAccessCertificate :
+        AuthorizationPolicyValidationError(IllegalArgumentException("Missing access certificate"))
+
+    class AuthorizationPolicyNotMet(val violation: RegistrationCertificatePolicy.PolicyViolation) :
+        AuthorizationPolicyValidationError(IllegalArgumentException("Authorization policy not met"))
+
+    class MalformedRegistrationCertificate(msg: String) :
+        AuthorizationPolicyValidationError(IllegalArgumentException(msg)) {
+            init {
+                require(msg.isNotEmpty()) { "Cause cannot be empty" }
+            }
+        }
 }
