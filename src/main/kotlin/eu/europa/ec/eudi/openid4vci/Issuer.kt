@@ -493,9 +493,6 @@ sealed class AuthorizationPolicyValidationError(cause: Throwable) : Throwable(ca
     class MultipleRegistrationCertificates :
         AuthorizationPolicyValidationError(IllegalArgumentException("Multiple Registration Certificates provided while only one expected"))
 
-    class RegistrationCertificateNotTrusted :
-        AuthorizationPolicyValidationError(IllegalArgumentException("Registration certificate not trusted"))
-
     class MissingAccessCertificate :
         AuthorizationPolicyValidationError(IllegalArgumentException("Missing access certificate"))
 

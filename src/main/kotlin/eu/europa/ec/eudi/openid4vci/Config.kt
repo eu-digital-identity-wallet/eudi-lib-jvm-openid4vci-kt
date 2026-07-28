@@ -24,7 +24,6 @@ import com.nimbusds.jose.crypto.impl.ContentCryptoProvider
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.ensure
-import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.security.cert.X509Certificate
 import java.time.Clock
@@ -98,28 +97,33 @@ sealed interface ClientAuthentication : java.io.Serializable {
     }
 }
 
-data class RegistrationCertificatePolicy(
-    val trust: IssuerTrust,
-    val apply: Authorize,
-) {
-    @JvmInline
-    value class PolicyViolation(val violation: String) {
-        init {
-            require(violation.isNotEmpty()) { "Violation must not be empty" }
-        }
-    }
+/**
+ * Defines a policy for validating the registration certificate policy.
+ *
+ * This functional interface evaluates the provided access and registration certificates
+ * against a set of credential configurations to determine authorization for issuance.
+ */
+fun interface RegistrationCertificatePolicy {
 
+    suspend operator fun invoke(
+        accessCertificate: X509Certificate,
+        registrationCertificate: String,
+        issuanceContext: List<CredentialConfiguration>,
+    ): Authorization
+
+    /**
+     * Represents the result of registration certificate policy evaluation.
+     */
     sealed interface Authorization {
         data class Granted(val warnings: List<PolicyViolation> = emptyList()) : Authorization
         data class NotGranted(val error: PolicyViolation) : Authorization
     }
 
-    fun interface Authorize {
-        suspend operator fun invoke(
-            accessCertificate: X509Certificate,
-            registrationCertificate: JsonObject,
-            issuanceContext: List<CredentialConfiguration>,
-        ): Authorization
+    @JvmInline
+    value class PolicyViolation(val violation: String) {
+        init {
+            require(violation.isNotEmpty()) { "Violation must not be empty" }
+        }
     }
 }
 

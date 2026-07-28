@@ -15,24 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vci.internal
 
-import com.nimbusds.jose.JOSEException
-import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.jwk.AsymmetricJWK
-import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.proc.BadJOSEException
-import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
-import com.nimbusds.jose.proc.JWSKeySelector
-import com.nimbusds.jose.proc.SecurityContext
-import com.nimbusds.jose.util.JSONObjectUtils
-import com.nimbusds.jose.util.X509CertUtils
-import com.nimbusds.jwt.SignedJWT
-import com.nimbusds.jwt.proc.DefaultJWTProcessor
-import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.AuthorizationPolicyValidationError.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
+import eu.europa.ec.eudi.openid4vci.CredentialOffer
+import eu.europa.ec.eudi.openid4vci.IssuerInfo
+import eu.europa.ec.eudi.openid4vci.RegistrationCertificatePolicy
 import kotlinx.serialization.json.JsonPrimitive
-import java.security.cert.X509Certificate
 
 internal class RegistrationCertificatePolicyEvaluator(
     private val policy: RegistrationCertificatePolicy,
@@ -49,18 +36,14 @@ internal class RegistrationCertificatePolicyEvaluator(
 
         val wrprc = issuerInfoList.registrationCertificate()
 
-        val trustedX509CertChain = wrprc.trustedX509CertChain(policy.trust)
-        wrprc.verifyTrustedSignature(trustedX509CertChain)
-
         val offeredCredentialConfigs = metadata.credentialConfigurationsSupported.filter {
             credentialOffer.credentialConfigurationIdentifiers.contains(it.key)
         }.values.toList()
 
-        val wrprcClaimset = wrprc.jwtClaimsSet.toJSONObject().toKotlinxJsonObject()
-        return policy.apply(accessCertificate, wrprcClaimset, offeredCredentialConfigs)
+        return policy.invoke(accessCertificate, wrprc, offeredCredentialConfigs)
     }
 
-    private fun IssuerInfo.registrationCertificate(): SignedJWT {
+    private fun IssuerInfo.registrationCertificate(): String {
         val registrationCerts = attestations.filter {
             it.format == IssuerInfo.Attestation.Format.REGISTRATION_CERT
         }
@@ -71,47 +54,6 @@ internal class RegistrationCertificatePolicyEvaluator(
         ensure(dataValue is JsonPrimitive) {
             MalformedRegistrationCertificate("Provided registration certificate is not a JSON primitive")
         }
-
-        return try {
-            SignedJWT.parse(dataValue.content)
-        } catch (e: Exception) {
-            throw MalformedRegistrationCertificate("Failed to parse WRPRC as signed JWT: ${e.message}")
-        }
-    }
-
-    private fun Map<String, Any?>.toKotlinxJsonObject(): JsonObject {
-        val jsonString = JSONObjectUtils.toJSONString(this)
-        return Json.decodeFromString(jsonString)
-    }
-
-    private suspend fun SignedJWT.trustedX509CertChain(issuerTrust: IssuerTrust): List<X509Certificate> {
-        val x5c = header?.x509CertChain
-        ensureNotNull(x5c) { MalformedRegistrationCertificate("WRPRC is missing an x5c header") }
-        val pubCertChain = x5c.mapNotNull { X509CertUtils.parse(it.decode()) }
-        ensure(pubCertChain.isNotEmpty()) { MalformedRegistrationCertificate("Invalid x5c") }
-        ensure(issuerTrust.certificateChainTrust.isTrusted(pubCertChain)) { RegistrationCertificateNotTrusted() }
-
-        val leafCert = pubCertChain.first()
-        val jwk = JWK.parse(leafCert)
-        ensure(jwk is AsymmetricJWK) {
-            MalformedRegistrationCertificate("WRPRC signing key must be asymmetric")
-        }
-
-        return pubCertChain
-    }
-
-    private fun SignedJWT.verifyTrustedSignature(certCain: List<X509Certificate>) {
-        try {
-            val processor = DefaultJWTProcessor<SecurityContext>()
-                .apply {
-                    jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType(ETSI119475.REG_CERT_HEADER_TYPE))
-                    jwsKeySelector = JWSKeySelector { _, _ -> listOf(certCain.first().publicKey) }
-                }
-            processor.process(this, null)
-        } catch (e: JOSEException) {
-            throw MalformedRegistrationCertificate("Could not verify signature of registration certificate: ${e.message}")
-        } catch (e: BadJOSEException) {
-            throw MalformedRegistrationCertificate("Registration certificate invalid signature: ${e.message}")
-        }
+        return dataValue.content
     }
 }
