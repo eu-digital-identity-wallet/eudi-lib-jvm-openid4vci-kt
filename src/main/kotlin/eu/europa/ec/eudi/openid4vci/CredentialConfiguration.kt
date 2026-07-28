@@ -145,8 +145,8 @@ value class ProofTypesSupported private constructor(val values: Set<ProofTypeMet
             if (values.isNotEmpty()) {
                 val supportsJwtProof = null != values.firstOrNull { it.type == ProofType.JWT }
                 val supportsAttestationProof = null != values.firstOrNull { it.type == ProofType.ATTESTATION }
-                require(supportsJwtProof && supportsAttestationProof) {
-                    "Both JWT Proofs and Attestation Proofs must be supported"
+                require(supportsJwtProof || supportsAttestationProof) {
+                    "Either JWT Proofs, or Attestation Proofs must be supported"
                 }
             }
 

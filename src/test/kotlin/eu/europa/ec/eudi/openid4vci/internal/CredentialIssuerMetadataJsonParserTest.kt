@@ -22,6 +22,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.toJavaDuration
 
@@ -71,17 +73,24 @@ class CredentialIssuerMetadataJsonParserTest {
     }
 
     @Test
-    fun `fails when credential configuration does not support both jwt proofs and attestation proofs`() {
-        fun test(resource: String) {
+    fun `succeeds when credential configuration supports either jwt proofs or attestation proofs`() {
+        fun test(resource: String, assertions: (CredentialConfiguration) -> Unit) {
             val json = getResourceAsText(resource)
-            val exception = assertFailsWith<CredentialIssuerMetadataValidationError.InvalidCredentialsSupported> {
-                CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
+            val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
+            assertTrue { metadata.credentialConfigurationsSupported.isNotEmpty() }
+            metadata.credentialConfigurationsSupported.values.forEach {
+                assertions(it)
             }
-            val cause = assertIs<IllegalArgumentException>(exception.cause)
-            assertEquals("Both JWT Proofs and Attestation Proofs must be supported", cause.message)
         }
 
-        test("well-known/openid-credential-issuer_only_jwt_proof.json")
-        test("well-known/openid-credential-issuer_only_attestation_proof.json")
+        test("well-known/openid-credential-issuer_only_jwt_proof.json") {
+            assertNotNull(it.proofTypesSupported[ProofType.JWT])
+            assertNull(it.proofTypesSupported[ProofType.ATTESTATION])
+        }
+
+        test("well-known/openid-credential-issuer_only_attestation_proof.json") {
+            assertNull(it.proofTypesSupported[ProofType.JWT])
+            assertNotNull(it.proofTypesSupported[ProofType.ATTESTATION])
+        }
     }
 }
