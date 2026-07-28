@@ -259,7 +259,6 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         }
 
     @Test
-    @Ignore
     internal fun `resolution fails when signed metadata is required and present but does not contain all required values`() =
         runTest {
             val credentialIssuerId = SampleIssuer.Id
@@ -324,9 +323,8 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         }
 
     @Test
-    @Ignore
     internal fun `resolution succeeds when signed metadata is required present and contains all values`() = runTest {
-        val credentialIssuerId = EUDIPidIssuer.Id
+        val credentialIssuerId = SampleIssuer.Id
 
         val resolver = resolver(
             credentialIssuerMetaDataHandler(

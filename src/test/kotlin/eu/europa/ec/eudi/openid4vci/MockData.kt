@@ -19,7 +19,11 @@ import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator
+import com.nimbusds.jose.util.Base64
+import com.nimbusds.jose.util.X509CertChainUtils
 import com.nimbusds.oauth2.sdk.GrantType
 import com.nimbusds.oauth2.sdk.ResponseMode
 import com.nimbusds.oauth2.sdk.ResponseType
@@ -32,9 +36,11 @@ import com.nimbusds.oauth2.sdk.id.Issuer
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import eu.europa.ec.eudi.openid4vci.internal.wellKnownUrl
 import io.ktor.http.*
+import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
 import java.time.Duration
 import java.util.*
+import kotlin.test.assertIs
 
 object SampleIssuer {
     val Id: CredentialIssuerId = CredentialIssuerId("https://credential-issuer.example.com").getOrThrow()
@@ -43,16 +49,6 @@ object SampleIssuer {
 
 object SampleAuthServer {
     val Url = HttpsUrl("https://keycloak-eudi.netcompany-intrasoft.com/realms/pid-issuer-realm").getOrThrow()
-    val OAuthWellKnownUrl = oauthAuthorizationServerMetadataUrl(Url)
-}
-
-object EUDIPidIssuer {
-    val Id: CredentialIssuerId = CredentialIssuerId("https://issuer-backend.eudiw.dev").getOrThrow()
-    val WellKnownUrl = Id.metaDataUrl()
-}
-
-object EUDIAuthServer {
-    val Url = HttpsUrl("https://authenticate.eudiw.dev/realms/pid-issuer-realm").getOrThrow()
     val OAuthWellKnownUrl = oauthAuthorizationServerMetadataUrl(Url)
 }
 
@@ -393,18 +389,26 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
         ),
     ),
     PositiveDuration(Duration.ofDays(30L)),
+    IssuerInfo(
+        listOf(
+            IssuerInfo.Attestation(
+                format = IssuerInfo.Attestation.Format.REGISTRATION_CERT,
+                data = IssuerInfo.Attestation.Data(JsonPrimitive(getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/wrprc.txt"))),
+            ),
+        ),
+    ),
 )
 
 /**
  * Gets the [CredentialIssuerMetadata] used throughout the tests when signed metadata are used.
  */
 internal fun credentialIssuerSignedMetadata() = CredentialIssuerMetadata(
-    EUDIPidIssuer.Id,
-    listOf(EUDIAuthServer.Url),
-    CredentialIssuerEndpoint("https://issuer-backend.eudiw.dev/wallet/credentialEndpoint").getOrThrow(),
-    CredentialIssuerEndpoint("https://issuer-backend.eudiw.dev/wallet/nonceEndpoint").getOrThrow(),
-    CredentialIssuerEndpoint("https://issuer-backend.eudiw.dev/wallet/deferredEndpoint").getOrThrow(),
-    CredentialIssuerEndpoint("https://issuer-backend.eudiw.dev/wallet/notificationEndpoint").getOrThrow(),
+    SampleIssuer.Id,
+    listOf(SampleAuthServer.Url),
+    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/credentials").getOrThrow(),
+    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/nonce").getOrThrow(),
+    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/credentials/deferred").getOrThrow(),
+    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/notification").getOrThrow(),
     CredentialRequestEncryption.Required(
         SupportedRequestEncryptionParameters(
             encryptionKeys = JWKSet.parse(
@@ -413,34 +417,29 @@ internal fun credentialIssuerSignedMetadata() = CredentialIssuerMetadata(
                       "keys": [
                         {
                           "kty": "EC",
-                          "x5t#S256": "Pd5UaOLoKrkGimnsMU169RaNI_kM1nbQ0bYlpKLDaW8",
-                          "nbf": 1784285453,
                           "use": "enc",
                           "crv": "P-256",
-                          "kid": "credential-request-encryption",
-                          "x5c": [
-                            "MIIBXTCCAQKgAwIBAgIEaloJDTAKBggqhkjOPQQDAjAoMSYwJAYDVQQDDB1jcmVkZW50aWFsLXJlcXVlc3QtZW5jcnlwdGlvbjAeFw0yNjA3MTcxMDUwNTNaFw0zMTA3MTcxMDUwNTNaMCgxJjAkBgNVBAMMHWNyZWRlbnRpYWwtcmVxdWVzdC1lbmNyeXB0aW9uMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsJ0Ybvj07MuxARt5OCwvVqTiFyPVd5j6FPYFWSyMhwl2+AJqlK2ghpzLZOgR40eVq7oIiPmHRDspaLI5oIllQ6MaMBgwCQYDVR0TBAIwADALBgNVHQ8EBAMCAwgwCgYIKoZIzj0EAwIDSQAwRgIhANJGr8cPBL11CXDZmuF3bK8GplezzYkFUSGfzNr/eXjlAiEAqjD6tQOWLq33WEkdznoKz9DZ4YkmogOZ4qwhaenZ0WQ="
-                          ],
-                          "x": "sJ0Ybvj07MuxARt5OCwvVqTiFyPVd5j6FPYFWSyMhwk",
-                          "y": "dvgCapStoIacy2ToEeNHlau6CIj5h0Q7KWiyOaCJZUM",
-                          "exp": 1942051853,
-                          "alg": "ECDH-ES"
+                          "alg": "ECDH-ES",
+                          "kid": "encKey-0",
+                          "x": "TmcsNF6JpWjP85wKfBXKybHaJNowtp6jCuToppDosdw",
+                          "y": "egzDuJuSxyypCE0qUoo1oKOnslpaw1Om-flQ4knafas",
+                          "iat": 1755352588
                         }
                       ]
                     }
                 """,
             ),
-            encryptionMethods = listOf(EncryptionMethod.A128GCM, EncryptionMethod.A256GCM),
-//            payloadCompression = PayloadCompression(listOf(CompressionAlgorithm.DEF)),
+            encryptionMethods = listOf(EncryptionMethod.XC20P),
+            payloadCompression = PayloadCompression(listOf(CompressionAlgorithm.DEF)),
         ),
     ),
     CredentialResponseEncryption.Required(
         SupportedResponseEncryptionParameters(
-            listOf(JWEAlgorithm.ECDH_ES),
-            listOf(EncryptionMethod.A128GCM, EncryptionMethod.A256GCM),
+            listOf(JWEAlgorithm.RSA_OAEP_256),
+            listOf(EncryptionMethod.XC20P),
         ),
     ),
-    BatchCredentialIssuance.Supported(batchSize = 20),
+    BatchCredentialIssuance.Supported(batchSize = 15),
     mapOf(
         CredentialConfigurationIdentifier("UniversityDegree_JWT") to universityDegreeJwt(),
         CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc") to mobileDrivingLicense(),
@@ -454,6 +453,20 @@ internal fun credentialIssuerSignedMetadata() = CredentialIssuerMetadata(
             logo = Display.Logo(URI.create("https://credential-issuer.example.com/logo.png"), "Credential Issuer Logo"),
         ),
     ),
+    accessCertificate =
+        X509CertChainUtils
+            .parse(
+                listOf(
+                    Base64(
+                        "MIIBszCCAVqgAwIBAgIGAZ+o7JNCMAoGCCqGSM49BAMCMBkxFzAVBgNVBAMMDldycGFjIFByb3ZpZGVyMB4XDTI2MDcyODEzMzE0NVoXDT" +
+                            "I2MDgyODEzMzE0NVowKDEmMCQGA1UEAwwdY3JlZGVudGlhbC1pc3N1ZXIuZXhhbXBsZS5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwN" +
+                            "CAATmIdJW3mSChaU9q2a2m4xNWE9vFkZqOw4aX+GaxkDG3ia1QJAk4iiiJM6EQfcMz/1BOaiW8CuBncEJW7pSmqbOo38wfTA+BgNVHSME" +
+                            "NzA1gBTeLRm4vLEWVX8vs8l0fXqse54Z0KEVpBMwETEPMA0GA1UEAwwGUm9vdENhggYBn6jsk0AwHQYDVR0OBBYEFAH4PfPwkkQ8OfEzm" +
+                            "aaVAf5LCcEqMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgeAMAoGCCqGSM49BAMCA0cAMEQCIBZldLHTOqRjGdEyyh7dkf3brBcO7t" +
+                            "2qtTfPu1Hy+FUjAiALYzpTUJordt923YGlBcl8VtLBVzKynuexIs+YkxfN3w==",
+                    ),
+                ),
+            ).first(),
 )
 
 /**
@@ -672,4 +685,45 @@ internal fun oauthAuthorizationServerMetadata(): AuthorizationServerMetadata = A
         backChannelAuthenticationEndpointURI = URI.create("$protocolBaseUrl/ext/ciba/auth")
     }
     setSupportsAuthorizationResponseIssuerParam(true)
+}
+
+internal fun credentialOffer(
+    credentialIssuerMetadata: CredentialIssuerMetadata,
+): CredentialOffer {
+    val responseEncryptionJwk = ECKeyGenerator(Curve.P_256)
+        .algorithm(JWEAlgorithm.ECDH_ES)
+        .keyID("123")
+        .generate()
+
+    val credentialRequestEncryption =
+        assertIs<CredentialRequestEncryption.Required>(credentialIssuerMetadata.credentialRequestEncryption)
+
+    return CredentialOffer(
+        SampleIssuer.Id,
+        credentialIssuerMetadata,
+        oauthAuthorizationServerMetadata(),
+        listOf(
+            CredentialConfigurationIdentifier("UniversityDegree_JWT"),
+            CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc"),
+            CredentialConfigurationIdentifier("UniversityDegree_LDP_VC"),
+            CredentialConfigurationIdentifier("UniversityDegree_JWT_VC_JSON-LD"),
+        ),
+        Grants.Both(
+            Grants.AuthorizationCode("eyJhbGciOiJSU0EtFYUaBy"),
+            Grants.PreAuthorizedCode("adhjhdjajkdkhjhdj", TxCode()),
+        ),
+        ExchangeEncryptionSpecification(
+            requestEncryptionSpec = EncryptionSpec(
+                recipientKey = credentialRequestEncryption.encryptionParameters.encryptionKeys.keys.first(),
+                encryptionMethod = EncryptionMethod.XC20P,
+                compressionAlgorithm = CompressionAlgorithm.DEF,
+            ),
+            responseEncryptionSpec = EncryptionSpec(
+                recipientKey = responseEncryptionJwk,
+                encryptionMethod = EncryptionMethod.XC20P,
+                compressionAlgorithm = CompressionAlgorithm.DEF,
+            ),
+        ),
+        null,
+    )
 }
