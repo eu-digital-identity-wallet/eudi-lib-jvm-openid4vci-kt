@@ -249,12 +249,12 @@ object JWKJsonObjectSerializer : KSerializer<JWK> {
     }
 }
 
-fun <T : Any> JWTClaimsSet.decodeAs(deserializationStrategy: DeserializationStrategy<T>): Result<T> =
+internal fun <T : Any> JWTClaimsSet.decodeAs(deserializationStrategy: DeserializationStrategy<T>): Result<T> =
     runCatching {
         JsonSupport.decodeFromString(deserializationStrategy, JSONObjectUtils.toJSONString(toJSONObject()))
     }
 
-inline fun <reified T : Any> JWTClaimsSet.decodeAs(): Result<T> = decodeAs(serializer())
+internal inline fun <reified T : Any> JWTClaimsSet.decodeAs(): Result<T> = decodeAs(serializer())
 
 object DurationSecondsSerializer : KSerializer<Duration> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DurationSecondsSerializer", PrimitiveKind.LONG)

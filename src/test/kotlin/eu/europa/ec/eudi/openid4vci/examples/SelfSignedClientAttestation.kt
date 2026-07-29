@@ -126,7 +126,7 @@ private class ClientAttestationJwtBuilder(
                 sign(signer)
             }
 
-        return ClientAttestationJWT(jwt)
+        return ClientAttestationJWT(jwt.serialize())
     }
 
     private fun jwsHeader(): JWSHeader =
@@ -162,7 +162,7 @@ internal fun HttpRequestData.verifySelfSignedClientAttestation(walletInstanceKey
             .apply {
                 assertTrue(verify(ECDSAVerifier(walletInstanceKey)))
             }
-        ClientAttestationJWT(jwt)
+        ClientAttestationJWT(jwt.serialize())
     }
 
     val clientAttestationPOP = run {
@@ -184,11 +184,14 @@ internal fun HttpRequestData.verifySelfSignedClientAttestation(walletInstanceKey
     }
 }
 
+internal val ClientAttestationJWT.jwt: SignedJWT
+    get() = SignedJWT.parse(value)
+
 internal val ClientAttestationJWT.header: JWSHeader
-    get() = value.header
+    get() = jwt.header
 
 internal val ClientAttestationJWT.claimsSet: ClientAttestationJWTClaims
-    get() = decodeClaimsSet()
+    get() = decodeClaimsSet<ClientAttestationJWTClaims>().getOrThrow()
 
 internal val ClientAttestationJWT.clientId: ClientId
     get() = claimsSet.subject.value
