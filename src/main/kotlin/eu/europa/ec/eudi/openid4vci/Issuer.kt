@@ -15,9 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod
 import eu.europa.ec.eudi.openid4vci.internal.*
 import eu.europa.ec.eudi.openid4vci.internal.http.*
@@ -387,7 +384,7 @@ internal fun ProvisionClientAttestation.Provisioned.ensureSupportedByAuthorizati
     }
 
     val supportedClientAttestationJWSAlgs = authorizationServerMetadata.clientAttestationJWSAlgs.orEmpty()
-    val clientAttestationJWSAlg = clientAttestation.header.algorithm
+    val clientAttestationJWSAlg = clientAttestation.jwt.header.algorithm
     require(clientAttestationJWSAlg in supportedClientAttestationJWSAlgs) {
         "${clientAttestationJWSAlg.name} Client Attestation JWS Algorithm not supported by Authorization Server"
     }
@@ -402,24 +399,16 @@ internal fun ProvisionClientAttestation.Provisioned.ensureSupportedByAuthorizati
 internal fun ProvisionClientAttestation.ensureValid(now: Instant, provisioned: ProvisionClientAttestation.Provisioned) {
     val clientAttestation = provisioned.clientAttestation
 
-    check(algorithm.toNimbus() == clientAttestation.header.algorithm) {
-        "Client Attestation JWT algorithm mismatch: expected ${algorithm.name}, got ${clientAttestation.header.algorithm.name}"
+    check(algorithm.toNimbus() == clientAttestation.jwt.header.algorithm) {
+        "Client Attestation JWT algorithm mismatch: expected ${algorithm.name}, got ${clientAttestation.jwt.header.algorithm.name}"
     }
 
-    if (null != clientAttestation.claimsSet.notBefore) {
-        check(now >= clientAttestation.claimsSet.notBefore) { "Client Attestation JWT is not active yet" }
+    if (null != clientAttestation.jwt.jwtClaimsSet.notBeforeTime) {
+        check(now >= clientAttestation.jwt.jwtClaimsSet.notBeforeTime.toInstant()) { "Client Attestation JWT is not active yet" }
     }
 
-    check(now < clientAttestation.claimsSet.expirationTime) { "Client Attestation JWT is expired" }
-
-    val confirmationJwk = clientAttestation.publicKey
-    check(confirmationJwk is ECKey) { "Confirmation JWK must be an EC Key" }
-
-    when (popAlgorithm.toNimbus()) {
-        JWSAlgorithm.ES256 -> check(Curve.P_256 == confirmationJwk.curve) { "Confirmation JWK must be an EC Key with P-256 curve" }
-        JWSAlgorithm.ES384 -> check(Curve.P_384 == confirmationJwk.curve) { "Confirmation JWK must be an EC Key with P-384 curve" }
-        JWSAlgorithm.ES512 -> check(Curve.P_521 == confirmationJwk.curve) { "Confirmation JWK must be an EC Key with P-521 curve" }
-        else -> error("Unsupported Client Attestation POP JWT algorithm: ${popAlgorithm.name}")
+    if (null != clientAttestation.jwt.jwtClaimsSet.expirationTime) {
+        check(now < clientAttestation.jwt.jwtClaimsSet.expirationTime.toInstant()) { "Client Attestation JWT is expired" }
     }
 
     val popSignerAlgorithm = provisioned.popSigner.javaAlgorithm.toJoseAlg()

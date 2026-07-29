@@ -36,7 +36,7 @@ import eu.europa.ec.eudi.openid4vci.internal.toJoseAlg
 import io.ktor.client.request.*
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
-import java.security.Key
+import java.security.PublicKey
 import java.time.Clock
 import java.util.*
 import kotlin.test.assertEquals
@@ -150,7 +150,7 @@ private class ClientAttestationJwtBuilder(
     }
 }
 
-internal val JWK.publicKey: Key
+internal val JWK.publicKey: PublicKey
     get() = when (this) {
         is ECKey -> toECPublicKey()
         is RSAKey -> toRSAPublicKey()
@@ -170,7 +170,7 @@ internal fun HttpRequestData.verifySelfSignedClientAttestation(walletInstanceKey
         val jwt = SignedJWT.parse(assertNotNull(headers[AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_POP_HEADER]))
             .apply {
                 assertTrue(verify(ECDSAVerifier(walletInstanceKey)))
-                assertTrue(verify(DefaultJWSVerifierFactory().createJWSVerifier(header, clientAttestation.publicKey.publicKey)))
+                assertTrue(verify(DefaultJWSVerifierFactory().createJWSVerifier(header, clientAttestation.publicKey)))
             }
         ClientAttestationPoPJWT(jwt)
     }
@@ -184,3 +184,15 @@ internal fun HttpRequestData.verifySelfSignedClientAttestation(walletInstanceKey
         assertNull(clientAttestationPOP.jwt.jwtClaimsSet.getStringClaim(AttestationBasedClientAuthenticationSpec.CHALLENGE_CLAIM))
     }
 }
+
+internal val ClientAttestationJWT.header: JWSHeader
+    get() = jwt.header
+
+internal val ClientAttestationJWT.claimsSet: ClientAttestationJWTClaims
+    get() = decodeClaimsSet()
+
+internal val ClientAttestationJWT.clientId: ClientId
+    get() = claimsSet.subject.value
+
+internal val ClientAttestationJWT.publicKey: PublicKey
+    get() = claimsSet.confirmation.jwk.publicKey
