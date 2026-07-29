@@ -81,13 +81,10 @@ internal fun dPoPJwtFactory(
     }
 
 internal fun clientAttestation(
-    clock: Clock,
     authorizationServer: HttpsUrl,
     preferredClientStatusPeriod: PositiveDuration?,
     clientAuthentication: ClientAuthentication.AttestationBased,
 ): ProvisionOnce<ProvisionClientAttestation.Provisioned> =
     ProvisionOnce {
-        val provisionedClientAttestation = clientAuthentication.provisionClientAttestation(authorizationServer, preferredClientStatusPeriod)
-        clientAuthentication.provisionClientAttestation.ensureValid(clock.instant(), provisionedClientAttestation)
-        provisionedClientAttestation
+        clientAuthentication.provisionClientAttestation(authorizationServer, preferredClientStatusPeriod)
     }

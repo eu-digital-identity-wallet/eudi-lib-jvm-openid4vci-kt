@@ -15,9 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod
 import eu.europa.ec.eudi.openid4vci.internal.*
 import eu.europa.ec.eudi.openid4vci.internal.http.*
@@ -122,15 +120,17 @@ interface Issuer :
 
             val provisionClientAttestation =
                 when (val clientAuthentication = config.clientAuthentication) {
-                    is ClientAuthentication.AttestationBased ->
+                    is ClientAuthentication.AttestationBased -> {
+                        clientAuthentication.provisionClientAttestation.ensureSupportedByAuthorizationServer(
+                            credentialOffer.authorizationServerMetadata,
+                        )
+
                         clientAttestation(
-                            config.clock,
                             authorizationServer,
                             credentialOffer.credentialIssuerMetadata.preferredClientStatusPeriod,
                             clientAuthentication,
-                        ).verifying {
-                            it.ensureSupportedByAuthorizationServer(credentialOffer.authorizationServerMetadata)
-                        }
+                        )
+                    }
 
                     is ClientAuthentication.None -> {
                         { null }
@@ -376,7 +376,7 @@ interface Issuer :
     }
 }
 
-internal fun ProvisionClientAttestation.Provisioned.ensureSupportedByAuthorizationServer(
+internal fun ProvisionClientAttestation.ensureSupportedByAuthorizationServer(
     authorizationServerMetadata: CIAuthorizationServerMetadata,
 ) {
     val supportedAuthenticationMethods = authorizationServerMetadata.tokenEndpointAuthMethods.orEmpty()
@@ -387,39 +387,35 @@ internal fun ProvisionClientAttestation.Provisioned.ensureSupportedByAuthorizati
     }
 
     val supportedClientAttestationJWSAlgs = authorizationServerMetadata.clientAttestationJWSAlgs.orEmpty()
-    val clientAttestationJWSAlg = clientAttestation.header.algorithm
+    val clientAttestationJWSAlg = algorithm.toNimbus()
     require(clientAttestationJWSAlg in supportedClientAttestationJWSAlgs) {
         "${clientAttestationJWSAlg.name} Client Attestation JWS Algorithm not supported by Authorization Server"
     }
 
     val supportedClientAttestationPOPJWSAlgs = authorizationServerMetadata.clientAttestationPOPJWSAlgs.orEmpty()
-    val clientAttestationPOPJWSAlg = popSigner.javaAlgorithm.toJoseAlg()
+    val clientAttestationPOPJWSAlg = popAlgorithm.toNimbus()
     require(clientAttestationPOPJWSAlg in supportedClientAttestationPOPJWSAlgs) {
         "${clientAttestationPOPJWSAlg.name} Client Attestation POP JWS Algorithm not supported by Authorization Server"
     }
 }
 
-internal fun ProvisionClientAttestation.ensureValid(now: Instant, provisioned: ProvisionClientAttestation.Provisioned) {
-    val clientAttestation = provisioned.clientAttestation
+/**
+ * Utility function used to verify a [provisioned ClientAttestation and its PoP Signer][ProvisionClientAttestation.Provisioned]
+ * is active and according to the specification advertised by the [this].
+ */
+fun ProvisionClientAttestation.ensureValid(now: Instant, provisioned: ProvisionClientAttestation.Provisioned) {
+    val clientAttestation = SignedJWT.parse(provisioned.clientAttestation.value)
 
     check(algorithm.toNimbus() == clientAttestation.header.algorithm) {
         "Client Attestation JWT algorithm mismatch: expected ${algorithm.name}, got ${clientAttestation.header.algorithm.name}"
     }
 
-    if (null != clientAttestation.claimsSet.notBefore) {
-        check(now >= clientAttestation.claimsSet.notBefore) { "Client Attestation JWT is not active yet" }
+    if (null != clientAttestation.jwtClaimsSet.notBeforeTime) {
+        check(now >= clientAttestation.jwtClaimsSet.notBeforeTime.toInstant()) { "Client Attestation JWT is not active yet" }
     }
 
-    check(now < clientAttestation.claimsSet.expirationTime) { "Client Attestation JWT is expired" }
-
-    val confirmationJwk = clientAttestation.publicKey
-    check(confirmationJwk is ECKey) { "Confirmation JWK must be an EC Key" }
-
-    when (popAlgorithm.toNimbus()) {
-        JWSAlgorithm.ES256 -> check(Curve.P_256 == confirmationJwk.curve) { "Confirmation JWK must be an EC Key with P-256 curve" }
-        JWSAlgorithm.ES384 -> check(Curve.P_384 == confirmationJwk.curve) { "Confirmation JWK must be an EC Key with P-384 curve" }
-        JWSAlgorithm.ES512 -> check(Curve.P_521 == confirmationJwk.curve) { "Confirmation JWK must be an EC Key with P-521 curve" }
-        else -> error("Unsupported Client Attestation POP JWT algorithm: ${popAlgorithm.name}")
+    if (null != clientAttestation.jwtClaimsSet.expirationTime) {
+        check(now < clientAttestation.jwtClaimsSet.expirationTime.toInstant()) { "Client Attestation JWT is expired" }
     }
 
     val popSignerAlgorithm = provisioned.popSigner.javaAlgorithm.toJoseAlg()

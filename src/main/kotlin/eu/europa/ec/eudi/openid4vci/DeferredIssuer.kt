@@ -175,7 +175,6 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                 when (val clientAuthentication = config.clientAuthentication) {
                     is ClientAuthentication.AttestationBased ->
                         clientAttestation(
-                            config.clock,
                             authorizationServer,
                             config.preferredClientStatusPeriod,
                             clientAuthentication,
