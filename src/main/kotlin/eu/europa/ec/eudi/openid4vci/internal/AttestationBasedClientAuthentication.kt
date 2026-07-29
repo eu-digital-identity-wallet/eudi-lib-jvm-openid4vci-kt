@@ -63,6 +63,6 @@ internal fun HttpRequestBuilder.clientAttestationHeaders(
     clientAttestation: ClientAttestation,
 ) {
     val (attestation, pop) = clientAttestation
-    header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_HEADER, attestation.jwt.serialize())
+    header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_HEADER, attestation.value.serialize())
     header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_POP_HEADER, pop.jwt.serialize())
 }

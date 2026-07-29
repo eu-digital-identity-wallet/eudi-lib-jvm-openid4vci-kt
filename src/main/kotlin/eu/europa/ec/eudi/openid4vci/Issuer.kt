@@ -384,7 +384,7 @@ internal fun ProvisionClientAttestation.Provisioned.ensureSupportedByAuthorizati
     }
 
     val supportedClientAttestationJWSAlgs = authorizationServerMetadata.clientAttestationJWSAlgs.orEmpty()
-    val clientAttestationJWSAlg = clientAttestation.jwt.header.algorithm
+    val clientAttestationJWSAlg = clientAttestation.value.header.algorithm
     require(clientAttestationJWSAlg in supportedClientAttestationJWSAlgs) {
         "${clientAttestationJWSAlg.name} Client Attestation JWS Algorithm not supported by Authorization Server"
     }
@@ -399,16 +399,16 @@ internal fun ProvisionClientAttestation.Provisioned.ensureSupportedByAuthorizati
 internal fun ProvisionClientAttestation.ensureValid(now: Instant, provisioned: ProvisionClientAttestation.Provisioned) {
     val clientAttestation = provisioned.clientAttestation
 
-    check(algorithm.toNimbus() == clientAttestation.jwt.header.algorithm) {
-        "Client Attestation JWT algorithm mismatch: expected ${algorithm.name}, got ${clientAttestation.jwt.header.algorithm.name}"
+    check(algorithm.toNimbus() == clientAttestation.value.header.algorithm) {
+        "Client Attestation JWT algorithm mismatch: expected ${algorithm.name}, got ${clientAttestation.value.header.algorithm.name}"
     }
 
-    if (null != clientAttestation.jwt.jwtClaimsSet.notBeforeTime) {
-        check(now >= clientAttestation.jwt.jwtClaimsSet.notBeforeTime.toInstant()) { "Client Attestation JWT is not active yet" }
+    if (null != clientAttestation.value.jwtClaimsSet.notBeforeTime) {
+        check(now >= clientAttestation.value.jwtClaimsSet.notBeforeTime.toInstant()) { "Client Attestation JWT is not active yet" }
     }
 
-    if (null != clientAttestation.jwt.jwtClaimsSet.expirationTime) {
-        check(now < clientAttestation.jwt.jwtClaimsSet.expirationTime.toInstant()) { "Client Attestation JWT is expired" }
+    if (null != clientAttestation.value.jwtClaimsSet.expirationTime) {
+        check(now < clientAttestation.value.jwtClaimsSet.expirationTime.toInstant()) { "Client Attestation JWT is expired" }
     }
 
     val popSignerAlgorithm = provisioned.popSigner.javaAlgorithm.toJoseAlg()

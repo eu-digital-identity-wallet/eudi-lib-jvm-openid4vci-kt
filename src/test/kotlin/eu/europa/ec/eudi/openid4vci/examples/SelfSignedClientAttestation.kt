@@ -38,7 +38,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
 import java.security.PublicKey
 import java.time.Clock
-import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -186,7 +185,7 @@ internal fun HttpRequestData.verifySelfSignedClientAttestation(walletInstanceKey
 }
 
 internal val ClientAttestationJWT.header: JWSHeader
-    get() = jwt.header
+    get() = value.header
 
 internal val ClientAttestationJWT.claimsSet: ClientAttestationJWTClaims
     get() = decodeClaimsSet()
