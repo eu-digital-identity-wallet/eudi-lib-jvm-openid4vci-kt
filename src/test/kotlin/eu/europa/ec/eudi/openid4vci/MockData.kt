@@ -402,68 +402,18 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
 /**
  * Gets the [CredentialIssuerMetadata] used throughout the tests when signed metadata are used.
  */
-internal fun credentialIssuerSignedMetadata() = CredentialIssuerMetadata(
-    SampleIssuer.Id,
-    listOf(SampleAuthServer.Url),
-    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/credentials").getOrThrow(),
-    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/nonce").getOrThrow(),
-    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/credentials/deferred").getOrThrow(),
-    CredentialIssuerEndpoint("https://credential-issuer.example.com/signed/notification").getOrThrow(),
-    CredentialRequestEncryption.Required(
-        SupportedRequestEncryptionParameters(
-            encryptionKeys = JWKSet.parse(
-                """
-                    {
-                      "keys": [
-                        {
-                          "kty": "EC",
-                          "use": "enc",
-                          "crv": "P-256",
-                          "alg": "ECDH-ES",
-                          "kid": "encKey-0",
-                          "x": "TmcsNF6JpWjP85wKfBXKybHaJNowtp6jCuToppDosdw",
-                          "y": "egzDuJuSxyypCE0qUoo1oKOnslpaw1Om-flQ4knafas",
-                          "iat": 1755352588
-                        }
-                      ]
-                    }
-                """,
-            ),
-            encryptionMethods = listOf(EncryptionMethod.XC20P),
-            payloadCompression = PayloadCompression(listOf(CompressionAlgorithm.DEF)),
-        ),
-    ),
-    CredentialResponseEncryption.Required(
-        SupportedResponseEncryptionParameters(
-            listOf(JWEAlgorithm.RSA_OAEP_256),
-            listOf(EncryptionMethod.XC20P),
-        ),
-    ),
-    BatchCredentialIssuance.Supported(batchSize = 15),
-    mapOf(
-        CredentialConfigurationIdentifier("UniversityDegree_JWT") to universityDegreeJwt(),
-        CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc") to mobileDrivingLicense(),
-        CredentialConfigurationIdentifier("UniversityDegree_LDP_VC") to universityDegreeLdpVc(),
-        CredentialConfigurationIdentifier("UniversityDegree_JWT_VC_JSON-LD") to universityDegreeJwtVcJsonLD(),
-    ),
-    listOf(
-        Display(
-            name = "credential-issuer.example.com",
-            locale = Locale.forLanguageTag("en-US"),
-            logo = Display.Logo(URI.create("https://credential-issuer.example.com/logo.png"), "Credential Issuer Logo"),
-        ),
-    ),
+internal fun credentialIssuerSignedMetadata() = credentialIssuerMetadata().copy(
     accessCertificate =
         X509CertChainUtils
             .parse(
                 listOf(
                     Base64(
-                        "MIIBszCCAVqgAwIBAgIGAZ+o7JNCMAoGCCqGSM49BAMCMBkxFzAVBgNVBAMMDldycGFjIFByb3ZpZGVyMB4XDTI2MDcyODEzMzE0NVoXDT" +
-                            "I2MDgyODEzMzE0NVowKDEmMCQGA1UEAwwdY3JlZGVudGlhbC1pc3N1ZXIuZXhhbXBsZS5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwN" +
-                            "CAATmIdJW3mSChaU9q2a2m4xNWE9vFkZqOw4aX+GaxkDG3ia1QJAk4iiiJM6EQfcMz/1BOaiW8CuBncEJW7pSmqbOo38wfTA+BgNVHSME" +
-                            "NzA1gBTeLRm4vLEWVX8vs8l0fXqse54Z0KEVpBMwETEPMA0GA1UEAwwGUm9vdENhggYBn6jsk0AwHQYDVR0OBBYEFAH4PfPwkkQ8OfEzm" +
-                            "aaVAf5LCcEqMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgeAMAoGCCqGSM49BAMCA0cAMEQCIBZldLHTOqRjGdEyyh7dkf3brBcO7t" +
-                            "2qtTfPu1Hy+FUjAiALYzpTUJordt923YGlBcl8VtLBVzKynuexIs+YkxfN3w==",
+                        "MIIBtTCCAVqgAwIBAgIGAZ+tp+vlMAoGCCqGSM49BAMCMBkxFzAVBgNVBAMMDldycGFjIFByb3ZpZGVyMB4XDTI2MDcyOTExMzQ1MVoXDTI2MD" +
+                            "gyOTExMzQ1MVowKDEmMCQGA1UEAwwdY3JlZGVudGlhbC1pc3N1ZXIuZXhhbXBsZS5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNC" +
+                            "AAThFrxJxmGnLw7Vda0HEIZTgelsemPXakCFY8bjQM+2UbnAYCh+mWweEjLc2F+0Bd3iqsHjfYxJH6SyomCsMTWPo38wfTA+BgNVHS" +
+                            "MENzA1gBQNIkRlPsfQMP71uwjqEbfJFhws1qEVpBMwETEPMA0GA1UEAwwGUm9vdENhggYBn62n6+MwHQYDVR0OBBYEFL7VLSkX83xr" +
+                            "OFwwXxAAJPuvmXO1MAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgeAMAoGCCqGSM49BAMCA0kAMEYCIQCX+0wgjxHSdgsETV1mJi" +
+                            "SRk1chBsbZvCmNat8ZPer1/QIhANt/64dl0RRAM5DDdhJAM2TyAVpFtizv/RJhXnTIIPOv",
                     ),
                 ),
             ).first(),

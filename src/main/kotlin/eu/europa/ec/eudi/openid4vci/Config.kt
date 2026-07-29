@@ -163,7 +163,7 @@ data class OpenId4VCIConfig(
                 IllegalStateException(
                     "Wrong configuration: " +
                         "IssuerMetadataPolicy does not match RegistrationCertificatePolicy. " +
-                        "When RegistrationCertificatePolicy is provided IssuerMetadataPolicy must be RequireSigned",
+                        "When RegistrationCertificatePolicy is provided, IssuerMetadataPolicy must be RequireSigned",
                 )
             }
         }
