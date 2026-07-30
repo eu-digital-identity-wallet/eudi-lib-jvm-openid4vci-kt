@@ -55,10 +55,7 @@ internal data class RootCa(val certAndKey: CertificateAndKey) {
 
         val NAME: X500Name = X500Name("CN=RootCa")
 
-        val DEFAULT = let {
-            val rootCACert = CertOps.genTrustAnchor(SIGN_ALG, NAME)
-            RootCa(rootCACert)
-        }
+        val DEFAULT = RootCa(CertOps.genTrustAnchor(SIGN_ALG, NAME))
 
         operator fun invoke(certAndKey: Pair<KeyPair, X509CertificateHolder>): RootCa =
             RootCa(CertificateAndKey(certAndKey))
@@ -88,30 +85,34 @@ internal class WrpacProvider(private val certAndKey: CertificateAndKey) {
     }
 }
 
-internal class WrprcProvider(private val certAndKey: CertificateAndKey, private val clock: Clock) {
+internal class WrprcProvider(
+    private val certAndKey: CertificateAndKey,
+    private val clock: Clock,
+) {
 
     fun issueWRPRC(wrprcContent: JsonObject): SignedJWT {
-        val jwsHeader = JWSHeader
-            .Builder(JWSAlgorithm.ES256)
-            .apply {
-                type(JOSEObjectType(ETSI119475.REG_CERT_HEADER_TYPE))
-                x509CertChain(
-                    listOf(Base64.encode(certAndKey.cert.encoded)),
-                )
-            }.build()
-
-        val payload = wrprcContent
-            .buildUpon {
-                put("iat", clock.now().epochSeconds)
-            }.toPayload()
-
-        val signedWrprc =
-            JWSObject(jwsHeader, payload).apply {
-                sign(certAndKey.keyPair.jwsSigner(JWSAlgorithm.ES256))
-            }
-
-        return SignedJWT.parse(signedWrprc.serialize())
+        val jwsHeader = header()
+        val payload = payload(wrprcContent)
+        val jWSObject = JWSObject(jwsHeader, payload).apply {
+            sign(certAndKey.keyPair.jwsSigner(JWSAlgorithm.ES256))
+        }
+        return SignedJWT.parse(jWSObject.serialize())
     }
+
+    private fun payload(wrprcContent: JsonObject): Payload = wrprcContent
+        .buildUpon {
+            put(RFC7519.ISSUED_AT, clock.now().epochSeconds)
+        }.let {
+            Payload(JSONObjectUtils.parse(Json.encodeToString(it)))
+        }
+
+    private fun header(): JWSHeader? = JWSHeader.Builder(JWSAlgorithm.ES256)
+        .apply {
+            type(JOSEObjectType(ETSI119475.REG_CERT_HEADER_TYPE))
+            x509CertChain(
+                listOf(Base64.encode(certAndKey.cert.encoded)),
+            )
+        }.build()
 
     companion object {
         val NAME: X500Name = X500Name("CN=Wrprc Provider")
@@ -119,8 +120,7 @@ internal class WrprcProvider(private val certAndKey: CertificateAndKey, private 
         operator fun invoke(
             certAndKey: Pair<KeyPair, X509CertificateHolder>,
             clock: Clock,
-        ): WrprcProvider =
-            WrprcProvider(CertificateAndKey(certAndKey), clock)
+        ): WrprcProvider = WrprcProvider(CertificateAndKey(certAndKey), clock)
     }
 }
 
@@ -185,29 +185,45 @@ internal class AttestationProvider(
         CredentialIssuerMetadataJsonParser.parseMetaData(metadataJson, id)
 
     fun signedMetadata(): SignedJWT {
-        val jwsHeader = JWSHeader
-            .Builder(JWSAlgorithm.ES256)
+        val metadataJson = Json.decodeFromString<JsonObject>(metadataJson).embedWrprc()
+        val jwsHeader = header()
+        val payload = metadataJson.toPayload()
+        val jWSObject = JWSObject(jwsHeader, payload)
             .apply {
-                type(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
-                x509CertChain(
-                    wrpacCertChain.map { Base64.encode(it.encoded) },
-                )
-            }.build()
-
-        val payload = Json.decodeFromString<JsonObject>(metadataJson)
-            .buildUpon {
-                put("iat", clock.now().epochSeconds)
-                put("iss", id.toString())
-                put("sub", id.toString())
-            }.toPayload()
-
-        val signedWrprc =
-            JWSObject(jwsHeader, payload).apply {
                 sign(wrpacKey.jwsSigner(JWSAlgorithm.ES256))
             }
-
-        return SignedJWT.parse(signedWrprc.serialize())
+        return SignedJWT.parse(jWSObject.serialize())
     }
+
+    private fun JsonObject.toPayload(): Payload = this
+        .buildUpon {
+            put(RFC7519.ISSUED_AT, clock.now().epochSeconds)
+            put(RFC7519.ISSUER, id.toString())
+            put(RFC7519.SUBJECT, id.toString())
+        }.let {
+            Payload(JSONObjectUtils.parse(Json.encodeToString(it)))
+        }
+
+    private fun header(): JWSHeader? = JWSHeader.Builder(JWSAlgorithm.ES256)
+        .apply {
+            type(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
+            x509CertChain(wrpacCertChain.map { Base64.encode(it.encoded) })
+        }.build()
+
+    private fun JsonObject.embedWrprc(): JsonObject = this
+        .buildUpon {
+            put(
+                "issuer_info",
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put(ETSI119472Part3.FORMAT, ETSI119472Part3.REGISTRATION_CERT)
+                            put(ETSI119472Part3.DATA, wrprc.serialize())
+                        },
+                    )
+                },
+            )
+        }
 }
 
 private fun Map<String, JsonElement>.buildUpon(builder: JsonObjectBuilder.() -> Unit): JsonObject =
@@ -215,9 +231,6 @@ private fun Map<String, JsonElement>.buildUpon(builder: JsonObjectBuilder.() -> 
         entries.forEach { (key, value) -> put(key, value) }
         builder()
     }
-
-private fun JsonObject.toPayload(): Payload =
-    Payload(JSONObjectUtils.parse(Json.encodeToString(this)))
 
 private fun KeyPair.jwsSigner(signingAlg: JWSAlgorithm): JWSSigner =
     if (JWSAlgorithm.Family.RSA.contains(signingAlg)) {
