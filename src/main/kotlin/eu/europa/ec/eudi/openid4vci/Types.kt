@@ -370,6 +370,7 @@ fun interface CertificateChainTrust {
 /**
  * Mechanism a Wallet can establish trust with a JWT Issuer.
  */
+@Deprecated("Use CertificateChainTrust", ReplaceWith("CertificateChainTrust"))
 data class IssuerTrust(val certificateChainTrust: CertificateChainTrust)
 
 private fun String.requireNotEmpty() {

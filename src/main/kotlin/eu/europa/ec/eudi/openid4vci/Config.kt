@@ -382,13 +382,21 @@ sealed interface IssuerMetadataPolicy {
     /**
      * Credential Issuer **must** provide signed metadata. Only values from signed metadata are used.
      */
-    data class RequireSigned(val issuerTrust: IssuerTrust) : IssuerMetadataPolicy
+    data class RequireSigned(val issuerTrust: CertificateChainTrust) : IssuerMetadataPolicy {
+
+        @Deprecated(message = "Use constructor passing CertificateChainTrust", ReplaceWith("RequireSigned"))
+        constructor(issuerTrust: IssuerTrust) : this(issuerTrust.certificateChainTrust)
+    }
 
     /**
      * Credential Issuer **may** provide signed metadata. If signed metadata are provided, values conveyed in the singed
      * metadata take precedence over their corresponding unsigned counterparts.
      */
-    data class PreferSigned(val issuerTrust: IssuerTrust) : IssuerMetadataPolicy
+    data class PreferSigned(val issuerTrust: CertificateChainTrust) : IssuerMetadataPolicy {
+
+        @Deprecated(message = "Use constructor passing CertificateChainTrust", ReplaceWith("PreferSigned"))
+        constructor(issuerTrust: IssuerTrust) : this(issuerTrust.certificateChainTrust)
+    }
 
     /**
      * Signed metadata are ignored. Only values conveyed using plain json elements are used.

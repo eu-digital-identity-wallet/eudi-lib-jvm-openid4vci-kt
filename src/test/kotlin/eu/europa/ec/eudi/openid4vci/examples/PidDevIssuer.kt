@@ -53,7 +53,7 @@ internal object PidDevIssuer :
         parUsage = ParUsage.Required(),
         supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
         proofs = ProofsConfig.Default,
-        issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(IssuerTrust(TrustAnyX509)),
+        issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(TrustAnyX509),
     )
 
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_vc_sd_jwt")

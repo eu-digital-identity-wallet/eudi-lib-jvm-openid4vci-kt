@@ -67,7 +67,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
         return response.body<String>()
     }
 
-    private suspend fun Url.requestSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): Pair<String, X509Certificate?> {
+    private suspend fun Url.requestSigned(issuerTrust: CertificateChainTrust, issuer: CredentialIssuerId): Pair<String, X509Certificate?> {
         val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT)
         val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
         ensure(contentType?.withoutParameters() == CONTENT_TYPE_APPLICATION_JWT) {
@@ -79,7 +79,10 @@ internal class DefaultCredentialIssuerMetadataResolver(
             }
     }
 
-    private suspend fun Url.requestPreferringSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): Pair<String, X509Certificate?> {
+    private suspend fun Url.requestPreferringSigned(
+        issuerTrust: CertificateChainTrust,
+        issuer: CredentialIssuerId,
+    ): Pair<String, X509Certificate?> {
         val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT, ContentType.Application.Json)
         val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
         requireNotNull(contentType) { "Credential issuer did not respond with a content type header" }
@@ -109,7 +112,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
      */
     private suspend fun parseAndVerifySignedMetadata(
         jwt: String,
-        issuerTrust: IssuerTrust,
+        issuerTrust: CertificateChainTrust,
         issuer: CredentialIssuerId,
     ): Result<Pair<String, X509Certificate?>> = runCatchingCancellable {
         val signedJwt = SignedJWT.parse(jwt)
@@ -135,12 +138,12 @@ internal class DefaultCredentialIssuerMetadataResolver(
         metadataJson to leafCertificate
     }
 
-    private suspend fun IssuerTrust.keySelector(signedJwt: SignedJWT): JWSKeySelector<SecurityContext> {
+    private suspend fun CertificateChainTrust.keySelector(signedJwt: SignedJWT): JWSKeySelector<SecurityContext> {
         val certChain = requireNotNull(signedJwt.header.x509CertChain) {
             "missing 'x5c' header claim"
         }.let { X509CertChainUtils.parse(it) }
 
-        require(certificateChainTrust.isTrusted(certChain)) {
+        require(isTrusted(certChain)) {
             "certificate chain in 'x5c' header claim is not trusted"
         }
         val jwk = JWK.parse(certChain.first())

@@ -28,8 +28,8 @@ import kotlin.time.Duration.Companion.seconds
 
 internal class DefaultCredentialIssuerMetadataResolverTest {
 
-    val trustAll = IssuerTrust({ _ -> true })
-    val trustNone = IssuerTrust({ _ -> false })
+    val trustAll = CertificateChainTrust { _ -> true }
+    val trustNone = CertificateChainTrust { _ -> false }
 
     @Test
     internal fun `fails when metadata cannot be fetched`() = runTest {

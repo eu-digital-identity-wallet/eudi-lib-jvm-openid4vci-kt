@@ -24,6 +24,8 @@ import kotlin.test.*
 
 class IssuerTest {
 
+    private val trustAll = CertificateChainTrust { _ -> true }
+
     @Test
     fun `when wrprc policy provided then IssuerMetadataPolicy must be RequireSigned`() = runTest {
         assertFailsWith<IllegalArgumentException> {
@@ -45,7 +47,7 @@ class IssuerTest {
             PolicyViolation("WRPRC policy violation 2"),
         )
         val config = OpenId4VCIConfiguration.copy(
-            issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(IssuerTrust({ _ -> true })),
+            issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(trustAll),
             registrationCertificatePolicy = RegistrationCertificatePolicy { _, _, _ -> Authorization.Granted(warnings) },
         )
         val mockedHttpClient = mockedHttpClient(
@@ -75,7 +77,7 @@ class IssuerTest {
     fun `when wrprc policy validation fails then issuer resolution fails with IssuerResolutionResult Failure`() = runTest {
         val policyViolation = PolicyViolation("You shall not pass!!")
         val config = OpenId4VCIConfiguration.copy(
-            issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(IssuerTrust({ _ -> true })),
+            issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(trustAll),
             registrationCertificatePolicy = RegistrationCertificatePolicy { _, _, _ -> Authorization.NotGranted(policyViolation) },
         )
         val mockedHttpClient = mockedHttpClient(
