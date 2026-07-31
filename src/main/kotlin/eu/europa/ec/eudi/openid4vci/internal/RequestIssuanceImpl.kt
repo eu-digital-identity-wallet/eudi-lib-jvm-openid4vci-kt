@@ -446,17 +446,21 @@ private fun ProofsConfig.ensureCompatibleWith(issuerSupportedProofTypes: ProofTy
 
         else -> {
             val supportsJwtProof = null != jwtProof &&
-                jwtProof.supportedAlgorithms.intersect(issuerSupportedProofTypes.jwtProof.algorithms.toSet()).isNotEmpty()
+                jwtProof.supportedAlgorithms.intersect(
+                    issuerSupportedProofTypes.jwtProof?.algorithms.orEmpty().toSet(),
+                ).isNotEmpty()
             val supportsAttestationProof = null != attestationProof &&
-                attestationProof.supportedAlgorithms.intersect(issuerSupportedProofTypes.attestationProof.algorithms.toSet()).isNotEmpty()
+                attestationProof.supportedAlgorithms.intersect(
+                    issuerSupportedProofTypes.attestationProof?.algorithms.orEmpty().toSet(),
+                ).isNotEmpty()
 
             require(supportsJwtProof || supportsAttestationProof) { "Wallet doesn't support any of the advertised Proofs" }
         }
     }
 }
 
-private val ProofTypesSupported.jwtProof: ProofTypeMeta.Jwt
-    get() = this[ProofType.JWT] as ProofTypeMeta.Jwt
+private val ProofTypesSupported.jwtProof: ProofTypeMeta.Jwt?
+    get() = this[ProofType.JWT] as ProofTypeMeta.Jwt?
 
-private val ProofTypesSupported.attestationProof: ProofTypeMeta.Attestation
-    get() = this[ProofType.ATTESTATION] as ProofTypeMeta.Attestation
+private val ProofTypesSupported.attestationProof: ProofTypeMeta.Attestation?
+    get() = this[ProofType.ATTESTATION] as ProofTypeMeta.Attestation?

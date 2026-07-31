@@ -1173,4 +1173,159 @@ class IssuanceSingleRequestTest {
                 assertEquals("Wallet doesn't support any of the advertised Proofs", exception.message)
             }
         }
+
+    @Test
+    fun `when issuer supports only jwt proofs and wallet sends attestation proof issuance fails`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ONLY_JWT_PROOFS_SUPPORTED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+            httpClient = mockedHttpClient,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        val exception = with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            val proofSpec = attestationProofSpec()
+            assertFailsWith<IllegalArgumentException> {
+                authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
+            }
+        }
+        assertEquals("Credential configuration doesn't support attestation proofs.", exception.message)
+    }
+
+    @Test
+    fun `when issuer supports only jwt proofs and wallet sends jwt proof with unsupported algorithm issuance fails`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ONLY_JWT_PROOFS_SUPPORTED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+            httpClient = mockedHttpClient,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            val proofSpec = jwtProofSpec(Curve.P_521)
+            assertFailsWith<CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported> {
+                authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
+            }
+        }
+    }
+
+    @Test
+    fun `when issuer supports only jwt proofs and wallet sends no proof`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ONLY_JWT_PROOFS_SUPPORTED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+            httpClient = mockedHttpClient,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        val exception = with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            val proofSpec = ProofSpecification.NoProof
+            assertFailsWith<IllegalArgumentException> {
+                authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
+            }
+        }
+        assertEquals("Credential configuration requires proofs.", exception.message)
+    }
+
+    @Test
+    fun `when issuer supports only attestation proofs and wallet sends jwt proof issuance fails`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ONLY_ATTESTATION_PROOFS_SUPPORTED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+            httpClient = mockedHttpClient,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        val exception = with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            val proofSpec = jwtProofSpec()
+            assertFailsWith<IllegalArgumentException> {
+                authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
+            }
+        }
+        assertEquals("Credential configuration doesn't support JWT proofs.", exception.message)
+    }
+
+    @Test
+    fun `when issuer supports only attestation proofs and wallet sends attestation proof with unsupported algorithm issuance fails`() =
+        runTest {
+            val mockedHttpClient = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ONLY_ATTESTATION_PROOFS_SUPPORTED),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                nonceEndpointMocker(),
+                singleIssuanceRequestMocker(),
+            )
+            val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                httpClient = mockedHttpClient,
+            )
+
+            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+            with(issuer) {
+                val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                val proofSpec = attestationProofSpec(keyAttestationJwt = CryptoGenerator.keyAttestationJwt(Curve.P_521))
+                assertFailsWith<CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported> {
+                    authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
+                }
+            }
+        }
+
+    @Test
+    fun `when issuer supports only attestation proofs and wallet sends no proof`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ONLY_ATTESTATION_PROOFS_SUPPORTED),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+            httpClient = mockedHttpClient,
+        )
+
+        val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+        val exception = with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+            val proofSpec = ProofSpecification.NoProof
+            assertFailsWith<IllegalArgumentException> {
+                authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
+            }
+        }
+        assertEquals("Credential configuration requires proofs.", exception.message)
+    }
 }

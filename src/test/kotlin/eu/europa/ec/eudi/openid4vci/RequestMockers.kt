@@ -87,6 +87,8 @@ enum class IssuerMetadataVersion {
     CONTAINS_DEPRECATED_METHOD,
     ATTESTATION_PROOF_SUPPORTED,
     WITH_PREFERRED_CLIENT_STATUS_PERIOD,
+    ONLY_JWT_PROOFS_SUPPORTED,
+    ONLY_ATTESTATION_PROOFS_SUPPORTED,
 }
 
 internal fun issuerMetadataJsonContent(issuerMetadataVersion: IssuerMetadataVersion): String = when (issuerMetadataVersion) {
@@ -99,6 +101,8 @@ internal fun issuerMetadataJsonContent(issuerMetadataVersion: IssuerMetadataVers
     CONTAINS_DEPRECATED_METHOD -> getResourceAsText("well-known/openid-credential-issuer_contains_invalid_configuration.json")
     ATTESTATION_PROOF_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_attestation_proof_supported.json")
     WITH_PREFERRED_CLIENT_STATUS_PERIOD -> getResourceAsText("well-known/openid-credential-issuer_with_preferred_client_status_period.json")
+    ONLY_JWT_PROOFS_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_only_jwt_proof.json")
+    ONLY_ATTESTATION_PROOFS_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_only_attestation_proof.json")
 }
 
 enum class AuthServerMetadataVersion {
