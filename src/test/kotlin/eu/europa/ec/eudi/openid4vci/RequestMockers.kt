@@ -77,6 +77,22 @@ internal fun credentialIssuerMetadataWellKnownMocker(
         )
     },
 )
+
+internal fun credentialIssuerSignedMetadataWellKnownMocker(): RequestMocker = RequestMocker(
+    requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
+    responseBuilder = {
+        val contentType = ContentType("application", "jwt")
+        val content = issuerMetadataJsonContent(SIGNED_FULL)
+        respond(
+            content = content,
+            status = HttpStatusCode.OK,
+            headers = headersOf(
+                HttpHeaders.ContentType to listOf(contentType.toString()),
+            ),
+        )
+    },
+)
+
 enum class IssuerMetadataVersion {
     ENCRYPTION_REQUIRED,
     ENCRYPTION_NOT_SUPPORTED,
@@ -89,6 +105,7 @@ enum class IssuerMetadataVersion {
     WITH_PREFERRED_CLIENT_STATUS_PERIOD,
     ONLY_JWT_PROOFS_SUPPORTED,
     ONLY_ATTESTATION_PROOFS_SUPPORTED,
+    SIGNED_FULL,
 }
 
 internal fun issuerMetadataJsonContent(issuerMetadataVersion: IssuerMetadataVersion): String = when (issuerMetadataVersion) {
@@ -103,6 +120,7 @@ internal fun issuerMetadataJsonContent(issuerMetadataVersion: IssuerMetadataVers
     WITH_PREFERRED_CLIENT_STATUS_PERIOD -> getResourceAsText("well-known/openid-credential-issuer_with_preferred_client_status_period.json")
     ONLY_JWT_PROOFS_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_only_jwt_proof.json")
     ONLY_ATTESTATION_PROOFS_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_only_attestation_proof.json")
+    SIGNED_FULL -> getResourceAsText("well-known/openid-credential-issuer_full_signed.txt")
 }
 
 enum class AuthServerMetadataVersion {

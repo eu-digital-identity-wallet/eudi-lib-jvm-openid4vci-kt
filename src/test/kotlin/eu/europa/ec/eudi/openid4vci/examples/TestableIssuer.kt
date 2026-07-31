@@ -33,11 +33,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.addAll
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.*
 import org.openqa.selenium.By
 import org.openqa.selenium.chrome.ChromeDriver
 import org.openqa.selenium.chrome.ChromeOptions
@@ -54,7 +50,7 @@ interface CanBeUsedWithVciLib {
     val cfg: OpenId4VCIConfig
 
     suspend fun createIssuer(credentialOfferUri: String, httpClient: HttpClient): Issuer {
-        return Issuer.make(cfg, credentialOfferUri, httpClient).getOrThrow()
+        return Issuer.make(cfg, credentialOfferUri, httpClient).getIssuerOrThrow()
     }
 }
 

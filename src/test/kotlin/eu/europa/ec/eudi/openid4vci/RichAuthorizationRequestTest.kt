@@ -17,7 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointForm
-import io.ktor.client.HttpClient
+import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
@@ -64,7 +64,7 @@ class RichAuthorizationRequestTest {
             config = OpenId4VCIConfiguration,
             credentialOffer = offer,
             httpClient = mockedKtorHttpClientFactory,
-        ).getOrThrow()
+        ).getIssuerOrThrow()
         with(issuer) {
             authorizeWithPreAuthorizationCode(
                 txCode = "1234",
@@ -103,7 +103,7 @@ class RichAuthorizationRequestTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 httpClient = mockedKtorHttpClientFactory,
-            ).getOrThrow()
+            ).getIssuerOrThrow()
             with(issuer) {
                 val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
@@ -161,7 +161,7 @@ class RichAuthorizationRequestTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 httpClient = mockedKtorHttpClientFactory,
-            ).getOrThrow()
+            ).getIssuerOrThrow()
             with(issuer) {
                 val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
@@ -210,7 +210,7 @@ class RichAuthorizationRequestTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 httpClient = mockedKtorHttpClientFactory,
-            ).getOrThrow()
+            ).getIssuerOrThrow()
 
             with(issuer) {
                 val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
@@ -267,7 +267,7 @@ class RichAuthorizationRequestTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 httpClient = mockedKtorHttpClientFactory,
-            ).getOrThrow()
+            ).getIssuerOrThrow()
 
             val authRequestPrepared = issuer.prepareAuthorizationRequest().getOrThrow()
                 .also { println(it) }

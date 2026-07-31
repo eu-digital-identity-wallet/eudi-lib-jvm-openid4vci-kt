@@ -22,12 +22,18 @@ import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.KeyType
 import com.nimbusds.jose.jwk.KeyUse
 import eu.europa.ec.eudi.openid4vci.internal.DefaultCredentialIssuerMetadataResolver
+import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import io.ktor.client.*
-import java.io.Serializable
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
 import java.net.URL
+import java.security.cert.X509Certificate
+import java.io.Serializable as JavaIoSerializable
 
-sealed interface CredentialRequestEncryption : Serializable {
+sealed interface CredentialRequestEncryption : JavaIoSerializable {
     data object NotSupported : CredentialRequestEncryption {
         @Suppress("unused")
         private fun readResolve(): Any = NotSupported
@@ -42,7 +48,7 @@ sealed interface CredentialRequestEncryption : Serializable {
     ) : CredentialRequestEncryption
 }
 
-sealed interface CredentialResponseEncryption : Serializable {
+sealed interface CredentialResponseEncryption : JavaIoSerializable {
     data object NotSupported : CredentialResponseEncryption {
         @Suppress("unused")
         private fun readResolve(): Any = NotSupported
@@ -57,7 +63,7 @@ sealed interface CredentialResponseEncryption : Serializable {
     ) : CredentialResponseEncryption
 }
 
-sealed interface PayloadCompression : Serializable {
+sealed interface PayloadCompression : JavaIoSerializable {
     data object NotSupported : PayloadCompression {
         @Suppress("unused")
         private fun readResolve(): Any = NotSupported
@@ -132,7 +138,7 @@ data class SupportedRequestEncryptionParameters(
     }
 }
 
-sealed interface BatchCredentialIssuance : Serializable {
+sealed interface BatchCredentialIssuance : JavaIoSerializable {
     data object NotSupported : BatchCredentialIssuance {
         @Suppress("unused")
         private fun readResolve(): Any = NotSupported
@@ -142,6 +148,55 @@ sealed interface BatchCredentialIssuance : Serializable {
         init {
             require(batchSize > 0) { "batchSize must be greater than 0" }
         }
+    }
+}
+
+@JvmInline
+value class IssuerInfo(val attestations: List<Attestation>) : JavaIoSerializable {
+    init {
+        require(attestations.isNotEmpty())
+    }
+
+    override fun toString(): String = attestations.toString()
+
+    fun isEmpty(): Boolean = attestations.isEmpty()
+
+    @Serializable
+    data class Attestation(
+        @SerialName(ETSI119472Part3.FORMAT) @Required val format: Format,
+        @SerialName(ETSI119472Part3.DATA) @Required val data: Data,
+    ) : JavaIoSerializable {
+
+        @Serializable
+        @JvmInline
+        value class Format(val value: String) : JavaIoSerializable {
+            init {
+                require(value.isNotEmpty())
+            }
+
+            override fun toString(): String = value
+
+            companion object {
+                val REGISTRATION_CERT: Format get() = Format(ETSI119472Part3.REGISTRATION_CERT)
+            }
+        }
+
+        @Serializable
+        @JvmInline
+        value class Data(val value: JsonElement) : JavaIoSerializable {
+            init {
+                require((value is JsonPrimitive && value.isString) || (value is JsonObject))
+            }
+
+            override fun toString(): String = value.toString()
+        }
+    }
+
+    companion object {
+        fun fromJson(json: JsonArray): Result<IssuerInfo> =
+            runCatchingCancellable {
+                IssuerInfo(JsonSupport.decodeFromJsonElement(json))
+            }
     }
 }
 
@@ -161,7 +216,9 @@ data class CredentialIssuerMetadata(
     val credentialConfigurationsSupported: Map<CredentialConfigurationIdentifier, CredentialConfiguration>,
     val display: List<Display> = emptyList(),
     val preferredClientStatusPeriod: PositiveDuration? = null,
-) : Serializable {
+    val issuerInfo: IssuerInfo? = null,
+    val metadataSigningCertificate: X509Certificate? = null,
+) : JavaIoSerializable {
 
     init {
         require(credentialConfigurationsSupported.isNotEmpty()) { "credentialConfigurationsSupported must not be empty" }
@@ -202,7 +259,7 @@ value class CredentialIssuerEndpoint(val value: URL) {
 /**
  * Errors that can occur while trying to fetch and validate the metadata of a Credential Issuer.
  */
-sealed class CredentialIssuerMetadataError(cause: Throwable) : Throwable(cause), Serializable {
+sealed class CredentialIssuerMetadataError(cause: Throwable) : Throwable(cause), JavaIoSerializable {
 
     /**
      * Indicates the Credential Issuer metadata could not be fetched.
@@ -344,6 +401,8 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
      * `preferred_client_status_period` advertised by Credential Issuer is invalid.
      */
     class InvalidPreferredClientStatusPeriod(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+
+    class InvalidIssuerInfo(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
 }
 
 /**

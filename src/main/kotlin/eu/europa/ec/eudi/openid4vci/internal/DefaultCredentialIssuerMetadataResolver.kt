@@ -35,6 +35,7 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import java.security.cert.X509Certificate
 
 private val CONTENT_TYPE_APPLICATION_JWT = ContentType.parse("application/jwt")
 
@@ -47,12 +48,13 @@ internal class DefaultCredentialIssuerMetadataResolver(
         policy: IssuerMetadataPolicy,
     ): Result<CredentialIssuerMetadata> = runCatchingCancellable {
         val wellKnownUrl = issuer.wellKnown()
-        val json = when (policy) {
-            IssuerMetadataPolicy.IgnoreSigned -> wellKnownUrl.requestUnsigned()
+        val (json, accessCertificate) = when (policy) {
+            IssuerMetadataPolicy.IgnoreSigned -> wellKnownUrl.requestUnsigned() to null
             is IssuerMetadataPolicy.RequireSigned -> wellKnownUrl.requestSigned(policy.issuerTrust, issuer)
             is IssuerMetadataPolicy.PreferSigned -> wellKnownUrl.requestPreferringSigned(policy.issuerTrust, issuer)
         }
-        CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer)
+        val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer)
+        metadata.copy(metadataSigningCertificate = accessCertificate)
     }
 
     private suspend fun Url.requestUnsigned(): String {
@@ -65,7 +67,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
         return response.body<String>()
     }
 
-    private suspend fun Url.requestSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): String {
+    private suspend fun Url.requestSigned(issuerTrust: CertificateChainTrust, issuer: CredentialIssuerId): Pair<String, X509Certificate?> {
         val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT)
         val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
         ensure(contentType?.withoutParameters() == CONTENT_TYPE_APPLICATION_JWT) {
@@ -77,7 +79,10 @@ internal class DefaultCredentialIssuerMetadataResolver(
             }
     }
 
-    private suspend fun Url.requestPreferringSigned(issuerTrust: IssuerTrust, issuer: CredentialIssuerId): String {
+    private suspend fun Url.requestPreferringSigned(
+        issuerTrust: CertificateChainTrust,
+        issuer: CredentialIssuerId,
+    ): Pair<String, X509Certificate?> {
         val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT, ContentType.Application.Json)
         val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
         requireNotNull(contentType) { "Credential issuer did not respond with a content type header" }
@@ -91,9 +96,9 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 throw CredentialIssuerMetadataError.InvalidSignedMetadata(it)
             }
 
-            ContentType.Application.Json -> response.body<String>()
+            ContentType.Application.Json -> response.body<String>() to null
 
-            else -> "Unexpected content type $contentType when retrieving issuer metadata."
+            else -> "Unexpected content type $contentType when retrieving issuer metadata." to null
         }
     }
 
@@ -103,12 +108,13 @@ internal class DefaultCredentialIssuerMetadataResolver(
      * @param jwt the Signed JWT to parse and verify
      * @param issuerTrust trust anchor for the issuer of the signed metadata
      * @param issuer the id of the Credential Issuer whose signed metadata to parse
+     * @return a pair of (metadata JSON string, leaf certificate from x5c header if present)
      */
     private suspend fun parseAndVerifySignedMetadata(
         jwt: String,
-        issuerTrust: IssuerTrust,
+        issuerTrust: CertificateChainTrust,
         issuer: CredentialIssuerId,
-    ): Result<String> = runCatchingCancellable {
+    ): Result<Pair<String, X509Certificate?>> = runCatchingCancellable {
         val signedJwt = SignedJWT.parse(jwt)
         val processor = DefaultJWTProcessor<SecurityContext>()
             .apply {
@@ -125,24 +131,23 @@ internal class DefaultCredentialIssuerMetadataResolver(
             }
 
         val claimsSet = processor.process(signedJwt, null)
-        JSONObjectUtils.toJSONString(claimsSet.toJSONObject())
+        val metadataJson = JSONObjectUtils.toJSONString(claimsSet.toJSONObject())
+        val leafCertificate = signedJwt.header.x509CertChain?.let { certChain ->
+            X509CertChainUtils.parse(certChain).firstOrNull()
+        }
+        metadataJson to leafCertificate
     }
 
-    private suspend fun IssuerTrust.keySelector(signedJwt: SignedJWT): JWSKeySelector<SecurityContext> {
-        val jwk = when (this) {
-            is IssuerTrust.ByPublicKey -> jwk.toPublicJWK()
+    private suspend fun CertificateChainTrust.keySelector(signedJwt: SignedJWT): JWSKeySelector<SecurityContext> {
+        val certChain = requireNotNull(signedJwt.header.x509CertChain) {
+            "missing 'x5c' header claim"
+        }.let { X509CertChainUtils.parse(it) }
 
-            is IssuerTrust.ByCertificateChain -> {
-                val certChain = requireNotNull(signedJwt.header.x509CertChain) {
-                    "missing 'x5c' header claim"
-                }.let { X509CertChainUtils.parse(it) }
-
-                require(certificateChainTrust.isTrusted(certChain)) {
-                    "certificate chain in 'x5c' header claim is not trusted"
-                }
-                JWK.parse(certChain.first())
-            }
+        require(isTrusted(certChain)) {
+            "certificate chain in 'x5c' header claim is not trusted"
         }
+        val jwk = JWK.parse(certChain.first())
+
         require(jwk is AsymmetricJWK) {
             "Metadata signing key should be asymmetric."
         }

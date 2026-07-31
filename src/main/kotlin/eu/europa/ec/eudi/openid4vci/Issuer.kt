@@ -26,6 +26,8 @@ import kotlinx.coroutines.coroutineScope
 import java.net.URI
 import java.time.Instant
 
+typealias IssuerNegotiationResult = Pair<Issuer, List<RegistrationCertificatePolicy.PolicyViolation>>
+
 /**
  * Entry point to the issuance library
  *
@@ -109,13 +111,13 @@ interface Issuer :
          * @return if wallet's [config] can satisfy the requirements of [credentialOffer] an [Issuer] will be
          * created. Otherwise, there would be a failed result
          */
-        fun make(
+        suspend fun make(
             config: OpenId4VCIConfig,
             credentialOffer: CredentialOffer,
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): Result<Issuer> = runCatching {
+        ): Result<IssuerNegotiationResult> = runCatchingCancellable {
             val authorizationServer = HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
 
             val provisionClientAttestation =
@@ -239,7 +241,18 @@ interface Issuer :
                     }
                 }
 
-            object :
+            val policyViolationWarnings = config.registrationCertificatePolicy?.let { policy ->
+                with(RegistrationCertificatePolicyEvaluator(policy)) {
+                    val authorization = evaluate(credentialOffer)
+                    when (authorization) {
+                        is RegistrationCertificatePolicy.Authorization.Granted -> authorization.warnings
+                        is RegistrationCertificatePolicy.Authorization.NotGranted ->
+                            throw AuthorizationPolicyValidationError.AuthorizationPolicyNotMet(authorization.error)
+                    }
+                }
+            } ?: emptyList()
+
+            val issuer = object :
                 Issuer,
                 AuthorizeIssuance by authorizeIssuance,
                 RefreshAccessToken by refreshAccessToken,
@@ -288,6 +301,8 @@ interface Issuer :
                     )
                 }
             }
+
+            issuer to policyViolationWarnings
         }
 
         /**
@@ -309,7 +324,7 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): Result<Issuer> = runCatchingCancellable {
+        ): Result<IssuerNegotiationResult> = runCatchingCancellable {
             val credentialOffer = CredentialOffer.resolve(
                 requestEncryptionSpecFactory,
                 responseEncryptionSpecFactory,
@@ -351,7 +366,7 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): Result<Issuer> = runCatchingCancellable {
+        ): Result<IssuerNegotiationResult> = runCatchingCancellable {
             val metadata = metaData(httpClient, credentialIssuerId, config.issuerMetadataPolicy)
             val authorizationServer = metadata.first.authorizationServers.first()
 
@@ -422,4 +437,29 @@ fun ProvisionClientAttestation.ensureValid(now: Instant, provisioned: ProvisionC
     check(popAlgorithm.toNimbus() == popSignerAlgorithm) {
         "Client Attestation POP signer algorithm mismatch: expected ${popAlgorithm.name}, got ${popSignerAlgorithm.name}"
     }
+}
+
+sealed class AuthorizationPolicyValidationError(cause: Throwable) : Throwable(cause) {
+
+    class MissingIssuerInfo :
+        AuthorizationPolicyValidationError(IllegalArgumentException("Missing issuer info"))
+
+    class MissingRegistrationCertificate :
+        AuthorizationPolicyValidationError(IllegalArgumentException("Missing issuer registration certificate"))
+
+    class MultipleRegistrationCertificates :
+        AuthorizationPolicyValidationError(IllegalArgumentException("Multiple Registration Certificates provided while only one expected"))
+
+    class MissingAccessCertificate :
+        AuthorizationPolicyValidationError(IllegalArgumentException("Missing access certificate"))
+
+    class AuthorizationPolicyNotMet(val violation: RegistrationCertificatePolicy.PolicyViolation) :
+        AuthorizationPolicyValidationError(IllegalArgumentException("Authorization policy not met"))
+
+    class MalformedRegistrationCertificate(msg: String) :
+        AuthorizationPolicyValidationError(IllegalArgumentException(msg)) {
+            init {
+                require(msg.isNotEmpty()) { "Cause cannot be empty" }
+            }
+        }
 }
