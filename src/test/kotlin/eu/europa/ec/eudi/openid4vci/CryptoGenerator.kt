@@ -27,6 +27,8 @@ import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.oauth2.sdk.id.Issuer
+import com.nimbusds.oauth2.sdk.util.X509CertificateUtils
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import java.net.URI
@@ -35,6 +37,8 @@ import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.interfaces.ECPrivateKey
 import java.security.spec.PKCS8EncodedKeySpec
+import java.time.Duration
+import java.time.Instant
 import java.time.Instant.now
 import java.util.*
 import kotlin.time.Duration.Companion.days
@@ -138,6 +142,38 @@ object CryptoGenerator {
             signer = ECDSASigner(privateKey),
             nonce,
             preferredKeyStorageStatusPeriod,
+            JWSAlgorithm.ES256,
+        )
+        KeyAttestationJWT(jwt.serialize())
+    }
+
+    fun keyAttestationJwt(
+        attestedKeys: List<JWK>? = null,
+        nonce: Nonce? = null,
+        preferredKeyStorageStatusPeriod: PositiveDuration? = null,
+        curve: Curve,
+    ) = run {
+        val algorithm = when (curve) {
+            Curve.P_256 -> JWSAlgorithm.ES256
+            Curve.P_384 -> JWSAlgorithm.ES384
+            Curve.P_521 -> JWSAlgorithm.ES512
+            else -> error("Unsupported Curve: $curve")
+        }
+        val privateKey = ECKeyGenerator(curve).algorithm(algorithm).generate()
+        val certificate = X509CertificateUtils.generateSelfSigned(
+            Issuer("Wallet-Provider"),
+            Date.from(Instant.now()),
+            Date.from(Instant.now().plus(Duration.ofDays(365))),
+            privateKey.toECPublicKey(),
+            privateKey.toECPrivateKey(),
+        )
+        val jwt = keyAttestationJwt(
+            attestedKeys = attestedKeys ?: List(3) { randomECSigningKey(Curve.P_256) },
+            certificate = certificate,
+            signer = ECDSASigner(privateKey),
+            nonce,
+            preferredKeyStorageStatusPeriod,
+            algorithm,
         )
         KeyAttestationJWT(jwt.serialize())
     }
@@ -148,6 +184,7 @@ object CryptoGenerator {
         signer: JWSSigner,
         nonce: Nonce? = null,
         preferredKeyStorageStatusPeriod: PositiveDuration? = null,
+        algorithm: JWSAlgorithm,
     ): SignedJWT {
         val keyAttestationJWTClaims = KeyAttestationJWTClaims(
             issuedAt = now(),
@@ -169,7 +206,7 @@ object CryptoGenerator {
             ),
         )
 
-        val header = JWSHeader.Builder(JWSAlgorithm.ES256)
+        val header = JWSHeader.Builder(algorithm)
             .type(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
             .x509CertChain(listOf(com.nimbusds.jose.util.Base64.encode(certificate.encoded)))
             .build()

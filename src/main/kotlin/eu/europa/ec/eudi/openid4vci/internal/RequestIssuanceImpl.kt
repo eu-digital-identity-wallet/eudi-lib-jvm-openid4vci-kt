@@ -438,20 +438,21 @@ internal sealed interface SubmissionOutcomeInternal {
         }
 }
 
-// internal instead of private to allow unit testing
-internal fun ProofsConfig.ensureCompatibleWith(issuerSupportedProofTypes: ProofTypesSupported) {
+private fun ProofsConfig.ensureCompatibleWith(issuerSupportedProofTypes: ProofTypesSupported) {
     when (issuerSupportedProofTypes) {
         ProofTypesSupported.Empty -> {
             require(isNoProofSupported) { "Wallet doesn't support attestations that require no proofs" }
         }
 
         else -> {
-            val issuerJwtProof = issuerSupportedProofTypes.jwtProof
-            val supportsJwtProof = null != jwtProof && null != issuerJwtProof &&
-                jwtProof.supportedAlgorithms.intersect(issuerJwtProof.algorithms.toSet()).isNotEmpty()
-            val issuerAttestationProof = issuerSupportedProofTypes.attestationProof
-            val supportsAttestationProof = null != attestationProof && null != issuerAttestationProof &&
-                attestationProof.supportedAlgorithms.intersect(issuerAttestationProof.algorithms.toSet()).isNotEmpty()
+            val supportsJwtProof = null != jwtProof &&
+                jwtProof.supportedAlgorithms.intersect(
+                    issuerSupportedProofTypes.jwtProof?.algorithms.orEmpty().toSet(),
+                ).isNotEmpty()
+            val supportsAttestationProof = null != attestationProof &&
+                attestationProof.supportedAlgorithms.intersect(
+                    issuerSupportedProofTypes.attestationProof?.algorithms.orEmpty().toSet(),
+                ).isNotEmpty()
 
             require(supportsJwtProof || supportsAttestationProof) { "Wallet doesn't support any of the advertised Proofs" }
         }
@@ -459,7 +460,7 @@ internal fun ProofsConfig.ensureCompatibleWith(issuerSupportedProofTypes: ProofT
 }
 
 private val ProofTypesSupported.jwtProof: ProofTypeMeta.Jwt?
-    get() = this[ProofType.JWT] as? ProofTypeMeta.Jwt
+    get() = this[ProofType.JWT] as ProofTypeMeta.Jwt?
 
 private val ProofTypesSupported.attestationProof: ProofTypeMeta.Attestation?
-    get() = this[ProofType.ATTESTATION] as? ProofTypeMeta.Attestation
+    get() = this[ProofType.ATTESTATION] as ProofTypeMeta.Attestation?
