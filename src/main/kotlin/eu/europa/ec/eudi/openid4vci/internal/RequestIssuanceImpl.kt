@@ -438,7 +438,8 @@ internal sealed interface SubmissionOutcomeInternal {
         }
 }
 
-private fun ProofsConfig.ensureCompatibleWith(issuerSupportedProofTypes: ProofTypesSupported) {
+// internal instead of private to allow unit testing
+internal fun ProofsConfig.ensureCompatibleWith(issuerSupportedProofTypes: ProofTypesSupported) {
     when (issuerSupportedProofTypes) {
         ProofTypesSupported.Empty -> {
             require(isNoProofSupported) { "Wallet doesn't support attestations that require no proofs" }
