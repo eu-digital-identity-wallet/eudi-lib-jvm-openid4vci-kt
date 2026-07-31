@@ -1296,14 +1296,7 @@ class IssuanceSingleRequestTest {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             with(issuer) {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val proofSpec = attestationProofSpec(keyAttestationJwt = { attestedKeys, nonce, preferredKeyStorageStatusPeriod ->
-                    CryptoGenerator.keyAttestationJwt(
-                        attestedKeys,
-                        nonce,
-                        preferredKeyStorageStatusPeriod,
-                        Curve.P_521,
-                    )
-                })
+                val proofSpec = attestationProofSpec(keyAttestationJwt = CryptoGenerator.keyAttestationJwt(Curve.P_521))
                 assertFailsWith<CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported> {
                     authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
                 }

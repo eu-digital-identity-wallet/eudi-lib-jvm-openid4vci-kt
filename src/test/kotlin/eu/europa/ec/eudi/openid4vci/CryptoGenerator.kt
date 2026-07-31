@@ -178,6 +178,15 @@ object CryptoGenerator {
         KeyAttestationJWT(jwt.serialize())
     }
 
+    fun keyAttestationJwt(curve: Curve): (List<JWK>?, nonce: Nonce?, PositiveDuration?) -> KeyAttestationJWT =
+        {
+                attestedKeys,
+                nonce,
+                preferredKeyStorageStatusPeriod,
+            ->
+            keyAttestationJwt(attestedKeys, nonce, preferredKeyStorageStatusPeriod, curve)
+        }
+
     private fun keyAttestationJwt(
         attestedKeys: List<JWK>,
         certificate: X509Certificate,
