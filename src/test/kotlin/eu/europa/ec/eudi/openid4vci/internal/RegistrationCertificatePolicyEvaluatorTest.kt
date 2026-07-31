@@ -154,7 +154,7 @@ class RegistrationCertificatePolicyEvaluatorTest {
     private fun SignedJWT.toDomain(): CredentialIssuerMetadata {
         val (metadataJson, accessCertificate) = parseAndVerifySignedMetadata(this, pidProvider.id).getOrThrow()
         val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(metadataJson, pidProvider.id)
-        return metadata.copy(accessCertificate = accessCertificate)
+        return metadata.copy(metadataSigningCertificate = accessCertificate)
     }
 
     private fun parseAndVerifySignedMetadata(

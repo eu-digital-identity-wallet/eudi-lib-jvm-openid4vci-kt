@@ -193,7 +193,3 @@ object TokenStatusListSpec {
     const val INDEX: String = "idx"
     const val URI: String = "uri"
 }
-
-object ETSI119475 {
-    const val REG_CERT_HEADER_TYPE = "rc-wrp+jwt"
-}

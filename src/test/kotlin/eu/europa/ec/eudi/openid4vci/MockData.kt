@@ -403,7 +403,7 @@ internal fun credentialIssuerMetadata() = CredentialIssuerMetadata(
  * Gets the [CredentialIssuerMetadata] used throughout the tests when signed metadata are used.
  */
 internal fun credentialIssuerSignedMetadata() = credentialIssuerMetadata().copy(
-    accessCertificate =
+    metadataSigningCertificate =
         X509CertChainUtils
             .parse(
                 listOf(

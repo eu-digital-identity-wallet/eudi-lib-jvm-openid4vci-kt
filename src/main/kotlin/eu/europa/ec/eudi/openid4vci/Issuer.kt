@@ -26,41 +26,7 @@ import kotlinx.coroutines.coroutineScope
 import java.net.URI
 import java.time.Instant
 
-/**
- * Represents the result of an issuer resolution process which can either be successful or a failure.
- */
-sealed interface IssuerResolutionResult {
-
-    /**
-     * Represents a successful outcome of the issuer resolution process.
-     *
-     * @property issuer The resolved issuer from the process.
-     * @property policyViolationWarning A list of warnings related to policy violations
-     * during the registration certificate policy processing. Defaults to an empty list.
-     */
-    data class Success(
-        val issuer: Issuer,
-        val policyViolationWarning: List<RegistrationCertificatePolicy.PolicyViolation> = emptyList(),
-    ) : IssuerResolutionResult
-
-    /**
-     * Represents a failed outcome of the issuer resolution process.
-     *
-     * This class encapsulates details about the failure that occurred during the issuer resolution process.
-     * The failure is represented by an associated exception, providing additional context about the error.
-     *
-     * @property exception The exception encountered during the issuer resolution process.
-     */
-    data class Failure(
-        val exception: Throwable,
-    ) : IssuerResolutionResult
-}
-
-fun IssuerResolutionResult.getIssuerOrThrow(): Issuer =
-    when (this) {
-        is IssuerResolutionResult.Success -> this.issuer
-        is IssuerResolutionResult.Failure -> throw exception
-    }
+typealias IssuerNegotiationResult = Pair<Issuer, List<RegistrationCertificatePolicy.PolicyViolation>>
 
 /**
  * Entry point to the issuance library
@@ -151,7 +117,7 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): IssuerResolutionResult = runCatchingCancellable {
+        ): Result<IssuerNegotiationResult> = runCatchingCancellable {
             val authorizationServer = HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
 
             val provisionClientAttestation =
@@ -284,7 +250,7 @@ interface Issuer :
                             throw AuthorizationPolicyValidationError.AuthorizationPolicyNotMet(authorization.error)
                     }
                 }
-            }
+            } ?: emptyList()
 
             val issuer = object :
                 Issuer,
@@ -336,11 +302,8 @@ interface Issuer :
                 }
             }
 
-            policyViolationWarnings to issuer
-        }.fold(
-            onSuccess = { IssuerResolutionResult.Success(it.second, it.first ?: emptyList()) },
-            onFailure = { IssuerResolutionResult.Failure(it) },
-        )
+            issuer to policyViolationWarnings
+        }
 
         /**
          * Factory method for creating an instance of [Issuer] based on a credential offer URI.
@@ -361,7 +324,7 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): IssuerResolutionResult = runCatchingCancellable {
+        ): Result<IssuerNegotiationResult> = runCatchingCancellable {
             val credentialOffer = CredentialOffer.resolve(
                 requestEncryptionSpecFactory,
                 responseEncryptionSpecFactory,
@@ -375,11 +338,8 @@ interface Issuer :
                 httpClient,
                 requestEncryptionSpecFactory,
                 responseEncryptionSpecFactory,
-            )
-        }.fold(
-            onSuccess = { it },
-            onFailure = { IssuerResolutionResult.Failure(it) },
-        )
+            ).getOrThrow()
+        }
 
         /**
          * Factory method for creating an instance of [Issuer] with a credential offer (Wallet initiated)
@@ -406,7 +366,7 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): IssuerResolutionResult = runCatchingCancellable {
+        ): Result<IssuerNegotiationResult> = runCatchingCancellable {
             val metadata = metaData(httpClient, credentialIssuerId, config.issuerMetadataPolicy)
             val authorizationServer = metadata.first.authorizationServers.first()
 
@@ -426,11 +386,8 @@ interface Issuer :
                 httpClient,
                 requestEncryptionSpecFactory,
                 responseEncryptionSpecFactory,
-            )
-        }.fold(
-            onSuccess = { it },
-            onFailure = { IssuerResolutionResult.Failure(it) },
-        )
+            ).getOrThrow()
+        }
     }
 }
 

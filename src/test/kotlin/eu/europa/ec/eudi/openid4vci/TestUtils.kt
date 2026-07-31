@@ -198,3 +198,5 @@ internal fun ProvisionDPoPSigner(signingKey: ECKey): ProvisionDPoPSigner {
     require(signingKey.isPrivate)
     return ProvisionDPoPSigner(Signer.fromNimbusEcKey(signingKey, signingKey.toPublicJWK(), secureRandom = null, provider = null))
 }
+
+internal fun Result<IssuerNegotiationResult>.getIssuerOrThrow(): Issuer = this.getOrThrow().first

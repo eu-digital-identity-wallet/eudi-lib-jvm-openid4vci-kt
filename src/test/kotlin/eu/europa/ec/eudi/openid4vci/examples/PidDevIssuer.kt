@@ -19,6 +19,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.http.*
+import java.security.cert.X509Certificate
 
 private val IssuerId = CredentialIssuerId("https://dev.issuer-backend.eudiw.dev").getOrThrow()
 private val WalletInstanceAttestationServiceUrl = Url("https://dev.wallet-provider.eudiw.dev/wallet-instance-attestation/jwk")
@@ -33,6 +34,10 @@ internal object PidDevIssuer :
     CanRequestKeyAttestation by CanRequestKeyAttestation.usingWalletProviderService(KeyAttestationServiceUrl, enableLogging = false) {
 
     private const val WALLET_CLIENT_ID = "eudiw-abca"
+    private val TrustAnyX509: (List<X509Certificate>) -> Boolean = { _ ->
+        println("Warning!! Trusting any certificate. Do not use in production")
+        true
+    }
 
     override val issuerId = IssuerId
     override val testUser = KeycloakUser("tneal", "password")
@@ -48,7 +53,7 @@ internal object PidDevIssuer :
         parUsage = ParUsage.Required(),
         supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
         proofs = ProofsConfig.Default,
-        issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(IssuerTrust({ true })),
+        issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(IssuerTrust(TrustAnyX509)),
     )
 
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_vc_sd_jwt")

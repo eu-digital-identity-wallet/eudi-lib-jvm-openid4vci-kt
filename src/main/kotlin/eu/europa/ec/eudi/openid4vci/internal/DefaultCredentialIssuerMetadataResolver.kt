@@ -54,7 +54,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
             is IssuerMetadataPolicy.PreferSigned -> wellKnownUrl.requestPreferringSigned(policy.issuerTrust, issuer)
         }
         val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer)
-        metadata.copy(accessCertificate = accessCertificate)
+        metadata.copy(metadataSigningCertificate = accessCertificate)
     }
 
     private suspend fun Url.requestUnsigned(): String {

@@ -160,7 +160,7 @@ data class OpenId4VCIConfig(
     init {
         if (registrationCertificatePolicy != null) {
             ensure(issuerMetadataPolicy is IssuerMetadataPolicy.RequireSigned) {
-                IllegalStateException(
+                IllegalArgumentException(
                     "Wrong configuration: " +
                         "IssuerMetadataPolicy does not match RegistrationCertificatePolicy. " +
                         "When RegistrationCertificatePolicy is provided, IssuerMetadataPolicy must be RequireSigned",

@@ -26,7 +26,7 @@ class IssuerTest {
 
     @Test
     fun `when wrprc policy provided then IssuerMetadataPolicy must be RequireSigned`() = runTest {
-        assertFailsWith<IllegalStateException> {
+        assertFailsWith<IllegalArgumentException> {
             OpenId4VCIConfig(
                 clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
                 authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
@@ -55,16 +55,20 @@ class IssuerTest {
             authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
         )
 
-        val issuerResolutionResult = Issuer.makeWalletInitiated(
+        val issuerNegotiationResult = Issuer.makeWalletInitiated(
             config,
             SampleIssuer.Id,
             listOf(CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc")),
             mockedHttpClient,
         )
 
-        assertIs<IssuerResolutionResult.Success>(issuerResolutionResult)
-        assertNotNull(issuerResolutionResult.policyViolationWarning)
-        assertEquals(warnings, issuerResolutionResult.policyViolationWarning)
+        issuerNegotiationResult.fold(
+            onSuccess = {
+                assertNotNull(it.second)
+                assertEquals(warnings, it.second)
+            },
+            onFailure = { fail("Expected success") },
+        )
     }
 
     @Test
@@ -81,17 +85,20 @@ class IssuerTest {
             authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
         )
 
-        val issuerResolutionResult = Issuer.makeWalletInitiated(
+        val issuerNegotiationResult = Issuer.makeWalletInitiated(
             config,
             SampleIssuer.Id,
             listOf(CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc")),
             mockedHttpClient,
         )
 
-        assertIs<IssuerResolutionResult.Failure>(issuerResolutionResult)
-        val exception = issuerResolutionResult.exception
-        assertIs<AuthorizationPolicyValidationError.AuthorizationPolicyNotMet>(exception)
-        assertEquals(policyViolation, exception.violation)
+        issuerNegotiationResult.fold(
+            onSuccess = { fail("Expected failure") },
+            onFailure = { e ->
+                assertIs<AuthorizationPolicyValidationError.AuthorizationPolicyNotMet>(e)
+                assertEquals(policyViolation, e.violation)
+            },
+        )
     }
 
     @Test

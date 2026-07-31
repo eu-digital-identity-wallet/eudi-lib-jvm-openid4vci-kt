@@ -217,7 +217,7 @@ data class CredentialIssuerMetadata(
     val display: List<Display> = emptyList(),
     val preferredClientStatusPeriod: PositiveDuration? = null,
     val issuerInfo: IssuerInfo? = null,
-    val accessCertificate: X509Certificate? = null,
+    val metadataSigningCertificate: X509Certificate? = null,
 ) : JavaIoSerializable {
 
     init {

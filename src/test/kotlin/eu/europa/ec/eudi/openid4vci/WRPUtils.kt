@@ -38,6 +38,7 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 private const val SIGN_ALG = "SHA256withECDSA"
+private const val ETSI119475_REG_CERT_HEADER_TYPE = "rc-wrp+jwt"
 
 internal data class CertificateAndKey(
     val keyPair: KeyPair,
@@ -108,7 +109,7 @@ internal class WrprcProvider(
 
     private fun header(): JWSHeader? = JWSHeader.Builder(JWSAlgorithm.ES256)
         .apply {
-            type(JOSEObjectType(ETSI119475.REG_CERT_HEADER_TYPE))
+            type(JOSEObjectType(ETSI119475_REG_CERT_HEADER_TYPE))
             x509CertChain(
                 listOf(Base64.encode(certAndKey.cert.encoded)),
             )

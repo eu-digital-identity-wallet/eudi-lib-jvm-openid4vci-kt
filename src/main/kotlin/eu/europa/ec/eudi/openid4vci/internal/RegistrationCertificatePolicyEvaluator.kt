@@ -29,7 +29,7 @@ internal class RegistrationCertificatePolicyEvaluator(
     ): RegistrationCertificatePolicy.Authorization {
         val metadata = credentialOffer.credentialIssuerMetadata
 
-        val accessCertificate = ensureNotNull(metadata.accessCertificate) { MissingAccessCertificate() }
+        val accessCertificate = ensureNotNull(metadata.metadataSigningCertificate) { MissingAccessCertificate() }
 
         val issuerInfoList = metadata.issuerInfo
         ensure(issuerInfoList != null && !issuerInfoList.isEmpty()) { MissingIssuerInfo() }
