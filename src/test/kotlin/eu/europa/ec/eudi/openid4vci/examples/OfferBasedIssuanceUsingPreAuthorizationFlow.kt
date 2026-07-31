@@ -41,7 +41,7 @@ fun main(): Unit = runBlocking {
             config = vciConfig,
             credentialOfferUri = credentialOfferUrl,
             httpClient = httpClient,
-        ).getOrThrow()
+        ).getIssuerOrThrow()
 
         val credentialOffer = issuer.credentialOffer
         ensure(credentialOffer.grants is Grants.PreAuthorizedCode || credentialOffer.grants is Grants.Both) {

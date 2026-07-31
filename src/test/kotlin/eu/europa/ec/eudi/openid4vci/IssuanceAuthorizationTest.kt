@@ -17,7 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import eu.europa.ec.eudi.openid4vci.internal.http.PushedAuthorizationRequestResponseTO
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenResponseTO
-import io.ktor.client.HttpClient
+import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
@@ -26,11 +26,7 @@ import parPostApplyAssertionsAndGetFormData
 import tokenPostApplyAuthFlowAssertionsAndGetFormData
 import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
 import java.util.*
-import kotlin.test.Test
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
-import kotlin.test.fail
+import kotlin.test.*
 
 class IssuanceAuthorizationTest {
 
@@ -59,7 +55,7 @@ class IssuanceAuthorizationTest {
             config = OpenId4VCIConfiguration,
             credentialOffer = offer,
             httpClient = mockedHttpClient,
-        ).getOrThrow()
+        ).getIssuerOrThrow()
         with(issuer) {
             val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
             val authorizationCode = UUID.randomUUID().toString()
@@ -95,7 +91,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 httpClient = mockedHttpClient,
-            ).getOrThrow()
+            ).getIssuerOrThrow()
             with(issuer) {
                 val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
@@ -124,7 +120,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 httpClient = mockedHttpClient,
-            ).getOrThrow()
+            ).getIssuerOrThrow()
             with(issuer) {
                 authorizeWithPreAuthorizationCode("1234").getOrThrow()
             }
@@ -143,7 +139,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 httpClient = mockedHttpClient,
-            ).getOrThrow()
+            ).getIssuerOrThrow()
 
             with(issuer) {
                 authorizeWithPreAuthorizationCode("123456")
@@ -173,7 +169,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 httpClient = mockedHttpClient,
-            ).getOrThrow()
+            ).getIssuerOrThrow()
 
             with(issuer) {
                 authorizeWithPreAuthorizationCode("AbdSS2356")
@@ -219,7 +215,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 httpClient = mockedHttpClient,
-            ).getOrThrow()
+            ).getIssuerOrThrow()
             with(issuer) {
                 prepareAuthorizationRequest()
                     .fold(
@@ -264,7 +260,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 httpClient = mockedHttpClient,
-            ).getOrThrow()
+            ).getIssuerOrThrow()
 
             with(issuer) {
                 val parPlaced = prepareAuthorizationRequest().getOrThrow()
@@ -313,7 +309,7 @@ class IssuanceAuthorizationTest {
                 config = OpenId4VCIConfiguration,
                 credentialOffer = offer,
                 httpClient = mockedHttpClient,
-            ).getOrThrow()
+            ).getIssuerOrThrow()
 
             with(issuer) {
                 authorizeWithPreAuthorizationCode("1234")
@@ -351,7 +347,7 @@ class IssuanceAuthorizationTest {
             config = config,
             credentialOffer = offer,
             httpClient = mockedHttpClient,
-        ).getOrThrow()
+        ).getIssuerOrThrow()
         with(issuer) {
             val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
             val authorizationCode = UUID.randomUUID().toString()
@@ -383,7 +379,7 @@ class IssuanceAuthorizationTest {
             config = config,
             credentialOffer = offer,
             httpClient = mockedHttpClient,
-        ).getOrThrow()
+        ).getIssuerOrThrow()
         with(issuer) {
             val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
             val authorizationCode = UUID.randomUUID().toString()

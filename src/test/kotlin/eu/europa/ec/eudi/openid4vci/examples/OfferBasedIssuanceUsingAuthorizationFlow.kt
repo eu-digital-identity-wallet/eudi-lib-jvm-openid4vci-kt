@@ -37,7 +37,7 @@ fun main(): Unit = runBlocking {
             config = PidDevIssuer.cfg,
             credentialOfferUri = credentialOfferUrl,
             httpClient = httpClient,
-        ).getOrThrow()
+        ).getIssuerOrThrow()
 
         val credentialOffer = issuer.credentialOffer
         ensure(credentialOffer.grants is Grants.AuthorizationCode || credentialOffer.grants is Grants.Both) {

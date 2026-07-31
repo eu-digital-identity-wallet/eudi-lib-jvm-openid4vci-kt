@@ -19,21 +19,15 @@ import com.nimbusds.jose.CompressionAlgorithm
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.*
+import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.InvalidCredentialIssuerId
-import eu.europa.ec.eudi.openid4vci.internal.DurationSecondsSerializer
-import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
-import eu.europa.ec.eudi.openid4vci.internal.ensure
-import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
-import eu.europa.ec.eudi.openid4vci.internal.ensureSuccess
+import eu.europa.ec.eudi.openid4vci.internal.*
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import java.net.URI
 import java.time.Duration
 import java.util.*
-import kotlin.collections.component1
-import kotlin.collections.component2
 import kotlin.time.Duration.Companion.seconds
 
 internal object CredentialIssuerMetadataJsonParser {
@@ -442,6 +436,7 @@ private data class CredentialIssuerMetadataTO(
     @SerialName("display") val display: List<DisplayTO>? = null,
     @SerialName(TS3.PREFERRED_CLIENT_STATUS_PERIOD)
     @Serializable(with = DurationSecondsSerializer::class) val preferredClientStatusPeriod: Duration? = null,
+    @SerialName(ETSI119472Part3.ISSUER_INFO) val issuerInfo: JsonArray? = null,
 )
 
 private object KeepKnownConfigurations : JsonTransformingSerializer<Map<String, CredentialSupportedTO>>(serializer()) {
@@ -751,6 +746,12 @@ private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuer
         PositiveDuration.of(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidPreferredClientStatusPeriod)
     }
 
+    val issuerInfo = issuerInfo?.let { json ->
+        IssuerInfo.fromJson(json).getOrElse {
+            throw CredentialIssuerMetadataValidationError.InvalidIssuerInfo(it)
+        }
+    }
+
     return CredentialIssuerMetadata(
         credentialIssuerIdentifier,
         authorizationServers,
@@ -764,5 +765,7 @@ private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuer
         credentialsSupported,
         display,
         preferredClientStatusPeriod,
+        issuerInfo,
+        null,
     )
 }

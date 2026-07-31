@@ -23,7 +23,9 @@ import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.impl.ContentCryptoProvider
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
+import eu.europa.ec.eudi.openid4vci.internal.ensure
 import java.net.URI
+import java.security.cert.X509Certificate
 import java.time.Clock
 
 typealias ClientId = String
@@ -96,6 +98,36 @@ sealed interface ClientAuthentication : java.io.Serializable {
 }
 
 /**
+ * Defines a policy for validating the registration certificate policy.
+ *
+ * This functional interface evaluates the provided access and registration certificates
+ * against a set of credential configurations to determine authorization for issuance.
+ */
+fun interface RegistrationCertificatePolicy {
+
+    suspend operator fun invoke(
+        accessCertificate: X509Certificate,
+        registrationCertificate: String,
+        issuanceContext: List<CredentialConfiguration>,
+    ): Authorization
+
+    /**
+     * Represents the result of registration certificate policy evaluation.
+     */
+    sealed interface Authorization {
+        data class Granted(val warnings: List<PolicyViolation> = emptyList()) : Authorization
+        data class NotGranted(val error: PolicyViolation) : Authorization
+    }
+
+    @JvmInline
+    value class PolicyViolation(val violation: String) {
+        init {
+            require(violation.isNotEmpty()) { "Violation must not be empty" }
+        }
+    }
+}
+
+/**
  * Configuration object to pass configuration properties to the issuance components.
  *
  * @param clientAuthentication the OAuth 2.0 Client Authentication Method of the Wallet
@@ -122,7 +154,20 @@ data class OpenId4VCIConfig(
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     val proofs: ProofsConfig = ProofsConfig.Default,
+    val registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
 ) {
+
+    init {
+        if (registrationCertificatePolicy != null) {
+            ensure(issuerMetadataPolicy is IssuerMetadataPolicy.RequireSigned) {
+                IllegalArgumentException(
+                    "Wrong configuration: " +
+                        "IssuerMetadataPolicy does not match RegistrationCertificatePolicy. " +
+                        "When RegistrationCertificatePolicy is provided, IssuerMetadataPolicy must be RequireSigned",
+                )
+            }
+        }
+    }
 
     /**
      * Creates a new [OpenId4VCIConfig] instance for a Wallet that uses [a Public OAuth 2.0 Client][ClientAuthentication.None].
@@ -138,6 +183,7 @@ data class OpenId4VCIConfig(
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
         proofs: ProofsConfig = ProofsConfig.Default,
+        registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
     ) : this(
         ClientAuthentication.None(clientId),
         authFlowRedirectionURI,
@@ -149,6 +195,7 @@ data class OpenId4VCIConfig(
         issuerMetadataPolicy,
         supportedCredentialReusePolicies,
         proofs,
+        registrationCertificatePolicy,
     )
 }
 
@@ -335,13 +382,21 @@ sealed interface IssuerMetadataPolicy {
     /**
      * Credential Issuer **must** provide signed metadata. Only values from signed metadata are used.
      */
-    data class RequireSigned(val issuerTrust: IssuerTrust) : IssuerMetadataPolicy
+    data class RequireSigned(val issuerTrust: CertificateChainTrust) : IssuerMetadataPolicy {
+
+        @Deprecated(message = "Use constructor passing CertificateChainTrust", ReplaceWith("RequireSigned"))
+        constructor(issuerTrust: IssuerTrust) : this(issuerTrust.certificateChainTrust)
+    }
 
     /**
      * Credential Issuer **may** provide signed metadata. If signed metadata are provided, values conveyed in the singed
      * metadata take precedence over their corresponding unsigned counterparts.
      */
-    data class PreferSigned(val issuerTrust: IssuerTrust) : IssuerMetadataPolicy
+    data class PreferSigned(val issuerTrust: CertificateChainTrust) : IssuerMetadataPolicy {
+
+        @Deprecated(message = "Use constructor passing CertificateChainTrust", ReplaceWith("PreferSigned"))
+        constructor(issuerTrust: IssuerTrust) : this(issuerTrust.certificateChainTrust)
+    }
 
     /**
      * Signed metadata are ignored. Only values conveyed using plain json elements are used.
