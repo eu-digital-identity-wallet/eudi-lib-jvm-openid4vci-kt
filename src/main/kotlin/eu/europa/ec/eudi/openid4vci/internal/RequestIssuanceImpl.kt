@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CNonceAndDPoPNonce
@@ -273,7 +272,7 @@ internal class RequestIssuanceImpl(
         return Proof.Attestation(keyAttestationJwt)
     }
 
-    private fun List<JWK>.assertMatchesBatchIssuanceBatchSize(
+    private fun AttestedKeys.assertMatchesBatchIssuanceBatchSize(
         selectedReusePolicy: EudiReusePolicy?,
     ) = size.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
 

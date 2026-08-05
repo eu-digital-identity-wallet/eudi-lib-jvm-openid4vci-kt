@@ -19,22 +19,16 @@ import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.crypto.MACSigner
+import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.serializer
 
 internal fun SignedJWT.ensureSignedOrVerified() {
     require(state == JWSObject.State.SIGNED || state == JWSObject.State.VERIFIED) {
         "Provided JWT is not signed"
     }
 }
-
-internal fun SignedJWT.ensureSignedWithAllowedAlgorithm(allowedAlgorithms: Set<JWSAlgorithm>) {
-    require(header.algorithm in allowedAlgorithms) {
-        "Signature algorithm must be one of $allowedAlgorithms"
-    }
-}
-
-internal inline fun <reified T : Any> SignedJWT.ensureValidClaimsSet(): T =
-    jwtClaimsSet.decodeAs<T>().getOrElse { throw IllegalArgumentException("Invalid Claims Set.", it) }
 
 internal fun SignedJWT.ensureSignedNotMAC() {
     ensureSignedOrVerified()
@@ -52,3 +46,10 @@ internal fun SignedJWT.ensureType(expectedType: JOSEObjectType) {
         "Expected SignedJWT `typ` to be '${expectedType.type}', but found '${header.type?.type}' instead"
     }
 }
+
+internal operator fun <T : Any> JWTClaimsSet.get(key: String, deserializer: DeserializationStrategy<T>): T? =
+    claims[key]?.let { value ->
+        JsonSupport.decodeFromString(deserializer, GsonSupport.toJson(value))
+    }
+
+internal inline operator fun <reified T : Any> JWTClaimsSet.get(key: String): T? = this[key, serializer<T>()]
