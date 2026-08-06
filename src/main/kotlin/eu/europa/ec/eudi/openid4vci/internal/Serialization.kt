@@ -16,6 +16,9 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.shaded.gson.GsonBuilder
+import com.nimbusds.jose.shaded.gson.Strictness
+import com.nimbusds.jose.shaded.gson.ToNumberPolicy
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
@@ -40,6 +43,13 @@ internal val JsonSupport: Json = Json {
     ignoreUnknownKeys = true
     prettyPrint = true
 }
+
+internal val GsonSupport = GsonBuilder()
+    .setStrictness(Strictness.STRICT)
+    .serializeNulls()
+    .setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+    .disableHtmlEscaping()
+    .create()
 
 internal object LocaleSerializer : KSerializer<Locale> {
 
