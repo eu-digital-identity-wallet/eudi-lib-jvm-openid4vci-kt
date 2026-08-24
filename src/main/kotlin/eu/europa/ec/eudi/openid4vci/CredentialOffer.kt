@@ -166,7 +166,15 @@ sealed interface Grants : Serializable {
     data class Both(
         val authorizationCode: AuthorizationCode,
         val preAuthorizedCode: PreAuthorizedCode,
-    ) : Grants
+    ) : Grants {
+        init {
+            if (null != authorizationCode.authorizationServer && null != preAuthorizedCode.authorizationServer) {
+                require(authorizationCode.authorizationServer == preAuthorizedCode.authorizationServer) {
+                    "authorizationCode, and preAuthorizedCode must contain the same authorizationServer"
+                }
+            }
+        }
+    }
 
     fun authorizationCode(): AuthorizationCode? = when (this) {
         is PreAuthorizedCode -> null
