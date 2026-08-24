@@ -105,6 +105,7 @@ internal class CredentialOfferRequestResolver(
             }
 
             val grants = credentialOffer.grants?.toGrants(credentialIssuerMetadata)
+            grants?.ensureSupported(config.grants)
             val authorizationServer = grants?.authServer() ?: credentialIssuerMetadata.authorizationServers[0]
             val authorizationServerMetadata = fetchAuthServerMetaData(authorizationServer)
             val authorizationCodeGrant = grants?.authorizationCode()
@@ -279,3 +280,25 @@ internal fun <A : Any, B : Any> DPoPUsage<A>.map(convert: (A) -> B): DPoPUsage<B
         is DPoPUsage.IfSupported -> DPoPUsage.IfSupported(convert(value))
         is DPoPUsage.Required -> DPoPUsage.Required(convert(value))
     }
+
+private fun Grants.ensureSupported(supported: SupportedGrants) {
+    when (supported) {
+        SupportedGrants.AuthorizationCode -> {
+            ensure(this is Grants.AuthorizationCode || this is Grants.Both) {
+                val reason = IllegalArgumentException("Credential Offer does not support Authorization Code Grant")
+                CredentialOfferRequestValidationError.UnsupportedGrants(reason).toException()
+            }
+        }
+
+        SupportedGrants.PreAuthorizedCode -> {
+            ensure(this is Grants.PreAuthorizedCode || this is Grants.Both) {
+                val reason = IllegalArgumentException("Credential Offer does not support Pre-authorized Code Grant")
+                CredentialOfferRequestValidationError.UnsupportedGrants(reason).toException()
+            }
+        }
+
+        SupportedGrants.Both -> {
+            // no-op
+        }
+    }
+}

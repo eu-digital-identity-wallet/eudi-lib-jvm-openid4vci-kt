@@ -24,6 +24,7 @@ import com.nimbusds.jose.crypto.impl.ContentCryptoProvider
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.ensure
+import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
 import java.net.URI
 import java.security.cert.X509Certificate
 import java.time.Clock
@@ -142,9 +143,12 @@ fun interface RegistrationCertificatePolicy {
  * @param issuerMetadataPolicy policy concerning signed metadata usage
  * @param supportedCredentialReusePolicies the reuse policies supported by the wallet, used to validate against credential issuer metadata.
  * @param proofs proofs supported by the Wallet
+ * @param registrationCertificatePolicy a policy for validating Registration Certificates
  * @param authResponseIssChecking Wallet's policy concerning the validation of the `iss` parameter
  * present in the authorization response, as described by the Authorization Server metadata field
  * `authorization_response_iss_parameter_supported`
+ * @param grants grant types supported by the wallet
+ *
  */
 data class OpenId4VCIConfig(
     val clientAuthentication: ClientAuthentication,
@@ -159,6 +163,7 @@ data class OpenId4VCIConfig(
     val proofs: ProofsConfig = ProofsConfig.Default,
     val registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
     val authResponseIssChecking: AuthorizationResponseIssChecking = AuthorizationResponseIssChecking.Never,
+    val grants: SupportedGrants = SupportedGrants.Both,
 ) {
 
     init {
@@ -168,6 +173,15 @@ data class OpenId4VCIConfig(
                     "Wrong configuration: " +
                         "IssuerMetadataPolicy does not match RegistrationCertificatePolicy. " +
                         "When RegistrationCertificatePolicy is provided, IssuerMetadataPolicy must be RequireSigned",
+                )
+            }
+        }
+
+        if (SupportedGrants.AuthorizationCode == grants || SupportedGrants.Both == grants) {
+            ensureNotNull(authFlowRedirectionURI) {
+                IllegalArgumentException(
+                    "Wrong configuration: " +
+                        "authFlowRedirectionURI must be provided when grants is AuthorizationCode or Both",
                 )
             }
         }
@@ -189,6 +203,7 @@ data class OpenId4VCIConfig(
         proofs: ProofsConfig = ProofsConfig.Default,
         registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
         authResponseIssChecking: AuthorizationResponseIssChecking = AuthorizationResponseIssChecking.Never,
+        grants: SupportedGrants = SupportedGrants.Both,
     ) : this(
         clientAuthentication = ClientAuthentication.None(clientId),
         authFlowRedirectionURI = authFlowRedirectionURI,
@@ -202,6 +217,7 @@ data class OpenId4VCIConfig(
         proofs = proofs,
         registrationCertificatePolicy = registrationCertificatePolicy,
         authResponseIssChecking = authResponseIssChecking,
+        grants = grants
     )
 }
 
@@ -527,4 +543,24 @@ data class ProofsConfig(
             )
         }
     }
+}
+
+/**
+ * Wallet-supported grant types.
+ */
+sealed interface SupportedGrants {
+    /**
+     * Wallet supports Authorization Code grant.
+     */
+    data object AuthorizationCode : SupportedGrants
+
+    /**
+     * Wallet supports Pre-authorized Code grant.
+     */
+    data object PreAuthorizedCode : SupportedGrants
+
+    /**
+     * Wallet supports both Authorization Code and Pre-authorized Code grants.
+     */
+    data object Both : SupportedGrants
 }

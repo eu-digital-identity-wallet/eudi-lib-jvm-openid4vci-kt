@@ -338,6 +338,11 @@ sealed interface CredentialOfferRequestValidationError : CredentialOfferRequestE
      * The Grants of a Credential Offer are not valid.
      */
     data class InvalidGrants(val reason: Throwable) : CredentialOfferRequestValidationError
+
+    /**
+     * The Credential Offer contains Grant Types not supported by the Wallet.
+     */
+    class UnsupportedGrants(val reason: Throwable) : CredentialOfferRequestValidationError
 }
 
 /**
