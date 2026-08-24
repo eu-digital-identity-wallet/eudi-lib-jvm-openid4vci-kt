@@ -99,7 +99,7 @@ sealed interface ClientAuthentication : java.io.Serializable {
 }
 
 /**
- * Defines a policy for validating the registration certificate policy.
+ * Defines a policy for validating the registration certificate.
  *
  * This functional interface evaluates the provided access and registration certificates
  * against a set of credential configurations to determine authorization for issuance.
