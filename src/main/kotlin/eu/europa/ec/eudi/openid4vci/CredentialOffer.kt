@@ -168,6 +168,9 @@ sealed interface Grants : Serializable {
         val preAuthorizedCode: PreAuthorizedCode,
     ) : Grants {
         init {
+            // CredentialOfferRequestResolver resolves the metadata of the first Authorization Server.
+            // see: Grants.authServer(): HttpsUrl?
+            // To avoid issues, require AuthorizationCode and PreAuthorizedCode use the same Authorization Server.
             if (null != authorizationCode.authorizationServer && null != preAuthorizedCode.authorizationServer) {
                 require(authorizationCode.authorizationServer == preAuthorizedCode.authorizationServer) {
                     "authorizationCode, and preAuthorizedCode must contain the same authorizationServer"
