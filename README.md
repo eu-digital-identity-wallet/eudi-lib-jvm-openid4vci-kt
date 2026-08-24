@@ -158,7 +158,7 @@ This resolution includes the following
 
 > [!IMPORTANT]
 >
-> The library currently supports resolving Credential Offers that contain Grants that use the use Authorization Server.
+> The library currently supports resolving Credential Offers that contain Grants that use the same Authorization Server.
 >
 > Trying to resolve a Credential Offer that contains an Authorization Code Grant, and a Pre-Authorized Code Grant that use 
 > different Authorization Servers will result in a `CredentialOfferRequestValidationError.InvalidGrants` error being raised.
