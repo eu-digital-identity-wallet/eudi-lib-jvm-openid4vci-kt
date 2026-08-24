@@ -166,7 +166,18 @@ sealed interface Grants : Serializable {
     data class Both(
         val authorizationCode: AuthorizationCode,
         val preAuthorizedCode: PreAuthorizedCode,
-    ) : Grants
+    ) : Grants {
+        init {
+            // CredentialOfferRequestResolver resolves the metadata of the first Authorization Server.
+            // see: Grants.authServer(): HttpsUrl?
+            // To avoid issues, require AuthorizationCode and PreAuthorizedCode use the same Authorization Server.
+            if (null != authorizationCode.authorizationServer && null != preAuthorizedCode.authorizationServer) {
+                require(authorizationCode.authorizationServer == preAuthorizedCode.authorizationServer) {
+                    "authorizationCode, and preAuthorizedCode must contain the same authorizationServer"
+                }
+            }
+        }
+    }
 
     fun authorizationCode(): AuthorizationCode? = when (this) {
         is PreAuthorizedCode -> null

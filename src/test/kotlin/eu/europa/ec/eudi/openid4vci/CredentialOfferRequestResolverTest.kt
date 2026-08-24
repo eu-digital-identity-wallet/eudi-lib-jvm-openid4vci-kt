@@ -290,6 +290,35 @@ internal class CredentialOfferRequestResolverTest {
                 cause.message,
             )
         }
+
+    @Test
+    internal fun `resolution fails when grants contain different authorization servers`() = runTest {
+        val resolver = resolver(
+            RequestEncryptionSpecFactory.DEFAULT,
+            ResponseEncryptionSpecFactory.DEFAULT,
+            RequestMocker(
+                match(SampleIssuer.WellKnownUrl.value.toURI()),
+                jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid_multiple_auth_servers.json"),
+            ),
+            oauthMetaDataHandler,
+        )
+        val credentialOffer =
+            getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_offer_with_different_authorization_servers.json")
+
+        val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+            .addParameter("credential_offer", credentialOffer)
+            .build()
+
+        val exception = assertFailsWith<CredentialOfferRequestException> {
+            resolver.resolve(uri = credentialEndpointUrl.toString()).getOrThrow()
+        }
+        val error = assertIs<CredentialOfferRequestValidationError.InvalidGrants>(exception.error)
+        val reason = assertIs<IllegalArgumentException>(error.reason)
+        assertEquals(
+            "authorizationCode, and preAuthorizedCode must contain the same authorizationServer",
+            reason.message,
+        )
+    }
 }
 
 private fun assertEquals(expected: CredentialOffer, offer: CredentialOffer) {
