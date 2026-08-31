@@ -52,7 +52,11 @@ internal class DefaultCredentialIssuerMetadataResolver(
         val (json, accessCertificate) = when (policy) {
             IssuerMetadataPolicy.IgnoreSigned -> wellKnownUrl.requestUnsigned() to null
             is IssuerMetadataPolicy.RequireSigned -> wellKnownUrl.requestSigned(policy.issuerTrust, issuer, policy.allowedJwsAlgorithms)
-            is IssuerMetadataPolicy.PreferSigned -> wellKnownUrl.requestPreferringSigned(policy.issuerTrust, issuer, policy.allowedJwsAlgorithms)
+            is IssuerMetadataPolicy.PreferSigned -> wellKnownUrl.requestPreferringSigned(
+                policy.issuerTrust,
+                issuer,
+                policy.allowedJwsAlgorithms,
+            )
         }
         val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer)
         metadata.copy(metadataSigningCertificate = accessCertificate)
