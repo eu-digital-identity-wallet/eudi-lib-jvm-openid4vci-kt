@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JOSEObjectType
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.AsymmetricJWK
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
@@ -160,11 +161,12 @@ class RegistrationCertificatePolicyEvaluatorTest {
     private fun parseAndVerifySignedMetadata(
         signedJwt: SignedJWT,
         issuer: CredentialIssuerId,
+        allowedJwsAlgorithms: Set<JWSAlgorithm> = TS3.ALLOWED_SIGNATURE_ALGORITHMS,
     ): Result<Pair<String, X509Certificate?>> = runCatchingCancellable {
         val processor = DefaultJWTProcessor<SecurityContext>()
             .apply {
                 jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
-                jwsKeySelector = keySelector(signedJwt)
+                jwsKeySelector = keySelector(signedJwt, allowedJwsAlgorithms)
                 jwtClaimsSetVerifier =
                     DefaultJWTClaimsVerifier(
                         null,
@@ -183,7 +185,10 @@ class RegistrationCertificatePolicyEvaluatorTest {
         metadataJson to leafCertificate
     }
 
-    private fun keySelector(signedJwt: SignedJWT): JWSKeySelector<SecurityContext> {
+    private fun keySelector(
+        signedJwt: SignedJWT,
+        allowedJwsAlgorithms: Set<JWSAlgorithm>,
+    ): JWSKeySelector<SecurityContext> {
         val certChain = requireNotNull(signedJwt.header.x509CertChain) {
             "missing 'x5c' header claim"
         }.let { X509CertChainUtils.parse(it) }
@@ -195,6 +200,10 @@ class RegistrationCertificatePolicyEvaluatorTest {
         }
 
         val algorithm = signedJwt.header.algorithm
+        requireIsNotMAC(algorithm)
+        require(algorithm in allowedJwsAlgorithms) {
+            "JWS algorithm '$algorithm' is not in the accepted set of algorithms $allowedJwsAlgorithms"
+        }
         return SingleKeyJWSKeySelector(algorithm, jwk.toPublicKey())
     }
 }

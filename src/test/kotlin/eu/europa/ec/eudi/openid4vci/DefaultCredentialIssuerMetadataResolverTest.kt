@@ -15,6 +15,16 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.JOSEObjectType
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.crypto.RSASSASigner
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import com.nimbusds.jose.util.Base64
+import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.oauth2.sdk.id.Issuer
+import com.nimbusds.oauth2.sdk.util.X509CertificateUtils
+import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.InvalidSignedMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
@@ -23,6 +33,10 @@ import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.assertDoesNotThrow
+import java.security.cert.X509Certificate
+import java.time.Duration
+import java.time.Instant
+import java.util.Date
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
@@ -565,6 +579,46 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         val cause = assertIs<IllegalArgumentException>(exception.cause)
         assertEquals("Duration must be positive", cause.message)
     }
+
+    @Test
+    internal fun `resolution fails when signed metadata uses a JWS algorithm not in the allowed set`() = runTest {
+        val credentialIssuerId = SampleIssuer.Id
+        val resource = "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_signed_full.txt"
+        val jwt = tamperedAlgorithmJwt(resource, JWSAlgorithm.RS256)
+
+        listOf(
+            IssuerMetadataPolicy.RequireSigned(trustAll),
+            IssuerMetadataPolicy.PreferSigned(trustAll),
+        ).forEach { policy ->
+            val resolver = resolver(signedMetadataHandler(jwt))
+            assertFailsWith<InvalidSignedMetadata> {
+                resolver.resolve(credentialIssuerId, policy).getOrThrow()
+            }
+        }
+    }
+
+    @Test
+    internal fun `resolution succeeds when signed metadata algorithm is within the configured allow-list`() = runTest {
+        val credentialIssuerId = SampleIssuer.Id
+        val resource = "eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_signed_full.txt"
+        val jwt = rs256SignedMetadataJwt(resource)
+        val resolver = resolver(signedMetadataHandler(jwt))
+
+        val policy = IssuerMetadataPolicy.RequireSigned(trustAll, setOf(JWSAlgorithm.RS256))
+
+        val metadata = assertDoesNotThrow { resolver.resolve(credentialIssuerId, policy).getOrThrow() }
+        assertNotNull(metadata.metadataSigningCertificate)
+    }
+
+    @Test
+    internal fun `resolution fails when the configured allow-list is empty`() = runTest {
+        assertFailsWith<IllegalArgumentException> {
+            IssuerMetadataPolicy.RequireSigned(trustAll, emptySet())
+        }
+        assertFailsWith<IllegalArgumentException> {
+            IssuerMetadataPolicy.PreferSigned(trustAll, emptySet())
+        }
+    }
 }
 
 private fun Map<CredentialConfigurationIdentifier, CredentialConfiguration>.jwtProofTypeSupported(
@@ -576,3 +630,51 @@ private fun resolver(request: RequestMocker, expectSuccessOnly: Boolean = false)
     CredentialIssuerMetadataResolver(
         mockedHttpClient(request, expectSuccessOnly = expectSuccessOnly),
     )
+
+private fun signedMetadataHandler(jwt: String): RequestMocker = RequestMocker(
+    match(SampleIssuer.WellKnownUrl.value.toURI()),
+    {
+        respond(
+            content = jwt,
+            status = HttpStatusCode.OK,
+            headers = headersOf(HttpHeaders.ContentType to listOf("application/jwt")),
+        )
+    },
+)
+
+/**
+ * Returns a copy of the signed metadata JWT stored at [resource] whose `alg` header has been
+ * replaced with [algorithm]. The signature is left untouched, which is sufficient to exercise the
+ * algorithm allow-list check (evaluated before signature verification).
+ */
+private fun tamperedAlgorithmJwt(resource: String, algorithm: JWSAlgorithm): String {
+    val original = SignedJWT.parse(getResourceAsText(resource).trim())
+    val header = JWSHeader.Builder(algorithm)
+        .type(original.header.type)
+        .x509CertChain(original.header.x509CertChain)
+        .build()
+    val headerPart = header.toBase64URL().toString()
+    val parts = getResourceAsText(resource).trim().split('.')
+    return "$headerPart.${parts[1]}.${parts[2]}"
+}
+
+/**
+ * Re-signs the (valid) issuer metadata payload of the signed metadata JWT stored at [resource]
+ * using RSASSA-PKCS1-v1_5 with RS256 and a freshly generated self-signed RSA certificate chain.
+ */
+private fun rs256SignedMetadataJwt(resource: String): String {
+    val original = SignedJWT.parse(getResourceAsText(resource).trim())
+    val rsa = RSAKeyGenerator(2048).generate()
+    val certificate: X509Certificate = X509CertificateUtils.generateSelfSigned(
+        Issuer("Credential-Issuer"),
+        Date.from(Instant.now().minusSeconds(60)),
+        Date.from(Instant.now().plus(Duration.ofDays(365))),
+        rsa.toRSAPublicKey(),
+        rsa.toRSAPrivateKey(),
+    )
+    val header = JWSHeader.Builder(JWSAlgorithm.RS256)
+        .type(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
+        .x509CertChain(listOf(Base64.encode(certificate.encoded)))
+        .build()
+    return SignedJWT(header, original.jwtClaimsSet).apply { sign(RSASSASigner(rsa)) }.serialize()
+}

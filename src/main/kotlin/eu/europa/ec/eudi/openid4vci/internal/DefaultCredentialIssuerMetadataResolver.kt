@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JOSEObjectType
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.AsymmetricJWK
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
@@ -50,8 +51,12 @@ internal class DefaultCredentialIssuerMetadataResolver(
         val wellKnownUrl = issuer.wellKnown()
         val (json, accessCertificate) = when (policy) {
             IssuerMetadataPolicy.IgnoreSigned -> wellKnownUrl.requestUnsigned() to null
-            is IssuerMetadataPolicy.RequireSigned -> wellKnownUrl.requestSigned(policy.issuerTrust, issuer)
-            is IssuerMetadataPolicy.PreferSigned -> wellKnownUrl.requestPreferringSigned(policy.issuerTrust, issuer)
+            is IssuerMetadataPolicy.RequireSigned -> wellKnownUrl.requestSigned(policy.issuerTrust, issuer, policy.allowedJwsAlgorithms)
+            is IssuerMetadataPolicy.PreferSigned -> wellKnownUrl.requestPreferringSigned(
+                policy.issuerTrust,
+                issuer,
+                policy.allowedJwsAlgorithms,
+            )
         }
         val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer)
         metadata.copy(metadataSigningCertificate = accessCertificate)
@@ -67,13 +72,17 @@ internal class DefaultCredentialIssuerMetadataResolver(
         return response.body<String>()
     }
 
-    private suspend fun Url.requestSigned(issuerTrust: CertificateChainTrust, issuer: CredentialIssuerId): Pair<String, X509Certificate?> {
+    private suspend fun Url.requestSigned(
+        issuerTrust: CertificateChainTrust,
+        issuer: CredentialIssuerId,
+        allowedJwsAlgorithms: Set<JWSAlgorithm>,
+    ): Pair<String, X509Certificate?> {
         val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT)
         val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
         ensure(contentType?.withoutParameters() == CONTENT_TYPE_APPLICATION_JWT) {
             CredentialIssuerMetadataError.MissingSignedMetadata()
         }
-        return parseAndVerifySignedMetadata(response.body<String>(), issuerTrust, issuer)
+        return parseAndVerifySignedMetadata(response.body<String>(), issuerTrust, issuer, allowedJwsAlgorithms)
             .getOrElse {
                 throw CredentialIssuerMetadataError.InvalidSignedMetadata(it)
             }
@@ -82,6 +91,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
     private suspend fun Url.requestPreferringSigned(
         issuerTrust: CertificateChainTrust,
         issuer: CredentialIssuerId,
+        allowedJwsAlgorithms: Set<JWSAlgorithm>,
     ): Pair<String, X509Certificate?> {
         val response = getAcceptingContentTypes(CONTENT_TYPE_APPLICATION_JWT, ContentType.Application.Json)
         val contentType = response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it) }
@@ -92,6 +102,7 @@ internal class DefaultCredentialIssuerMetadataResolver(
                 jwt = response.body<String>(),
                 issuerTrust = issuerTrust,
                 issuer = issuer,
+                allowedJwsAlgorithms = allowedJwsAlgorithms,
             ).getOrElse {
                 throw CredentialIssuerMetadataError.InvalidSignedMetadata(it)
             }
@@ -114,12 +125,13 @@ internal class DefaultCredentialIssuerMetadataResolver(
         jwt: String,
         issuerTrust: CertificateChainTrust,
         issuer: CredentialIssuerId,
+        allowedJwsAlgorithms: Set<JWSAlgorithm>,
     ): Result<Pair<String, X509Certificate?>> = runCatchingCancellable {
         val signedJwt = SignedJWT.parse(jwt)
         val processor = DefaultJWTProcessor<SecurityContext>()
             .apply {
                 jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
-                jwsKeySelector = issuerTrust.keySelector(signedJwt)
+                jwsKeySelector = issuerTrust.keySelector(signedJwt, allowedJwsAlgorithms)
                 jwtClaimsSetVerifier =
                     DefaultJWTClaimsVerifier(
                         null,
@@ -138,7 +150,10 @@ internal class DefaultCredentialIssuerMetadataResolver(
         metadataJson to leafCertificate
     }
 
-    private suspend fun CertificateChainTrust.keySelector(signedJwt: SignedJWT): JWSKeySelector<SecurityContext> {
+    private suspend fun CertificateChainTrust.keySelector(
+        signedJwt: SignedJWT,
+        allowedJwsAlgorithms: Set<JWSAlgorithm>,
+    ): JWSKeySelector<SecurityContext> {
         val certChain = requireNotNull(signedJwt.header.x509CertChain) {
             "missing 'x5c' header claim"
         }.let { X509CertChainUtils.parse(it) }
@@ -153,6 +168,10 @@ internal class DefaultCredentialIssuerMetadataResolver(
         }
 
         val algorithm = signedJwt.header.algorithm
+        requireIsNotMAC(algorithm)
+        require(algorithm in allowedJwsAlgorithms) {
+            "JWS algorithm '$algorithm' is not in the accepted set of algorithms $allowedJwsAlgorithms"
+        }
         return SingleKeyJWSKeySelector(algorithm, jwk.toPublicKey())
     }
 
