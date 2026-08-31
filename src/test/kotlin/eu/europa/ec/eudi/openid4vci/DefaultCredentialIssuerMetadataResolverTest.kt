@@ -385,10 +385,10 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         assertEquals("https://issuer.example.com/.well-known/openid-credential-issuer/tenant", id.wellKnown().toString())
 
         id = CredentialIssuerId(
-            "https://www.certification.openid.net/test/a/credimi-oid4vp-verifier-test-cf92628b-d782-4e6b-a116-5aad4897f9af/",
+            "https://www.certification.openid.net/foo/bar/",
         ).getOrThrow()
         assertEquals(
-            "https://www.certification.openid.net/.well-known/openid-credential-issuer/test/a/credimi-oid4vp-verifier-test-cf92628b-d782-4e6b-a116-5aad4897f9af/",
+            "https://www.certification.openid.net/.well-known/openid-credential-issuer/foo/bar/",
             id.wellKnown().toString(),
         )
     }
