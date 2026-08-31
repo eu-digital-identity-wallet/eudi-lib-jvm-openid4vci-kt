@@ -34,8 +34,8 @@ import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod
 import com.nimbusds.oauth2.sdk.ciba.BackChannelTokenDeliveryMode
 import com.nimbusds.oauth2.sdk.id.Issuer
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
+import eu.europa.ec.eudi.openid4vci.internal.wellKnown
 import eu.europa.ec.eudi.openid4vci.internal.wellKnownUrl
-import io.ktor.http.*
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
 import java.time.Duration
@@ -62,9 +62,7 @@ internal fun oauthAuthorizationServerMetadataUrl(authorizationServerIssuer: Http
 /**
  * Get the URL for fetching the metadata of the Credential Issuer used throughout the tests.
  */
-internal fun CredentialIssuerId.metaDataUrl() = HttpsUrl(
-    URLBuilder(toString()).appendPathSegments("/.well-known/openid-credential-issuer", encodeSlash = false).buildString(),
-).getOrThrow()
+internal fun CredentialIssuerId.metaDataUrl() = HttpsUrl(this.wellKnown().toString()).getOrThrow()
 
 /**
  * Gets the 'UniversityDegree_JWT' scoped credential used throughout the tests.
