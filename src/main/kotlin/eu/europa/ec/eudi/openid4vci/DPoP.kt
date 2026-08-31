@@ -81,7 +81,7 @@ class DPoPJwtFactory(
 
     private fun JsonObjectBuilder.dpopJwtHeader(jwk: JWK) {
         put("typ", NimbusDPoPProofFactory.TYPE.type)
-        put("jwk", JsonSupport.parseToJsonElement(jwk.toJSONString()))
+        put("jwk", JsonSupport.parseToJsonElement(jwk.toPublicJWK().toJSONString()))
     }
 
     private fun now(): Date = Date.from(clock.instant())
