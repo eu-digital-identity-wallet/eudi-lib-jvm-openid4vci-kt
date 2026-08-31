@@ -197,7 +197,7 @@ internal class AuthorizationEndpointClient(
             PushedAuthorizationRequest(parEndpoint, request)
         }
         val (response, dpopNonce) = pushAuthorizationRequest(parEndpoint, pushedAuthorizationRequest, authorizationCodeDPoPBinding)
-        val (pkceVerifier, url) = response.authorizationCodeUrlOrFail(clientID, codeVerifier, state)
+        val (pkceVerifier, url) = response.authorizationCodeUrlOrFail(clientID, codeVerifier)
         Triple(pkceVerifier, url, dpopNonce)
     }
 
@@ -246,13 +246,11 @@ internal class AuthorizationEndpointClient(
     private fun PushedAuthorizationRequestResponseTO.authorizationCodeUrlOrFail(
         clientID: ClientID,
         codeVerifier: CodeVerifier,
-        state: String,
     ): Pair<PKCEVerifier, HttpsUrl> = when (this) {
         is PushedAuthorizationRequestResponseTO.Success -> {
             val authorizationCodeUrl = run {
                 val httpsUrl = URLBuilder(Url(authorizationEndpoint.toURI())).apply {
                     parameters.append(AuthorizationEndpointParams.PARAM_CLIENT_ID, clientID.value)
-                    parameters.append(AuthorizationEndpointParams.PARAM_STATE, state)
                     parameters.append(AuthorizationEndpointParams.PARAM_REQUEST_URI, requestURI)
                 }.build()
                 HttpsUrl(httpsUrl.toString()).getOrThrow()
@@ -363,5 +361,4 @@ internal class AuthorizationEndpointClient(
 private object AuthorizationEndpointParams {
     const val PARAM_CLIENT_ID = "client_id"
     const val PARAM_REQUEST_URI = "request_uri"
-    const val PARAM_STATE = "state"
 }
