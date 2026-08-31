@@ -133,6 +133,33 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
     }
 
     @Test
+    internal fun `resolution success preserves trailing slash in credential issuer path`() = runTest {
+        val credentialIssuerId = CredentialIssuerId(
+            "https://www.certification.openid.net/test/a/credimi-oid4vp-verifier-test-cf92628b-d782-4e6b-a116-5aad4897f9af/",
+        ).getOrThrow()
+
+        val json = getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json")
+            .replace(
+                "\"credential_issuer\": \"https://credential-issuer.example.com\"",
+                "\"credential_issuer\": \"${credentialIssuerId.value}\"",
+            )
+
+        val resolver = resolver(
+            RequestMocker(
+                match(credentialIssuerId.metaDataUrl().value.toURI()),
+                responseBuilder = {
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType to listOf("application/json")),
+                    )
+                },
+            ),
+        )
+        assertDoesNotThrow { resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow() }
+    }
+
+    @Test
     internal fun `valid key attestation requirements`() = runTest {
         val credentialIssuerId = SampleIssuer.Id
 
@@ -356,6 +383,14 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
 
         id = CredentialIssuerId("https://issuer.example.com/tenant").getOrThrow()
         assertEquals("https://issuer.example.com/.well-known/openid-credential-issuer/tenant", id.wellKnown().toString())
+
+        id = CredentialIssuerId(
+            "https://www.certification.openid.net/foo/bar/",
+        ).getOrThrow()
+        assertEquals(
+            "https://www.certification.openid.net/.well-known/openid-credential-issuer/foo/bar/",
+            id.wellKnown().toString(),
+        )
     }
 
     @Test

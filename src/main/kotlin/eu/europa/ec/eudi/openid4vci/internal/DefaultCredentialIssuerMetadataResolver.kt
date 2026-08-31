@@ -197,6 +197,10 @@ internal fun CredentialIssuerId.wellKnown(): Url {
             OpenId4VCISpec.CREDENTIAL_ISSUER_WELL_KNOWN_PATH.trim('/').split("/"),
             encodeSlash = true,
         )
-        issuer.segments.forEach { appendPathSegments(listOf(it), encodeSlash = true) }
+        // Use `rawSegments` (not `segments`) so that the path component of the Credential Issuer
+        // Identifier is preserved exactly, including a trailing slash when present.
+        // OID4VCI Credential Issuer metadata discovery inserts the well-known path between the host
+        // and the path component without the RFC 8414 trailing-slash normalization.
+        issuer.rawSegments.forEach { appendPathSegments(listOf(it), encodeSlash = true) }
     }.build()
 }
