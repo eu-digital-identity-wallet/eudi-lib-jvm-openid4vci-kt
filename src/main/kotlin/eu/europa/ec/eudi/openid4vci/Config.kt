@@ -381,8 +381,19 @@ sealed interface IssuerMetadataPolicy {
 
     /**
      * Credential Issuer **must** provide signed metadata. Only values from signed metadata are used.
+     *
+     * @param issuerTrust trust anchor used to validate the certificate chain of the signed metadata.
+     * @param allowedJwsAlgorithms the set of JWS algorithms accepted for the signature of the signed metadata.
+     * Defaults to the algorithms allowed by the TS3 profile ([TS3.ALLOWED_SIGNATURE_ALGORITHMS]), i.e. ES256, ES384 and ES512.
      */
-    data class RequireSigned(val issuerTrust: CertificateChainTrust) : IssuerMetadataPolicy {
+    data class RequireSigned(
+        val issuerTrust: CertificateChainTrust,
+        val allowedJwsAlgorithms: Set<JWSAlgorithm> = TS3.ALLOWED_SIGNATURE_ALGORITHMS,
+    ) : IssuerMetadataPolicy {
+
+        init {
+            require(allowedJwsAlgorithms.isNotEmpty()) { "allowedJwsAlgorithms must not be empty" }
+        }
 
         @Deprecated(message = "Use constructor passing CertificateChainTrust", ReplaceWith("RequireSigned"))
         constructor(issuerTrust: IssuerTrust) : this(issuerTrust.certificateChainTrust)
@@ -391,8 +402,19 @@ sealed interface IssuerMetadataPolicy {
     /**
      * Credential Issuer **may** provide signed metadata. If signed metadata are provided, values conveyed in the singed
      * metadata take precedence over their corresponding unsigned counterparts.
+     *
+     * @param issuerTrust trust anchor used to validate the certificate chain of the signed metadata.
+     * @param allowedJwsAlgorithms the set of JWS algorithms accepted for the signature of the signed metadata.
+     * Defaults to the algorithms allowed by the TS3 profile ([TS3.ALLOWED_SIGNATURE_ALGORITHMS]), i.e. ES256, ES384 and ES512.
      */
-    data class PreferSigned(val issuerTrust: CertificateChainTrust) : IssuerMetadataPolicy {
+    data class PreferSigned(
+        val issuerTrust: CertificateChainTrust,
+        val allowedJwsAlgorithms: Set<JWSAlgorithm> = TS3.ALLOWED_SIGNATURE_ALGORITHMS,
+    ) : IssuerMetadataPolicy {
+
+        init {
+            require(allowedJwsAlgorithms.isNotEmpty()) { "allowedJwsAlgorithms must not be empty" }
+        }
 
         @Deprecated(message = "Use constructor passing CertificateChainTrust", ReplaceWith("PreferSigned"))
         constructor(issuerTrust: IssuerTrust) : this(issuerTrust.certificateChainTrust)

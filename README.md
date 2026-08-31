@@ -615,15 +615,21 @@ Options available:
 - parUsage: An indication to not use PAR endpoint or use it if advertised by the credential issuer. Additionally, allows configuring whether Authorization Code DPoP binding should be performed.  
 - clock: Wallet/Caller clock.
 - issuerMetadataPolicy: Wallet policy concerning Credential Issuer metadata. Possible options:
-  - `IssuerMetadataPolicy.RequireSigned`: require the presence of signed metadata and use only values from signed metadata
-  - `IssuerMetadataPolicy.PreferSigned`: presence of signed metadata is optional, if present values from signed metadata take precedence
+  - `IssuerMetadataPolicy.RequireSigned(issuerTrust, allowedJwsAlgorithms)`: require the presence of signed metadata and use only values from signed metadata
+  - `IssuerMetadataPolicy.PreferSigned(issuerTrust, allowedJwsAlgorithms)`: presence of signed metadata is optional, if present values from signed metadata take precedence
   - `IssuerMetadataPolicy.IgnoreSigned`: signed metadata are ignored
+
+  The `issuerTrust` parameter is a `CertificateChainTrust` instance used to establish trust in the certificate
+  chain carried in the `x5c` header claim of the signed metadata JWT. The `allowedJwsAlgorithms` parameter
+  restricts the JWS algorithms accepted for the signature of the signed metadata. It defaults to the algorithms
+  allowed by the TS3 profile (`ES256`, `ES384`, `ES512`); passing an empty set is rejected.
 - supportedCredentialReusePolicies: A set of `EudiReusePolicyType`s supported by the wallet for credential reuse. Defaults to `null`.
 - proofs: Whether Wallet supports attestations that require no proofs, alongside the supports proof types and signing algorithms.
 
-Trust between the Wallet and the Signer of the signed metadata advertised by the Credential Issuer is established using one of the following ways:
-- `IssuerTrust.ByPublicKey`: trusting the public key used to sign the metadata
-- `IssuerTrust.ByCertificateChain` trusting a certificate chain, the leaf certificate of which must contain the public key used to sign the metadata - in this case the Signed JWT must contain the 'x5c' header claim 
+Trust between the Wallet and the Signer of the signed metadata advertised by the Credential Issuer is established via a
+`CertificateChainTrust` instance, which is provided as the `issuerTrust` argument of `RequireSigned` / `PreferSigned`.
+The signed metadata JWT must contain the `x5c` header claim, the leaf certificate of which must contain the public key
+used to sign the metadata and whose chain must be trusted according to the supplied `CertificateChainTrust`.
 
 
 ```kotlin
