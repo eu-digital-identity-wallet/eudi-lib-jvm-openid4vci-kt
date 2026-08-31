@@ -25,9 +25,19 @@ import java.net.URL
 import java.time.Clock
 
 /**
- * Default implementation of [ClientAttestationPoPBuilder]
- * Populates only the mandatory claims : `iss`, `exp`, `jit`, `aud` and the optional `iat`
- * In regard to JOSE header, only `alg` claim is being populated
+ * Default implementation of [ClientAttestationPoPBuilder] per
+ * [OAuth 2.0 Attestation-Based Client Authentication draft 07 §5.2](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-attestation-based-client-auth-07#section-5.2).
+ *
+ * Creates a Client Attestation PoP JWT signed with [signer].
+ *
+ * **JWT header:** `alg` (set by [JwtSigner]) and
+ * `typ = oauth-client-attestation-pop+jwt` ([AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE]).
+ *
+ * **JWT claims:**
+ * - Mandatory: `iss` ([clientId]), `aud` ([authorizationServerId]), `jti` (random UUID), `iat` ([clock] now)
+ * - Optional: `nbf` (set to now), `challenge` (caller-supplied [Nonce], if provided)
+ *
+ * No `exp` claim is set — §5.2 does not define it for PoP JWTs; freshness is via `iat`/`challenge` window.
  */
 internal class ClientAttestationPoPBuilder(
     private val clock: Clock,
