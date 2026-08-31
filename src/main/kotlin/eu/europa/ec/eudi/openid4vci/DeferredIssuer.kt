@@ -57,6 +57,7 @@ data class DeferredIssuerConfig(
     val dPoPConfig: DPoPConfig?,
     val clock: Clock = Clock.systemDefaultZone(),
     val preferredClientStatusPeriod: PositiveDuration? = null,
+    val isDPoPRequired: Boolean = false,
 )
 
 /**
@@ -197,6 +198,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
                 challengeEndpoint = config.challengeEndpoint,
                 tokenEndpoint = config.tokenEndpoint,
                 provisionDPoPJwtFactory,
+                isDPoPRequired = config.isDPoPRequired,
                 httpClient,
             )
 
