@@ -249,8 +249,11 @@ internal data class DeferredIssuanceSuccessResponseTO(
                 throw ResponseUnparsable(
                     "Invalid deferred issuance response. " +
                         "Either 'transaction_id' and 'interval', or 'credentials' (potentially with 'notification_id') must be present," +
-                        " but not all. TransactionId: $transactionId, interval: $interval, credentials: $credentials, " +
-                        "notificationId: $notificationId",
+                        " but not both. " +
+                        "transactionId present: ${transactionId != null}, " +
+                        "interval present: ${interval != null}, " +
+                        "credentials present: ${!credentials.isNullOrEmpty()}, " +
+                        "notificationId present: ${notificationId != null}",
                 )
             }
         }
