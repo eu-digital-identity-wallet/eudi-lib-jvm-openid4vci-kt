@@ -96,6 +96,7 @@ internal class TokenEndpointClient(
     private val challengeEndpoint: URL?,
     private val tokenEndpoint: URL,
     private val dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
+    private val isDPoPRequired: Boolean,
     private val httpClient: HttpClient,
 ) {
 
@@ -127,6 +128,7 @@ internal class TokenEndpointClient(
         challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL(),
         tokenEndpoint = authorizationServerMetadata.tokenEndpointURI.toURL(),
         dPoPJwtFactory,
+        isDPoPRequired = config.dPoPUsage is DPoPUsage.Required,
         httpClient,
     )
 
@@ -288,7 +290,16 @@ internal class TokenEndpointClient(
             retriedAbcaChallenge = false,
             retriedDPoPNonce = false,
         )
-        return responseTO.tokensOrFail(clock) to newDopNonce
+        val tokenResponse = responseTO.tokensOrFail(clock)
+        if (isDPoPRequired && tokenResponse.accessToken !is AccessToken.DPoP) {
+            val issuedType =
+                if (tokenResponse.accessToken is AccessToken.Bearer) "Bearer" else "unknown"
+            throw AccessTokenRequestFailed(
+                "DPoP is required but Authorization Server issued $issuedType token",
+                null,
+            )
+        }
+        return tokenResponse to newDopNonce
     }
 
     private fun authorizationDetailsFormParam(

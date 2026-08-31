@@ -296,6 +296,7 @@ interface Issuer :
                                 if (null != credentialOffer.dPoPCtx) dPoPConfig
                                 else null,
                             clock = config.clock,
+                            isDPoPRequired = config.dPoPUsage is DPoPUsage.Required,
                         ),
                         AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
                     )

@@ -876,7 +876,7 @@ class IssuanceSingleRequestTest {
                 it.verifyDPoPProof(dPoPSigningKey.toPublicJWK(), dpopNonce)
             },
             challengePostMocker(challenge = updatedAbcaChallenge),
-            tokenPostMocker {
+            tokenPostMocker(dpopAccessToken = true) {
                 it.verifySelfSignedClientAttestation(walletInstanceKey, updatedAbcaChallenge)
                 it.verifyDPoPProof(dPoPSigningKey.toPublicJWK(), dpopNonce)
             },
@@ -927,7 +927,7 @@ class IssuanceSingleRequestTest {
                 it.verifyDPoPProof(dPoPSigningKey.toPublicJWK(), dpopNonce)
             },
             challengePostMocker(challenge = updatedAbcaChallenge, dpopNonce = updatedDpopNonce),
-            tokenPostMocker {
+            tokenPostMocker(dpopAccessToken = true) {
                 it.verifySelfSignedClientAttestation(walletInstanceKey, updatedAbcaChallenge)
                 it.verifyDPoPProof(dPoPSigningKey.toPublicJWK(), updatedDpopNonce)
             },
