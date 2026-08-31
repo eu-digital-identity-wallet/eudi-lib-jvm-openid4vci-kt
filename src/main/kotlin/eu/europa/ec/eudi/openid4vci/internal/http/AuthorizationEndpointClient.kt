@@ -35,7 +35,6 @@ import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
-import java.net.URL
 import com.nimbusds.oauth2.sdk.Scope as NimbusScope
 
 /**
@@ -71,9 +70,9 @@ internal sealed interface PushedAuthorizationRequestResponseTO : java.io.Seriali
 internal class AuthorizationEndpointClient(
     private val credentialIssuerId: CredentialIssuerId,
     private val authorizationIssuer: String,
-    private val authorizationEndpoint: URL,
-    private val pushedAuthorizationRequestEndpoint: URL?,
-    private val challengeEndpoint: URL?,
+    private val authorizationEndpoint: HttpsUrl,
+    private val pushedAuthorizationRequestEndpoint: HttpsUrl?,
+    private val challengeEndpoint: HttpsUrl?,
     private val config: OpenId4VCIConfig,
     private val dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
     private val provisionedClientAttestation: suspend () -> ProvisionClientAttestation.Provisioned?,
@@ -90,9 +89,15 @@ internal class AuthorizationEndpointClient(
     ) : this(
         credentialIssuerId,
         authorizationServerMetadata.issuer.value,
-        authorizationEndpoint = authorizationServerMetadata.authorizationEndpointURI.toURL(),
-        pushedAuthorizationRequestEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI?.toURL(),
-        challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL(),
+        authorizationEndpoint = HttpsUrl(
+            requireNotNull(authorizationServerMetadata.authorizationEndpointURI) {
+                "missing authorization_endpoint"
+            }.toString(),
+        ).getOrThrow(),
+        pushedAuthorizationRequestEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
+            ?.let { HttpsUrl(it.toString()).getOrThrow() },
+        challengeEndpoint = authorizationServerMetadata.challengeEndpointURI
+            ?.let { HttpsUrl(it.toString()).getOrThrow() },
         config,
         dPoPJwtFactory,
         provisionedClientAttestation,
@@ -167,7 +172,7 @@ internal class AuthorizationEndpointClient(
             "No scopes or authorization details provided. Cannot submit par."
         }
 
-        val parEndpoint = pushedAuthorizationRequestEndpoint?.toURI()
+        val parEndpoint = pushedAuthorizationRequestEndpoint?.value?.toURI()
         checkNotNull(parEndpoint) { "PAR endpoint not advertised" }
         val clientID = ClientID(config.clientAuthentication.id)
         val codeVerifier = CodeVerifier()
@@ -214,7 +219,7 @@ internal class AuthorizationEndpointClient(
         val clientID = ClientID(config.clientAuthentication.id)
         val codeVerifier = CodeVerifier()
         val authorizationRequest = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
-            endpointURI(authorizationEndpoint.toURI())
+            endpointURI(authorizationEndpoint.value.toURI())
             redirectionURI(config.authFlowRedirectionURI)
             codeChallenge(codeVerifier, CodeChallengeMethod.S256)
             state(State(state))
@@ -249,7 +254,7 @@ internal class AuthorizationEndpointClient(
     ): Pair<PKCEVerifier, HttpsUrl> = when (this) {
         is PushedAuthorizationRequestResponseTO.Success -> {
             val authorizationCodeUrl = run {
-                val httpsUrl = URLBuilder(Url(authorizationEndpoint.toURI())).apply {
+                val httpsUrl = URLBuilder(Url(authorizationEndpoint.value.toURI())).apply {
                     parameters.append(AuthorizationEndpointParams.PARAM_CLIENT_ID, clientID.value)
                     parameters.append(AuthorizationEndpointParams.PARAM_REQUEST_URI, requestURI)
                 }.build()

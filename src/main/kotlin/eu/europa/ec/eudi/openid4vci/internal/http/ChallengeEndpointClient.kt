@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal.http
 
 import eu.europa.ec.eudi.openid4vci.AttestationBasedClientAuthenticationSpec
+import eu.europa.ec.eudi.openid4vci.HttpsUrl
 import eu.europa.ec.eudi.openid4vci.Nonce
 import eu.europa.ec.eudi.openid4vci.runCatchingCancellable
 import io.ktor.client.HttpClient
@@ -27,16 +28,15 @@ import io.ktor.http.ContentType
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import java.net.URL
 
 internal data class ChallengeAndDPoPNonce(val challenge: Nonce, val dpopNonce: Nonce? = null)
 
 internal class ChallengeEndpointClient(
-    private val challengeEndpoint: URL,
+    private val challengeEndpoint: HttpsUrl,
     private val httpClient: HttpClient,
 ) {
     suspend fun getChallenge(): Result<ChallengeAndDPoPNonce> = runCatchingCancellable {
-        val response = httpClient.post(challengeEndpoint) {
+        val response = httpClient.post(challengeEndpoint.value) {
             expectSuccess = true
             accept(ContentType.Application.Json)
         }

@@ -38,7 +38,7 @@ import java.time.Clock
  * @param tokenEndpoint the URL of the token endpoint. Will be used if needed, to refresh the access token
  * @param authorizationServerId the URL of the authorization server that was selected for authenticating the initial request.
  * @param credentialIssuerId the ID of the Credential Issuer
- *   Must be provided only if client was of Client.Attested kind.
+ *   Must be provided only if the client was of Client.Attested kind.
  * @param requestEncryptionSpec the request encryption spec. Must be provided only if request encryption was used in the initial request.
  * @param responseEncryptionParams encryption method and compression algorithm as/if used in the initial request.
  * @param dPoPConfig DPoP configuration. Must be provided only if DPoP was used.
@@ -48,17 +48,51 @@ import java.time.Clock
 data class DeferredIssuerConfig(
     val credentialIssuerId: CredentialIssuerId,
     val clientAuthentication: ClientAuthentication,
-    val deferredEndpoint: URL,
-    val authorizationServerId: URL,
-    val challengeEndpoint: URL?,
-    val tokenEndpoint: URL,
+    val deferredEndpoint: HttpsUrl,
+    val authorizationServerId: HttpsUrl,
+    val challengeEndpoint: HttpsUrl?,
+    val tokenEndpoint: HttpsUrl,
     val requestEncryptionSpec: EncryptionSpec?,
     val responseEncryptionParams: Pair<EncryptionMethod, CompressionAlgorithm?>?,
     val dPoPConfig: DPoPConfig?,
     val clock: Clock = Clock.systemDefaultZone(),
     val preferredClientStatusPeriod: PositiveDuration? = null,
     val isDPoPRequired: Boolean = false,
-)
+) {
+
+    companion object {
+        @Deprecated(
+            message = "Use primary constructor with HttpsUrl; plain URL will be validated as https",
+        )
+        operator fun invoke(
+            credentialIssuerId: CredentialIssuerId,
+            clientAuthentication: ClientAuthentication,
+            deferredEndpoint: URL,
+            authorizationServerId: URL,
+            challengeEndpoint: URL?,
+            tokenEndpoint: URL,
+            requestEncryptionSpec: EncryptionSpec?,
+            responseEncryptionParams: Pair<EncryptionMethod, CompressionAlgorithm?>?,
+            dPoPConfig: DPoPConfig?,
+            clock: Clock = Clock.systemDefaultZone(),
+            preferredClientStatusPeriod: PositiveDuration? = null,
+            isDPoPRequired: Boolean = false,
+        ): DeferredIssuerConfig = DeferredIssuerConfig(
+            credentialIssuerId = credentialIssuerId,
+            clientAuthentication = clientAuthentication,
+            deferredEndpoint = HttpsUrl(deferredEndpoint.toString()).getOrThrow(),
+            authorizationServerId = HttpsUrl(authorizationServerId.toString()).getOrThrow(),
+            challengeEndpoint = challengeEndpoint?.let { HttpsUrl(it.toString()).getOrThrow() },
+            tokenEndpoint = HttpsUrl(tokenEndpoint.toString()).getOrThrow(),
+            requestEncryptionSpec = requestEncryptionSpec,
+            responseEncryptionParams = responseEncryptionParams,
+            dPoPConfig = dPoPConfig,
+            clock = clock,
+            preferredClientStatusPeriod = preferredClientStatusPeriod,
+            isDPoPRequired = isDPoPRequired,
+        )
+    }
+}
 
 /**
  * The information required to query the deferred endpoint.
@@ -72,7 +106,7 @@ data class AuthorizedTransaction(
 
 /**
  * Represents what a wallet needs to keep to be
- * able to query deferred endpoint on a later time.
+ * able to query deferred endpoint at a later time.
  *
  * It can be obtained via [Issuer.deferredContext]
  */
@@ -108,7 +142,7 @@ data class DeferredIssuanceContext(
  *
  * The [DeferredIssuanceContext] can be obtained by [Issuer.deferredContext]
  *
- * Finally, [DeferredIssuer] provides the [RefreshAccessToken] capability and, supports transparent refresh of access token
+ * Finally, [DeferredIssuer] provides the [RefreshAccessToken] capability and supports transparent refresh of access token
  */
 @Deprecated("Use Issuer instead")
 interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
@@ -120,9 +154,9 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
          * Creates a [DeferredIssuer] using the [ctx] and then queries the endpoint.
          *
          * @param ctx the context containing the data needed to instantiate the issuer and query the endpoint
-         * @param httpClient an http client, used while interacting with issuer
+         * @param httpClient an http client, used while interacting with an issuer
          * @param responseEncryptionKey the key to be used for response encryption. Its presence denotes the caller's preference for
-         *  encrypted response. If null, no response encryption will be requested to issuer.
+         *  encrypted response. If null, no response encryption will be requested to the issuer.
          *
          * @return The method returns a pair comprised of:
          * - On the right side, there is the [outcome][DeferredCredentialQueryOutcome] of querying the endpoint
@@ -160,7 +194,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
          * Factory method for getting an instance of [DeferredIssuer]
          *
          * @param config the minimal configuration needed.
-         * @param httpClient an http client, used while interacting with issuer
+         * @param httpClient an http client, used while interacting with an issuer
          * @param responseEncryptionKey the response encryption key. Its presence denotes the caller's preference for response encryption.
          *
          * @return the deferred issuer instance
@@ -170,7 +204,7 @@ interface DeferredIssuer : RefreshAccessToken, QueryForDeferredCredential {
             responseEncryptionKey: JWK?,
             httpClient: HttpClient,
         ): Result<DeferredIssuer> = runCatching {
-            val authorizationServer = HttpsUrl(config.authorizationServerId.toString()).getOrThrow()
+            val authorizationServer = config.authorizationServerId
 
             val provisionClientAttestation =
                 when (val clientAuthentication = config.clientAuthentication) {

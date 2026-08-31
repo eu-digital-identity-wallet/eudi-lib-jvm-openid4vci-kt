@@ -29,7 +29,6 @@ import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
-import java.net.URL
 import java.time.Clock
 
 /**
@@ -92,9 +91,9 @@ internal class TokenEndpointClient(
     private val clientId: ClientId,
     private val provisionedClientAttestation: suspend () -> ProvisionClientAttestation.Provisioned?,
     private val authFlowRedirectionURI: URI,
-    private val authServerId: URL,
-    private val challengeEndpoint: URL?,
-    private val tokenEndpoint: URL,
+    private val authServerId: HttpsUrl,
+    private val challengeEndpoint: HttpsUrl?,
+    private val tokenEndpoint: HttpsUrl,
     private val dPoPJwtFactory: suspend () -> DPoPJwtFactory?,
     private val isDPoPRequired: Boolean,
     private val httpClient: HttpClient,
@@ -124,21 +123,27 @@ internal class TokenEndpointClient(
         config.clientAuthentication.id,
         provisionedClientAttestation,
         authFlowRedirectionURI = config.authFlowRedirectionURI,
-        authServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
-        challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL(),
-        tokenEndpoint = authorizationServerMetadata.tokenEndpointURI.toURL(),
+        authServerId = HttpsUrl(authorizationServerMetadata.issuer.value).getOrThrow(),
+        challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.let {
+            HttpsUrl(it.toString()).getOrThrow()
+        },
+        tokenEndpoint = HttpsUrl(
+            requireNotNull(authorizationServerMetadata.tokenEndpointURI) {
+                "missing token_endpoint"
+            }.toString(),
+        ).getOrThrow(),
         dPoPJwtFactory,
         isDPoPRequired = config.dPoPUsage is DPoPUsage.Required,
         httpClient,
     )
 
     /**
-     * Submits a request for access token in authorization server's token endpoint passing parameters specific to the
+     * Submits a request for access token in the authorization server's token endpoint passing parameters specific to the
      * authorization code flow
      *
-     * @param authorizationCode The authorization code generated from authorization server.
+     * @param authorizationCode The authorization code generated from the authorization server.
      * @param pkceVerifier  The code verifier that was used when submitting the Pushed Authorization Request.
-     * @param credConfigIdsAsAuthDetails The list of [CredentialConfigurationIdentifier]s that have been passed to authorization server
+     * @param credConfigIdsAsAuthDetails The list of [CredentialConfigurationIdentifier]s that have been passed to the authorization server
      * as authorization details, part of a Rich Authorization Request.
      * @return The result of the request as a pair of the access token and the optional DPoP nonce returned by the endpoint.
      */
@@ -164,7 +169,7 @@ internal class TokenEndpointClient(
     }
 
     /**
-     * Submits a request for access token in authorization server's token endpoint passing parameters specific to the
+     * Submits a request for access token in the authorization server's token endpoint passing parameters specific to the
      * pre-authorization code flow
      *
      * @param preAuthorizedCode The pre-authorization code.
@@ -194,7 +199,7 @@ internal class TokenEndpointClient(
     }
 
     /**
-     * Submits a request for refreshing an access token in authorization server's token endpoint passing
+     * Submits a request for refreshing an access token in the authorization server's token endpoint passing
      * the refresh token
      * @param refreshToken the token to be used for refreshing the access token
      *
@@ -226,10 +231,10 @@ internal class TokenEndpointClient(
             val clientAttestation = provisionedClientAttestation()?.generateClientAttestation(
                 clock,
                 clientId,
-                authServerId,
+                authServerId.value,
                 abcaChallenge,
             )
-            val dpopProof = dPoPJwtFactory()?.createDPoPJwt(Htm.POST, tokenEndpoint, null, dpopNonce)
+            val dpopProof = dPoPJwtFactory()?.createDPoPJwt(Htm.POST, tokenEndpoint.value, null, dpopNonce)
                 ?.getOrThrow()
                 ?.serialize()
 
