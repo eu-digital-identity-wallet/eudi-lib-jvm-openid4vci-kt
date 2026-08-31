@@ -23,7 +23,6 @@ import io.ktor.client.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import java.net.URI
 import java.time.Instant
 
 typealias IssuerNegotiationResult = Pair<Issuer, List<RegistrationCertificatePolicy.PolicyViolation>>
@@ -104,7 +103,7 @@ interface Issuer :
          *
          * @param config wallet's configuration options
          * @param credentialOffer the offer for which the issuer is being created
-         * @param httpClient an http client, used while interacting with issuer
+         * @param httpClient an http client, used while interacting with the issuer
          * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
          * @param requestEncryptionSpecFactory a factory method to generate the issuance request encryption
          *
@@ -243,8 +242,7 @@ interface Issuer :
 
             val policyViolationWarnings = config.registrationCertificatePolicy?.let { policy ->
                 with(RegistrationCertificatePolicyEvaluator(policy)) {
-                    val authorization = evaluate(credentialOffer)
-                    when (authorization) {
+                    when (val authorization = evaluate(credentialOffer)) {
                         is RegistrationCertificatePolicy.Authorization.Granted -> authorization.warnings
                         is RegistrationCertificatePolicy.Authorization.NotGranted ->
                             throw AuthorizationPolicyValidationError.AuthorizationPolicyNotMet(authorization.error)
@@ -269,23 +267,30 @@ interface Issuer :
                     val authorizationServerMetadata = credentialOffer.authorizationServerMetadata
 
                     val deferredEndpoint =
-                        checkNotNull(credentialIssuerMetadata.deferredCredentialEndpoint?.value) {
-                            "Missing deferred credential endpoint"
-                        }
+                        HttpsUrl(
+                            checkNotNull(credentialIssuerMetadata.deferredCredentialEndpoint?.value) {
+                                "Missing deferred credential endpoint"
+                            }.toString(),
+                        ).getOrThrow()
 
-                    val challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.toURL()
+                    val challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.let {
+                        HttpsUrl(it.toString()).getOrThrow()
+                    }
 
-                    val tokenEndpoint =
-                        checkNotNull(authorizationServerMetadata.tokenEndpointURI?.toURL()) {
+                    val tokenEndpoint = HttpsUrl(
+                        checkNotNull(authorizationServerMetadata.tokenEndpointURI) {
                             "Missing token endpoint"
-                        }
+                        }.toString(),
+                    ).getOrThrow()
 
                     return DeferredIssuanceContext(
                         DeferredIssuerConfig(
                             credentialIssuerId = credentialOffer.credentialIssuerIdentifier,
                             clientAuthentication = config.clientAuthentication,
                             deferredEndpoint = deferredEndpoint,
-                            authorizationServerId = URI(authorizationServerMetadata.issuer.value).toURL(),
+                            authorizationServerId = HttpsUrl(
+                                authorizationServerMetadata.issuer.value,
+                            ).getOrThrow(),
                             challengeEndpoint = challengeEndpoint,
                             tokenEndpoint = tokenEndpoint,
                             requestEncryptionSpec = credentialOffer.exchangeEncryptionSpecification.requestEncryptionSpec,
@@ -313,7 +318,7 @@ interface Issuer :
          *
          * @param config wallet's configuration options
          * @param credentialOfferUri the credential offer uri to be resolved
-         * @param httpClient an http client, used while interacting with issuer
+         * @param httpClient an http client, used while interacting with the issuer
          * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
          *
          * @return if wallet's [config] can satisfy the requirements of the resolved credentialOffer an [Issuer] will be
@@ -353,7 +358,7 @@ interface Issuer :
          * @param config wallet's configuration options
          * @param credentialIssuerId the id of the credential issuer
          * @param credentialConfigurationIdentifiers a list of credential configuration identifiers
-         * @param httpClient an http client, used while interacting with issuer
+         * @param httpClient an http client, used while interacting with the issuer
          * @param requestEncryptionSpecFactory a factory method to generate the issuance request encryption
          * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
          *
@@ -419,6 +424,7 @@ internal fun ProvisionClientAttestation.ensureSupportedByAuthorizationServer(
  * Utility function used to verify a [provisioned ClientAttestation and its PoP Signer][ProvisionClientAttestation.Provisioned]
  * is active and according to the specification advertised by the [this].
  */
+@Suppress("UNUSED")
 fun ProvisionClientAttestation.ensureValid(now: Instant, provisioned: ProvisionClientAttestation.Provisioned) {
     val clientAttestation = SignedJWT.parse(provisioned.clientAttestation.value)
 
