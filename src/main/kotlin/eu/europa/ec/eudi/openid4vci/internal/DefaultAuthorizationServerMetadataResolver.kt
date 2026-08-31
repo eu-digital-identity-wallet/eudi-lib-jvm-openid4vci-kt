@@ -72,16 +72,9 @@ private fun CIAuthorizationServerMetadata.expectIssuer(expected: HttpsUrl) =
  */
 internal fun HttpsUrl.wellKnownUrl(wellKnownPath: String): Url {
     val issuer = Url(this.value.toString())
-    val pathSegment = buildString {
-        append("/${wellKnownPath.removePrefixAndSuffix("/")}")
-        val joinedSegments = issuer.segments.joinToString(separator = "/")
-        if (joinedSegments.isNotBlank()) {
-            append("/")
-        }
-        append(joinedSegments)
-    }
-
-    return URLBuilder(issuer).apply { path(pathSegment) }.build()
+    return URLBuilder(issuer).apply {
+        encodedPathSegments = emptyList()
+        appendPathSegments(wellKnownPath.trim('/').split("/"), encodeSlash = true)
+        issuer.segments.forEach { appendPathSegments(listOf(it), encodeSlash = true) }
+    }.build()
 }
-
-private fun String.removePrefixAndSuffix(s: CharSequence): String = removePrefix(s).removeSuffix(s)

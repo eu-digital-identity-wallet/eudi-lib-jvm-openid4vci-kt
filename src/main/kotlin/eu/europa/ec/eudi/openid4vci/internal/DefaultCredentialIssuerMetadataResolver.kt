@@ -172,13 +172,12 @@ internal class DefaultCredentialIssuerMetadataResolver(
 
 internal fun CredentialIssuerId.wellKnown(): Url {
     val issuer = Url(this.value.toString())
-    val pathSegment = buildString {
-        append(OpenId4VCISpec.CREDENTIAL_ISSUER_WELL_KNOWN_PATH)
-        val joinedSegments = issuer.segments.joinToString(separator = "/")
-        if (joinedSegments.isNotBlank()) {
-            append("/")
-        }
-        append(joinedSegments)
-    }
-    return URLBuilder(issuer).apply { path(pathSegment) }.build()
+    return URLBuilder(issuer).apply {
+        encodedPathSegments = emptyList()
+        appendPathSegments(
+            OpenId4VCISpec.CREDENTIAL_ISSUER_WELL_KNOWN_PATH.trim('/').split("/"),
+            encodeSlash = true,
+        )
+        issuer.segments.forEach { appendPathSegments(listOf(it), encodeSlash = true) }
+    }.build()
 }
