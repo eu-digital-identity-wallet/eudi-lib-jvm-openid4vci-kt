@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import eu.europa.ec.eudi.openid4vci.*
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AuthorizationResponseIssuerParamNotSupported
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.UnableToResolveAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialOfferRequestError.UnableToResolveCredentialIssuerMetadata
 import io.ktor.client.*
@@ -106,13 +107,19 @@ internal class CredentialOfferRequestResolver(
             val grants = credentialOffer.grants?.toGrants(credentialIssuerMetadata)
             val authorizationServer = grants?.authServer() ?: credentialIssuerMetadata.authorizationServers[0]
             val authorizationServerMetadata = fetchAuthServerMetaData(authorizationServer)
-            if (grants is Grants.AuthorizationCode) {
+            val authorizationCodeGrant = grants?.authorizationCode()
+            if (authorizationCodeGrant != null) {
                 ensureNotNull(authorizationServerMetadata.authorizationEndpointURI) {
                     val error =
                         IllegalArgumentException(
                             "Credential Offer requires Authorization Code Grant, but the Authorization Server does not support it",
                         )
                     CredentialOfferRequestValidationError.InvalidGrants(error).toException()
+                }
+                if (config.authResponseIssChecking is AuthorizationResponseIssChecking.Required) {
+                    ensure(authorizationServerMetadata.supportsAuthorizationResponseIssuerParam()) {
+                        AuthorizationResponseIssuerParamNotSupported()
+                    }
                 }
             }
 

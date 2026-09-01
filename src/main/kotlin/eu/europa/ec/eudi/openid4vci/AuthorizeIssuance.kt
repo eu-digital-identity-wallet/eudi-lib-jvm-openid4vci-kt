@@ -115,15 +115,16 @@ interface AuthorizeIssuance {
      * [AuthorizedRequest] state.
      *
      * @param authorizationCode The authorization code returned from authorization server via front-channel
-     * @param serverState The state returned from authorization server via front-channel
+     * @param serverState The state returned from the authorization server via front-channel
      * @param authDetailsOption Defines if upon access token request extra authorization details will be set to fine grain the
      * scope of the access token.
-     * @return an issuance request in authorized state
+     * @return an issuance request in an authorized state
      */
     suspend fun AuthorizationRequestPrepared.authorizeWithAuthorizationCode(
         authorizationCode: AuthorizationCode,
         serverState: String,
         authDetailsOption: AccessTokenOption = AccessTokenOption.AsRequested,
+        issuer: String? = null,
     ): Result<AuthorizedRequest>
 
     /**
