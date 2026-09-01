@@ -350,7 +350,7 @@ internal class CredentialOfferRequestResolverTest {
             val error = assertIs<CredentialOfferRequestValidationError.UnsupportedGrants>(exception.error)
             val reason = assertIs<IllegalArgumentException>(error.reason)
             assertEquals(
-                "Credential Offer does not support Authorization Code Grant",
+                "Credential Offer does not contain any supported Grant Type",
                 reason.message,
             )
         }
@@ -385,7 +385,7 @@ internal class CredentialOfferRequestResolverTest {
             val error = assertIs<CredentialOfferRequestValidationError.UnsupportedGrants>(exception.error)
             val reason = assertIs<IllegalArgumentException>(error.reason)
             assertEquals(
-                "Credential Offer does not support Pre-authorized Code Grant",
+                "Credential Offer does not contain any supported Grant Type",
                 reason.message,
             )
         }
