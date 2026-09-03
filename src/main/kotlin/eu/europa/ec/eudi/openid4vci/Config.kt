@@ -217,7 +217,7 @@ data class OpenId4VCIConfig(
         proofs = proofs,
         registrationCertificatePolicy = registrationCertificatePolicy,
         authResponseIssChecking = authResponseIssChecking,
-        grants = grants
+        grants = grants,
     )
 }
 
