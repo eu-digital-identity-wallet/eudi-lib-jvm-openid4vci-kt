@@ -142,6 +142,9 @@ fun interface RegistrationCertificatePolicy {
  * @param issuerMetadataPolicy policy concerning signed metadata usage
  * @param supportedCredentialReusePolicies the reuse policies supported by the wallet, used to validate against credential issuer metadata.
  * @param proofs proofs supported by the Wallet
+ * @param authResponseIssChecking Wallet's policy concerning the validation of the `iss` parameter
+ * present in the authorization response, as described by the Authorization Server metadata field
+ * `authorization_response_iss_parameter_supported`
  */
 data class OpenId4VCIConfig(
     val clientAuthentication: ClientAuthentication,
@@ -155,6 +158,7 @@ data class OpenId4VCIConfig(
     val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     val proofs: ProofsConfig = ProofsConfig.Default,
     val registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
+    val authResponseIssChecking: AuthorizationResponseIssChecking = AuthorizationResponseIssChecking.Never,
 ) {
 
     init {
@@ -184,18 +188,20 @@ data class OpenId4VCIConfig(
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
         proofs: ProofsConfig = ProofsConfig.Default,
         registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
+        authResponseIssChecking: AuthorizationResponseIssChecking = AuthorizationResponseIssChecking.Never,
     ) : this(
-        ClientAuthentication.None(clientId),
-        authFlowRedirectionURI,
-        encryptionSupportConfig,
-        authorizeIssuanceConfig,
-        dPoPUsage,
-        parUsage,
-        clock,
-        issuerMetadataPolicy,
-        supportedCredentialReusePolicies,
-        proofs,
-        registrationCertificatePolicy,
+        clientAuthentication = ClientAuthentication.None(clientId),
+        authFlowRedirectionURI = authFlowRedirectionURI,
+        encryptionSupportConfig = encryptionSupportConfig,
+        authorizeIssuanceConfig = authorizeIssuanceConfig,
+        dPoPUsage = dPoPUsage,
+        parUsage = parUsage,
+        clock = clock,
+        issuerMetadataPolicy = issuerMetadataPolicy,
+        supportedCredentialReusePolicies = supportedCredentialReusePolicies,
+        proofs = proofs,
+        registrationCertificatePolicy = registrationCertificatePolicy,
+        authResponseIssChecking = authResponseIssChecking,
     )
 }
 
@@ -268,6 +274,46 @@ sealed interface ParUsage : java.io.Serializable {
     data class IfSupported(val authorizationCodeDPoPBinding: Boolean = true) : ParUsage
 
     data class Required(val authorizationCodeDPoPBinding: Boolean = true) : ParUsage
+}
+
+/**
+ * Wallet's policy in regard to validating the `iss` parameter present in the authorization response,
+ * as described by the Authorization Server metadata field `authorization_response_iss_parameter_supported`.
+ *
+ * The `iss` parameter is used to mitigate mix-up attacks, by allowing the Wallet to verify that the
+ * authorization response was issued by the expected Authorization Server.
+ *
+ * - [Never]: The Wallet never validates the `iss` parameter of the authorization response.
+ * - [IfSupported]: The Wallet validates the `iss` parameter only when the Authorization Server
+ *   advertises support for it (i.e. `authorization_response_iss_parameter_supported` is `true`).
+ * - [Required]: The Wallet requires the Authorization Server to support the `iss` parameter. If the
+ *   Authorization Server does not advertise support for it, issuance fails. Otherwise, the `iss`
+ *   parameter is validated.
+ */
+sealed interface AuthorizationResponseIssChecking : java.io.Serializable {
+
+    /**
+     * The Wallet never validates the `iss` parameter of the authorization response.
+     */
+    data object Never : AuthorizationResponseIssChecking {
+        private fun readResolve(): Any = Never
+    }
+
+    /**
+     * The Wallet validates the `iss` parameter only when the Authorization Server
+     * advertises support for it.
+     */
+    data object IfSupported : AuthorizationResponseIssChecking {
+        private fun readResolve(): Any = IfSupported
+    }
+
+    /**
+     * The Wallet requires the Authorization Server to support the `iss` parameter.
+     * If the Authorization Server does not advertise support, issuance fails.
+     */
+    data object Required : AuthorizationResponseIssChecking {
+        private fun readResolve(): Any = Required
+    }
 }
 
 /**

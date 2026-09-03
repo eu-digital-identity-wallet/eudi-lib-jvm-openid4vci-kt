@@ -18,10 +18,14 @@ package eu.europa.ec.eudi.openid4vci.internal
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.AccessTokenOption.AsRequested
 import eu.europa.ec.eudi.openid4vci.AccessTokenOption.Limited
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AuthorizationResponseIssuerParamNotSupported
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidAuthorizationIssuer
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidAuthorizationState
+import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.MissingAuthorizationResponseIssuer
 import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationEndpointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
 import java.time.Instant
+import com.nimbusds.oauth2.sdk.id.Issuer as NimbusIssuer
 import com.nimbusds.oauth2.sdk.id.State as NimbusState
 
 internal data class TokenResponse(
@@ -84,8 +88,40 @@ internal class AuthorizeIssuanceImpl(
         authorizationCode: AuthorizationCode,
         serverState: String,
         authDetailsOption: AccessTokenOption,
+        issuer: String?,
     ): Result<AuthorizedRequest> = runCatchingCancellable {
         ensure(serverState == state) { InvalidAuthorizationState() }
+        validateAuthorizationResponseIssuer(issuer)
+        requestAccessToken(authorizationCode, authDetailsOption)
+    }
+
+    private fun validateAuthorizationResponseIssuer(iss: String?) {
+        val metadata = credentialOffer.authorizationServerMetadata
+        when (config.authResponseIssChecking) {
+            AuthorizationResponseIssChecking.Never -> Unit
+
+            AuthorizationResponseIssChecking.IfSupported ->
+                if (metadata.supportsAuthorizationResponseIssuerParam()) {
+                    ensure(!iss.isNullOrEmpty()) { MissingAuthorizationResponseIssuer() }
+                    ensure(issuerMatches(iss, metadata.issuer)) { InvalidAuthorizationIssuer() }
+                }
+
+            AuthorizationResponseIssChecking.Required -> {
+                ensure(metadata.supportsAuthorizationResponseIssuerParam()) {
+                    AuthorizationResponseIssuerParamNotSupported()
+                }
+                ensure(!iss.isNullOrEmpty()) { MissingAuthorizationResponseIssuer() }
+                ensure(issuerMatches(iss, metadata.issuer)) { InvalidAuthorizationIssuer() }
+            }
+        }
+    }
+
+    private fun issuerMatches(iss: String, expected: NimbusIssuer): Boolean = iss == expected.value
+
+    private suspend fun AuthorizationRequestPrepared.requestAccessToken(
+        authorizationCode: AuthorizationCode,
+        authDetailsOption: AccessTokenOption,
+    ): AuthorizedRequest {
         val credConfigIdsAsAuthDetails = identifiersSentAsAuthDetails.filter(authDetailsOption)
         val (tokenResponse, newDpopNonce) =
             tokenEndpointClient.requestAccessTokenAuthFlow(
@@ -95,7 +131,7 @@ internal class AuthorizeIssuanceImpl(
                 dpopNonce,
             ).getOrThrow()
 
-        AuthorizedRequest(
+        return AuthorizedRequest(
             accessToken = tokenResponse.accessToken,
             refreshToken = tokenResponse.refreshToken,
             credentialIdentifiers = tokenResponse.authorizationDetails,
