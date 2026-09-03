@@ -319,6 +319,76 @@ internal class CredentialOfferRequestResolverTest {
             reason.message,
         )
     }
+
+    @Test
+    internal fun `fails when wallet supports authorization code but credential offer contains pre-authorized code`() =
+        runTest {
+            val resolver = resolver(
+                RequestEncryptionSpecFactory.DEFAULT,
+                ResponseEncryptionSpecFactory.DEFAULT,
+                RequestMocker(
+                    match(SampleIssuer.WellKnownUrl.value.toURI()),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
+                ),
+                oauthMetaDataHandler,
+            )
+
+            val credentialOffer =
+                getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer_pre-auth_code.json")
+
+            val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+                .addParameter("credential_offer", credentialOffer)
+                .build()
+            val config = OpenId4VCIConfiguration.copy(
+                issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+                grants = SupportedGrants.AuthorizationCode,
+            )
+
+            val exception = assertFailsWith<CredentialOfferRequestException> {
+                resolver.resolve(config, credentialEndpointUrl.toString()).getOrThrow()
+            }
+            val error = assertIs<CredentialOfferRequestValidationError.UnsupportedGrants>(exception.error)
+            val reason = assertIs<IllegalArgumentException>(error.reason)
+            assertEquals(
+                "Credential Offer does not contain any supported Grant Type",
+                reason.message,
+            )
+        }
+
+    @Test
+    internal fun `fails when wallet supports pre-authorized code but credential offer contains authorization code`() =
+        runTest {
+            val resolver = resolver(
+                RequestEncryptionSpecFactory.DEFAULT,
+                ResponseEncryptionSpecFactory.DEFAULT,
+                RequestMocker(
+                    match(SampleIssuer.WellKnownUrl.value.toURI()),
+                    jsonResponse("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json"),
+                ),
+                oauthMetaDataHandler,
+            )
+
+            val credentialOffer =
+                getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/sample_credential_offer_auth_code.json")
+
+            val credentialEndpointUrl = URIBuilder("wallet://credential_offer")
+                .addParameter("credential_offer", credentialOffer)
+                .build()
+            val config = OpenId4VCIConfiguration.copy(
+                issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+                grants = SupportedGrants.PreAuthorizedCode,
+            )
+
+            val exception = assertFailsWith<CredentialOfferRequestException> {
+                resolver.resolve(config, credentialEndpointUrl.toString()).getOrThrow()
+            }
+            val error = assertIs<CredentialOfferRequestValidationError.UnsupportedGrants>(exception.error)
+            val reason = assertIs<IllegalArgumentException>(error.reason)
+            assertEquals(
+                "Credential Offer does not contain any supported Grant Type",
+                reason.message,
+            )
+        }
 }
 
 private fun assertEquals(expected: CredentialOffer, offer: CredentialOffer) {

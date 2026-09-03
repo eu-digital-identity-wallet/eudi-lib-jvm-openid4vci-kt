@@ -90,7 +90,7 @@ internal class TokenEndpointClient(
     private val clock: Clock,
     private val clientId: ClientId,
     private val provisionedClientAttestation: suspend () -> ProvisionClientAttestation.Provisioned?,
-    private val authFlowRedirectionURI: URI,
+    private val authFlowRedirectionURI: URI?,
     private val authServerId: HttpsUrl,
     private val challengeEndpoint: HttpsUrl?,
     private val tokenEndpoint: HttpsUrl,
@@ -161,7 +161,9 @@ internal class TokenEndpointClient(
             TokenEndpointForm.authCodeFlow(
                 clientId = clientId,
                 authorizationCode = authorizationCode,
-                redirectionURI = authFlowRedirectionURI,
+                redirectionURI = checkNotNull(authFlowRedirectionURI) {
+                    "authFlowRedirectionURI must be provided when using Authorization Code flow"
+                },
                 pkceVerifier = pkceVerifier,
                 authorizationDetails = authDetails,
             )

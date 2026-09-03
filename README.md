@@ -591,7 +591,7 @@ The options available for the `Issuer` are represented by `OpenId4VCIConfig`
 ```kotlin
 data class OpenId4VCIConfig(
     val clientAuthentication: ClientAuthentication,
-    val authFlowRedirectionURI: URI,
+    val authFlowRedirectionURI: URI?,
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
@@ -600,6 +600,8 @@ data class OpenId4VCIConfig(
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     val proofs: ProofsConfig = ProofsConfig.Default,
+    val registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
+    val grants: SupportedGrants = SupportedGrants.Both,
 )
 ```
 
@@ -608,7 +610,7 @@ Options available:
 - clientAuthentication: Wallet `client authentication method` in the OAuth 2.0 sense while interacting with the Credential Issuer. 
   - Either None, i.e. a Public Client,
   - [Attestation-Based Client Authentication](#oauth-20-attestation-based-client-authentication)
-- authFlowRedirectionURI: It is the `redirect_uri` parameter that will be included in a PAR or simple authorization request.
+- authFlowRedirectionURI: It is the `redirect_uri` parameter that will be included in a PAR or simple authorization request. Required when Wallet supports Authorization Code Grant.
 - encryptionSupportConfig: Wallet supported encryption parameters to be used for Credential Request and Credential Response encryption.
 - authorizeIssuanceConfig: Preference on using `scope` or `authorization_details` during authorization code flow.
 - dPoPUsage: An indication about whether DPoP is never to be used, supported, or required. If Wallet requires DPoP but Credential Issuer doesn't advertise this feature, issuance does not proceed. 
@@ -625,6 +627,8 @@ Options available:
   allowed by the TS3 profile (`ES256`, `ES384`, `ES512`); passing an empty set is rejected.
 - supportedCredentialReusePolicies: A set of `EudiReusePolicyType`s supported by the wallet for credential reuse. Defaults to `null`.
 - proofs: Whether Wallet supports attestations that require no proofs, alongside the supports proof types and signing algorithms.
+- registrationCertificatePolicy: Wallet policy for validating the Registration Certificates of Credential Issuers.
+- grants: Wallet-supported Grant Types.
 
 Trust between the Wallet and the Signer of the signed metadata advertised by the Credential Issuer is established via a
 `CertificateChainTrust` instance, which is provided as the `issuerTrust` argument of `RequireSigned` / `PreferSigned`.
@@ -650,7 +654,9 @@ val openId4VCIConfig = OpenId4VCIConfig(
         isNoProofSupported = true, // whether attestations that require no proofs are supported
         jwtProof = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)), // whether jwt proofs are supported
         attestationProof = ProofsConfig.SupportedAttestationProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)), // whether attestation proofs are supported
-    )
+    ),
+    registrationCertificatePolicy = RegistrationCertificatePolicy { accessCertificate, registrationCertificate, issuanceContext -> ... },
+    grants = SupportedGrants.Both,
 )
 val credentialOfferUri: String = "..."
 val httpClient: HttpClient = ...

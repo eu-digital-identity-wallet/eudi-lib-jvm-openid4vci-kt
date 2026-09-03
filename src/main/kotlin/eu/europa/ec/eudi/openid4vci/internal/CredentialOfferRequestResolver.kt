@@ -105,6 +105,14 @@ internal class CredentialOfferRequestResolver(
             }
 
             val grants = credentialOffer.grants?.toGrants(credentialIssuerMetadata)
+            if (null != grants) {
+                val supportedGrants = findSupportedGrants(grants, config.grants)
+                ensureNotNull(supportedGrants) {
+                    val reason = IllegalArgumentException("Credential Offer does not contain any supported Grant Type")
+                    CredentialOfferRequestValidationError.UnsupportedGrants(reason).toException()
+                }
+            }
+
             val authorizationServer = grants?.authServer() ?: credentialIssuerMetadata.authorizationServers[0]
             val authorizationServerMetadata = fetchAuthServerMetaData(authorizationServer)
             val authorizationCodeGrant = grants?.authorizationCode()
@@ -278,4 +286,26 @@ internal fun <A : Any, B : Any> DPoPUsage<A>.map(convert: (A) -> B): DPoPUsage<B
         DPoPUsage.Never -> DPoPUsage.Never
         is DPoPUsage.IfSupported -> DPoPUsage.IfSupported(convert(value))
         is DPoPUsage.Required -> DPoPUsage.Required(convert(value))
+    }
+
+private fun findSupportedGrants(
+    issuerSupported: Grants,
+    walletSupported: SupportedGrants,
+): SupportedGrants? =
+    when (issuerSupported) {
+        is Grants.AuthorizationCode ->
+            when (walletSupported) {
+                SupportedGrants.AuthorizationCode,
+                SupportedGrants.Both,
+                -> SupportedGrants.AuthorizationCode
+                SupportedGrants.PreAuthorizedCode -> null
+            }
+        is Grants.PreAuthorizedCode ->
+            when (walletSupported) {
+                SupportedGrants.PreAuthorizedCode,
+                SupportedGrants.Both,
+                -> SupportedGrants.PreAuthorizedCode
+                SupportedGrants.AuthorizationCode -> null
+            }
+        is Grants.Both -> walletSupported
     }
