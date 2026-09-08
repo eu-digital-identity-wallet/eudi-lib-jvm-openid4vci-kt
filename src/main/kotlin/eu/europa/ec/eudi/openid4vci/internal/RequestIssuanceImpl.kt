@@ -74,9 +74,53 @@ internal class RequestIssuanceImpl(
             ).getOrThrow()
 
         // Update state (maybe) with new Dpop Nonce from resource server
-        val updatedAuthorizedRequest =
-            this.withResourceServerDpopNonce(newResourceServerDpopNonce ?: proofsOrAuthRequestDpopNonce)
-        updatedAuthorizedRequest to outcome.withSelectedCredentialReusePolicy(selectedCredentialReusePolicy).toPub()
+        val updatedAuthorizedRequest = withResourceServerDpopNonce(newResourceServerDpopNonce ?: proofsOrAuthRequestDpopNonce)
+
+        // When JWT Proofs without Key Attestation are used, Credential Reuse Policy is not applicable
+        val updatedOutcome =
+            if (proofSpecification is ProofSpecification.JwtProofsWithoutKeyAttestation) {
+                outcome
+            } else {
+                outcome.withSelectedCredentialReusePolicy(selectedCredentialReusePolicy)
+            }
+        updatedAuthorizedRequest to updatedOutcome.toPub()
+    }
+
+    override suspend fun AuthorizedRequest.request(
+        requestPayload: IssuanceRequestPayload,
+        proofSigner: BatchSigner<JwtBindingKey>,
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatchingCancellable {
+        validateRequestPayload(requestPayload, credentialIdentifiers.orEmpty())
+
+        val credentialConfiguration = credentialSupportedById(requestPayload.credentialConfigurationIdentifier)
+        config.proofs.ensureCompatibleWith(credentialConfiguration.proofTypesSupported)
+
+        val proofSpecification = ProofSpecification.JwtProofsWithoutKeyAttestation(proofSigner)
+        val proofRequirement = proofSpecification.ensureCompatibleWith(credentialConfiguration)
+        check(proofRequirement is ProofTypeMeta.Jwt)
+        check(null == proofRequirement.keyAttestationRequirement)
+
+        val cNonceAndDPoPNonce = cNonce()
+        val proofs = jwtProofsWithoutKeyAttestation(
+            proofRequirement,
+            ProofSpecification.JwtProofsWithoutKeyAttestation(proofSigner),
+            grant,
+            cNonceAndDPoPNonce?.cnonce,
+        )
+
+        // Place the request
+        val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
+        val proofsOrAuthRequestDpopNonce = cNonceAndDPoPNonce?.dpopNonce ?: resourceServerDpopNonce
+        val (outcome, newResourceServerDpopNonce) =
+            credentialEndpointClient.placeIssuanceRequest(
+                accessToken,
+                proofsOrAuthRequestDpopNonce,
+                credentialRequest,
+            ).getOrThrow()
+
+        // Update state (maybe) with new Dpop Nonce from resource server
+        val updatedAuthorizedRequest = withResourceServerDpopNonce(newResourceServerDpopNonce ?: proofsOrAuthRequestDpopNonce)
+        updatedAuthorizedRequest to outcome.toPub()
     }
 
     private fun validateRequestPayload(
@@ -131,7 +175,6 @@ internal class RequestIssuanceImpl(
                 val proofs = jwtProofsWithoutKeyAttestation(
                     proofRequirement as ProofTypeMeta.Jwt,
                     proofSpecification,
-                    selectedReusePolicy,
                     grant,
                     cNonceAndDPoPNonce?.cnonce,
                 )
@@ -279,7 +322,6 @@ internal class RequestIssuanceImpl(
     private suspend fun jwtProofsWithoutKeyAttestation(
         proofRequirement: ProofTypeMeta.Jwt,
         proofSpecification: ProofSpecification.JwtProofsWithoutKeyAttestation,
-        selectedReusePolicy: EudiReusePolicy?,
         grant: Grant,
         cNonce: Nonce?,
     ): List<Proof.Jwt> {
@@ -290,7 +332,7 @@ internal class RequestIssuanceImpl(
             javaSigningAlgorithm.toSupportedJoseAlgorithm(proofRequirement)
         }
         return proofSpecification.proofSigner.use { operation ->
-            operation.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy) // TODO: Is this applicable here?
+            operation.assertMatchesBatchIssuanceBatchSize()
             val proofsSigner = NoKeyAttestationJwtProofsSigner(joseAlg, operation)
             val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
             proofsSigner.sign(claims).map {
@@ -323,10 +365,15 @@ internal class RequestIssuanceImpl(
         return Proof.Attestation(keyAttestationJwt)
     }
 
-    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize(
-        selectedReusePolicy: EudiReusePolicy?,
-    ) {
-        operations.size.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
+    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize() {
+        if (operations.size > 1) {
+            ensure(batchCredentialIssuance is BatchCredentialIssuance.Supported) {
+                CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+            }
+            ensure(operations.size <= batchCredentialIssuance.batchSize) {
+                CredentialIssuanceError.IssuerBatchSizeLimitExceeded(batchCredentialIssuance.batchSize)
+            }
+        }
     }
 
     private fun AttestedKeys.assertMatchesBatchIssuanceBatchSize(

@@ -154,7 +154,7 @@ sealed interface ProofSpecification {
 /**
  * An interface for submitting a credential issuance request.
  */
-fun interface RequestIssuance {
+interface RequestIssuance {
 
     /**
      * Places a request to the credential issuance endpoint.
@@ -171,6 +171,23 @@ fun interface RequestIssuance {
     suspend fun AuthorizedRequest.request(
         requestPayload: IssuanceRequestPayload,
         proofSpecification: ProofSpecification,
+    ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
+
+    /**
+     * Places a request to the credential issuance endpoint using JWT Proofs without Key Attestation.
+     *
+     * If the [AuthorizedRequest] contains authorization details for the requested
+     * [IssuanceRequestPayload.credentialConfigurationIdentifier], then the [requestPayload] must be
+     * [IssuanceRequestPayload.IdentifierBased] and the credential identifier must be one of the authorized identifiers.
+     *
+     * @param requestPayload the payload of the request
+     * @param proofSigner a signer to sign the JWT Proofs to be included in the request
+     * @return the possibly updated [AuthorizedRequest] (if updated, it will contain a fresh updated Resource-Server DPoP Nonce)
+     * and the [SubmissionOutcome]
+     */
+    suspend fun AuthorizedRequest.request(
+        requestPayload: IssuanceRequestPayload,
+        proofSigner: BatchSigner<JwtBindingKey>,
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>>
 }
 
