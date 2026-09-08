@@ -64,7 +64,7 @@ enum class ProofType : Serializable {
 sealed interface ProofTypeMeta : Serializable {
     data class Jwt(
         val algorithms: List<JWSAlgorithm>,
-        val keyAttestationRequirement: KeyAttestationRequirement,
+        val keyAttestationRequirement: KeyAttestationRequirement?,
     ) : ProofTypeMeta {
         init {
             require(algorithms.isNotEmpty()) { "Supported algorithms in case of JWT cannot be empty" }

@@ -114,12 +114,23 @@ internal class RequestIssuanceImpl(
         return when (proofSpecification) {
             is ProofSpecification.NoProof -> null to null
 
-            is ProofSpecification.JwtProof -> {
+            is ProofSpecification.JwtProof.WithKeyAttestation -> {
                 val cNonceAndDPoPNonce = cNonce()
-                val proof = jwtProof(
+                val proof = jwtProofWithKeyAttestation(
                     proofRequirement as ProofTypeMeta.Jwt,
                     proofSpecification,
                     selectedReusePolicy,
+                    grant,
+                    cNonceAndDPoPNonce?.cnonce,
+                )
+                proof to cNonceAndDPoPNonce?.dpopNonce
+            }
+
+            is ProofSpecification.JwtProof.WithoutKeyAttestation -> {
+                val cNonceAndDPoPNonce = cNonce()
+                val proof = jwtProofWithoutKeyAttestation(
+                    proofRequirement as ProofTypeMeta.Jwt,
+                    proofSpecification,
                     grant,
                     cNonceAndDPoPNonce?.cnonce,
                 )
@@ -158,6 +169,18 @@ internal class RequestIssuanceImpl(
                     "Credential configuration doesn't support JWT proofs."
                 }
                 check(proofRequirement is ProofTypeMeta.Jwt)
+                when (this) {
+                    is ProofSpecification.JwtProof.WithKeyAttestation -> {
+                        requireNotNull(proofRequirement.keyAttestationRequirement) {
+                            "Credential configuration does not support key attestation."
+                        }
+                    }
+                    is ProofSpecification.JwtProof.WithoutKeyAttestation -> {
+                        require(null == proofRequirement.keyAttestationRequirement) {
+                            "Credential configuration requires key attestation."
+                        }
+                    }
+                }
                 proofRequirement
             }
 
@@ -221,13 +244,14 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private suspend fun jwtProof(
+    private suspend fun jwtProofWithKeyAttestation(
         proofRequirement: ProofTypeMeta.Jwt,
-        proofSpecification: ProofSpecification.JwtProof,
+        proofSpecification: ProofSpecification.JwtProof.WithKeyAttestation,
         selectedReusePolicy: EudiReusePolicy?,
         grant: Grant,
         cNonce: Nonce?,
     ): Proof.Jwt {
+        checkNotNull(proofRequirement.keyAttestationRequirement)
         val proofSigner = proofSpecification.proofSignerProvider(
             cNonce,
             proofRequirement.keyAttestationRequirement.preferredKeyStorageStatusPeriod,
@@ -240,12 +264,31 @@ internal class RequestIssuanceImpl(
         val jwtProof = proofSigner.use { operation ->
             operation.publicMaterial.ensureKeyAttestationJwtAlgIsSupported(proofRequirement)
             operation.publicMaterial.attestedKeys.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
-            val signer = JwtProofSigner(joseAlg, operation, ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX)
+            val signer = KeyAttestationJwtProofSigner(joseAlg, operation, ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX)
             val signedJwt = signer.sign(claims)
             SignedJWT.parse(signedJwt)
         }
         verifyKeyAttestationJwtProofSignature(jwtProof)
         return Proof.Jwt(jwtProof)
+    }
+
+    private suspend fun jwtProofWithoutKeyAttestation(
+        proofRequirement: ProofTypeMeta.Jwt,
+        proofSpecification: ProofSpecification.JwtProof.WithoutKeyAttestation,
+        grant: Grant,
+        cNonce: Nonce?,
+    ): Proof.Jwt {
+        check(null == proofRequirement.keyAttestationRequirement)
+
+        val joseAlg = run {
+            val javaSigningAlgorithm = proofSpecification.proofSigner.javaAlgorithm
+            javaSigningAlgorithm.toSupportedJoseAlgorithm(proofRequirement)
+        }
+        return proofSpecification.proofSigner.use { operation ->
+            val proofSigner = NoKeyAttestationJwtProofSigner(joseAlg, operation)
+            val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
+            Proof.Jwt(SignedJWT.parse(proofSigner.sign(claims)))
+        }
     }
 
     private fun KeyAttestationJWT.ensureKeyAttestationJwtAlgIsSupported(
@@ -444,10 +487,24 @@ private fun ProofsConfig.ensureCompatibleWith(issuerSupportedProofTypes: ProofTy
         }
 
         else -> {
-            val supportsJwtProof = null != jwtProof &&
-                jwtProof.supportedAlgorithms.intersect(
-                    issuerSupportedProofTypes.jwtProof?.algorithms.orEmpty().toSet(),
-                ).isNotEmpty()
+            val supportsJwtProof = run {
+                val issuerSupportedJwtProof = issuerSupportedProofTypes.jwtProof
+                if (null != jwtProof && null != issuerSupportedJwtProof) {
+                    val commonSupportedAlgorithms =
+                        jwtProof.supportedAlgorithms.intersect(
+                            issuerSupportedJwtProof.algorithms.toSet(),
+                        )
+
+                    val keyAttestationSupportedWhenRequired =
+                        (jwtProof.keyAttestationRequired && null != issuerSupportedJwtProof.keyAttestationRequirement) ||
+                            (!jwtProof.keyAttestationRequired && null == issuerSupportedJwtProof.keyAttestationRequirement)
+
+                    commonSupportedAlgorithms.isNotEmpty() && keyAttestationSupportedWhenRequired
+                } else {
+                    false
+                }
+            }
+
             val supportsAttestationProof = null != attestationProof &&
                 attestationProof.supportedAlgorithms.intersect(
                     issuerSupportedProofTypes.attestationProof?.algorithms.orEmpty().toSet(),

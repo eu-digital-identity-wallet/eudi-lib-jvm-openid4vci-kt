@@ -284,8 +284,8 @@ class IssuanceSingleRequestTest {
                         "c_nonce expected to be found in proof but was not",
                     )
                     assertEquals(
-                        cNonce,
                         nonceValue,
+                        cNonce,
                         "Expected c_nonce $nonceValue but found $cNonce",
                     )
                 },
@@ -1156,7 +1156,7 @@ class IssuanceSingleRequestTest {
                 config = OpenId4VCIConfiguration.copy(
                     proofs = ProofsConfig(
                         isNoProofSupported = false,
-                        jwtProof = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES512)),
+                        jwtProof = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES512), true),
                         attestationProof = null,
                     ),
                 ),

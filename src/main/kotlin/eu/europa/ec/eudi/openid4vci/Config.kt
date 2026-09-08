@@ -505,40 +505,52 @@ data class ProofsConfig(
      * Indicates support for JWT Proofs.
      *
      * @property supportedAlgorithms the signing algorithms supported by the Wallet
+     * @property keyAttestationRequired whether Key Attestations are required for JWT Proofs
      */
-    data class SupportedJwtProof(val supportedAlgorithms: Set<JWSAlgorithm>)
+    data class SupportedJwtProof(
+        val supportedAlgorithms: Set<JWSAlgorithm>,
+        val keyAttestationRequired: Boolean,
+    ) {
+        init {
+            require(supportedAlgorithms.isNotEmpty()) { "At least one supported algorithm must be provided." }
+        }
+    }
 
     /**
      * Indicates support for Attestation Proofs.
      *
      * @property supportedAlgorithms the signing algorithms supported by the Wallet
      */
-    data class SupportedAttestationProof(val supportedAlgorithms: Set<JWSAlgorithm>)
+    data class SupportedAttestationProof(val supportedAlgorithms: Set<JWSAlgorithm>) {
+        init {
+            require(supportedAlgorithms.isNotEmpty()) { "At least one supported algorithm must be provided." }
+        }
+    }
 
     companion object {
         /**
          * A [ProofsConfig] instance for Wallets that support issuance of attestations that require no proofs, and attestations that
-         * require either JWT Proofs or Attestation Proofs signed with either ES256, ES384, or ES512.
+         * require either JWT Proofs with Key Attestations or Attestation Proofs signed with either ES256, ES384, or ES512.
          */
         val Default: ProofsConfig
             get() {
                 val supportedAlgorithms = setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
                 return ProofsConfig(
                     true,
-                    SupportedJwtProof(supportedAlgorithms),
+                    SupportedJwtProof(supportedAlgorithms, true),
                     SupportedAttestationProof(supportedAlgorithms),
                 )
             }
 
         /**
-         * Creates a [ProofsConfig] instance for a Wallet that supports issueance of attestations that require
-         * either JWT Proofs or Attestation Proofs signed with one of the provided JWS Algorithms.
+         * Creates a [ProofsConfig] instance for a Wallet that supports issuance of attestations that require
+         * either JWT Proofs with Key Attestation, or Attestation Proofs signed with one of the provided JWS Algorithms.
          */
         operator fun invoke(first: JWSAlgorithm, vararg remaining: JWSAlgorithm): ProofsConfig {
             val supportedAlgorithms = setOf(first, *remaining)
             return ProofsConfig(
                 isNoProofSupported = false,
-                jwtProof = SupportedJwtProof(supportedAlgorithms),
+                jwtProof = SupportedJwtProof(supportedAlgorithms, true),
                 attestationProof = SupportedAttestationProof(supportedAlgorithms),
             )
         }
