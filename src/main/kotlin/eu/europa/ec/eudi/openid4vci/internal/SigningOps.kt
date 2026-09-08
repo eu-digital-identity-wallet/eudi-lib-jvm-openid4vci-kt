@@ -161,10 +161,12 @@ internal fun <PUB> BatchSigner.Companion.fromNimbusEcKeys(
     provider: String?,
 ): BatchSigner<PUB> {
     require(ecKeyPairs.isNotEmpty()) { "At least one EC key pair must be provided" }
-    ecKeyPairs.forEach {
-        require(it.key.isPrivate) { "All EC keys must be private keys" }
+    val firstCurve = ecKeyPairs.entries.first().key.curve
+    ecKeyPairs.forEach { (key, _) ->
+        require(key.isPrivate) { "All EC keys must be private keys" }
+        require(key.curve == firstCurve) { "All EC keys must use the same curve, but found ${key.curve}" }
     }
-    val signatureAlgorithm = ecKeyPairs.entries.first().key.curve.toJavaSigningAlg()
+    val signatureAlgorithm = firstCurve.toJavaSigningAlg()
     return fromECPrivateKeys(
         signatureAlgorithm,
         ecKeyPairs.map {
