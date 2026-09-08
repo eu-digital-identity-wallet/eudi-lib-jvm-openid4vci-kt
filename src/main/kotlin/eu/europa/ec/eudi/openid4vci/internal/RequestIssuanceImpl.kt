@@ -503,30 +503,39 @@ private fun ProofsConfig.ensureCompatibleWith(issuerSupportedProofTypes: ProofTy
         }
 
         else -> {
-            val supportsJwtProof = run {
-                val issuerSupportedJwtProof = issuerSupportedProofTypes.jwtProof
-                if (null != jwtProof && null != issuerSupportedJwtProof) {
-                    val commonSupportedAlgorithms =
-                        jwtProof.supportedAlgorithms.intersect(
-                            issuerSupportedJwtProof.algorithms.toSet(),
-                        )
-
-                    val keyAttestationSupportedWhenRequired =
-                        (jwtProof.keyAttestationRequired && null != issuerSupportedJwtProof.keyAttestationRequirement) ||
-                            (!jwtProof.keyAttestationRequired && null == issuerSupportedJwtProof.keyAttestationRequirement)
-
-                    commonSupportedAlgorithms.isNotEmpty() && keyAttestationSupportedWhenRequired
-                } else {
-                    false
+            val supportsJwtProofWithKeyAttestation = run {
+                jwtProofWithKeyAttestation?.let { jwtProofWithKeyAttestation ->
+                    val issuerSupportedJwtProof = issuerSupportedProofTypes.jwtProof
+                    issuerSupportedJwtProof?.let { issuerSupportedJwtProof ->
+                        null != issuerSupportedJwtProof.keyAttestationRequirement &&
+                            jwtProofWithKeyAttestation.supportedAlgorithms.intersect(
+                                issuerSupportedJwtProof.algorithms.toSet(),
+                            ).isNotEmpty()
+                    }
                 }
-            }
+            } ?: false
 
-            val supportsAttestationProof = null != attestationProof &&
+            val supportsJwtProofsWithoutKeyAttestation = run {
+                jwtProofsWithoutKeyAttestation?.let { jwtProofsWithoutKeyAttestation ->
+                    val issuerSupportedJwtProof = issuerSupportedProofTypes.jwtProof
+                    issuerSupportedJwtProof?.let { issuerSupportedJwtProof ->
+                        null == issuerSupportedJwtProof.keyAttestationRequirement &&
+                            jwtProofsWithoutKeyAttestation.supportedAlgorithms.intersect(
+                                issuerSupportedJwtProof.algorithms.toSet(),
+                            ).isNotEmpty()
+                    }
+                }
+            } ?: false
+
+            val supportsAttestationProof = attestationProof?.let { attestationProof ->
                 attestationProof.supportedAlgorithms.intersect(
                     issuerSupportedProofTypes.attestationProof?.algorithms.orEmpty().toSet(),
                 ).isNotEmpty()
+            } ?: false
 
-            require(supportsJwtProof || supportsAttestationProof) { "Wallet doesn't support any of the advertised Proofs" }
+            require(supportsJwtProofWithKeyAttestation || supportsJwtProofsWithoutKeyAttestation || supportsAttestationProof) {
+                "Wallet doesn't support any of the advertised Proofs"
+            }
         }
     }
 }

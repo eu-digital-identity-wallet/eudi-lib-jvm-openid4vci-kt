@@ -492,25 +492,23 @@ sealed interface IssuerMetadataPolicy {
  * Wallet supported proofs.
  *
  * @property isNoProofSupported whether the Wallet supports issuance of attestations that require no proofs
- * @property jwtProof whether the Wallet supports JWT Proofs
- * @property attestationProof whether the Wallet supports Attestation Proofs
+ * @property jwtProofWithKeyAttestation whether the Wallet supports JWT Proof with Key Attestation
+ * @property attestationProof whether the Wallet supports Attestation Proof
+ * @property jwtProofsWithoutKeyAttestation whether the Wallet supports JWT Proofs without Key Attestation
  */
 data class ProofsConfig(
     val isNoProofSupported: Boolean,
-    val jwtProof: SupportedJwtProof?,
+    val jwtProofWithKeyAttestation: SupportedJwtProof?,
     val attestationProof: SupportedAttestationProof?,
+    val jwtProofsWithoutKeyAttestation: SupportedJwtProof?,
 ) {
 
     /**
      * Indicates support for JWT Proofs.
      *
      * @property supportedAlgorithms the signing algorithms supported by the Wallet
-     * @property keyAttestationRequired whether Key Attestations are required for JWT Proofs
      */
-    data class SupportedJwtProof(
-        val supportedAlgorithms: Set<JWSAlgorithm>,
-        val keyAttestationRequired: Boolean,
-    ) {
+    data class SupportedJwtProof(val supportedAlgorithms: Set<JWSAlgorithm>) {
         init {
             require(supportedAlgorithms.isNotEmpty()) { "At least one supported algorithm must be provided." }
         }
@@ -536,9 +534,10 @@ data class ProofsConfig(
             get() {
                 val supportedAlgorithms = setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)
                 return ProofsConfig(
-                    true,
-                    SupportedJwtProof(supportedAlgorithms, true),
-                    SupportedAttestationProof(supportedAlgorithms),
+                    isNoProofSupported = true,
+                    jwtProofWithKeyAttestation = SupportedJwtProof(supportedAlgorithms),
+                    attestationProof = SupportedAttestationProof(supportedAlgorithms),
+                    jwtProofsWithoutKeyAttestation = null,
                 )
             }
 
@@ -550,8 +549,9 @@ data class ProofsConfig(
             val supportedAlgorithms = setOf(first, *remaining)
             return ProofsConfig(
                 isNoProofSupported = false,
-                jwtProof = SupportedJwtProof(supportedAlgorithms, true),
+                jwtProofWithKeyAttestation = SupportedJwtProof(supportedAlgorithms),
                 attestationProof = SupportedAttestationProof(supportedAlgorithms),
+                jwtProofsWithoutKeyAttestation = null,
             )
         }
     }

@@ -1096,7 +1096,7 @@ class IssuanceSingleRequestTest {
         }
 
     @Test
-    fun `when wallet does not support atestations that require not proofs, issuance fails`() = runTest {
+    fun `when wallet does not support attestations that require not proofs, issuance fails`() = runTest {
         val mockedHttpClient = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(),
@@ -1104,7 +1104,7 @@ class IssuanceSingleRequestTest {
             tokenPostMocker(),
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            config = OpenId4VCIConfiguration.copy(proofs = ProofsConfig(false, null, null)),
+            config = OpenId4VCIConfiguration.copy(proofs = ProofsConfig(false, null, null, null)),
             credentialOfferStr = CredentialOfferWithMDLMdoc_NO_GRANTS,
             httpClient = mockedHttpClient,
         )
@@ -1128,7 +1128,7 @@ class IssuanceSingleRequestTest {
             tokenPostMocker(),
         )
         val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
-            config = OpenId4VCIConfiguration.copy(proofs = ProofsConfig(false, null, null)),
+            config = OpenId4VCIConfiguration.copy(proofs = ProofsConfig(false, null, null, null)),
             credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
             httpClient = mockedHttpClient,
         )
@@ -1156,8 +1156,9 @@ class IssuanceSingleRequestTest {
                 config = OpenId4VCIConfiguration.copy(
                     proofs = ProofsConfig(
                         isNoProofSupported = false,
-                        jwtProof = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES512), true),
+                        jwtProofWithKeyAttestation = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES512)),
                         attestationProof = null,
+                        jwtProofsWithoutKeyAttestation = null,
                     ),
                 ),
                 credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
