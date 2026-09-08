@@ -28,6 +28,7 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.Issuer
 import com.nimbusds.oauth2.sdk.util.X509CertificateUtils
 import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
+import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKeys
 import java.net.URI
 import java.security.KeyFactory
 import java.security.cert.CertificateFactory
@@ -61,12 +62,12 @@ object CryptoGenerator {
         )
     }
 
-    fun jwtProofSpec(
+    fun jwtProofWithKeyAttestationSpec(
         curve: Curve = Curve.P_256,
         attestedKeysCount: Int = 3,
         keyAttestationJwt: suspend (List<JWK>, Nonce?, PositiveDuration?) -> KeyAttestationJWT = CryptoGenerator::keyAttestationJwt,
         assertions: (Nonce?, PositiveDuration?) -> Unit = { _, _ -> },
-    ): ProofSpecification {
+    ): ProofSpecification.JwtProofWithKeyAttestation {
         val ecKeys = List(attestedKeysCount) { randomECSigningKey(curve) }
         val signerProvider: suspend (Nonce?, PositiveDuration?) -> Signer<KeyAttestationJWT> = { cNonce, preferredKeyStorageStatusPeriod ->
             assertions(cNonce, preferredKeyStorageStatusPeriod)
@@ -82,7 +83,20 @@ object CryptoGenerator {
                 provider = null,
             )
         }
-        return ProofSpecification.JwtProof.WithKeyAttestation(signerProvider)
+        return ProofSpecification.JwtProofWithKeyAttestation(signerProvider)
+    }
+
+    fun jwtProofsWithoutKeyAttestation(
+        curve: Curve = Curve.P_256,
+        keysNo: Int = 1,
+    ): ProofSpecification.JwtProofsWithoutKeyAttestation {
+        val ecKeys = List(keysNo) { randomECSigningKey(curve) }
+        val batchSigner = BatchSigner.fromNimbusEcKeys(
+            ecKeyPairs = ecKeys.associateWith { JwtBindingKey.Jwk(it.toPublicJWK()) },
+            secureRandom = null,
+            provider = null,
+        )
+        return ProofSpecification.JwtProofsWithoutKeyAttestation(batchSigner)
     }
 
     fun attestationProofSpec(
@@ -90,7 +104,7 @@ object CryptoGenerator {
         keysNo: Int = 3,
         keyAttestationJwt: suspend (List<JWK>, Nonce?, PositiveDuration?) -> KeyAttestationJWT = CryptoGenerator::keyAttestationJwt,
         assertions: (Nonce?, PositiveDuration?) -> Unit = { _, _ -> },
-    ) =
+    ): ProofSpecification.AttestationProof =
         ProofSpecification.AttestationProof { nonce, preferredKeyStorageStatusPeriod ->
             assertions(nonce, preferredKeyStorageStatusPeriod)
             keyAttestationJwt(

@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofSpec
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofWithKeyAttestationSpec
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialResponseSuccessTO
 import kotlinx.coroutines.test.runTest
@@ -82,7 +82,7 @@ class IssuanceBatchRequestTest {
             CredentialConfigurationIdentifier(PID_MsoMdoc),
         )
         val (_, outcome) = with(issuer) {
-            authorizedRequest.request(request, jwtProofSpec(attestedKeysCount = 3)).getOrThrow()
+            authorizedRequest.request(request, jwtProofWithKeyAttestationSpec(attestedKeysCount = 3)).getOrThrow()
         }
         when (outcome) {
             is SubmissionOutcome.Failed -> {

@@ -114,7 +114,7 @@ internal class RequestIssuanceImpl(
         return when (proofSpecification) {
             is ProofSpecification.NoProof -> emptyList<Proof>() to null
 
-            is ProofSpecification.JwtProof.WithKeyAttestation -> {
+            is ProofSpecification.JwtProofWithKeyAttestation -> {
                 val cNonceAndDPoPNonce = cNonce()
                 val proof = jwtProofWithKeyAttestation(
                     proofRequirement as ProofTypeMeta.Jwt,
@@ -126,7 +126,7 @@ internal class RequestIssuanceImpl(
                 listOf(proof) to cNonceAndDPoPNonce?.dpopNonce
             }
 
-            is ProofSpecification.JwtProof.WithoutKeyAttestation -> {
+            is ProofSpecification.JwtProofsWithoutKeyAttestation -> {
                 val cNonceAndDPoPNonce = cNonce()
                 val proofs = jwtProofsWithoutKeyAttestation(
                     proofRequirement as ProofTypeMeta.Jwt,
@@ -164,23 +164,26 @@ internal class RequestIssuanceImpl(
                 null
             }
 
-            is ProofSpecification.JwtProof -> {
+            is ProofSpecification.JwtProofWithKeyAttestation -> {
                 val proofRequirement = proofTypesSupported[ProofType.JWT]
                 requireNotNull(proofRequirement) {
                     "Credential configuration doesn't support JWT proofs."
                 }
                 check(proofRequirement is ProofTypeMeta.Jwt)
-                when (this) {
-                    is ProofSpecification.JwtProof.WithKeyAttestation -> {
-                        requireNotNull(proofRequirement.keyAttestationRequirement) {
-                            "Credential configuration does not support key attestation."
-                        }
-                    }
-                    is ProofSpecification.JwtProof.WithoutKeyAttestation -> {
-                        require(null == proofRequirement.keyAttestationRequirement) {
-                            "Credential configuration requires key attestation."
-                        }
-                    }
+                requireNotNull(proofRequirement.keyAttestationRequirement) {
+                    "Credential configuration does not support key attestation."
+                }
+                proofRequirement
+            }
+
+            is ProofSpecification.JwtProofsWithoutKeyAttestation -> {
+                val proofRequirement = proofTypesSupported[ProofType.JWT]
+                requireNotNull(proofRequirement) {
+                    "Credential configuration doesn't support JWT proofs."
+                }
+                check(proofRequirement is ProofTypeMeta.Jwt)
+                require(null == proofRequirement.keyAttestationRequirement) {
+                    "Credential configuration requires key attestation."
                 }
                 proofRequirement
             }
@@ -247,7 +250,7 @@ internal class RequestIssuanceImpl(
 
     private suspend fun jwtProofWithKeyAttestation(
         proofRequirement: ProofTypeMeta.Jwt,
-        proofSpecification: ProofSpecification.JwtProof.WithKeyAttestation,
+        proofSpecification: ProofSpecification.JwtProofWithKeyAttestation,
         selectedReusePolicy: EudiReusePolicy?,
         grant: Grant,
         cNonce: Nonce?,
@@ -275,7 +278,7 @@ internal class RequestIssuanceImpl(
 
     private suspend fun jwtProofsWithoutKeyAttestation(
         proofRequirement: ProofTypeMeta.Jwt,
-        proofSpecification: ProofSpecification.JwtProof.WithoutKeyAttestation,
+        proofSpecification: ProofSpecification.JwtProofsWithoutKeyAttestation,
         selectedReusePolicy: EudiReusePolicy?,
         grant: Grant,
         cNonce: Nonce?,
@@ -287,7 +290,7 @@ internal class RequestIssuanceImpl(
             javaSigningAlgorithm.toSupportedJoseAlgorithm(proofRequirement)
         }
         return proofSpecification.proofSigner.use { operation ->
-            operation.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
+            operation.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy) // TODO: Is this applicable here?
             val proofsSigner = NoKeyAttestationJwtProofsSigner(joseAlg, operation)
             val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
             proofsSigner.sign(claims).map {

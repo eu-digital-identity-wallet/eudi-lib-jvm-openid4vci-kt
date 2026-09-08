@@ -22,7 +22,7 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseUnparsable
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.attestationProofSpec
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofSpec
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofWithKeyAttestationSpec
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
 import eu.europa.ec.eudi.openid4vci.examples.selfSignedClient
 import eu.europa.ec.eudi.openid4vci.examples.verifySelfSignedClientAttestation
@@ -99,7 +99,7 @@ class IssuanceSingleRequestTest {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val (_, outcome) = assertDoesNotThrow {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256, 3)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256, 3)).getOrThrow()
             }
             assertIs<SubmissionOutcome.Failed>(outcome)
             assertIs<CredentialIssuanceError.InvalidProof>(outcome.error)
@@ -148,7 +148,7 @@ class IssuanceSingleRequestTest {
             assertFailsWith<CredentialIssuanceError.IssuerBatchSizeLimitExceeded> {
                 with(issuer) {
                     val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                    authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256, 4)).getOrThrow()
+                    authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256, 4)).getOrThrow()
                 }
             }
         }
@@ -243,7 +243,7 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+            authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
         }
     }
 
@@ -300,7 +300,7 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
         val (_, outcome) = with(issuer) {
-            authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+            authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
         }
         val success = assertIs<SubmissionOutcome.Success>(outcome)
         assertNull(success.selectedCredentialReusePolicy)
@@ -340,7 +340,7 @@ class IssuanceSingleRequestTest {
             )
         } ?: error("No credential identifier")
         with(issuer) {
-            authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256, 1)).getOrThrow()
+            authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256, 1)).getOrThrow()
         }
     }
 
@@ -377,7 +377,7 @@ class IssuanceSingleRequestTest {
         )
         assertThrows<IllegalArgumentException> {
             with(issuer) {
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256, 1)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256, 1)).getOrThrow()
             }
         }
     }
@@ -414,7 +414,7 @@ class IssuanceSingleRequestTest {
         )
         assertThrows<IllegalArgumentException> {
             with(issuer) {
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
             }
         }
     }
@@ -493,7 +493,7 @@ class IssuanceSingleRequestTest {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val (_, outcome) = assertDoesNotThrow {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
             }
             assertIs<SubmissionOutcome.Success>(outcome)
             assertTrue { outcome.credentials.size == 1 }
@@ -544,7 +544,7 @@ class IssuanceSingleRequestTest {
             val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
             val ex = assertFailsWith<JsonConvertException> {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
             }
             assertIs<ResponseUnparsable>(ex.cause)
         }
@@ -586,7 +586,7 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+            authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
         }
     }
 
@@ -641,7 +641,7 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+            authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
         }
     }
 
@@ -687,7 +687,7 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+            authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
         }
     }
 
@@ -726,7 +726,7 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+            authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
         }
     }
 
@@ -749,7 +749,7 @@ class IssuanceSingleRequestTest {
         assertFailsWith<CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported> {
             with(issuer) {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_384)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_384)).getOrThrow()
             }
         }
     }
@@ -1137,7 +1137,7 @@ class IssuanceSingleRequestTest {
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
             val exception = assertFailsWith<IllegalArgumentException> {
-                authorizedRequest.request(requestPayload, jwtProofSpec()).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec()).getOrThrow()
             }
             assertEquals("Wallet doesn't support any of the advertised Proofs", exception.message)
         }
@@ -1168,7 +1168,7 @@ class IssuanceSingleRequestTest {
             with(issuer) {
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
                 val exception = assertFailsWith<IllegalArgumentException> {
-                    authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_521)).getOrThrow()
+                    authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_521)).getOrThrow()
                 }
                 assertEquals("Wallet doesn't support any of the advertised Proofs", exception.message)
             }
@@ -1218,7 +1218,7 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            val proofSpec = jwtProofSpec(Curve.P_521)
+            val proofSpec = jwtProofWithKeyAttestationSpec(Curve.P_521)
             assertFailsWith<CredentialIssuanceError.ProofGenerationError.ProofTypeSigningAlgorithmNotSupported> {
                 authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
             }
@@ -1269,7 +1269,7 @@ class IssuanceSingleRequestTest {
         val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
         val exception = with(issuer) {
             val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-            val proofSpec = jwtProofSpec()
+            val proofSpec = jwtProofWithKeyAttestationSpec()
             assertFailsWith<IllegalArgumentException> {
                 authorizedRequest.request(requestPayload, proofSpec).getOrThrow()
             }
