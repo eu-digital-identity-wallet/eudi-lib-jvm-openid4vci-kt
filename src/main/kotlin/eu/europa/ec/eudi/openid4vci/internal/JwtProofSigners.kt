@@ -52,13 +52,13 @@ private fun JsonObjectBuilder.keyAttestationHeader(keyAttestation: KeyAttestatio
     put(OpenId4VCISpec.JOSE_HEADER_KEY_ATTESTATION, keyAttestation.jwt)
 }
 
-internal class NoKeyAttestationJwtProofSigner(
+internal class NoKeyAttestationJwtProofsSigner(
     private val algorithm: JWSAlgorithm,
-    private val signOperation: SignOperation<JwtBindingKey>,
+    private val batchSignOperation: BatchSignOperation<JwtBindingKey>,
 ) {
-    suspend fun sign(claims: JwtProofClaims): String =
-        JwtSigner<JwtProofClaims, JwtBindingKey>(
-            signOperation = signOperation,
+    suspend fun sign(claims: JwtProofClaims): List<Pair<JwtBindingKey, String>> =
+        BatchJwtSigner<JwtProofClaims, JwtBindingKey>(
+            batchSignOperation = batchSignOperation,
             algorithm = algorithm,
             customizeHeader = { pubKey -> jwtProofHeader(pubKey) },
         ).sign(claims)

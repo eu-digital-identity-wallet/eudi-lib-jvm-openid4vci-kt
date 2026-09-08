@@ -140,7 +140,7 @@ sealed interface ProofSpecification {
 
     sealed interface JwtProof : ProofSpecification {
         data class WithoutKeyAttestation(
-            val proofSigner: Signer<JwtBindingKey>,
+            val proofSigner: BatchSigner<JwtBindingKey>,
         ) : JwtProof
 
         data class WithKeyAttestation(

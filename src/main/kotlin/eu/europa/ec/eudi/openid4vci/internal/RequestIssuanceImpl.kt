@@ -56,13 +56,13 @@ internal class RequestIssuanceImpl(
         val credentialConfiguration = credentialSupportedById(requestPayload.credentialConfigurationIdentifier)
         val selectedCredentialReusePolicy = selectCredentialReusePolicy(credentialConfiguration)
 
-        val (proof, proofsDpopNonce) = buildProof(
+        val (proofs, proofsDpopNonce) = buildProofs(
             proofSpecification,
             selectedCredentialReusePolicy,
             requestPayload.credentialConfigurationIdentifier,
             grant,
         )
-        val credentialRequest = buildRequest(requestPayload, proof, credentialIdentifiers.orEmpty())
+        val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
 
         // Place the request
         val proofsOrAuthRequestDpopNonce = proofsDpopNonce ?: resourceServerDpopNonce
@@ -101,18 +101,18 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private suspend fun buildProof(
+    private suspend fun buildProofs(
         proofSpecification: ProofSpecification,
         selectedReusePolicy: EudiReusePolicy?,
         credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
-    ): Pair<Proof?, Nonce?> {
+    ): Pair<List<Proof>, Nonce?> {
         val credentialConfiguration = credentialSupportedById(credentialConfigId)
         config.proofs.ensureCompatibleWith(credentialConfiguration.proofTypesSupported)
         val proofRequirement = proofSpecification.ensureCompatibleWith(credentialConfiguration)
 
         return when (proofSpecification) {
-            is ProofSpecification.NoProof -> null to null
+            is ProofSpecification.NoProof -> emptyList<Proof>() to null
 
             is ProofSpecification.JwtProof.WithKeyAttestation -> {
                 val cNonceAndDPoPNonce = cNonce()
@@ -123,18 +123,19 @@ internal class RequestIssuanceImpl(
                     grant,
                     cNonceAndDPoPNonce?.cnonce,
                 )
-                proof to cNonceAndDPoPNonce?.dpopNonce
+                listOf(proof) to cNonceAndDPoPNonce?.dpopNonce
             }
 
             is ProofSpecification.JwtProof.WithoutKeyAttestation -> {
                 val cNonceAndDPoPNonce = cNonce()
-                val proof = jwtProofWithoutKeyAttestation(
+                val proofs = jwtProofsWithoutKeyAttestation(
                     proofRequirement as ProofTypeMeta.Jwt,
                     proofSpecification,
+                    selectedReusePolicy,
                     grant,
                     cNonceAndDPoPNonce?.cnonce,
                 )
-                proof to cNonceAndDPoPNonce?.dpopNonce
+                proofs to cNonceAndDPoPNonce?.dpopNonce
             }
 
             is ProofSpecification.AttestationProof -> {
@@ -145,7 +146,7 @@ internal class RequestIssuanceImpl(
                     selectedReusePolicy,
                     cNonceAndDPoPNonce?.cnonce,
                 )
-                proof to cNonceAndDPoPNonce?.dpopNonce
+                listOf(proof) to cNonceAndDPoPNonce?.dpopNonce
             }
         }
     }
@@ -272,12 +273,13 @@ internal class RequestIssuanceImpl(
         return Proof.Jwt(jwtProof)
     }
 
-    private suspend fun jwtProofWithoutKeyAttestation(
+    private suspend fun jwtProofsWithoutKeyAttestation(
         proofRequirement: ProofTypeMeta.Jwt,
         proofSpecification: ProofSpecification.JwtProof.WithoutKeyAttestation,
+        selectedReusePolicy: EudiReusePolicy?,
         grant: Grant,
         cNonce: Nonce?,
-    ): Proof.Jwt {
+    ): List<Proof.Jwt> {
         check(null == proofRequirement.keyAttestationRequirement)
 
         val joseAlg = run {
@@ -285,9 +287,12 @@ internal class RequestIssuanceImpl(
             javaSigningAlgorithm.toSupportedJoseAlgorithm(proofRequirement)
         }
         return proofSpecification.proofSigner.use { operation ->
-            val proofSigner = NoKeyAttestationJwtProofSigner(joseAlg, operation)
+            operation.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
+            val proofsSigner = NoKeyAttestationJwtProofsSigner(joseAlg, operation)
             val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
-            Proof.Jwt(SignedJWT.parse(proofSigner.sign(claims)))
+            proofsSigner.sign(claims).map {
+                Proof.Jwt(SignedJWT.parse(it.second))
+            }
         }
     }
 
@@ -315,9 +320,17 @@ internal class RequestIssuanceImpl(
         return Proof.Attestation(keyAttestationJwt)
     }
 
+    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize(
+        selectedReusePolicy: EudiReusePolicy?,
+    ) {
+        operations.size.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
+    }
+
     private fun AttestedKeys.assertMatchesBatchIssuanceBatchSize(
         selectedReusePolicy: EudiReusePolicy?,
-    ) = size.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
+    ) {
+        size.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
+    }
 
     private fun Int.assertMatchesBatchIssuanceBatchSize(
         selectedReusePolicy: EudiReusePolicy?,
@@ -409,13 +422,13 @@ internal class RequestIssuanceImpl(
 
     private fun buildRequest(
         requestPayload: IssuanceRequestPayload,
-        proof: Proof?,
+        proofs: List<Proof>,
         authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
     ): CredentialIssuanceRequest = when (requestPayload) {
         is IssuanceRequestPayload.ConfigurationBased -> {
             CredentialIssuanceRequest.byCredentialConfigurationId(
                 requestPayload.credentialConfigurationIdentifier,
-                proof,
+                proofs,
                 exchangeEncryptionSpecification,
             )
         }
@@ -424,7 +437,7 @@ internal class RequestIssuanceImpl(
             requestPayload.ensureAuthorized(authorizationDetails)
             CredentialIssuanceRequest.byCredentialId(
                 requestPayload.credentialIdentifier,
-                proof,
+                proofs,
                 exchangeEncryptionSpecification,
             )
         }

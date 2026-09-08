@@ -38,23 +38,23 @@ internal data class CredentialIssuanceRequest(
     companion object {
         internal fun byCredentialId(
             credentialIdentifier: CredentialIdentifier,
-            proof: Proof?,
+            proofs: List<Proof>,
             encryptionSpecs: ExchangeEncryptionSpecification,
         ): CredentialIssuanceRequest =
             CredentialIssuanceRequest(
                 CredentialConfigurationReference.ByCredentialId(credentialIdentifier),
-                listOfNotNull(proof),
+                proofs,
                 encryptionSpecs,
             )
 
         internal fun byCredentialConfigurationId(
             credentialConfigurationId: CredentialConfigurationIdentifier,
-            proof: Proof?,
+            proofs: List<Proof>,
             encryptionSpecs: ExchangeEncryptionSpecification,
         ): CredentialIssuanceRequest =
             CredentialIssuanceRequest(
                 CredentialConfigurationReference.ByCredentialConfigurationId(credentialConfigurationId),
-                listOfNotNull(proof),
+                proofs,
                 encryptionSpecs,
             )
     }
