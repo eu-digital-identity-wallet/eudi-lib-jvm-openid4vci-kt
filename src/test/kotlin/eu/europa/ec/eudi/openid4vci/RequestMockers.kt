@@ -20,6 +20,7 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWEHeader
 import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.RSAEncrypter
+import com.nimbusds.jose.crypto.factories.DefaultJWSVerifierFactory
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
@@ -30,8 +31,10 @@ import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.*
+import eu.europa.ec.eudi.openid4vci.examples.publicKey
 import eu.europa.ec.eudi.openid4vci.internal.JsonSupport
 import eu.europa.ec.eudi.openid4vci.internal.http.*
 import eu.europa.ec.eudi.openid4vci.internal.issuanceEncryptionSpecs
@@ -41,8 +44,12 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import java.util.*
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -104,8 +111,10 @@ enum class IssuerMetadataVersion {
     ATTESTATION_PROOF_SUPPORTED,
     WITH_PREFERRED_CLIENT_STATUS_PERIOD,
     ONLY_JWT_PROOFS_SUPPORTED,
+    ONLY_JWT_PROOFS_WITHOUT_KEY_ATTESTATION_SUPPORTED,
     ONLY_ATTESTATION_PROOFS_SUPPORTED,
     SIGNED_FULL,
+    NO_BATCH,
 }
 
 internal fun issuerMetadataJsonContent(issuerMetadataVersion: IssuerMetadataVersion): String = when (issuerMetadataVersion) {
@@ -119,8 +128,12 @@ internal fun issuerMetadataJsonContent(issuerMetadataVersion: IssuerMetadataVers
     ATTESTATION_PROOF_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_attestation_proof_supported.json")
     WITH_PREFERRED_CLIENT_STATUS_PERIOD -> getResourceAsText("well-known/openid-credential-issuer_with_preferred_client_status_period.json")
     ONLY_JWT_PROOFS_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_only_jwt_proof.json")
+    ONLY_JWT_PROOFS_WITHOUT_KEY_ATTESTATION_SUPPORTED -> getResourceAsText(
+        "well-known/openid-credential-issuer_only_jwt_proofs_without_key_attestation.json",
+    )
     ONLY_ATTESTATION_PROOFS_SUPPORTED -> getResourceAsText("well-known/openid-credential-issuer_only_attestation_proof.json")
     SIGNED_FULL -> getResourceAsText("well-known/openid-credential-issuer_full_signed.txt")
+    NO_BATCH -> getResourceAsText("well-known/openid-credential-issuer_no_batch.json")
 }
 
 enum class AuthServerMetadataVersion {
@@ -463,6 +476,26 @@ fun MockRequestHandleScope.encryptionAwareResponseDataBuilder(
     }
 }
 
+internal fun encryptionAwareSuccessCredentialResponseResponseDataBuilder(
+    issuerMetadataVersion: IssuerMetadataVersion,
+    credentialsNo: Int,
+): HttpResponseDataBuilder {
+    require(credentialsNo > 0)
+    return { request ->
+        encryptionAwareResponseDataBuilder(request, issuerMetadataVersion) {
+            Json.encodeToString(
+                CredentialResponseSuccessTO(
+                    credentials = List(credentialsNo) { index ->
+                        buildJsonObject {
+                            put("credential", JsonPrimitive("issued_credential_content_mso_mdoc$index"))
+                        }
+                    },
+                ),
+            )
+        }
+    }
+}
+
 private fun extractResponseEncryptionSpec(
     request: HttpRequestData?,
     issuerMetadataVersion: IssuerMetadataVersion,
@@ -527,6 +560,50 @@ internal inline fun <reified RequestTO> encryptionAwareRequestValidator(
     val requestDecrypter = RequestDecrypter(issuerMetadataVersion, walletConfig)
     val decrypted = requestDecrypter.decrypt<RequestTO>(request)
     validateRequest(decrypted)
+}
+
+internal fun encryptionAwareJwtProofWithKeyAttestationRequestValidator(
+    issuerMetadataVersion: IssuerMetadataVersion,
+    attestedKeys: Int,
+): (request: HttpRequestData) -> Unit {
+    require(attestedKeys > 0)
+    return { request ->
+        encryptionAwareRequestValidator<CredentialRequestTO>(request, issuerMetadataVersion) {
+            assertNotNull(
+                it.proofs,
+                "Proofs expected but received none",
+            )
+            val jwtProofs = it.proofs.jwtProofs
+            assertNotNull(jwtProofs, "Jwt Proofs expected")
+            assertEquals(1, jwtProofs.size, "Exactly one Jwt Proof expected")
+            val keyAttestation =
+                KeyAttestationJWT(SignedJWT.parse(jwtProofs.first()).header.getCustomParam("key_attestation") as String)
+            assertEquals(attestedKeys, keyAttestation.attestedKeys.size, "Exactly $attestedKeys attested keys expected")
+        }
+    }
+}
+
+internal fun encryptionAwareJwtProofsWithoutKeyAttestationRequestValidator(
+    issuerMetadataVersion: IssuerMetadataVersion,
+    proofsNo: Int,
+): (request: HttpRequestData) -> Unit {
+    require(proofsNo >= 0)
+    return { request ->
+        encryptionAwareRequestValidator<CredentialRequestTO>(request, issuerMetadataVersion) {
+            val jwtProofs = assertNotNull(it.proofs?.jwtProofs, "JWT Proofs expected but received none")
+            assertEquals(proofsNo, jwtProofs.size, "Expected $proofsNo JWT Proofs to be sent")
+            jwtProofs.forEach { serialized ->
+                val deserialized = SignedJWT.parse(serialized)
+                val jwk = assertNotNull(deserialized.header.jwk)
+                assertTrue("JWT Proof signature cannot be verified") {
+                    deserialized.verify(
+                        DefaultJWSVerifierFactory().createJWSVerifier(deserialized.header, jwk.publicKey),
+                    )
+                }
+                assertNull(deserialized.header.getCustomParam("key_attestation"), "JWT Proof must not contain Key Attestation")
+            }
+        }
+    }
 }
 
 internal fun decrypt(encrypted: String, alg: JWEAlgorithm, enc: EncryptionMethod, jwkSet: JWKSet): Result<JWTClaimsSet> =
