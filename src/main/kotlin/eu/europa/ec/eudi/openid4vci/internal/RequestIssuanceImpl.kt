@@ -103,7 +103,7 @@ internal class RequestIssuanceImpl(
         val cNonceAndDPoPNonce = cNonce()
         val proofs = jwtProofsWithoutKeyAttestation(
             proofRequirement,
-            ProofSpecification.JwtProofsWithoutKeyAttestation(proofSigner),
+            proofSpecification,
             grant,
             cNonceAndDPoPNonce?.cnonce,
         )

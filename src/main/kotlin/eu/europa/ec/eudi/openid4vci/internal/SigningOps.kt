@@ -167,11 +167,13 @@ internal fun <PUB> BatchSigner.Companion.fromNimbusEcKeys(
         require(key.curve == firstCurve) { "All EC keys must use the same curve, but found ${key.curve}" }
     }
     val signatureAlgorithm = firstCurve.toJavaSigningAlg()
+    val javaKeys = ecKeyPairs.map { it.key.toECPrivateKey() to it.value }
+    require(javaKeys.distinctBy { it.first }.size == javaKeys.size) {
+        "Multiple EC keys resolve to the same Java private key (duplicate D value)."
+    }
     return fromECPrivateKeys(
         signatureAlgorithm,
-        ecKeyPairs.map {
-            it.key.toECPrivateKey() to it.value
-        }.toMap(),
+        javaKeys.toMap(),
         secureRandom,
         provider,
     )

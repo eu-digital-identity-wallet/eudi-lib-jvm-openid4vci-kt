@@ -64,7 +64,7 @@ class CredentialIssuerMetadataJsonParserTest {
     }
 
     @Test
-    fun `does fails when jwt proof does not require key attestation`() {
+    fun `fails when jwt proof does not require key attestation`() {
         val json = getResourceAsText("well-known/openid-credential-issuer_jwt_proof_no_keyattestation.json")
         val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
         val credentialConfiguration = assertNotNull(
