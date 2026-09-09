@@ -54,7 +54,19 @@ internal class RequestIssuanceImpl(
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatchingCancellable {
         validateRequestPayload(requestPayload, credentialIdentifiers.orEmpty())
         val credentialConfiguration = credentialSupportedById(requestPayload.credentialConfigurationIdentifier)
-        val selectedCredentialReusePolicy = selectCredentialReusePolicy(credentialConfiguration)
+
+        // Credential Reuse Policies are applicable only when using:
+        // JWT Proof with Key Attestation,
+        // or Attestation Proof
+        val selectedCredentialReusePolicy = when (proofSpecification) {
+            is ProofSpecification.JwtProofWithKeyAttestation,
+            is ProofSpecification.AttestationProof,
+            -> selectCredentialReusePolicy(credentialConfiguration)
+
+            ProofSpecification.NoProof,
+            is ProofSpecification.JwtProofsWithoutKeyAttestation,
+            -> null
+        }
 
         val (proofs, proofsDpopNonce) = buildProofs(
             proofSpecification,
@@ -76,13 +88,7 @@ internal class RequestIssuanceImpl(
         // Update state (maybe) with new Dpop Nonce from resource server
         val updatedAuthorizedRequest = withResourceServerDpopNonce(newResourceServerDpopNonce ?: proofsOrAuthRequestDpopNonce)
 
-        // When JWT Proofs without Key Attestation are used, Credential Reuse Policy is not applicable
-        val updatedOutcome =
-            if (proofSpecification is ProofSpecification.JwtProofsWithoutKeyAttestation) {
-                outcome
-            } else {
-                outcome.withSelectedCredentialReusePolicy(selectedCredentialReusePolicy)
-            }
+        val updatedOutcome = outcome.withSelectedCredentialReusePolicy(selectedCredentialReusePolicy)
         updatedAuthorizedRequest to updatedOutcome.toPub()
     }
 
