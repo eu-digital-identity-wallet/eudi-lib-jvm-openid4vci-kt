@@ -86,43 +86,6 @@ internal class RequestIssuanceImpl(
         updatedAuthorizedRequest to updatedOutcome.toPub()
     }
 
-    override suspend fun AuthorizedRequest.request(
-        requestPayload: IssuanceRequestPayload,
-        proofSigner: BatchSigner<JwtBindingKey>,
-    ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatchingCancellable {
-        validateRequestPayload(requestPayload, credentialIdentifiers.orEmpty())
-
-        val credentialConfiguration = credentialSupportedById(requestPayload.credentialConfigurationIdentifier)
-        config.proofs.ensureCompatibleWith(credentialConfiguration.proofTypesSupported)
-
-        val proofSpecification = ProofSpecification.JwtProofsWithoutKeyAttestation(proofSigner)
-        val proofRequirement = proofSpecification.ensureCompatibleWith(credentialConfiguration)
-        check(proofRequirement is ProofTypeMeta.Jwt)
-        check(null == proofRequirement.keyAttestationRequirement)
-
-        val cNonceAndDPoPNonce = cNonce()
-        val proofs = jwtProofsWithoutKeyAttestation(
-            proofRequirement,
-            proofSpecification,
-            grant,
-            cNonceAndDPoPNonce?.cnonce,
-        )
-
-        // Place the request
-        val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
-        val proofsOrAuthRequestDpopNonce = cNonceAndDPoPNonce?.dpopNonce ?: resourceServerDpopNonce
-        val (outcome, newResourceServerDpopNonce) =
-            credentialEndpointClient.placeIssuanceRequest(
-                accessToken,
-                proofsOrAuthRequestDpopNonce,
-                credentialRequest,
-            ).getOrThrow()
-
-        // Update state (maybe) with new Dpop Nonce from resource server
-        val updatedAuthorizedRequest = withResourceServerDpopNonce(newResourceServerDpopNonce ?: proofsOrAuthRequestDpopNonce)
-        updatedAuthorizedRequest to outcome.toPub()
-    }
-
     private fun validateRequestPayload(
         requestPayload: IssuanceRequestPayload,
         authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
