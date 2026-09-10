@@ -54,15 +54,27 @@ internal class RequestIssuanceImpl(
     ): Result<AuthorizedRequestAnd<SubmissionOutcome>> = runCatchingCancellable {
         validateRequestPayload(requestPayload, credentialIdentifiers.orEmpty())
         val credentialConfiguration = credentialSupportedById(requestPayload.credentialConfigurationIdentifier)
-        val selectedCredentialReusePolicy = selectCredentialReusePolicy(credentialConfiguration)
 
-        val (proof, proofsDpopNonce) = buildProof(
+        // Credential Reuse Policies are applicable only when using:
+        // JWT Proof with Key Attestation,
+        // or Attestation Proof
+        val selectedCredentialReusePolicy = when (proofSpecification) {
+            is ProofSpecification.JwtProofWithKeyAttestation,
+            is ProofSpecification.AttestationProof,
+            -> selectCredentialReusePolicy(credentialConfiguration)
+
+            ProofSpecification.NoProof,
+            is ProofSpecification.JwtProofsWithoutKeyAttestation,
+            -> null
+        }
+
+        val (proofs, proofsDpopNonce) = buildProofs(
             proofSpecification,
             selectedCredentialReusePolicy,
             requestPayload.credentialConfigurationIdentifier,
             grant,
         )
-        val credentialRequest = buildRequest(requestPayload, proof, credentialIdentifiers.orEmpty())
+        val credentialRequest = buildRequest(requestPayload, proofs, credentialIdentifiers.orEmpty())
 
         // Place the request
         val proofsOrAuthRequestDpopNonce = proofsDpopNonce ?: resourceServerDpopNonce
@@ -74,9 +86,10 @@ internal class RequestIssuanceImpl(
             ).getOrThrow()
 
         // Update state (maybe) with new Dpop Nonce from resource server
-        val updatedAuthorizedRequest =
-            this.withResourceServerDpopNonce(newResourceServerDpopNonce ?: proofsOrAuthRequestDpopNonce)
-        updatedAuthorizedRequest to outcome.withSelectedCredentialReusePolicy(selectedCredentialReusePolicy).toPub()
+        val updatedAuthorizedRequest = withResourceServerDpopNonce(newResourceServerDpopNonce ?: proofsOrAuthRequestDpopNonce)
+
+        val updatedOutcome = outcome.withSelectedCredentialReusePolicy(selectedCredentialReusePolicy)
+        updatedAuthorizedRequest to updatedOutcome.toPub()
     }
 
     private fun validateRequestPayload(
@@ -101,29 +114,40 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private suspend fun buildProof(
+    private suspend fun buildProofs(
         proofSpecification: ProofSpecification,
         selectedReusePolicy: EudiReusePolicy?,
         credentialConfigId: CredentialConfigurationIdentifier,
         grant: Grant,
-    ): Pair<Proof?, Nonce?> {
+    ): Pair<List<Proof>, Nonce?> {
         val credentialConfiguration = credentialSupportedById(credentialConfigId)
         config.proofs.ensureCompatibleWith(credentialConfiguration.proofTypesSupported)
         val proofRequirement = proofSpecification.ensureCompatibleWith(credentialConfiguration)
 
         return when (proofSpecification) {
-            is ProofSpecification.NoProof -> null to null
+            is ProofSpecification.NoProof -> emptyList<Proof>() to null
 
-            is ProofSpecification.JwtProof -> {
+            is ProofSpecification.JwtProofWithKeyAttestation -> {
                 val cNonceAndDPoPNonce = cNonce()
-                val proof = jwtProof(
+                val proof = jwtProofWithKeyAttestation(
                     proofRequirement as ProofTypeMeta.Jwt,
                     proofSpecification,
                     selectedReusePolicy,
                     grant,
                     cNonceAndDPoPNonce?.cnonce,
                 )
-                proof to cNonceAndDPoPNonce?.dpopNonce
+                listOf(proof) to cNonceAndDPoPNonce?.dpopNonce
+            }
+
+            is ProofSpecification.JwtProofsWithoutKeyAttestation -> {
+                val cNonceAndDPoPNonce = cNonce()
+                val proofs = jwtProofsWithoutKeyAttestation(
+                    proofRequirement as ProofTypeMeta.Jwt,
+                    proofSpecification,
+                    grant,
+                    cNonceAndDPoPNonce?.cnonce,
+                )
+                proofs to cNonceAndDPoPNonce?.dpopNonce
             }
 
             is ProofSpecification.AttestationProof -> {
@@ -134,7 +158,7 @@ internal class RequestIssuanceImpl(
                     selectedReusePolicy,
                     cNonceAndDPoPNonce?.cnonce,
                 )
-                proof to cNonceAndDPoPNonce?.dpopNonce
+                listOf(proof) to cNonceAndDPoPNonce?.dpopNonce
             }
         }
     }
@@ -152,12 +176,27 @@ internal class RequestIssuanceImpl(
                 null
             }
 
-            is ProofSpecification.JwtProof -> {
+            is ProofSpecification.JwtProofWithKeyAttestation -> {
                 val proofRequirement = proofTypesSupported[ProofType.JWT]
                 requireNotNull(proofRequirement) {
                     "Credential configuration doesn't support JWT proofs."
                 }
                 check(proofRequirement is ProofTypeMeta.Jwt)
+                requireNotNull(proofRequirement.keyAttestationRequirement) {
+                    "Credential configuration does not support key attestation."
+                }
+                proofRequirement
+            }
+
+            is ProofSpecification.JwtProofsWithoutKeyAttestation -> {
+                val proofRequirement = proofTypesSupported[ProofType.JWT]
+                requireNotNull(proofRequirement) {
+                    "Credential configuration doesn't support JWT proofs."
+                }
+                check(proofRequirement is ProofTypeMeta.Jwt)
+                require(null == proofRequirement.keyAttestationRequirement) {
+                    "Credential configuration requires key attestation."
+                }
                 proofRequirement
             }
 
@@ -221,13 +260,14 @@ internal class RequestIssuanceImpl(
         }
     }
 
-    private suspend fun jwtProof(
+    private suspend fun jwtProofWithKeyAttestation(
         proofRequirement: ProofTypeMeta.Jwt,
-        proofSpecification: ProofSpecification.JwtProof,
+        proofSpecification: ProofSpecification.JwtProofWithKeyAttestation,
         selectedReusePolicy: EudiReusePolicy?,
         grant: Grant,
         cNonce: Nonce?,
     ): Proof.Jwt {
+        checkNotNull(proofRequirement.keyAttestationRequirement)
         val proofSigner = proofSpecification.proofSignerProvider(
             cNonce,
             proofRequirement.keyAttestationRequirement.preferredKeyStorageStatusPeriod,
@@ -240,12 +280,34 @@ internal class RequestIssuanceImpl(
         val jwtProof = proofSigner.use { operation ->
             operation.publicMaterial.ensureKeyAttestationJwtAlgIsSupported(proofRequirement)
             operation.publicMaterial.attestedKeys.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
-            val signer = JwtProofSigner(joseAlg, operation, ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX)
+            val signer = KeyAttestationJwtProofSigner(joseAlg, operation, ETSI119472Part3.KEY_ATTESTATION_JWT_PROOF_SIGNING_KEY_INDEX)
             val signedJwt = signer.sign(claims)
             SignedJWT.parse(signedJwt)
         }
         verifyKeyAttestationJwtProofSignature(jwtProof)
         return Proof.Jwt(jwtProof)
+    }
+
+    private suspend fun jwtProofsWithoutKeyAttestation(
+        proofRequirement: ProofTypeMeta.Jwt,
+        proofSpecification: ProofSpecification.JwtProofsWithoutKeyAttestation,
+        grant: Grant,
+        cNonce: Nonce?,
+    ): List<Proof.Jwt> {
+        check(null == proofRequirement.keyAttestationRequirement)
+
+        val joseAlg = run {
+            val javaSigningAlgorithm = proofSpecification.proofSigner.javaAlgorithm
+            javaSigningAlgorithm.toSupportedJoseAlgorithm(proofRequirement)
+        }
+        return proofSpecification.proofSigner.use { operation ->
+            operation.assertMatchesBatchIssuanceBatchSize()
+            val proofsSigner = NoKeyAttestationJwtProofsSigner(joseAlg, operation)
+            val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
+            proofsSigner.sign(claims).map {
+                Proof.Jwt(SignedJWT.parse(it.second))
+            }
+        }
     }
 
     private fun KeyAttestationJWT.ensureKeyAttestationJwtAlgIsSupported(
@@ -272,9 +334,22 @@ internal class RequestIssuanceImpl(
         return Proof.Attestation(keyAttestationJwt)
     }
 
+    private fun BatchSignOperation<JwtBindingKey>.assertMatchesBatchIssuanceBatchSize() {
+        if (operations.size > 1) {
+            ensure(batchCredentialIssuance is BatchCredentialIssuance.Supported) {
+                CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance()
+            }
+            ensure(operations.size <= batchCredentialIssuance.batchSize) {
+                CredentialIssuanceError.IssuerBatchSizeLimitExceeded(batchCredentialIssuance.batchSize)
+            }
+        }
+    }
+
     private fun AttestedKeys.assertMatchesBatchIssuanceBatchSize(
         selectedReusePolicy: EudiReusePolicy?,
-    ) = size.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
+    ) {
+        size.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)
+    }
 
     private fun Int.assertMatchesBatchIssuanceBatchSize(
         selectedReusePolicy: EudiReusePolicy?,
@@ -366,13 +441,13 @@ internal class RequestIssuanceImpl(
 
     private fun buildRequest(
         requestPayload: IssuanceRequestPayload,
-        proof: Proof?,
+        proofs: List<Proof>,
         authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>,
     ): CredentialIssuanceRequest = when (requestPayload) {
         is IssuanceRequestPayload.ConfigurationBased -> {
             CredentialIssuanceRequest.byCredentialConfigurationId(
                 requestPayload.credentialConfigurationIdentifier,
-                proof,
+                proofs,
                 exchangeEncryptionSpecification,
             )
         }
@@ -381,7 +456,7 @@ internal class RequestIssuanceImpl(
             requestPayload.ensureAuthorized(authorizationDetails)
             CredentialIssuanceRequest.byCredentialId(
                 requestPayload.credentialIdentifier,
-                proof,
+                proofs,
                 exchangeEncryptionSpecification,
             )
         }
@@ -444,16 +519,39 @@ private fun ProofsConfig.ensureCompatibleWith(issuerSupportedProofTypes: ProofTy
         }
 
         else -> {
-            val supportsJwtProof = null != jwtProof &&
-                jwtProof.supportedAlgorithms.intersect(
-                    issuerSupportedProofTypes.jwtProof?.algorithms.orEmpty().toSet(),
-                ).isNotEmpty()
-            val supportsAttestationProof = null != attestationProof &&
+            val supportsJwtProofWithKeyAttestation = run {
+                jwtProofWithKeyAttestation?.let { jwtProofWithKeyAttestation ->
+                    val issuerSupportedJwtProof = issuerSupportedProofTypes.jwtProof
+                    issuerSupportedJwtProof?.let { issuerSupportedJwtProof ->
+                        null != issuerSupportedJwtProof.keyAttestationRequirement &&
+                            jwtProofWithKeyAttestation.supportedAlgorithms.intersect(
+                                issuerSupportedJwtProof.algorithms.toSet(),
+                            ).isNotEmpty()
+                    }
+                }
+            } ?: false
+
+            val supportsJwtProofsWithoutKeyAttestation = run {
+                jwtProofsWithoutKeyAttestation?.let { jwtProofsWithoutKeyAttestation ->
+                    val issuerSupportedJwtProof = issuerSupportedProofTypes.jwtProof
+                    issuerSupportedJwtProof?.let { issuerSupportedJwtProof ->
+                        null == issuerSupportedJwtProof.keyAttestationRequirement &&
+                            jwtProofsWithoutKeyAttestation.supportedAlgorithms.intersect(
+                                issuerSupportedJwtProof.algorithms.toSet(),
+                            ).isNotEmpty()
+                    }
+                }
+            } ?: false
+
+            val supportsAttestationProof = attestationProof?.let { attestationProof ->
                 attestationProof.supportedAlgorithms.intersect(
                     issuerSupportedProofTypes.attestationProof?.algorithms.orEmpty().toSet(),
                 ).isNotEmpty()
+            } ?: false
 
-            require(supportsJwtProof || supportsAttestationProof) { "Wallet doesn't support any of the advertised Proofs" }
+            require(supportsJwtProofWithKeyAttestation || supportsJwtProofsWithoutKeyAttestation || supportsAttestationProof) {
+                "Wallet doesn't support any of the advertised Proofs"
+            }
         }
     }
 }

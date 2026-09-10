@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vci
 
 import com.nimbusds.jose.jwk.Curve
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofSpec
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofWithKeyAttestationSpec
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredRequestTO
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -53,7 +53,7 @@ class IssuanceDeferredRequestTest {
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
             )
             val (newAuthorizedRequest, outcome) =
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
             assertIs<SubmissionOutcome.Deferred>(outcome)
 
             val (_, requestDeferredIssuance) =
@@ -95,7 +95,7 @@ class IssuanceDeferredRequestTest {
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
             )
             val (newAuthorizedRequest, outcome) =
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
             assertIs<SubmissionOutcome.Deferred>(outcome)
 
             val (_, requestDeferredIssuance) =
@@ -134,7 +134,7 @@ class IssuanceDeferredRequestTest {
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
             )
             val (newAuthorizedRequest, outcome) =
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
             assertIs<SubmissionOutcome.Deferred>(outcome)
 
             assertFailsWith<CredentialIssuanceError.UnexpectedTransactionId> {
@@ -189,7 +189,7 @@ class IssuanceDeferredRequestTest {
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
             )
             val (newAuthorized, outcome) =
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
 
             assertIs<SubmissionOutcome.Deferred>(outcome)
 

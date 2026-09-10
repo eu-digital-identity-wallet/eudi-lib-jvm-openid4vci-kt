@@ -78,7 +78,7 @@ class SignersTest {
                 provider = null,
             )
 
-            val jwtProofSigner = JwtProofSigner(
+            val jwtProofSigner = KeyAttestationJwtProofSigner(
                 algorithm = Curve.P_256.toJavaSigningAlg().toJoseAlg(),
                 signOperation = signer.acquire(),
                 keyIndex = 0,

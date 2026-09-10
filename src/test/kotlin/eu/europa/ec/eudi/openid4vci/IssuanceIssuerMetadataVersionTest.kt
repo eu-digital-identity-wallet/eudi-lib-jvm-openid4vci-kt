@@ -25,7 +25,7 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.RequestEncryptionError.IssuerRequiresEncryptedRequestButEncryptionSpecCannotBeFormulated
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.ResponseEncryptionError.*
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofSpec
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofWithKeyAttestationSpec
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialResponseSuccessTO
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredRequestTO
@@ -182,7 +182,7 @@ class IssuanceIssuerMetadataVersionTest {
             with(issuer) {
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
             }
         }
 
@@ -233,7 +233,7 @@ class IssuanceIssuerMetadataVersionTest {
             with(issuer) {
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
             }
         }
 
@@ -284,7 +284,7 @@ class IssuanceIssuerMetadataVersionTest {
             with(issuer) {
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
             }
         }
 
@@ -377,7 +377,7 @@ class IssuanceIssuerMetadataVersionTest {
             with(issuer) {
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
             }
         }
 
@@ -432,7 +432,7 @@ class IssuanceIssuerMetadataVersionTest {
             with(issuer) {
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val (_, outcome) = authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                val (_, outcome) = authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
                 assertIs<SubmissionOutcome.Success>(outcome)
             }
         }
@@ -496,7 +496,7 @@ class IssuanceIssuerMetadataVersionTest {
             with(issuer) {
                 val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
                 val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
-                val (_, outcome) = authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                val (_, outcome) = authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
                 assertIs<SubmissionOutcome.Success>(outcome)
             }
         }
@@ -542,7 +542,7 @@ class IssuanceIssuerMetadataVersionTest {
             val (_, outcome) = with(issuer) {
                 authorizedRequest.request(
                     IssuanceRequestPayload.ConfigurationBased(CredentialConfigurationIdentifier(PID_MsoMdoc)),
-                    jwtProofSpec(Curve.P_256),
+                    jwtProofWithKeyAttestationSpec(Curve.P_256),
                 ).getOrThrow()
             }
             assertIs<SubmissionOutcome.Success>(outcome)
@@ -580,7 +580,7 @@ class IssuanceIssuerMetadataVersionTest {
                     CredentialConfigurationIdentifier(PID_SdJwtVC),
                 )
                 val (newAuthorizedRequest, outcome) =
-                    authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                    authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
                 assertIs<SubmissionOutcome.Deferred>(outcome)
 
                 assertFailsWith<CredentialIssuanceError.InvalidResponseContentType>(
@@ -643,7 +643,7 @@ class IssuanceIssuerMetadataVersionTest {
                     CredentialConfigurationIdentifier(PID_SdJwtVC),
                 )
                 val (newAuthorizedRequest, outcome) =
-                    authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                    authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
                 assertIs<SubmissionOutcome.Deferred>(outcome)
 
                 val (_, deferredOutcome) = newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId).getOrThrow()
@@ -704,7 +704,7 @@ class IssuanceIssuerMetadataVersionTest {
                 CredentialConfigurationIdentifier(PID_SdJwtVC),
             )
             val (newAuthorizedRequest, outcome) =
-                authorizedRequest.request(requestPayload, jwtProofSpec(Curve.P_256)).getOrThrow()
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
             assertIs<SubmissionOutcome.Deferred>(outcome)
 
             val (_, deferredOutcome) =

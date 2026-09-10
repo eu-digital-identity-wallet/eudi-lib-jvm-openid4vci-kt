@@ -18,7 +18,7 @@ package eu.europa.ec.eudi.openid4vci.examples
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.attestationProofSpec
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofSpec
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofWithKeyAttestationSpec
 import io.ktor.client.*
 import io.ktor.client.engine.apache.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -112,7 +112,7 @@ suspend fun <ENV> Issuer.submitCredentialRequest(
         }
 
     val proofSpec: ProofSpecification = when (proofsType) {
-        is ProofsType.JwtProof -> jwtProofSpec(
+        is ProofsType.JwtProof -> jwtProofWithKeyAttestationSpec(
             Curve.P_256,
             proofsNo,
             keyAttestationJwt = {
