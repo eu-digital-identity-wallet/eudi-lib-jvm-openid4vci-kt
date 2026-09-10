@@ -721,14 +721,21 @@ The current version of the library supports:
 
 > [!IMPORTANT]
 >
+> By default, the library enables support for the following Proof Types:
+>
+> * JWT proofs that contain KeyAttestationJWTs
+> * Attestation proofs
+> 
+> To enable support for JWT Proofs without Key Attestation, provide a properly configured `ProofsConfig` instance.
+
+> [!IMPORTANT]
+>
 > When using:
 >
 > * JWT proofs that contain KeyAttestationJWTs
 > * Attestation proofs
 > 
 > The rules of ETSI TS 119 472-3 V1.1.1 apply i.e., Credential Requests may contain a single proof.
-> 
-> The KeyAttestationJWT used in a JWT proof, or as an Attestation proof, must be a valid Key Attestation per ARF's Technical Specification 3.
 
 
 ### Demonstrating Proof of Possession (DPoP)
