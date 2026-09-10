@@ -114,6 +114,15 @@ val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
     proofs = ProofsConfig.Default,
 )
 
+val OpenId4VCIConfigurationOnlyPlainJwtProofs = OpenId4VCIConfiguration.copy(
+    proofs = ProofsConfig(
+        isNoProofSupported = false,
+        jwtProofWithKeyAttestation = null,
+        jwtProofsWithoutKeyAttestation = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES256)),
+        attestationProof = null,
+    ),
+)
+
 suspend fun authorizeRequestForCredentialOffer(
     config: OpenId4VCIConfig? = OpenId4VCIConfiguration,
     credentialOfferStr: String,

@@ -15,84 +15,146 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
-import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofSpec
-import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
-import eu.europa.ec.eudi.openid4vci.internal.http.CredentialResponseSuccessTO
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofWithKeyAttestationSpec
+import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofsWithoutKeyAttestation
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
 import kotlin.test.*
 
 class IssuanceBatchRequestTest {
 
-    @Test
-    fun `successful batch issuance`() = runTest {
-        val issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_REQUIRED
-        val mockedKtorHttpClientFactory = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion = issuerMetadataVersion),
-            authServerWellKnownMocker(),
-            parPostMocker(),
-            tokenPostMocker(),
-            nonceEndpointMocker(),
-            singleIssuanceRequestMocker(
-                responseBuilder = {
-                    encryptionAwareResponseDataBuilder(it, issuerMetadataVersion) {
-                        Json.encodeToString(
-                            CredentialResponseSuccessTO(
-                                credentials = listOf(
-                                    buildJsonObject {
-                                        put("credential", JsonPrimitive("issued_credential_content_mso_mdoc0"))
-                                    },
-                                    buildJsonObject {
-                                        put("credential", JsonPrimitive("issued_credential_content_mso_mdoc1"))
-                                    },
-                                    buildJsonObject {
-                                        put("credential", JsonPrimitive("issued_credential_content_mso_mdoc2"))
-                                    },
-                                ),
-                            ),
-                        )
-                    }
-                },
-                requestValidator = { request ->
-                    encryptionAwareRequestValidator<CredentialRequestTO>(request, issuerMetadataVersion) {
-                        assertNotNull(
-                            it.proofs,
-                            "Proofs expected but received none",
-                        )
-                        val jwtProofs = it.proofs.jwtProofs
-                        assertNotNull(jwtProofs, "Jwt Proofs expected")
-                        assertEquals(1, jwtProofs.size, "Exactly one Jwt Proof expected")
-                        val keyAttestation =
-                            KeyAttestationJWT(SignedJWT.parse(jwtProofs.first()).header.getCustomParam("key_attestation") as String)
-                        assertEquals(3, keyAttestation.attestedKeys.size, "Exactly three attested keys expected")
-                    }
-                },
-            ),
-        )
-        val (authorizedRequest, issuer) =
-            authorizeRequestForCredentialOffer(
-                credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
-                httpClient = mockedKtorHttpClientFactory,
-            )
+    @Nested
+    @DisplayName("JWT Proof with Key Attestation")
+    inner class JwtProofWithKeyAttestation {
 
-        val request = IssuanceRequestPayload.ConfigurationBased(
-            CredentialConfigurationIdentifier(PID_MsoMdoc),
-        )
-        val (_, outcome) = with(issuer) {
-            authorizedRequest.request(request, jwtProofSpec(attestedKeysCount = 3)).getOrThrow()
+        @Test
+        fun `successful batch issuance`() = runTest {
+            val issuerMetadataVersion = IssuerMetadataVersion.ENCRYPTION_REQUIRED
+            val mockedKtorHttpClientFactory = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion = issuerMetadataVersion),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                nonceEndpointMocker(),
+                singleIssuanceRequestMocker(
+                    responseBuilder = encryptionAwareSuccessCredentialResponseResponseDataBuilder(issuerMetadataVersion, 3),
+                    requestValidator = encryptionAwareJwtProofWithKeyAttestationRequestValidator(issuerMetadataVersion, 3),
+                ),
+            )
+            val (authorizedRequest, issuer) =
+                authorizeRequestForCredentialOffer(
+                    credentialOfferStr = CredentialOfferMixedDocTypes_NO_GRANTS,
+                    httpClient = mockedKtorHttpClientFactory,
+                )
+
+            val request = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_MsoMdoc),
+            )
+            val (_, outcome) = with(issuer) {
+                authorizedRequest.request(request, jwtProofWithKeyAttestationSpec(attestedKeysCount = 3)).getOrThrow()
+            }
+            when (outcome) {
+                is SubmissionOutcome.Failed -> {
+                    fail(outcome.error.message)
+                }
+                is SubmissionOutcome.Deferred -> {
+                    fail("Got deferred")
+                }
+                is SubmissionOutcome.Success -> {
+                    outcome.credentials.forEach { assertIs<IssuedCredential>(it) }
+                }
+            }
         }
-        when (outcome) {
-            is SubmissionOutcome.Failed -> {
-                fail(outcome.error.message)
+    }
+
+    @Nested
+    @DisplayName("JWT Proofs without Key Attestation")
+    inner class JwtProofsWithoutKeyAttestation {
+
+        @Test
+        fun `successful batch issuance`() = runTest {
+            val issuerMetadataVersion = IssuerMetadataVersion.ONLY_JWT_PROOFS_WITHOUT_KEY_ATTESTATION_SUPPORTED
+            val mockedKtorHttpClientFactory = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion = issuerMetadataVersion),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                nonceEndpointMocker(),
+                singleIssuanceRequestMocker(
+                    responseBuilder = encryptionAwareSuccessCredentialResponseResponseDataBuilder(issuerMetadataVersion, 3),
+                    requestValidator = encryptionAwareJwtProofsWithoutKeyAttestationRequestValidator(issuerMetadataVersion, 3),
+                ),
+            )
+            val (authorizedRequest, issuer) =
+                authorizeRequestForCredentialOffer(
+                    config = OpenId4VCIConfigurationOnlyPlainJwtProofs,
+                    credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                    httpClient = mockedKtorHttpClientFactory,
+                )
+
+            val request = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_SdJwtVC),
+            )
+            val (_, outcome) = with(issuer) {
+                authorizedRequest.request(request, jwtProofsWithoutKeyAttestation(keysNo = 3)).getOrThrow()
             }
-            is SubmissionOutcome.Deferred -> {
-                fail("Got deferred")
+            val issuedCredentials = assertIs<SubmissionOutcome.Success>(outcome).credentials
+            assertEquals(3, issuedCredentials.size, "Expected 3 Credentials to be issued")
+        }
+
+        @Test
+        fun `fails when sending more proofs that allowed batch size`() = runTest {
+            val issuerMetadataVersion = IssuerMetadataVersion.ONLY_JWT_PROOFS_WITHOUT_KEY_ATTESTATION_SUPPORTED
+            val mockedKtorHttpClientFactory = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion = issuerMetadataVersion),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                nonceEndpointMocker(),
+            )
+            val (authorizedRequest, issuer) =
+                authorizeRequestForCredentialOffer(
+                    config = OpenId4VCIConfigurationOnlyPlainJwtProofs,
+                    credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                    httpClient = mockedKtorHttpClientFactory,
+                )
+
+            val request = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_SdJwtVC),
+            )
+            val error = assertFailsWith<CredentialIssuanceError.IssuerBatchSizeLimitExceeded> {
+                with(issuer) {
+                    authorizedRequest.request(request, jwtProofsWithoutKeyAttestation(keysNo = 4)).getOrThrow()
+                }
             }
-            is SubmissionOutcome.Success -> {
-                outcome.credentials.forEach { assertIs<IssuedCredential>(it) }
+            assertEquals(3, error.batchSize)
+        }
+
+        @Test
+        fun `fails when issuer does not support batch credential issuance`() = runTest {
+            val issuerMetadataVersion = IssuerMetadataVersion.NO_BATCH
+            val mockedKtorHttpClientFactory = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion = issuerMetadataVersion),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                nonceEndpointMocker(),
+            )
+            val (authorizedRequest, issuer) =
+                authorizeRequestForCredentialOffer(
+                    config = OpenId4VCIConfigurationOnlyPlainJwtProofs,
+                    credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                    httpClient = mockedKtorHttpClientFactory,
+                )
+
+            val request = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_SdJwtVC),
+            )
+            assertFailsWith<CredentialIssuanceError.IssuerDoesNotSupportBatchIssuance> {
+                with(issuer) {
+                    authorizedRequest.request(request, jwtProofsWithoutKeyAttestation(keysNo = 3)).getOrThrow()
+                }
             }
         }
     }

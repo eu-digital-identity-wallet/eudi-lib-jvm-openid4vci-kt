@@ -640,9 +640,7 @@ private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTy
     when (type) {
         "jwt" -> {
             val algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
-            val keyAttestationRequirement = requireNotNull(meta.keyAttestationRequirement?.toDomain()) {
-                "jwt proof must contain 'key_attestations_required'"
-            }
+            val keyAttestationRequirement = meta.keyAttestationRequirement?.toDomain()
             ProofTypeMeta.Jwt(algorithms, keyAttestationRequirement)
         }
 

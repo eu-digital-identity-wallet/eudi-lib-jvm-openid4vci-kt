@@ -44,6 +44,20 @@ internal suspend fun <PUB, R> Signer<PUB>.use(block: suspend (SignOperation<PUB>
     }
 }
 
+@OptIn(ExperimentalContracts::class)
+internal suspend fun <PUB, R> BatchSigner<PUB>.use(block: suspend (BatchSignOperation<PUB>) -> R): R {
+    contract {
+        callsInPlace(block, InvocationKind.AT_MOST_ONCE)
+    }
+
+    val signOps = authenticate()
+    try {
+        return block(signOps)
+    } finally {
+        release(signOps)
+    }
+}
+
 internal fun ByteArray.transcodeSignatureToConcat(alg: JWSAlgorithm): ByteArray {
     if (!JWSAlgorithm.Family.EC.contains(alg)) {
         return this
@@ -92,6 +106,34 @@ internal fun SignFunction.Companion.forJavaPrivateKey(
         }
     }
 
+internal fun <PUB> BatchSigner.Companion.fromECPrivateKeys(
+    signingAlgorithm: String,
+    ecKeyPairs: Map<ECPrivateKey, PUB>,
+    secureRandom: SecureRandom?,
+    provider: String?,
+): BatchSigner<PUB> = object : BatchSigner<PUB> {
+
+    override val javaAlgorithm: String
+        get() = signingAlgorithm
+
+    override suspend fun authenticate(): BatchSignOperation<PUB> {
+        val signOperations = ecKeyPairs.map {
+            val sign = SignFunction.forJavaPrivateKey(
+                signingAlgorithm,
+                it.key,
+                secureRandom,
+                provider,
+            )
+            SignOperation(sign, it.value)
+        }
+        return BatchSignOperation(signOperations)
+    }
+
+    override suspend fun release(signOps: BatchSignOperation<PUB>?) {
+        // Nothing to do for releasing
+    }
+}
+
 internal fun <PUB> Signer.Companion.fromEcPrivateKey(
     signingAlgorithm: String,
     privateKey: ECPrivateKey,
@@ -111,6 +153,30 @@ internal fun <PUB> Signer.Companion.fromEcPrivateKey(
     override suspend fun release(signOperation: SignOperation<PUB>?) {
         // Nothing to do for releasing
     }
+}
+
+internal fun <PUB> BatchSigner.Companion.fromNimbusEcKeys(
+    ecKeyPairs: Map<ECKey, PUB>,
+    secureRandom: SecureRandom?,
+    provider: String?,
+): BatchSigner<PUB> {
+    require(ecKeyPairs.isNotEmpty()) { "At least one EC key pair must be provided" }
+    val firstCurve = ecKeyPairs.entries.first().key.curve
+    ecKeyPairs.forEach { (key, _) ->
+        require(key.isPrivate) { "All EC keys must be private keys" }
+        require(key.curve == firstCurve) { "All EC keys must use the same curve, but found ${key.curve}" }
+    }
+    val signatureAlgorithm = firstCurve.toJavaSigningAlg()
+    val javaKeys = ecKeyPairs.map { it.key.toECPrivateKey() to it.value }
+    require(javaKeys.distinctBy { it.first }.size == javaKeys.size) {
+        "Multiple EC keys resolve to the same Java private key (duplicate D value)."
+    }
+    return fromECPrivateKeys(
+        signatureAlgorithm,
+        javaKeys.toMap(),
+        secureRandom,
+        provider,
+    )
 }
 
 internal fun <KI> Signer.Companion.fromNimbusEcKey(
