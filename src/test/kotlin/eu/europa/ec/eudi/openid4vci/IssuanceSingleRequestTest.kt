@@ -108,6 +108,27 @@ class IssuanceSingleRequestTest {
     }
 
     @Test
+    fun `when issuer responds with unknown_credential_configuration it is reflected in the submission outcomes`() = runTest {
+        val outcome = submitCredentialRequest { credentialErrorResponse("unknown_credential_configuration") }.getOrThrow()
+        assertIs<SubmissionOutcome.Failed>(outcome)
+        assertIs<CredentialIssuanceError.UnknownCredentialConfiguration>(outcome.error, "was ${outcome.error}")
+    }
+
+    @Test
+    fun `when issuer responds with unknown_credential_identifier it is reflected in the submission outcomes`() = runTest {
+        val outcome = submitCredentialRequest { credentialErrorResponse("unknown_credential_identifier") }.getOrThrow()
+        assertIs<SubmissionOutcome.Failed>(outcome)
+        assertIs<CredentialIssuanceError.UnknownCredentialIdentifier>(outcome.error, "was ${outcome.error}")
+    }
+
+    @Test
+    fun `when issuer responds with invalid_encryption_parameters it is reflected in the submission outcomes`() = runTest {
+        val outcome = submitCredentialRequest { credentialErrorResponse("invalid_encryption_parameters") }.getOrThrow()
+        assertIs<SubmissionOutcome.Failed>(outcome)
+        assertIs<CredentialIssuanceError.InvalidEncryptionParameters>(outcome.error, "was ${outcome.error}")
+    }
+
+    @Test
     fun `when the requested credential is not included in the offer an IllegalArgumentException is thrown`() = runTest {
         val mockedKtorHttpClientFactory = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
@@ -1382,5 +1403,30 @@ class IssuanceSingleRequestTest {
         }
         val issuedCredentials = assertIs<SubmissionOutcome.Success>(outcome).credentials
         assertEquals(1, issuedCredentials.size, "Expected 3 Credentials to be issued")
+    }
+
+    /** A Credential Error Response, OpenID4VCI 1.0 §8.3.1.2, carrying [code]. */
+    private fun MockRequestHandleScope.credentialErrorResponse(code: String) = respond(
+        content = """{"error": "$code"}""",
+        status = HttpStatusCode.BadRequest,
+        headers = headersOf(HttpHeaders.ContentType to listOf("application/json")),
+    )
+
+    private suspend fun submitCredentialRequest(credentialResponse: HttpResponseDataBuilder): Result<SubmissionOutcome> {
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferMsoMdoc_NO_GRANTS,
+            httpClient = mockedHttpClient(
+                credentialIssuerMetadataWellKnownMocker(),
+                authServerWellKnownMocker(),
+                parPostMocker(),
+                tokenPostMocker(),
+                nonceEndpointMocker(),
+                singleIssuanceRequestMocker(responseBuilder = credentialResponse),
+            ),
+        )
+        return with(issuer) {
+            val payload = IssuanceRequestPayload.ConfigurationBased(issuer.credentialOffer.credentialConfigurationIdentifiers[0])
+            authorizedRequest.request(payload, jwtProofWithKeyAttestationSpec(Curve.P_256)).map { it.second }
+        }
     }
 }
