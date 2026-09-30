@@ -323,10 +323,10 @@ internal data class GenericErrorResponseTO(
     fun toIssuanceError(): CredentialIssuanceError = when (error) {
         "invalid_proof" -> InvalidProof(errorDescription)
         "invalid_token" -> InvalidToken()
-        "invalid_transaction_id " -> InvalidTransactionId()
-        "unknown_credential_configuration " -> UnknownCredentialConfiguration()
-        "unknown_credential_identifier " -> UnknownCredentialIdentifier()
-        "invalid_encryption_parameters " -> InvalidEncryptionParameters()
+        "invalid_transaction_id" -> InvalidTransactionId()
+        "unknown_credential_configuration" -> UnknownCredentialConfiguration()
+        "unknown_credential_identifier" -> UnknownCredentialIdentifier()
+        "invalid_encryption_parameters" -> InvalidEncryptionParameters()
         else -> IssuanceRequestFailed(error, errorDescription)
     }
 }
