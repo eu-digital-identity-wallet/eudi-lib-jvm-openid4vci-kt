@@ -18,6 +18,8 @@ package eu.europa.ec.eudi.openid4vci
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofWithKeyAttestationSpec
 import eu.europa.ec.eudi.openid4vci.internal.http.DeferredRequestTO
+import io.ktor.client.call.NoTransformationFoundException
+import io.ktor.client.engine.mock.respond
 import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
@@ -204,4 +206,92 @@ class IssuanceDeferredRequestTest {
         } catch (_: Exception) {
             null
         }
+
+    @Test
+    fun `when issuer responds with 401 and www authenticate request fails with errored`() = runTest {
+        val wwwAuthenticate = "WWW-Authenticate: " +
+            "DPoP error=\"invalid_token\", " +
+            "error_description=\"Invalid DPoP key binding\", " +
+            "algs=\"ES256\""
+        val mockedKtorHttpClientFactory = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(
+                responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it) },
+            ),
+            deferredIssuanceRequestMocker(
+                responseBuilder = {
+                    respond(
+                        status = HttpStatusCode.Unauthorized,
+                        headers = headersOf(HttpHeaders.WWWAuthenticate to listOf(wwwAuthenticate)),
+                        content = "",
+                    )
+                },
+            ),
+        )
+
+        val (authorizedRequest, issuer) =
+            authorizeRequestForCredentialOffer(
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                httpClient = mockedKtorHttpClientFactory,
+            )
+
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_SdJwtVC),
+            )
+            val (newAuthorizedRequest, outcome) =
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
+            assertIs<SubmissionOutcome.Deferred>(outcome)
+
+            val (_, deferredOutcome) = newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId).getOrThrow()
+            assertIs<DeferredCredentialQueryOutcome.Errored>(deferredOutcome)
+            assertEquals("invalid_token", deferredOutcome.error)
+            assertEquals(wwwAuthenticate, deferredOutcome.errorDescription)
+        }
+    }
+
+    @Test
+    fun `when issuer responds with status code other than 401 parse exception is propagated`() = runTest {
+        val mockedKtorHttpClientFactory = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            nonceEndpointMocker(),
+            singleIssuanceRequestMocker(
+                responseBuilder = { respondToIssuanceRequestWithDeferredResponseDataBuilder(it) },
+            ),
+            deferredIssuanceRequestMocker(
+                responseBuilder = {
+                    respond(
+                        status = HttpStatusCode.BadGateway,
+                        headers = headersOf(),
+                        content = "",
+                    )
+                },
+            ),
+        )
+
+        val (authorizedRequest, issuer) =
+            authorizeRequestForCredentialOffer(
+                credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                httpClient = mockedKtorHttpClientFactory,
+            )
+
+        with(issuer) {
+            val requestPayload = IssuanceRequestPayload.ConfigurationBased(
+                CredentialConfigurationIdentifier(PID_SdJwtVC),
+            )
+            val (newAuthorizedRequest, outcome) =
+                authorizedRequest.request(requestPayload, jwtProofWithKeyAttestationSpec(Curve.P_256)).getOrThrow()
+            assertIs<SubmissionOutcome.Deferred>(outcome)
+            assertFailsWith<NoTransformationFoundException> {
+                newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId).getOrThrow()
+            }
+        }
+    }
 }
