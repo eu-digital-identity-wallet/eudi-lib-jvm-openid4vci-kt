@@ -1445,8 +1445,7 @@ class IssuanceSingleRequestTest {
             )
         }.getOrThrow()
         val error = assertIs<SubmissionOutcome.Failed>(outcome).error
-        val description = assertIs<CredentialIssuanceError.InvalidToken>(error).wwwAuthenticate
-        assertEquals(wwwAuthenticate, description)
+        assertIs<CredentialIssuanceError.InvalidToken>(error)
     }
 
     @Test
@@ -1459,8 +1458,7 @@ class IssuanceSingleRequestTest {
             )
         }.getOrThrow()
         val error = assertIs<SubmissionOutcome.Failed>(outcome).error
-        val description = assertIs<CredentialIssuanceError.InvalidToken>(error).wwwAuthenticate
-        assertNull(description)
+        assertIs<CredentialIssuanceError.InvalidToken>(error)
     }
 
     @Test

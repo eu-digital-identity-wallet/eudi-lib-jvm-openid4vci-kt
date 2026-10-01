@@ -318,10 +318,8 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
 
     /**
      * Invalid access token passed to issuance server
-     *
-     * @property wwwAuthenticate the contents of the WWW-Authenticate header as provided by the Credential Issuer
      */
-    data class InvalidToken(val wwwAuthenticate: String? = null) : CredentialIssuanceError("InvalidToken")
+    class InvalidToken : CredentialIssuanceError("InvalidToken")
 
     /**
      * Invalid transaction id passed to the issuance server in the context of deferred credential requests

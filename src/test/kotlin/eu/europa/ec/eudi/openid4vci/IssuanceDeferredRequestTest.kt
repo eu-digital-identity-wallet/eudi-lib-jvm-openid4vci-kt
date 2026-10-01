@@ -250,7 +250,7 @@ class IssuanceDeferredRequestTest {
             val (_, deferredOutcome) = newAuthorizedRequest.queryForDeferredCredential(outcome.transactionId).getOrThrow()
             assertIs<DeferredCredentialQueryOutcome.Errored>(deferredOutcome)
             assertEquals("invalid_token", deferredOutcome.error)
-            assertEquals(wwwAuthenticate, deferredOutcome.errorDescription)
+            assertEquals("Invalid DPoP key binding", deferredOutcome.errorDescription)
         }
     }
 

@@ -175,7 +175,7 @@ class IssuanceNotificationTest {
                 ).getOrThrow()
             }
             assertEquals("invalid_token", failure.error)
-            assertEquals(wwwAuthenticate, failure.errorDescription)
+            assertEquals("Invalid DPoP key binding", failure.errorDescription)
         }
     }
 

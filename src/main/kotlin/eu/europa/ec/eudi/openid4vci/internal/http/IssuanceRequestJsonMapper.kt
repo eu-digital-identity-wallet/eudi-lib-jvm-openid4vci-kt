@@ -329,4 +329,16 @@ internal data class GenericErrorResponseTO(
         "invalid_encryption_parameters" -> InvalidEncryptionParameters()
         else -> IssuanceRequestFailed(error, errorDescription)
     }
+
+    companion object {
+        fun fromWWWAuthenticate(challenge: String): GenericErrorResponseTO? {
+            fun String.param(name: String): String? = Regex("""\b$name="([^"]*)"""").find(this@param)?.groupValues?.get(1)
+            return challenge.param("error")?.let { error ->
+                GenericErrorResponseTO(error, challenge.param("error_description"))
+            }
+        }
+
+        val InvalidToken: GenericErrorResponseTO
+            get() = GenericErrorResponseTO(error = "invalid_token")
+    }
 }

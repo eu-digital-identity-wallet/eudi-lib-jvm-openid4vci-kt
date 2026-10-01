@@ -38,7 +38,7 @@ private fun HttpResponse.nonceHeader(name: String): Nonce? = headers[name]?.let(
 internal fun HttpResponse.isResourceServerDpopNonceRequired(): Boolean =
     when (status) {
         HttpStatusCode.Unauthorized -> {
-            val wwwAuthenticate = headers[HttpHeaders.WWWAuthenticate]
+            val wwwAuthenticate: String? = headers[HttpHeaders.WWWAuthenticate]
             wwwAuthenticate?.let {
                 it.contains("DPoP") && it.contains("error=\"use_dpop_nonce\"")
             } ?: false

@@ -54,26 +54,34 @@ internal class NotificationEndPointClient(
                 },
         )
 
+        val newResourceServerDpopNonce = response.dpopNonce()
         return if (response.status.isSuccess()) {
-            response.dpopNonce() ?: resourceServerDpopNonce
+            newResourceServerDpopNonce ?: resourceServerDpopNonce
         } else {
-            val newResourceServerDpopNonce = response.dpopNonce()
-            if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
-                notifyIssuerInternal(accessToken, newResourceServerDpopNonce, event, true)
-            } else {
-                val (error, errorDescription) = runCatchingCancellable {
-                    val errorResponse = response.body<GenericErrorResponseTO>()
-                    errorResponse.error to errorResponse.errorDescription
-                }.getOrElse { parseError ->
-                    if (HttpStatusCode.Unauthorized != response.status) {
-                        throw parseError
-                    }
-
+            when (response.status) {
+                HttpStatusCode.Unauthorized -> {
                     val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
-                    "invalid_token" to wwwAuthenticate
+                    if (null != wwwAuthenticate) {
+                        val errorResponse =
+                            GenericErrorResponseTO.fromWWWAuthenticate(wwwAuthenticate)
+                                ?: GenericErrorResponseTO.InvalidToken
+                        val isResourceServerDpopNonceRequired =
+                            wwwAuthenticate.startsWith("DPoP") &&
+                                "use_dpop_nonce" == errorResponse.error
+                        if (isResourceServerDpopNonceRequired && null != newResourceServerDpopNonce && !retried) {
+                            notifyIssuerInternal(accessToken, newResourceServerDpopNonce, event, true)
+                        } else {
+                            throw NotificationFailed(errorResponse.error, errorResponse.errorDescription)
+                        }
+                    } else {
+                        throw NotificationFailed("invalid_token")
+                    }
                 }
 
-                throw NotificationFailed(error, errorDescription)
+                else -> {
+                    val errorResponse = response.body<GenericErrorResponseTO>()
+                    throw NotificationFailed(errorResponse.error, errorResponse.errorDescription)
+                }
             }
         }
     }
