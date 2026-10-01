@@ -8,8 +8,10 @@ on:
   workflow_dispatch:
 
 permissions: 
-  security-events: write
   contents: read
+  security-events: write
+  actions: read
+  packages: read
 
 jobs:
   CodeQL_caller:
