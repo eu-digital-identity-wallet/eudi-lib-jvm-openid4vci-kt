@@ -100,18 +100,12 @@ internal class CredentialEndpointClient(
                 val reason = runCatchingCancellable {
                     response.body<GenericErrorResponseTO>().toIssuanceError()
                 }.getOrElse { parseError ->
-                    if (HttpStatusCode.Unauthorized == response.status) {
-                        val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
-                        CredentialIssuanceError.InvalidToken(wwwAuthenticate)
-                    } else {
-                        val description = parseError.message?.takeIf { it.isNotBlank() }
-                            ?: (
-                                "Credential Issuer response could not be parsed. " +
-                                    "Status Code: ${response.status}, " +
-                                    "Body: ${response.bodyAsText()}"
-                                )
-                        CredentialIssuanceError.ResponseUnparsable(description)
+                    if (HttpStatusCode.Unauthorized != response.status) {
+                        throw parseError
                     }
+
+                    val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
+                    CredentialIssuanceError.InvalidToken(wwwAuthenticate)
                 }
 
                 SubmissionOutcomeInternal.Failed(reason) to (
