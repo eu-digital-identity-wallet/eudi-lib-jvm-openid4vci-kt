@@ -12,7 +12,6 @@ jobs:
   sast:
     permissions:
       contents: read
-      pull-requests: write
     uses: eu-digital-identity-wallet/eudi-infra-ci/.github/workflows/sast_action_libs_kotlin.yml@feat/sast_kotlin_libs
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
