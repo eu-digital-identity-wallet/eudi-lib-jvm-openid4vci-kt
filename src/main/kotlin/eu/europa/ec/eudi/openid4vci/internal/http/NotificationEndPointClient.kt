@@ -61,8 +61,19 @@ internal class NotificationEndPointClient(
             if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
                 notifyIssuerInternal(accessToken, newResourceServerDpopNonce, event, true)
             } else {
-                val errorResponse = response.body<GenericErrorResponseTO>()
-                throw NotificationFailed(errorResponse.error)
+                val (error, errorDescription) = runCatchingCancellable {
+                    val errorResponse = response.body<GenericErrorResponseTO>()
+                    errorResponse.error to errorResponse.errorDescription
+                }.getOrElse { parseError ->
+                    if (HttpStatusCode.Unauthorized != response.status) {
+                        throw parseError
+                    }
+
+                    val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
+                    "invalid_token" to wwwAuthenticate
+                }
+
+                throw NotificationFailed(error, errorDescription)
             }
         }
     }

@@ -381,6 +381,7 @@ sealed class CredentialIssuanceError(message: String) : Throwable(message) {
      */
     data class NotificationFailed(
         val error: String,
+        val errorDescription: String? = null,
     ) : CredentialIssuanceError(error)
 
     /**
