@@ -1429,4 +1429,49 @@ class IssuanceSingleRequestTest {
             authorizedRequest.request(payload, jwtProofWithKeyAttestationSpec(Curve.P_256)).map { it.second }
         }
     }
+
+    @Test
+    fun `issuance fails with invalid token with 401 www authenticate and empty response body`() = runTest {
+        val wwwAuthenticate = "WWW-Authenticate: " +
+            "DPoP error=\"invalid_token\", " +
+            "error_description=\"Invalid DPoP key binding\", " +
+            "algs=\"ES256\""
+        val outcome = submitCredentialRequest {
+            respond(
+                status = HttpStatusCode.Unauthorized,
+                headers = headersOf(HttpHeaders.WWWAuthenticate to listOf(wwwAuthenticate)),
+                content = "",
+            )
+        }.getOrThrow()
+        val error = assertIs<SubmissionOutcome.Failed>(outcome).error
+        val description = assertIs<CredentialIssuanceError.InvalidToken>(error).wwwAuthenticate
+        assertEquals(wwwAuthenticate, description)
+    }
+
+    @Test
+    fun `issuance fails with invalid token with 401 no www authenticate and empty response body`() = runTest {
+        val outcome = submitCredentialRequest {
+            respond(
+                status = HttpStatusCode.Unauthorized,
+                headers = headersOf(),
+                content = "",
+            )
+        }.getOrThrow()
+        val error = assertIs<SubmissionOutcome.Failed>(outcome).error
+        val description = assertIs<CredentialIssuanceError.InvalidToken>(error).wwwAuthenticate
+        assertNull(description)
+    }
+
+    @Test
+    fun `issuance fails with response unparseable with non 401 no www authenticate and empty response body`() = runTest {
+        val outcome = submitCredentialRequest {
+            respond(
+                status = HttpStatusCode.BadGateway,
+                headers = headersOf(),
+                content = "",
+            )
+        }.getOrThrow()
+        val error = assertIs<SubmissionOutcome.Failed>(outcome).error
+        assertIs<CredentialIssuanceError.ResponseUnparsable>(error)
+    }
 }

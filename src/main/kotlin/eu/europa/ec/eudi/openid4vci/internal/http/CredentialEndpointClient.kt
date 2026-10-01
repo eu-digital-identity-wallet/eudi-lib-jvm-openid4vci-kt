@@ -97,8 +97,24 @@ internal class CredentialEndpointClient(
             if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
                 placeIssuanceRequestInternal(accessToken, newResourceServerDpopNonce, request, true)
             } else {
-                val error = response.body<GenericErrorResponseTO>()
-                SubmissionOutcomeInternal.Failed(error.toIssuanceError()) to (
+                val reason = runCatchingCancellable {
+                    response.body<GenericErrorResponseTO>().toIssuanceError()
+                }.getOrElse { parseError ->
+                    if (HttpStatusCode.Unauthorized == response.status) {
+                        val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
+                        CredentialIssuanceError.InvalidToken(wwwAuthenticate)
+                    } else {
+                        val description = parseError.message?.takeIf { it.isNotBlank() }
+                            ?: (
+                                "Credential Issuer response could not be parsed. " +
+                                    "Status Code: ${response.status}, " +
+                                    "Body: ${response.bodyAsText()}"
+                                )
+                        CredentialIssuanceError.ResponseUnparsable(description)
+                    }
+                }
+
+                SubmissionOutcomeInternal.Failed(reason) to (
                     newResourceServerDpopNonce
                         ?: resourceServerDpopNonce
                     )
