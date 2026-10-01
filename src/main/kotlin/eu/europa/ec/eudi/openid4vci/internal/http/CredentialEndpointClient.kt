@@ -203,12 +203,12 @@ internal class DeferredEndPointClient(
                     val responsePayload = response.body<GenericErrorResponseTO>()
                     DeferredCredentialQueryOutcome.Errored(responsePayload.error, responsePayload.errorDescription)
                 }.getOrElse { parseError ->
-                    if (HttpStatusCode.Unauthorized == response.status) {
-                        val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
-                        DeferredCredentialQueryOutcome.Errored("invalid_token", wwwAuthenticate)
-                    } else {
+                    if (HttpStatusCode.Unauthorized != response.status) {
                         throw parseError
                     }
+
+                    val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
+                    DeferredCredentialQueryOutcome.Errored("invalid_token", wwwAuthenticate)
                 }
 
                 errored to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
