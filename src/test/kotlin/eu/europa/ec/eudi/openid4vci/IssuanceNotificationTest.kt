@@ -19,6 +19,7 @@ import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofWithKeyAttestationSpec
 import eu.europa.ec.eudi.openid4vci.internal.http.NotificationEventTO
 import eu.europa.ec.eudi.openid4vci.internal.http.NotificationTO
+import io.ktor.client.call.NoTransformationFoundException
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -135,6 +136,116 @@ class IssuanceNotificationTest {
                     }
                 },
             )
+        }
+    }
+
+    @Test
+    fun `when notification fails with 401 and www authenticate notification failed is raised`() = runTest {
+        val wwwAuthenticate = "WWW-Authenticate: " +
+            "DPoP error=\"invalid_token\", " +
+            "error_description=\"Invalid DPoP key binding\", " +
+            "algs=\"ES256\""
+        val httpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            RequestMocker(
+                requestMatcher = endsWith("/notification", HttpMethod.Post),
+                responseBuilder = {
+                    respond(
+                        status = HttpStatusCode.Unauthorized,
+                        headers = headersOf(HttpHeaders.WWWAuthenticate to listOf(wwwAuthenticate)),
+                        content = "",
+                    )
+                },
+            ),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+            httpClient = httpClient,
+        )
+        with(issuer) {
+            val failure = assertFailsWith<CredentialIssuanceError.NotificationFailed> {
+                authorizedRequest.notify(
+                    CredentialIssuanceEvent.Accepted(
+                        id = NotificationId("123456"),
+                        description = "Credential received and validated",
+                    ),
+                ).getOrThrow()
+            }
+            assertEquals("invalid_token", failure.error)
+            assertEquals("Invalid DPoP key binding", failure.errorDescription)
+        }
+    }
+
+    @Test
+    fun `when notification fails with 401 and no www authenticate notification failed is raised`() = runTest {
+        val httpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            RequestMocker(
+                requestMatcher = endsWith("/notification", HttpMethod.Post),
+                responseBuilder = {
+                    respond(
+                        status = HttpStatusCode.Unauthorized,
+                        headers = headersOf(),
+                        content = "",
+                    )
+                },
+            ),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+            httpClient = httpClient,
+        )
+        with(issuer) {
+            val failure = assertFailsWith<CredentialIssuanceError.NotificationFailed> {
+                authorizedRequest.notify(
+                    CredentialIssuanceEvent.Accepted(
+                        id = NotificationId("123456"),
+                        description = "Credential received and validated",
+                    ),
+                ).getOrThrow()
+            }
+            assertEquals("invalid_token", failure.error)
+            assertNull(failure.errorDescription)
+        }
+    }
+
+    @Test
+    fun `when notification fails with status other than 401 parse error is propagated`() = runTest {
+        val httpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(),
+            parPostMocker(),
+            tokenPostMocker(),
+            RequestMocker(
+                requestMatcher = endsWith("/notification", HttpMethod.Post),
+                responseBuilder = {
+                    respond(
+                        status = HttpStatusCode.BadGateway,
+                        headers = headersOf(),
+                        content = "",
+                    )
+                },
+            ),
+        )
+        val (authorizedRequest, issuer) = authorizeRequestForCredentialOffer(
+            credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+            httpClient = httpClient,
+        )
+        with(issuer) {
+            assertFailsWith<NoTransformationFoundException> {
+                authorizedRequest.notify(
+                    CredentialIssuanceEvent.Accepted(
+                        id = NotificationId("123456"),
+                        description = "Credential received and validated",
+                    ),
+                ).getOrThrow()
+            }
         }
     }
 }

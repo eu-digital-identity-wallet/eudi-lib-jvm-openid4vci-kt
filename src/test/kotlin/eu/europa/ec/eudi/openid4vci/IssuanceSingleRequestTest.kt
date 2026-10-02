@@ -28,6 +28,7 @@ import eu.europa.ec.eudi.openid4vci.IssuerMetadataVersion.NO_NONCE_ENDPOINT
 import eu.europa.ec.eudi.openid4vci.examples.selfSignedClient
 import eu.europa.ec.eudi.openid4vci.examples.verifySelfSignedClientAttestation
 import eu.europa.ec.eudi.openid4vci.internal.http.CredentialRequestTO
+import io.ktor.client.call.NoTransformationFoundException
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -1427,6 +1428,49 @@ class IssuanceSingleRequestTest {
         return with(issuer) {
             val payload = IssuanceRequestPayload.ConfigurationBased(issuer.credentialOffer.credentialConfigurationIdentifiers[0])
             authorizedRequest.request(payload, jwtProofWithKeyAttestationSpec(Curve.P_256)).map { it.second }
+        }
+    }
+
+    @Test
+    fun `issuance fails with invalid token with 401 www authenticate and empty response body`() = runTest {
+        val wwwAuthenticate = "WWW-Authenticate: " +
+            "DPoP error=\"invalid_token\", " +
+            "error_description=\"Invalid DPoP key binding\", " +
+            "algs=\"ES256\""
+        val outcome = submitCredentialRequest {
+            respond(
+                status = HttpStatusCode.Unauthorized,
+                headers = headersOf(HttpHeaders.WWWAuthenticate to listOf(wwwAuthenticate)),
+                content = "",
+            )
+        }.getOrThrow()
+        val error = assertIs<SubmissionOutcome.Failed>(outcome).error
+        assertIs<CredentialIssuanceError.InvalidToken>(error)
+    }
+
+    @Test
+    fun `issuance fails with invalid token with 401 no www authenticate and empty response body`() = runTest {
+        val outcome = submitCredentialRequest {
+            respond(
+                status = HttpStatusCode.Unauthorized,
+                headers = headersOf(),
+                content = "",
+            )
+        }.getOrThrow()
+        val error = assertIs<SubmissionOutcome.Failed>(outcome).error
+        assertIs<CredentialIssuanceError.InvalidToken>(error)
+    }
+
+    @Test
+    fun `issuance propagates parse error with non 401 no www authenticate and empty response body`() = runTest {
+        assertFailsWith<NoTransformationFoundException> {
+            submitCredentialRequest {
+                respond(
+                    status = HttpStatusCode.BadGateway,
+                    headers = headersOf(),
+                    content = "",
+                )
+            }.getOrThrow()
         }
     }
 }

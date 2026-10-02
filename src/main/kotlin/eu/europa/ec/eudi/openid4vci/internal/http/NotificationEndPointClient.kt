@@ -54,15 +54,36 @@ internal class NotificationEndPointClient(
                 },
         )
 
+        val newResourceServerDpopNonce = response.dpopNonce()
         return if (response.status.isSuccess()) {
-            response.dpopNonce() ?: resourceServerDpopNonce
+            newResourceServerDpopNonce ?: resourceServerDpopNonce
         } else {
-            val newResourceServerDpopNonce = response.dpopNonce()
-            if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
-                notifyIssuerInternal(accessToken, newResourceServerDpopNonce, event, true)
-            } else {
-                val errorResponse = response.body<GenericErrorResponseTO>()
-                throw NotificationFailed(errorResponse.error)
+            when (response.status) {
+                HttpStatusCode.Unauthorized -> {
+                    val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
+                    if (null != wwwAuthenticate) {
+                        if (isResourceServerDpopNonceRequired(wwwAuthenticate) && null != newResourceServerDpopNonce && !retried) {
+                            notifyIssuerInternal(
+                                accessToken,
+                                newResourceServerDpopNonce,
+                                event,
+                                true,
+                            )
+                        } else {
+                            val errorResponse =
+                                GenericErrorResponseTO.fromWWWAuthenticate(wwwAuthenticate)
+                                    ?: GenericErrorResponseTO.InvalidToken
+                            throw NotificationFailed(errorResponse.error, errorResponse.errorDescription)
+                        }
+                    } else {
+                        throw NotificationFailed("invalid_token")
+                    }
+                }
+
+                else -> {
+                    val errorResponse = response.body<GenericErrorResponseTO>()
+                    throw NotificationFailed(errorResponse.error, errorResponse.errorDescription)
+                }
             }
         }
     }

@@ -33,16 +33,8 @@ internal fun HttpResponse.abcaChallege(): Nonce? = nonceHeader(AttestationBasedC
 private fun HttpResponse.nonceHeader(name: String): Nonce? = headers[name]?.let(::Nonce)
 
 /**
- * Checks if this [HttpResponse] is from a Resource Server that requires a Nonce value to be included in the DPoP Header.
+ * Checks if a Resource Server requires a Nonce value to be included in the DPoP Header.
  */
-internal fun HttpResponse.isResourceServerDpopNonceRequired(): Boolean =
-    when (status) {
-        HttpStatusCode.Unauthorized -> {
-            val wwwAuthenticate = headers[HttpHeaders.WWWAuthenticate]
-            wwwAuthenticate?.let {
-                it.contains("DPoP") && it.contains("error=\"use_dpop_nonce\"")
-            } ?: false
-        }
-
-        else -> false
-    }
+internal fun isResourceServerDpopNonceRequired(
+    wwwAuthenticate: String,
+): Boolean = wwwAuthenticate.startsWith("DPoP") && wwwAuthenticate.contains("error=\"use_dpop_nonce\"")

@@ -83,6 +83,8 @@ internal class CredentialEndpointClient(
                 },
         )
 
+        val newResourceServerDpopNonce = response.dpopNonce()
+        val updatedResourceServerDpopNonce = newResourceServerDpopNonce ?: resourceServerDpopNonce
         return if (response.status.isSuccess()) {
             val submissionOutcome = responsePossiblyEncrypted(
                 response,
@@ -90,18 +92,36 @@ internal class CredentialEndpointClient(
                 fromTransferObject = { it.toDomain() },
                 transferObjectFromJwtClaims = { CredentialResponseSuccessTO.from(it) },
             )
-            val newResourceServerDpopNonce = response.dpopNonce()
-            submissionOutcome to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
+            submissionOutcome to updatedResourceServerDpopNonce
         } else {
-            val newResourceServerDpopNonce = response.dpopNonce()
-            if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
-                placeIssuanceRequestInternal(accessToken, newResourceServerDpopNonce, request, true)
-            } else {
-                val error = response.body<GenericErrorResponseTO>()
-                SubmissionOutcomeInternal.Failed(error.toIssuanceError()) to (
-                    newResourceServerDpopNonce
-                        ?: resourceServerDpopNonce
-                    )
+            when (response.status) {
+                HttpStatusCode.Unauthorized -> {
+                    val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
+                    if (null != wwwAuthenticate) {
+                        if (isResourceServerDpopNonceRequired(wwwAuthenticate) && null != newResourceServerDpopNonce && !retried) {
+                            placeIssuanceRequestInternal(
+                                accessToken,
+                                newResourceServerDpopNonce,
+                                request,
+                                true,
+                            )
+                        } else {
+                            val responsePayload =
+                                GenericErrorResponseTO.fromWWWAuthenticate(wwwAuthenticate)
+                                    ?: GenericErrorResponseTO.InvalidToken
+                            val error = responsePayload.toIssuanceError()
+                            SubmissionOutcomeInternal.Failed(error) to updatedResourceServerDpopNonce
+                        }
+                    } else {
+                        val error = CredentialIssuanceError.InvalidToken()
+                        SubmissionOutcomeInternal.Failed(error) to updatedResourceServerDpopNonce
+                    }
+                }
+
+                else -> {
+                    val error = response.body<GenericErrorResponseTO>().toIssuanceError()
+                    SubmissionOutcomeInternal.Failed(error) to updatedResourceServerDpopNonce
+                }
             }
         }
     }
@@ -165,6 +185,8 @@ internal class DeferredEndPointClient(
                 },
         )
 
+        val newResourceServerDpopNonce = response.dpopNonce()
+        val updatedResourceServerDpopNonce = newResourceServerDpopNonce ?: resourceServerDpopNonce
         return if (response.status.isSuccess()) {
             val outcome =
                 responsePossiblyEncrypted<DeferredIssuanceSuccessResponseTO, DeferredCredentialQueryOutcome>(
@@ -176,22 +198,39 @@ internal class DeferredEndPointClient(
             if (outcome is DeferredCredentialQueryOutcome.IssuancePending) {
                 outcome.ensureTransactionId(transactionId)
             }
-            val newResourceServerDpopNonce = response.dpopNonce()
-            outcome to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
+            outcome to updatedResourceServerDpopNonce
         } else {
-            val newResourceServerDpopNonce = response.dpopNonce()
-            if (response.isResourceServerDpopNonceRequired() && newResourceServerDpopNonce != null && !retried) {
-                placeDeferredCredentialRequestInternal(
-                    accessToken,
-                    newResourceServerDpopNonce,
-                    transactionId,
-                    exchangeEncryptionSpecification,
-                    true,
-                )
-            } else {
-                val responsePayload = response.body<GenericErrorResponseTO>()
-                val errored = DeferredCredentialQueryOutcome.Errored(responsePayload.error, responsePayload.errorDescription)
-                errored to (newResourceServerDpopNonce ?: resourceServerDpopNonce)
+            when (response.status) {
+                HttpStatusCode.Unauthorized -> {
+                    val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
+                    if (null != wwwAuthenticate) {
+                        if (isResourceServerDpopNonceRequired(wwwAuthenticate) && null != newResourceServerDpopNonce && !retried) {
+                            placeDeferredCredentialRequestInternal(
+                                accessToken,
+                                newResourceServerDpopNonce,
+                                transactionId,
+                                exchangeEncryptionSpecification,
+                                true,
+                            )
+                        } else {
+                            val responsePayload =
+                                GenericErrorResponseTO.fromWWWAuthenticate(wwwAuthenticate)
+                                    ?: GenericErrorResponseTO.InvalidToken
+                            DeferredCredentialQueryOutcome.Errored(
+                                responsePayload.error,
+                                responsePayload.errorDescription,
+                            ) to updatedResourceServerDpopNonce
+                        }
+                    } else {
+                        DeferredCredentialQueryOutcome.Errored("invalid_token") to updatedResourceServerDpopNonce
+                    }
+                } else -> {
+                    val responsePayload = response.body<GenericErrorResponseTO>()
+                    DeferredCredentialQueryOutcome.Errored(
+                        responsePayload.error,
+                        responsePayload.errorDescription,
+                    ) to updatedResourceServerDpopNonce
+                }
             }
         }
     }

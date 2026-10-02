@@ -329,4 +329,23 @@ internal data class GenericErrorResponseTO(
         "invalid_encryption_parameters" -> InvalidEncryptionParameters()
         else -> IssuanceRequestFailed(error, errorDescription)
     }
+
+    companion object {
+
+        /**
+         * Tries to construct a [GenericErrorResponseTO] by parsing the `error` and `error_description` parameters from
+         * the challenge provided in the `WWW-Authenticate` response header.
+         *
+         * @param wwwAuthenticateHeader the challenge provided in the `WWW-Authenticate` response header
+         */
+        fun fromWWWAuthenticate(wwwAuthenticateHeader: String): GenericErrorResponseTO? {
+            fun String.param(name: String): String? = Regex("""\b$name="([^"]*)"""").find(this@param)?.groupValues?.get(1)
+            return wwwAuthenticateHeader.param("error")?.let { error ->
+                GenericErrorResponseTO(error, wwwAuthenticateHeader.param("error_description"))
+            }
+        }
+
+        val InvalidToken: GenericErrorResponseTO
+            get() = GenericErrorResponseTO(error = "invalid_token")
+    }
 }
