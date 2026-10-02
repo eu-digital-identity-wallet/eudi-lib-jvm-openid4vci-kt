@@ -331,10 +331,17 @@ internal data class GenericErrorResponseTO(
     }
 
     companion object {
-        fun fromWWWAuthenticate(challenge: String): GenericErrorResponseTO? {
+
+        /**
+         * Tries to construct a [GenericErrorResponseTO] by parsing the `error` and `error_description` parameters from
+         * the challenge provided in the `WWW-Authenticate` response header.
+         *
+         * @param wwwAuthenticateHeader the challenge provided in the `WWW-Authenticate` response header
+         */
+        fun fromWWWAuthenticate(wwwAuthenticateHeader: String): GenericErrorResponseTO? {
             fun String.param(name: String): String? = Regex("""\b$name="([^"]*)"""").find(this@param)?.groupValues?.get(1)
-            return challenge.param("error")?.let { error ->
-                GenericErrorResponseTO(error, challenge.param("error_description"))
+            return wwwAuthenticateHeader.param("error")?.let { error ->
+                GenericErrorResponseTO(error, wwwAuthenticateHeader.param("error_description"))
             }
         }
 
