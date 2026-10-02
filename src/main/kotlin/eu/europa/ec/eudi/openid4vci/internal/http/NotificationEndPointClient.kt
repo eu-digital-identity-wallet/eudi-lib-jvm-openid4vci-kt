@@ -62,15 +62,17 @@ internal class NotificationEndPointClient(
                 HttpStatusCode.Unauthorized -> {
                     val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
                     if (null != wwwAuthenticate) {
-                        val errorResponse =
-                            GenericErrorResponseTO.fromWWWAuthenticate(wwwAuthenticate)
-                                ?: GenericErrorResponseTO.InvalidToken
-                        val isResourceServerDpopNonceRequired =
-                            wwwAuthenticate.startsWith("DPoP") &&
-                                "use_dpop_nonce" == errorResponse.error
-                        if (isResourceServerDpopNonceRequired && null != newResourceServerDpopNonce && !retried) {
-                            notifyIssuerInternal(accessToken, newResourceServerDpopNonce, event, true)
+                        if (isResourceServerDpopNonceRequired(wwwAuthenticate) && null != newResourceServerDpopNonce && !retried) {
+                            notifyIssuerInternal(
+                                accessToken,
+                                newResourceServerDpopNonce,
+                                event,
+                                true,
+                            )
                         } else {
+                            val errorResponse =
+                                GenericErrorResponseTO.fromWWWAuthenticate(wwwAuthenticate)
+                                    ?: GenericErrorResponseTO.InvalidToken
                             throw NotificationFailed(errorResponse.error, errorResponse.errorDescription)
                         }
                     } else {

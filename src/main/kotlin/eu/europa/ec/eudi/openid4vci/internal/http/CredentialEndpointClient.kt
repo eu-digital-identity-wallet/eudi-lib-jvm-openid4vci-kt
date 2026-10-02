@@ -98,13 +98,7 @@ internal class CredentialEndpointClient(
                 HttpStatusCode.Unauthorized -> {
                     val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
                     if (null != wwwAuthenticate) {
-                        val responsePayload =
-                            GenericErrorResponseTO.fromWWWAuthenticate(wwwAuthenticate)
-                                ?: GenericErrorResponseTO.InvalidToken
-                        val isResourceServerDpopNonceRequired =
-                            wwwAuthenticate.startsWith("DPoP") &&
-                                "use_dpop_nonce" == responsePayload.error
-                        if (isResourceServerDpopNonceRequired && null != newResourceServerDpopNonce && !retried) {
+                        if (isResourceServerDpopNonceRequired(wwwAuthenticate) && null != newResourceServerDpopNonce && !retried) {
                             placeIssuanceRequestInternal(
                                 accessToken,
                                 newResourceServerDpopNonce,
@@ -112,6 +106,9 @@ internal class CredentialEndpointClient(
                                 true,
                             )
                         } else {
+                            val responsePayload =
+                                GenericErrorResponseTO.fromWWWAuthenticate(wwwAuthenticate)
+                                    ?: GenericErrorResponseTO.InvalidToken
                             val error = responsePayload.toIssuanceError()
                             SubmissionOutcomeInternal.Failed(error) to updatedResourceServerDpopNonce
                         }
@@ -207,13 +204,7 @@ internal class DeferredEndPointClient(
                 HttpStatusCode.Unauthorized -> {
                     val wwwAuthenticate = response.headers[HttpHeaders.WWWAuthenticate]
                     if (null != wwwAuthenticate) {
-                        val responsePayload =
-                            GenericErrorResponseTO.fromWWWAuthenticate(wwwAuthenticate)
-                                ?: GenericErrorResponseTO.InvalidToken
-                        val isResourceServerDpopNonceRequired =
-                            wwwAuthenticate.startsWith("DPoP") &&
-                                "use_dpop_nonce" == responsePayload.error
-                        if (isResourceServerDpopNonceRequired && null != newResourceServerDpopNonce && !retried) {
+                        if (isResourceServerDpopNonceRequired(wwwAuthenticate) && null != newResourceServerDpopNonce && !retried) {
                             placeDeferredCredentialRequestInternal(
                                 accessToken,
                                 newResourceServerDpopNonce,
@@ -222,6 +213,9 @@ internal class DeferredEndPointClient(
                                 true,
                             )
                         } else {
+                            val responsePayload =
+                                GenericErrorResponseTO.fromWWWAuthenticate(wwwAuthenticate)
+                                    ?: GenericErrorResponseTO.InvalidToken
                             DeferredCredentialQueryOutcome.Errored(
                                 responsePayload.error,
                                 responsePayload.errorDescription,
