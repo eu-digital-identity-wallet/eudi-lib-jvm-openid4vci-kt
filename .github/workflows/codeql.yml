@@ -15,5 +15,5 @@ permissions:
 
 jobs:
   CodeQL_caller:
-    uses: eu-digital-identity-wallet/eudi-infra-ci/.github/workflows/code_ql_kotlin.yml@main
+    uses: eu-digital-identity-wallet/eudi-infra-ci/.github/workflows/code_ql_kotlin.yml@testing/test-ubuntu-26
     secrets: inherit
