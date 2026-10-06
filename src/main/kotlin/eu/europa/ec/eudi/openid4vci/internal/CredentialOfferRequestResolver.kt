@@ -85,12 +85,15 @@ internal class CredentialOfferRequestResolver(
     private val requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
     private val responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
 ) {
-
-    suspend fun resolve(config: OpenId4VCIConfig, request: CredentialOfferRequest): Result<CredentialOffer> =
+    suspend fun resolve(
+        config: OpenId4VCIConfig,
+        request: CredentialOfferRequest,
+    ): Result<CredentialOffer> =
         runCatchingCancellable {
             val credentialOffer = fetchOffer(request)
-            val credentialIssuerId = CredentialIssuerId(credentialOffer.credentialIssuerIdentifier)
-                .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).raise() }
+            val credentialIssuerId =
+                CredentialIssuerId(credentialOffer.credentialIssuerIdentifier)
+                    .getOrElse { CredentialOfferRequestValidationError.InvalidCredentialIssuerId(it).raise() }
 
             ensure(credentialOffer.credentialConfigurationIds.isNotEmpty()) {
                 val er = IllegalArgumentException("credentials are required")
@@ -131,17 +134,19 @@ internal class CredentialOfferRequestResolver(
                 }
             }
 
-            val exchangeEncryptionSpecification = issuanceEncryptionSpecs(
-                issuerMetadata = credentialIssuerMetadata,
-                encryptionSupportConfig = config.encryptionSupportConfig,
-                requestEncryptionSpecFactory = requestEncryptionSpecFactory,
-                responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-            ).getOrThrow()
+            val exchangeEncryptionSpecification =
+                issuanceEncryptionSpecs(
+                    issuerMetadata = credentialIssuerMetadata,
+                    encryptionSupportConfig = config.encryptionSupportConfig,
+                    requestEncryptionSpecFactory = requestEncryptionSpecFactory,
+                    responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+                ).getOrThrow()
 
-            val dPoPCtx = run {
-                val dPoPUsage = config.dPoPUsage.map { it.provisionDPoPSigner.popAlgorithm }
-                DPoPCtx.createForServer(dPoPUsage, authorizationServerMetadata).getOrThrow()
-            }
+            val dPoPCtx =
+                run {
+                    val dPoPUsage = config.dPoPUsage.map { it.provisionDPoPSigner.popAlgorithm }
+                    DPoPCtx.createForServer(dPoPUsage, authorizationServerMetadata).getOrThrow()
+                }
 
             CredentialOffer(
                 credentialIssuerId,
@@ -155,15 +160,20 @@ internal class CredentialOfferRequestResolver(
         }
 
     private suspend fun fetchOffer(request: CredentialOfferRequest): CredentialOfferRequestTO {
-        val credentialOfferRequestObjectString: String = when (request) {
-            is CredentialOfferRequest.PassByValue -> request.value
-            is CredentialOfferRequest.PassByReference ->
-                try {
-                    httpClient.get(request.value.value).body()
-                } catch (t: Throwable) {
-                    throw CredentialOfferRequestError.UnableToFetchCredentialOffer(t).toException()
+        val credentialOfferRequestObjectString: String =
+            when (request) {
+                is CredentialOfferRequest.PassByValue -> {
+                    request.value
                 }
-        }
+
+                is CredentialOfferRequest.PassByReference -> {
+                    try {
+                        httpClient.get(request.value.value).body()
+                    } catch (t: Throwable) {
+                        throw CredentialOfferRequestError.UnableToFetchCredentialOffer(t).toException()
+                    }
+                }
+            }
         return try {
             JsonSupport.decodeFromString<CredentialOfferRequestTO>(credentialOfferRequestObjectString)
         } catch (t: Throwable) {
@@ -187,68 +197,83 @@ internal class CredentialOfferRequestResolver(
         }
 }
 
-private fun Grants.authServer(): HttpsUrl? = when (this) {
-    is Grants.AuthorizationCode -> authorizationServer
-    is Grants.PreAuthorizedCode -> authorizationServer
-    is Grants.Both -> authorizationCode.authorizationServer ?: preAuthorizedCode.authorizationServer
-}
+private fun Grants.authServer(): HttpsUrl? =
+    when (this) {
+        is Grants.AuthorizationCode -> authorizationServer
+        is Grants.PreAuthorizedCode -> authorizationServer
+        is Grants.Both -> authorizationCode.authorizationServer ?: preAuthorizedCode.authorizationServer
+    }
 
 /**
  * Tries to parse a [GrantsTO] to a [Grants] instance.
  */
-private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata): Grants? = runCatching {
-    fun TxCodeTO.toTxCode(): TxCode {
-        return when (inputMode) {
-            InputModeTO.TEXT ->
-                TxCode(
-                    inputMode = TxCodeInputMode.TEXT,
-                    length = length,
-                    description = description,
-                )
+private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata): Grants? =
+    runCatching {
+        fun TxCodeTO.toTxCode(): TxCode =
+            when (inputMode) {
+                InputModeTO.TEXT -> {
+                    TxCode(
+                        inputMode = TxCodeInputMode.TEXT,
+                        length = length,
+                        description = description,
+                    )
+                }
 
-            else ->
-                TxCode(
-                    inputMode = TxCodeInputMode.NUMERIC,
-                    length = length,
-                    description = description,
-                )
-        }
-    }
-
-    val maybeAuthorizationCodeGrant =
-        authorizationCode?.let {
-            val authorizationServer = it.authorizationServer?.let { url ->
-                val authServer = HttpsUrl(url).getOrThrow()
-                require(authServer in credentialIssuerMetadata.authorizationServers)
-                authServer
+                else -> {
+                    TxCode(
+                        inputMode = TxCodeInputMode.NUMERIC,
+                        length = length,
+                        description = description,
+                    )
+                }
             }
-            Grants.AuthorizationCode(it.issuerState, authorizationServer)
-        }
-    val maybePreAuthorizedCodeGrant =
-        preAuthorizedCode?.let {
-            val authorizationServer = it.authorizationServer?.let { url ->
-                val authServer = HttpsUrl(url).getOrThrow()
-                require(authServer in credentialIssuerMetadata.authorizationServers)
-                authServer
+
+        val maybeAuthorizationCodeGrant =
+            authorizationCode?.let {
+                val authorizationServer =
+                    it.authorizationServer?.let { url ->
+                        val authServer = HttpsUrl(url).getOrThrow()
+                        require(authServer in credentialIssuerMetadata.authorizationServers)
+                        authServer
+                    }
+                Grants.AuthorizationCode(it.issuerState, authorizationServer)
             }
-            Grants.PreAuthorizedCode(
-                it.preAuthorizedCode,
-                it.txCode?.toTxCode(),
-                authorizationServer,
-            )
+        val maybePreAuthorizedCodeGrant =
+            preAuthorizedCode?.let {
+                val authorizationServer =
+                    it.authorizationServer?.let { url ->
+                        val authServer = HttpsUrl(url).getOrThrow()
+                        require(authServer in credentialIssuerMetadata.authorizationServers)
+                        authServer
+                    }
+                Grants.PreAuthorizedCode(
+                    it.preAuthorizedCode,
+                    it.txCode?.toTxCode(),
+                    authorizationServer,
+                )
+            }
+
+        return when {
+            maybeAuthorizationCodeGrant != null && maybePreAuthorizedCodeGrant != null -> {
+                Grants.Both(
+                    maybeAuthorizationCodeGrant,
+                    maybePreAuthorizedCodeGrant,
+                )
+            }
+
+            maybeAuthorizationCodeGrant == null && maybePreAuthorizedCodeGrant == null -> {
+                null
+            }
+
+            maybeAuthorizationCodeGrant != null -> {
+                maybeAuthorizationCodeGrant
+            }
+
+            else -> {
+                maybePreAuthorizedCodeGrant
+            }
         }
-
-    return when {
-        maybeAuthorizationCodeGrant != null && maybePreAuthorizedCodeGrant != null -> Grants.Both(
-            maybeAuthorizationCodeGrant,
-            maybePreAuthorizedCodeGrant,
-        )
-
-        maybeAuthorizationCodeGrant == null && maybePreAuthorizedCodeGrant == null -> null
-        maybeAuthorizationCodeGrant != null -> maybeAuthorizationCodeGrant
-        else -> maybePreAuthorizedCodeGrant
-    }
-}.getOrElse { throw CredentialOfferRequestValidationError.InvalidGrants(it).toException() }
+    }.getOrElse { throw CredentialOfferRequestValidationError.InvalidGrants(it).toException() }
 
 /**
  * Creates and returns serialized a new Credential Offer using Authorization Code Grant.
@@ -266,17 +291,20 @@ internal fun createAuthorizationCodeGrantCredentialOffer(
         "At least one credential configuration identifier must be specified"
     }
 
-    val credentialOfferRequest = CredentialOfferRequestTO(
-        credentialIssuerIdentifier = credentialIssuerId.toString(),
-        credentialConfigurationIds = credentialConfigurationIdentifiers.map { it.value },
-        grants = GrantsTO(
-            authorizationCode = AuthorizationCodeTO(
-                authorizationServer = authorizationServer.toString(),
-                issuerState = null,
-            ),
-            preAuthorizedCode = null,
-        ),
-    )
+    val credentialOfferRequest =
+        CredentialOfferRequestTO(
+            credentialIssuerIdentifier = credentialIssuerId.toString(),
+            credentialConfigurationIds = credentialConfigurationIdentifiers.map { it.value },
+            grants =
+                GrantsTO(
+                    authorizationCode =
+                        AuthorizationCodeTO(
+                            authorizationServer = authorizationServer.toString(),
+                            issuerState = null,
+                        ),
+                    preAuthorizedCode = null,
+                ),
+        )
 
     return JsonSupport.encodeToString(credentialOfferRequest)
 }
@@ -293,19 +321,27 @@ private fun findSupportedGrants(
     walletSupported: SupportedGrants,
 ): SupportedGrants? =
     when (issuerSupported) {
-        is Grants.AuthorizationCode ->
+        is Grants.AuthorizationCode -> {
             when (walletSupported) {
                 SupportedGrants.AuthorizationCode,
                 SupportedGrants.Both,
                 -> SupportedGrants.AuthorizationCode
+
                 SupportedGrants.PreAuthorizedCode -> null
             }
-        is Grants.PreAuthorizedCode ->
+        }
+
+        is Grants.PreAuthorizedCode -> {
             when (walletSupported) {
                 SupportedGrants.PreAuthorizedCode,
                 SupportedGrants.Both,
                 -> SupportedGrants.PreAuthorizedCode
+
                 SupportedGrants.AuthorizationCode -> null
             }
-        is Grants.Both -> walletSupported
+        }
+
+        is Grants.Both -> {
+            walletSupported
+        }
     }

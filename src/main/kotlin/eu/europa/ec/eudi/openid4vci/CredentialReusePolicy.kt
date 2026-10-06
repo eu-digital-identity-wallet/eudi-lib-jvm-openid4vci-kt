@@ -18,10 +18,15 @@ package eu.europa.ec.eudi.openid4vci
 import java.io.Serializable
 import kotlin.time.Duration
 
-sealed class EudiReusePolicyType(val jsonValue: String) {
+sealed class EudiReusePolicyType(
+    val jsonValue: String,
+) {
     data object OnceOnly : EudiReusePolicyType("once_only")
+
     data object LimitedTime : EudiReusePolicyType("limited_time")
+
     data object RotatingBatch : EudiReusePolicyType("rotating-batch")
+
     data object PerRelyingParty : EudiReusePolicyType("per-relying-party")
 
     companion object {
@@ -44,7 +49,6 @@ sealed class EudiReusePolicyType(val jsonValue: String) {
  * A single ARF Annex II option in the reuse policy.
  */
 sealed interface EudiReusePolicy {
-
     val batchSize: Int?
     val reissueTriggerUnused: Int?
     val reissueTriggerLifetimeLeft: Duration?
@@ -58,7 +62,6 @@ sealed interface EudiReusePolicy {
         override val batchSize: Int,
         override val reissueTriggerUnused: Int,
     ) : EudiReusePolicy {
-
         init {
             validateBatchSize(batchSize)
             validateReissueTriggerUnused(reissueTriggerUnused, batchSize)
@@ -73,7 +76,6 @@ sealed interface EudiReusePolicy {
     data class LimitedTime(
         override val reissueTriggerLifetimeLeft: Duration,
     ) : EudiReusePolicy {
-
         init {
             validateReissueTriggerLifetimeLeft(reissueTriggerLifetimeLeft)
         }
@@ -89,7 +91,6 @@ sealed interface EudiReusePolicy {
         override val batchSize: Int,
         override val reissueTriggerLifetimeLeft: Duration,
     ) : EudiReusePolicy {
-
         init {
             validateBatchSize(batchSize)
             validateReissueTriggerLifetimeLeft(reissueTriggerLifetimeLeft)
@@ -106,7 +107,6 @@ sealed interface EudiReusePolicy {
         override val reissueTriggerLifetimeLeft: Duration,
         override val reissueTriggerUnused: Int,
     ) : EudiReusePolicy {
-
         init {
             validateBatchSize(batchSize)
             validateReissueTriggerLifetimeLeft(reissueTriggerLifetimeLeft)
@@ -129,45 +129,61 @@ sealed interface EudiReusePolicy {
 
             return details.map { detail ->
                 when (detail) {
-                    EudiReusePolicyType.OnceOnly -> OnceOnly(
-                        batchSize = requireNotNull(batchSize) {
-                            "batch_size is required when details contains once_only, rotating-batch, or per-relying-party"
-                        },
-                        reissueTriggerUnused = requireNotNull(reissueTriggerUnused) {
-                            "reissue_trigger_unused is required when details contains once_only"
-                        },
-                    )
+                    EudiReusePolicyType.OnceOnly -> {
+                        OnceOnly(
+                            batchSize =
+                                requireNotNull(batchSize) {
+                                    "batch_size is required when details contains once_only, rotating-batch, or per-relying-party"
+                                },
+                            reissueTriggerUnused =
+                                requireNotNull(reissueTriggerUnused) {
+                                    "reissue_trigger_unused is required when details contains once_only"
+                                },
+                        )
+                    }
 
-                    EudiReusePolicyType.LimitedTime -> LimitedTime(
-                        reissueTriggerLifetimeLeft = requireNotNull(reissueTriggerLifetimeLeft) {
-                            "reissue_trigger_lifetime_left is required when details contains limited_time, " +
-                                "rotating-batch, or per-relying-party"
-                        },
-                    )
+                    EudiReusePolicyType.LimitedTime -> {
+                        LimitedTime(
+                            reissueTriggerLifetimeLeft =
+                                requireNotNull(reissueTriggerLifetimeLeft) {
+                                    "reissue_trigger_lifetime_left is required when details contains limited_time, " +
+                                        "rotating-batch, or per-relying-party"
+                                },
+                        )
+                    }
 
-                    EudiReusePolicyType.RotatingBatch -> RotatingBatch(
-                        batchSize = requireNotNull(batchSize) {
-                            "batch_size is required when details contains once_only, rotating-batch, or per-relying-party"
-                        },
-                        reissueTriggerLifetimeLeft = requireNotNull(reissueTriggerLifetimeLeft) {
-                            "reissue_trigger_lifetime_left is required when details contains limited_time, " +
-                                "rotating-batch, or per-relying-party"
-                        },
-                    )
+                    EudiReusePolicyType.RotatingBatch -> {
+                        RotatingBatch(
+                            batchSize =
+                                requireNotNull(batchSize) {
+                                    "batch_size is required when details contains once_only, rotating-batch, or per-relying-party"
+                                },
+                            reissueTriggerLifetimeLeft =
+                                requireNotNull(reissueTriggerLifetimeLeft) {
+                                    "reissue_trigger_lifetime_left is required when details contains limited_time, " +
+                                        "rotating-batch, or per-relying-party"
+                                },
+                        )
+                    }
 
-                    EudiReusePolicyType.PerRelyingParty -> PerRelyingParty(
-                        batchSize = requireNotNull(batchSize) {
-                            "batch_size is required when details contains once_only, " +
-                                "rotating-batch, or per-relying-party"
-                        },
-                        reissueTriggerLifetimeLeft = requireNotNull(reissueTriggerLifetimeLeft) {
-                            "reissue_trigger_lifetime_left is required when details contains limited_time, " +
-                                "rotating-batch, or per-relying-party"
-                        },
-                        reissueTriggerUnused = requireNotNull(reissueTriggerUnused) {
-                            "reissue_trigger_unused is required when details contains once_only or per-relying-party"
-                        },
-                    )
+                    EudiReusePolicyType.PerRelyingParty -> {
+                        PerRelyingParty(
+                            batchSize =
+                                requireNotNull(batchSize) {
+                                    "batch_size is required when details contains once_only, " +
+                                        "rotating-batch, or per-relying-party"
+                                },
+                            reissueTriggerLifetimeLeft =
+                                requireNotNull(reissueTriggerLifetimeLeft) {
+                                    "reissue_trigger_lifetime_left is required when details contains limited_time, " +
+                                        "rotating-batch, or per-relying-party"
+                                },
+                            reissueTriggerUnused =
+                                requireNotNull(reissueTriggerUnused) {
+                                    "reissue_trigger_unused is required when details contains once_only or per-relying-party"
+                                },
+                        )
+                    }
                 }
             }
         }
@@ -176,7 +192,10 @@ sealed interface EudiReusePolicy {
             require(batchSize > 1) { "batch_size must be greater than 1" }
         }
 
-        private fun validateReissueTriggerUnused(reissueTriggerUnused: Int, batchSize: Int) {
+        private fun validateReissueTriggerUnused(
+            reissueTriggerUnused: Int,
+            batchSize: Int,
+        ) {
             require(reissueTriggerUnused >= 0) { "reissue_trigger_unused must be non-negative" }
             require(reissueTriggerUnused < batchSize) { "reissue_trigger_unused must be lower than batch_size" }
         }
@@ -192,7 +211,6 @@ sealed interface EudiReusePolicy {
  *
  */
 sealed interface CredentialReusePolicy : Serializable {
-
     /**
      * No reuse policy is defined.
      */
@@ -208,7 +226,6 @@ sealed interface CredentialReusePolicy : Serializable {
     data class EUDI(
         val options: List<EudiReusePolicy>,
     ) : CredentialReusePolicy {
-
         init {
             require(options.isNotEmpty()) { "options must not be empty for arf_annex_ii policy" }
             validateNoOverlappingDetails(options)
@@ -216,7 +233,6 @@ sealed interface CredentialReusePolicy : Serializable {
         }
 
         companion object {
-
             private fun validateNoOverlappingDetails(options: List<EudiReusePolicy>) {
                 if (options.size <= 1) return
                 val optionTypes = options.map { it::class }

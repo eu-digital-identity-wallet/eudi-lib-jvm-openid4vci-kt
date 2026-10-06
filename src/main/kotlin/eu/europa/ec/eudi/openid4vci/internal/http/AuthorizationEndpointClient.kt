@@ -41,7 +41,6 @@ import com.nimbusds.oauth2.sdk.Scope as NimbusScope
  * Sealed hierarchy of possible responses to a Pushed Authorization Request.
  */
 internal sealed interface PushedAuthorizationRequestResponseTO : java.io.Serializable {
-
     /**
      * Successful request submission.
      *
@@ -78,7 +77,6 @@ internal class AuthorizationEndpointClient(
     private val provisionedClientAttestation: suspend () -> ProvisionClientAttestation.Provisioned?,
     private val httpClient: HttpClient,
 ) {
-
     constructor(
         credentialIssuerId: CredentialIssuerId,
         authorizationServerMetadata: CIAuthorizationServerMetadata,
@@ -89,15 +87,18 @@ internal class AuthorizationEndpointClient(
     ) : this(
         credentialIssuerId,
         authorizationServerMetadata.issuer.value,
-        authorizationEndpoint = HttpsUrl(
-            requireNotNull(authorizationServerMetadata.authorizationEndpointURI) {
-                "missing authorization_endpoint"
-            }.toString(),
-        ).getOrThrow(),
-        pushedAuthorizationRequestEndpoint = authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
-            ?.let { HttpsUrl(it.toString()).getOrThrow() },
-        challengeEndpoint = authorizationServerMetadata.challengeEndpointURI
-            ?.let { HttpsUrl(it.toString()).getOrThrow() },
+        authorizationEndpoint =
+            HttpsUrl(
+                requireNotNull(authorizationServerMetadata.authorizationEndpointURI) {
+                    "missing authorization_endpoint"
+                }.toString(),
+            ).getOrThrow(),
+        pushedAuthorizationRequestEndpoint =
+            authorizationServerMetadata.pushedAuthorizationRequestEndpointURI
+                ?.let { HttpsUrl(it.toString()).getOrThrow() },
+        challengeEndpoint =
+            authorizationServerMetadata.challengeEndpointURI
+                ?.let { HttpsUrl(it.toString()).getOrThrow() },
         config,
         dPoPJwtFactory,
         provisionedClientAttestation,
@@ -124,22 +125,30 @@ internal class AuthorizationEndpointClient(
         state: String,
         issuerState: String?,
     ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> {
-        val usePar = when (config.parUsage) {
-            ParUsage.Never -> false
-            is ParUsage.IfSupported -> supportsPar
-            is ParUsage.Required -> {
-                require(supportsPar) {
-                    "PAR uses is required, yet authorization server doesn't advertise PAR endpoint"
+        val usePar =
+            when (config.parUsage) {
+                ParUsage.Never -> {
+                    false
                 }
-                true
+
+                is ParUsage.IfSupported -> {
+                    supportsPar
+                }
+
+                is ParUsage.Required -> {
+                    require(supportsPar) {
+                        "PAR uses is required, yet authorization server doesn't advertise PAR endpoint"
+                    }
+                    true
+                }
             }
-        }
         return if (usePar) {
-            val authorizationCodeDPoPBinding = when (config.parUsage) {
-                ParUsage.Never -> error("cannot happen")
-                is ParUsage.IfSupported -> config.parUsage.authorizationCodeDPoPBinding
-                is ParUsage.Required -> config.parUsage.authorizationCodeDPoPBinding
-            }
+            val authorizationCodeDPoPBinding =
+                when (config.parUsage) {
+                    ParUsage.Never -> error("cannot happen")
+                    is ParUsage.IfSupported -> config.parUsage.authorizationCodeDPoPBinding
+                    is ParUsage.Required -> config.parUsage.authorizationCodeDPoPBinding
+                }
             submitPushedAuthorizationRequest(scopes, credentialsConfigurationIds, state, issuerState, authorizationCodeDPoPBinding)
         } else {
             authorizationRequestUrl(scopes, credentialsConfigurationIds, state, issuerState).map { (a, b) ->
@@ -167,106 +176,120 @@ internal class AuthorizationEndpointClient(
         state: String,
         issuerState: String?,
         authorizationCodeDPoPBinding: Boolean,
-    ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> = runCatchingCancellable {
-        require(scopes.isNotEmpty() || credentialsConfigurationIds.isNotEmpty()) {
-            "No scopes or authorization details provided. Cannot submit par."
-        }
+    ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> =
+        runCatchingCancellable {
+            require(scopes.isNotEmpty() || credentialsConfigurationIds.isNotEmpty()) {
+                "No scopes or authorization details provided. Cannot submit par."
+            }
 
-        val parEndpoint = pushedAuthorizationRequestEndpoint?.value?.toURI()
-        checkNotNull(parEndpoint) { "PAR endpoint not advertised" }
-        val clientID = ClientID(config.clientAuthentication.id)
-        val codeVerifier = CodeVerifier()
-        val pushedAuthorizationRequest = run {
-            val request = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
-                redirectionURI(config.authFlowRedirectionURI)
-                codeChallenge(codeVerifier, CodeChallengeMethod.S256)
-                state(State(state))
-                issuerState?.let { customParameter("issuer_state", issuerState) }
-                if (scopes.isNotEmpty()) {
-                    scope(NimbusScope(*scopes.map { it.value }.toTypedArray()))
-                    if (!isCredentialIssuerAuthorizationServer) {
-                        resource(credentialIssuerId.value.value.toURI())
-                    }
+            val parEndpoint = pushedAuthorizationRequestEndpoint?.value?.toURI()
+            checkNotNull(parEndpoint) { "PAR endpoint not advertised" }
+            val clientID = ClientID(config.clientAuthentication.id)
+            val codeVerifier = CodeVerifier()
+            val pushedAuthorizationRequest =
+                run {
+                    val request =
+                        AuthorizationRequest
+                            .Builder(ResponseType.CODE, clientID)
+                            .apply {
+                                redirectionURI(config.authFlowRedirectionURI)
+                                codeChallenge(codeVerifier, CodeChallengeMethod.S256)
+                                state(State(state))
+                                issuerState?.let { customParameter("issuer_state", issuerState) }
+                                if (scopes.isNotEmpty()) {
+                                    scope(NimbusScope(*scopes.map { it.value }.toTypedArray()))
+                                    if (!isCredentialIssuerAuthorizationServer) {
+                                        resource(credentialIssuerId.value.value.toURI())
+                                    }
+                                }
+                                if (credentialsConfigurationIds.isNotEmpty()) {
+                                    authorizationDetails(
+                                        credentialsConfigurationIds.map {
+                                            it.toNimbusAuthDetail(
+                                                includeLocations = !isCredentialIssuerAuthorizationServer,
+                                                credentialIssuerId = credentialIssuerId,
+                                            )
+                                        },
+                                    )
+                                }
+                            }.build()
+                    PushedAuthorizationRequest(parEndpoint, request)
                 }
-                if (credentialsConfigurationIds.isNotEmpty()) {
-                    authorizationDetails(
-                        credentialsConfigurationIds.map {
-                            it.toNimbusAuthDetail(
-                                includeLocations = !isCredentialIssuerAuthorizationServer,
-                                credentialIssuerId = credentialIssuerId,
-                            )
-                        },
-                    )
-                }
-            }.build()
-            PushedAuthorizationRequest(parEndpoint, request)
+            val (response, dpopNonce) = pushAuthorizationRequest(parEndpoint, pushedAuthorizationRequest, authorizationCodeDPoPBinding)
+            val (pkceVerifier, url) = response.authorizationCodeUrlOrFail(clientID, codeVerifier)
+            Triple(pkceVerifier, url, dpopNonce)
         }
-        val (response, dpopNonce) = pushAuthorizationRequest(parEndpoint, pushedAuthorizationRequest, authorizationCodeDPoPBinding)
-        val (pkceVerifier, url) = response.authorizationCodeUrlOrFail(clientID, codeVerifier)
-        Triple(pkceVerifier, url, dpopNonce)
-    }
 
     private fun authorizationRequestUrl(
         credentialsScopes: List<Scope>,
         credentialsAuthorizationDetails: List<CredentialConfigurationIdentifier>,
         state: String,
         issuerState: String?,
-    ): Result<Pair<PKCEVerifier, HttpsUrl>> = runCatching {
-        require(credentialsScopes.isNotEmpty() || credentialsAuthorizationDetails.isNotEmpty()) {
-            "No scopes or authorization details provided. Cannot prepare authorization request."
+    ): Result<Pair<PKCEVerifier, HttpsUrl>> =
+        runCatching {
+            require(credentialsScopes.isNotEmpty() || credentialsAuthorizationDetails.isNotEmpty()) {
+                "No scopes or authorization details provided. Cannot prepare authorization request."
+            }
+
+            val clientID = ClientID(config.clientAuthentication.id)
+            val codeVerifier = CodeVerifier()
+            val authorizationRequest =
+                AuthorizationRequest
+                    .Builder(ResponseType.CODE, clientID)
+                    .apply {
+                        endpointURI(authorizationEndpoint.value.toURI())
+                        redirectionURI(config.authFlowRedirectionURI)
+                        codeChallenge(codeVerifier, CodeChallengeMethod.S256)
+                        state(State(state))
+                        issuerState?.let { customParameter("issuer_state", issuerState) }
+                        if (credentialsScopes.isNotEmpty()) {
+                            scope(NimbusScope(*credentialsScopes.map { it.value }.toTypedArray()))
+                            if (!isCredentialIssuerAuthorizationServer) {
+                                resource(credentialIssuerId.value.value.toURI())
+                            }
+                        }
+                        if (credentialsAuthorizationDetails.isNotEmpty()) {
+                            authorizationDetails(
+                                credentialsAuthorizationDetails.map {
+                                    it.toNimbusAuthDetail(
+                                        includeLocations = !isCredentialIssuerAuthorizationServer,
+                                        credentialIssuerId = credentialIssuerId,
+                                    )
+                                },
+                            )
+                        }
+                        prompt(Prompt.Type.LOGIN)
+                    }.build()
+
+            val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())
+            val url = HttpsUrl(authorizationRequest.toURI().toString()).getOrThrow()
+            pkceVerifier to url
         }
-
-        val clientID = ClientID(config.clientAuthentication.id)
-        val codeVerifier = CodeVerifier()
-        val authorizationRequest = AuthorizationRequest.Builder(ResponseType.CODE, clientID).apply {
-            endpointURI(authorizationEndpoint.value.toURI())
-            redirectionURI(config.authFlowRedirectionURI)
-            codeChallenge(codeVerifier, CodeChallengeMethod.S256)
-            state(State(state))
-            issuerState?.let { customParameter("issuer_state", issuerState) }
-            if (credentialsScopes.isNotEmpty()) {
-                scope(NimbusScope(*credentialsScopes.map { it.value }.toTypedArray()))
-                if (!isCredentialIssuerAuthorizationServer) {
-                    resource(credentialIssuerId.value.value.toURI())
-                }
-            }
-            if (credentialsAuthorizationDetails.isNotEmpty()) {
-                authorizationDetails(
-                    credentialsAuthorizationDetails.map {
-                        it.toNimbusAuthDetail(
-                            includeLocations = !isCredentialIssuerAuthorizationServer,
-                            credentialIssuerId = credentialIssuerId,
-                        )
-                    },
-                )
-            }
-            prompt(Prompt.Type.LOGIN)
-        }.build()
-
-        val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())
-        val url = HttpsUrl(authorizationRequest.toURI().toString()).getOrThrow()
-        pkceVerifier to url
-    }
 
     private fun PushedAuthorizationRequestResponseTO.authorizationCodeUrlOrFail(
         clientID: ClientID,
         codeVerifier: CodeVerifier,
-    ): Pair<PKCEVerifier, HttpsUrl> = when (this) {
-        is PushedAuthorizationRequestResponseTO.Success -> {
-            val authorizationCodeUrl = run {
-                val httpsUrl = URLBuilder(Url(authorizationEndpoint.value.toURI())).apply {
-                    parameters.append(AuthorizationEndpointParams.PARAM_CLIENT_ID, clientID.value)
-                    parameters.append(AuthorizationEndpointParams.PARAM_REQUEST_URI, requestURI)
-                }.build()
-                HttpsUrl(httpsUrl.toString()).getOrThrow()
+    ): Pair<PKCEVerifier, HttpsUrl> =
+        when (this) {
+            is PushedAuthorizationRequestResponseTO.Success -> {
+                val authorizationCodeUrl =
+                    run {
+                        val httpsUrl =
+                            URLBuilder(Url(authorizationEndpoint.value.toURI()))
+                                .apply {
+                                    parameters.append(AuthorizationEndpointParams.PARAM_CLIENT_ID, clientID.value)
+                                    parameters.append(AuthorizationEndpointParams.PARAM_REQUEST_URI, requestURI)
+                                }.build()
+                        HttpsUrl(httpsUrl.toString()).getOrThrow()
+                    }
+                val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())
+                pkceVerifier to authorizationCodeUrl
             }
-            val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())
-            pkceVerifier to authorizationCodeUrl
-        }
 
-        is PushedAuthorizationRequestResponseTO.Failure ->
-            throw PushedAuthorizationRequestFailed(error, errorDescription)
-    }
+            is PushedAuthorizationRequestResponseTO.Failure -> {
+                throw PushedAuthorizationRequestFailed(error, errorDescription)
+            }
+        }
 
     private suspend fun pushAuthorizationRequest(
         parEndpoint: URI,
@@ -274,12 +297,13 @@ internal class AuthorizationEndpointClient(
         authorizationCodeDPoPBinding: Boolean,
     ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> {
         val url = parEndpoint.toURL()
-        val formParameters = run {
-            val fps = pushedAuthorizationRequest.asFormPostParams()
-            Parameters.build {
-                fps.entries.forEach { (k, v) -> append(k, v) }
+        val formParameters =
+            run {
+                val fps = pushedAuthorizationRequest.asFormPostParams()
+                Parameters.build {
+                    fps.entries.forEach { (k, v) -> append(k, v) }
+                }
             }
-        }
 
         tailrec suspend fun requestInternal(
             existingAbcaChallenge: Nonce?,
@@ -287,28 +311,32 @@ internal class AuthorizationEndpointClient(
             abcaChallengeRetried: Boolean,
             dpopNonceRetried: Boolean,
         ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> {
-            val (abcaChallenge, dpopNonce) = getAbcaChallengeAndDPoPNonce(
-                existingAbcaChallenge = existingAbcaChallenge,
-                existingDpopNonce = existingDpopNonce,
-            )
+            val (abcaChallenge, dpopNonce) =
+                getAbcaChallengeAndDPoPNonce(
+                    existingAbcaChallenge = existingAbcaChallenge,
+                    existingDpopNonce = existingDpopNonce,
+                )
             val dpopProof =
                 if (authorizationCodeDPoPBinding)
                     dPoPJwtFactory()
                         ?.createDPoPJwt(Htm.POST, url, null, dpopNonce)
                         ?.getOrThrow()
                         ?.serialize()
-                else null
-            val clientAttestation = provisionedClientAttestation()?.generateClientAttestation(
-                config.clock,
-                config.clientAuthentication.id,
-                URI(authorizationIssuer).toURL(),
-                abcaChallenge,
-            )
+                else
+                    null
+            val clientAttestation =
+                provisionedClientAttestation()?.generateClientAttestation(
+                    config.clock,
+                    config.clientAuthentication.id,
+                    URI(authorizationIssuer).toURL(),
+                    abcaChallenge,
+                )
 
-            val response = httpClient.submitForm(url.toString(), formParameters) {
-                clientAttestation?.let { clientAttestationHeaders(it) }
-                dpopProof?.let { header(DPoP, dpopProof) }
-            }
+            val response =
+                httpClient.submitForm(url.toString(), formParameters) {
+                    clientAttestation?.let { clientAttestationHeaders(it) }
+                    dpopProof?.let { header(DPoP, dpopProof) }
+                }
 
             return when {
                 response.status.isSuccess() -> {
@@ -343,11 +371,15 @@ internal class AuthorizationEndpointClient(
                             )
                         }
 
-                        else -> errorTO to (newDopNonce ?: dpopNonce)
+                        else -> {
+                            errorTO to (newDopNonce ?: dpopNonce)
+                        }
                     }
                 }
 
-                else -> throw AccessTokenRequestFailed("Token request failed with ${response.status}", "N/A")
+                else -> {
+                    throw AccessTokenRequestFailed("Token request failed with ${response.status}", "N/A")
+                }
             }
         }
 

@@ -32,7 +32,6 @@ internal object PidDevIssuer :
     CanBeUsedWithVciLib,
     CanRequestForCredentialOffer<KeycloakUser> by CanRequestForCredentialOffer.onlyStatelessAuthorizationCode(IssuerId),
     CanRequestKeyAttestation by CanRequestKeyAttestation.usingWalletProviderService(KeyAttestationServiceUrl, enableLogging = false) {
-
     private const val WALLET_CLIENT_ID = "eudiw-abca"
     private val TrustAnyX509: (List<X509Certificate>) -> Boolean = { _ ->
         println("Warning!! Trusting any certificate. Do not use in production")
@@ -41,20 +40,22 @@ internal object PidDevIssuer :
 
     override val issuerId = IssuerId
     override val testUser = KeycloakUser("tneal", "password")
-    override val cfg = OpenId4VCIConfig(
-        clientAuthentication = ClientAuthentication.AttestationBased(
-            WALLET_CLIENT_ID,
-            WalletProviderProvisionClientAttestation(createHttpClient(enableLogging = false), WalletInstanceAttestationServiceUrl),
-        ),
-        dPoPUsage = DPoPUsage.Required(DPoPConfig(ProvisionDPoPSigner(CryptoGenerator.ecSigner(Curve.P_256, JWSAlgorithm.ES256)))),
-        authFlowRedirectionURI = Keycloak.DebugRedirectUri,
-        encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-        authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-        parUsage = ParUsage.Required(),
-        supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
-        proofs = ProofsConfig.Default,
-        issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(TrustAnyX509),
-    )
+    override val cfg =
+        OpenId4VCIConfig(
+            clientAuthentication =
+                ClientAuthentication.AttestationBased(
+                    WALLET_CLIENT_ID,
+                    WalletProviderProvisionClientAttestation(createHttpClient(enableLogging = false), WalletInstanceAttestationServiceUrl),
+                ),
+            dPoPUsage = DPoPUsage.Required(DPoPConfig(ProvisionDPoPSigner(CryptoGenerator.ecSigner(Curve.P_256, JWSAlgorithm.ES256)))),
+            authFlowRedirectionURI = Keycloak.DebugRedirectUri,
+            encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+            authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+            parUsage = ParUsage.Required(),
+            supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
+            proofs = ProofsConfig.Default,
+            issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(TrustAnyX509),
+        )
 
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_vc_sd_jwt")
     val PID_MsoMdoc_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_mso_mdoc")
@@ -62,10 +63,11 @@ internal object PidDevIssuer :
     val LearningCredential_SdJwtVcCompact_Config_Id =
         CredentialConfigurationIdentifier("urn:eu.europa.ec.eudi:learning:credential:1:dc+sd-jwt-compact")
 
-    val AllCredentialConfigurationIds = listOf(
-        PID_SdJwtVC_config_id,
-        PID_MsoMdoc_config_id,
-        MDL_config_id,
-        LearningCredential_SdJwtVcCompact_Config_Id,
-    )
+    val AllCredentialConfigurationIds =
+        listOf(
+            PID_SdJwtVC_config_id,
+            PID_MsoMdoc_config_id,
+            MDL_config_id,
+            LearningCredential_SdJwtVcCompact_Config_Id,
+        )
 }

@@ -48,7 +48,6 @@ interface Issuer :
     RequestIssuance,
     QueryForDeferredCredential,
     NotifyIssuer {
-
     val credentialOffer: CredentialOffer
 
     /**
@@ -64,7 +63,6 @@ interface Issuer :
     fun AuthorizedRequest.deferredContext(deferredCredential: SubmissionOutcome.Deferred): DeferredIssuanceContext
 
     companion object {
-
         /**
          * Fetches & validates the issuer's [CredentialIssuerMetadata] and list
          * of [CIAuthorizationServerMetadata][OAUTH2 server(s) metadata] used by the issuer
@@ -80,23 +78,27 @@ interface Issuer :
             httpClient: HttpClient,
             credentialIssuerId: CredentialIssuerId,
             policy: IssuerMetadataPolicy,
-        ): Pair<CredentialIssuerMetadata, List<CIAuthorizationServerMetadata>> = coroutineScope {
-            with(httpClient) {
-                val issuerMetadata = run {
-                    val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
-                    resolver.resolve(credentialIssuerId, policy).getOrThrow()
-                }
-                val authorizationServersMetadata =
-                    issuerMetadata.authorizationServers.distinct().map { authServerUrl ->
-                        async {
-                            val resolver = DefaultAuthorizationServerMetadataResolver(httpClient)
-                            resolver.resolve(authServerUrl).getOrThrow()
+        ): Pair<CredentialIssuerMetadata, List<CIAuthorizationServerMetadata>> =
+            coroutineScope {
+                with(httpClient) {
+                    val issuerMetadata =
+                        run {
+                            val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
+                            resolver.resolve(credentialIssuerId, policy).getOrThrow()
                         }
-                    }.awaitAll()
+                    val authorizationServersMetadata =
+                        issuerMetadata.authorizationServers
+                            .distinct()
+                            .map { authServerUrl ->
+                                async {
+                                    val resolver = DefaultAuthorizationServerMetadataResolver(httpClient)
+                                    resolver.resolve(authServerUrl).getOrThrow()
+                                }
+                            }.awaitAll()
 
-                issuerMetadata to authorizationServersMetadata
+                    issuerMetadata to authorizationServersMetadata
+                }
             }
-        }
 
         /**
          * Factory method for creating an instance of [Issuer] based on a resolved and validated credential offer.
@@ -116,200 +118,228 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): Result<IssuerNegotiationResult> = runCatchingCancellable {
-            val authorizationServer = HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
+        ): Result<IssuerNegotiationResult> =
+            runCatchingCancellable {
+                val authorizationServer = HttpsUrl(credentialOffer.authorizationServerMetadata.issuer.value).getOrThrow()
 
-            val provisionClientAttestation =
-                when (val clientAuthentication = config.clientAuthentication) {
-                    is ClientAuthentication.AttestationBased -> {
-                        clientAuthentication.provisionClientAttestation.ensureSupportedByAuthorizationServer(
-                            credentialOffer.authorizationServerMetadata,
-                        )
+                val provisionClientAttestation =
+                    when (val clientAuthentication = config.clientAuthentication) {
+                        is ClientAuthentication.AttestationBased -> {
+                            clientAuthentication.provisionClientAttestation.ensureSupportedByAuthorizationServer(
+                                credentialOffer.authorizationServerMetadata,
+                            )
 
-                        clientAttestation(
-                            authorizationServer,
-                            credentialOffer.credentialIssuerMetadata.preferredClientStatusPeriod,
-                            clientAuthentication,
-                        )
+                            clientAttestation(
+                                authorizationServer,
+                                credentialOffer.credentialIssuerMetadata.preferredClientStatusPeriod,
+                                clientAuthentication,
+                            )
+                        }
+
+                        is ClientAuthentication.None -> {
+                            { null }
+                        }
                     }
 
-                    is ClientAuthentication.None -> {
+                val dPoPConfig =
+                    when (val dPoPUsage = config.dPoPUsage) {
+                        DPoPUsage.Never -> {
+                            null
+                        }
+
+                        is DPoPUsage.IfSupported -> {
+                            dPoPUsage.value
+                        }
+
+                        is DPoPUsage.Required -> {
+                            checkNotNull(credentialOffer.dPoPCtx) {
+                                "Client requires the usage of DPoP, but the Authorization Server does not support DPoP " +
+                                    "or the signing algorithm supported by the Client"
+                            }
+                            dPoPUsage.value
+                        }
+                    }
+
+                val provisionDPoPJwtFactory =
+                    if (null != credentialOffer.dPoPCtx) {
+                        checkNotNull(dPoPConfig) { "dPoPConfig is required when using DPoP" }
+                        dPoPJwtFactory(config.clock, authorizationServer, dPoPConfig)
+                    } else {
                         { null }
                     }
-                }
 
-            val dPoPConfig = when (val dPoPUsage = config.dPoPUsage) {
-                DPoPUsage.Never -> null
-                is DPoPUsage.IfSupported -> dPoPUsage.value
-                is DPoPUsage.Required -> {
-                    checkNotNull(credentialOffer.dPoPCtx) {
-                        "Client requires the usage of DPoP, but the Authorization Server does not support DPoP " +
-                            "or the signing algorithm supported by the Client"
-                    }
-                    dPoPUsage.value
-                }
-            }
+                val authorizationEndpointClient =
+                    credentialOffer.authorizationServerMetadata
+                        .authorizationEndpointURI
+                        ?.let {
+                            AuthorizationEndpointClient(
+                                credentialOffer.credentialIssuerIdentifier,
+                                credentialOffer.authorizationServerMetadata,
+                                config,
+                                provisionDPoPJwtFactory,
+                                provisionClientAttestation,
+                                httpClient,
+                            )
+                        }
 
-            val provisionDPoPJwtFactory =
-                if (null != credentialOffer.dPoPCtx) {
-                    checkNotNull(dPoPConfig) { "dPoPConfig is required when using DPoP" }
-                    dPoPJwtFactory(config.clock, authorizationServer, dPoPConfig)
-                } else {
-                    { null }
-                }
-
-            val authorizationEndpointClient =
-                credentialOffer.authorizationServerMetadata
-                    .authorizationEndpointURI
-                    ?.let {
-                        AuthorizationEndpointClient(
-                            credentialOffer.credentialIssuerIdentifier,
-                            credentialOffer.authorizationServerMetadata,
-                            config,
-                            provisionDPoPJwtFactory,
-                            provisionClientAttestation,
-                            httpClient,
-                        )
-                    }
-
-            val tokenEndpointClient =
-                TokenEndpointClient(
-                    credentialOffer.credentialIssuerIdentifier,
-                    credentialOffer.authorizationServerMetadata,
-                    config,
-                    provisionDPoPJwtFactory,
-                    provisionClientAttestation,
-                    httpClient,
-                )
-
-            val authorizeIssuance =
-                AuthorizeIssuanceImpl(
-                    credentialOffer,
-                    config,
-                    authorizationEndpointClient,
-                    tokenEndpointClient,
-                )
-
-            val requestIssuance = run {
-                val credentialEndpointClient =
-                    CredentialEndpointClient(
-                        credentialOffer.credentialIssuerMetadata.credentialEndpoint,
+                val tokenEndpointClient =
+                    TokenEndpointClient(
+                        credentialOffer.credentialIssuerIdentifier,
+                        credentialOffer.authorizationServerMetadata,
+                        config,
                         provisionDPoPJwtFactory,
+                        provisionClientAttestation,
                         httpClient,
                     )
-                val nonceEndpointClient = credentialOffer.credentialIssuerMetadata.nonceEndpoint?.let {
-                    NonceEndpointClient(
-                        credentialOffer.credentialIssuerMetadata.nonceEndpoint,
-                        httpClient,
+
+                val authorizeIssuance =
+                    AuthorizeIssuanceImpl(
+                        credentialOffer,
+                        config,
+                        authorizationEndpointClient,
+                        tokenEndpointClient,
                     )
-                }
-                RequestIssuanceImpl(
-                    credentialOffer,
-                    config,
-                    credentialEndpointClient,
-                    nonceEndpointClient,
-                    credentialOffer.credentialIssuerMetadata.batchCredentialIssuance,
-                    credentialOffer.exchangeEncryptionSpecification,
-                )
-            }
 
-            val refreshAccessToken = RefreshAccessTokenImpl(tokenEndpointClient)
-
-            val queryForDeferredCredential =
-                when (val deferredEndpoint = credentialOffer.credentialIssuerMetadata.deferredCredentialEndpoint) {
-                    null -> QueryForDeferredCredential.NotSupported
-                    else -> {
-                        val deferredEndPointClient =
-                            DeferredEndPointClient(deferredEndpoint, provisionDPoPJwtFactory, httpClient)
-                        QueryForDeferredCredential(
-                            config.clock,
-                            refreshAccessToken,
-                            deferredEndPointClient,
+                val requestIssuance =
+                    run {
+                        val credentialEndpointClient =
+                            CredentialEndpointClient(
+                                credentialOffer.credentialIssuerMetadata.credentialEndpoint,
+                                provisionDPoPJwtFactory,
+                                httpClient,
+                            )
+                        val nonceEndpointClient =
+                            credentialOffer.credentialIssuerMetadata.nonceEndpoint?.let {
+                                NonceEndpointClient(
+                                    credentialOffer.credentialIssuerMetadata.nonceEndpoint,
+                                    httpClient,
+                                )
+                            }
+                        RequestIssuanceImpl(
+                            credentialOffer,
+                            config,
+                            credentialEndpointClient,
+                            nonceEndpointClient,
+                            credentialOffer.credentialIssuerMetadata.batchCredentialIssuance,
                             credentialOffer.exchangeEncryptionSpecification,
                         )
                     }
-                }
 
-            val notifyIssuer =
-                when (val notificationEndpoint = credentialOffer.credentialIssuerMetadata.notificationEndpoint) {
-                    null -> NotifyIssuer.NoOp
-                    else -> {
-                        val notificationEndPointClient =
-                            NotificationEndPointClient(notificationEndpoint, provisionDPoPJwtFactory, httpClient)
-                        NotifyIssuer(notificationEndPointClient)
-                    }
-                }
+                val refreshAccessToken = RefreshAccessTokenImpl(tokenEndpointClient)
 
-            val policyViolationWarnings = config.registrationCertificatePolicy?.let { policy ->
-                with(RegistrationCertificatePolicyEvaluator(policy)) {
-                    when (val authorization = evaluate(credentialOffer)) {
-                        is RegistrationCertificatePolicy.Authorization.Granted -> authorization.warnings
-                        is RegistrationCertificatePolicy.Authorization.NotGranted ->
-                            throw AuthorizationPolicyValidationError.AuthorizationPolicyNotMet(authorization.error)
-                    }
-                }
-            } ?: emptyList()
+                val queryForDeferredCredential =
+                    when (val deferredEndpoint = credentialOffer.credentialIssuerMetadata.deferredCredentialEndpoint) {
+                        null -> {
+                            QueryForDeferredCredential.NotSupported
+                        }
 
-            val issuer = object :
-                Issuer,
-                AuthorizeIssuance by authorizeIssuance,
-                RefreshAccessToken by refreshAccessToken,
-                RequestIssuance by requestIssuance,
-                QueryForDeferredCredential by queryForDeferredCredential,
-                NotifyIssuer by notifyIssuer {
-                override val credentialOffer: CredentialOffer
-                    get() = credentialOffer
-
-                override fun AuthorizedRequest.deferredContext(
-                    deferredCredential: SubmissionOutcome.Deferred,
-                ): DeferredIssuanceContext {
-                    val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
-                    val authorizationServerMetadata = credentialOffer.authorizationServerMetadata
-
-                    val deferredEndpoint =
-                        HttpsUrl(
-                            checkNotNull(credentialIssuerMetadata.deferredCredentialEndpoint?.value) {
-                                "Missing deferred credential endpoint"
-                            }.toString(),
-                        ).getOrThrow()
-
-                    val challengeEndpoint = authorizationServerMetadata.challengeEndpointURI?.let {
-                        HttpsUrl(it.toString()).getOrThrow()
+                        else -> {
+                            val deferredEndPointClient =
+                                DeferredEndPointClient(deferredEndpoint, provisionDPoPJwtFactory, httpClient)
+                            QueryForDeferredCredential(
+                                config.clock,
+                                refreshAccessToken,
+                                deferredEndPointClient,
+                                credentialOffer.exchangeEncryptionSpecification,
+                            )
+                        }
                     }
 
-                    val tokenEndpoint = HttpsUrl(
-                        checkNotNull(authorizationServerMetadata.tokenEndpointURI) {
-                            "Missing token endpoint"
-                        }.toString(),
-                    ).getOrThrow()
+                val notifyIssuer =
+                    when (val notificationEndpoint = credentialOffer.credentialIssuerMetadata.notificationEndpoint) {
+                        null -> {
+                            NotifyIssuer.NoOp
+                        }
 
-                    return DeferredIssuanceContext(
-                        DeferredIssuerConfig(
-                            credentialIssuerId = credentialOffer.credentialIssuerIdentifier,
-                            clientAuthentication = config.clientAuthentication,
-                            deferredEndpoint = deferredEndpoint,
-                            authorizationServerId = HttpsUrl(
-                                authorizationServerMetadata.issuer.value,
-                            ).getOrThrow(),
-                            challengeEndpoint = challengeEndpoint,
-                            tokenEndpoint = tokenEndpoint,
-                            requestEncryptionSpec = credentialOffer.exchangeEncryptionSpecification.requestEncryptionSpec,
-                            responseEncryptionParams = credentialOffer.exchangeEncryptionSpecification.responseEncryptionSpec?.let {
-                                it.encryptionMethod to it.compressionAlgorithm
-                            },
-                            dPoPConfig =
-                                if (null != credentialOffer.dPoPCtx) dPoPConfig
-                                else null,
-                            clock = config.clock,
-                            isDPoPRequired = config.dPoPUsage is DPoPUsage.Required,
-                        ),
-                        AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
-                    )
-                }
+                        else -> {
+                            val notificationEndPointClient =
+                                NotificationEndPointClient(notificationEndpoint, provisionDPoPJwtFactory, httpClient)
+                            NotifyIssuer(notificationEndPointClient)
+                        }
+                    }
+
+                val policyViolationWarnings =
+                    config.registrationCertificatePolicy?.let { policy ->
+                        with(RegistrationCertificatePolicyEvaluator(policy)) {
+                            when (val authorization = evaluate(credentialOffer)) {
+                                is RegistrationCertificatePolicy.Authorization.Granted -> {
+                                    authorization.warnings
+                                }
+
+                                is RegistrationCertificatePolicy.Authorization.NotGranted -> {
+                                    throw AuthorizationPolicyValidationError.AuthorizationPolicyNotMet(authorization.error)
+                                }
+                            }
+                        }
+                    } ?: emptyList()
+
+                val issuer =
+                    object :
+                        Issuer,
+                        AuthorizeIssuance by authorizeIssuance,
+                        RefreshAccessToken by refreshAccessToken,
+                        RequestIssuance by requestIssuance,
+                        QueryForDeferredCredential by queryForDeferredCredential,
+                        NotifyIssuer by notifyIssuer {
+                        override val credentialOffer: CredentialOffer
+                            get() = credentialOffer
+
+                        override fun AuthorizedRequest.deferredContext(
+                            deferredCredential: SubmissionOutcome.Deferred,
+                        ): DeferredIssuanceContext {
+                            val credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata
+                            val authorizationServerMetadata = credentialOffer.authorizationServerMetadata
+
+                            val deferredEndpoint =
+                                HttpsUrl(
+                                    checkNotNull(credentialIssuerMetadata.deferredCredentialEndpoint?.value) {
+                                        "Missing deferred credential endpoint"
+                                    }.toString(),
+                                ).getOrThrow()
+
+                            val challengeEndpoint =
+                                authorizationServerMetadata.challengeEndpointURI?.let {
+                                    HttpsUrl(it.toString()).getOrThrow()
+                                }
+
+                            val tokenEndpoint =
+                                HttpsUrl(
+                                    checkNotNull(authorizationServerMetadata.tokenEndpointURI) {
+                                        "Missing token endpoint"
+                                    }.toString(),
+                                ).getOrThrow()
+
+                            return DeferredIssuanceContext(
+                                DeferredIssuerConfig(
+                                    credentialIssuerId = credentialOffer.credentialIssuerIdentifier,
+                                    clientAuthentication = config.clientAuthentication,
+                                    deferredEndpoint = deferredEndpoint,
+                                    authorizationServerId =
+                                        HttpsUrl(
+                                            authorizationServerMetadata.issuer.value,
+                                        ).getOrThrow(),
+                                    challengeEndpoint = challengeEndpoint,
+                                    tokenEndpoint = tokenEndpoint,
+                                    requestEncryptionSpec = credentialOffer.exchangeEncryptionSpecification.requestEncryptionSpec,
+                                    responseEncryptionParams =
+                                        credentialOffer.exchangeEncryptionSpecification.responseEncryptionSpec?.let {
+                                            it.encryptionMethod to it.compressionAlgorithm
+                                        },
+                                    dPoPConfig =
+                                        if (null != credentialOffer.dPoPCtx)
+                                            dPoPConfig
+                                        else
+                                            null,
+                                    clock = config.clock,
+                                    isDPoPRequired = config.dPoPUsage is DPoPUsage.Required,
+                                ),
+                                AuthorizedTransaction(this@deferredContext, deferredCredential.transactionId),
+                            )
+                        }
+                    }
+
+                issuer to policyViolationWarnings
             }
-
-            issuer to policyViolationWarnings
-        }
 
         /**
          * Factory method for creating an instance of [Issuer] based on a credential offer URI.
@@ -330,22 +360,25 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): Result<IssuerNegotiationResult> = runCatchingCancellable {
-            val credentialOffer = CredentialOffer.resolve(
-                requestEncryptionSpecFactory,
-                responseEncryptionSpecFactory,
-                httpClient,
-                config,
-                credentialOfferUri,
-            ).getOrThrow()
-            make(
-                config,
-                credentialOffer,
-                httpClient,
-                requestEncryptionSpecFactory,
-                responseEncryptionSpecFactory,
-            ).getOrThrow()
-        }
+        ): Result<IssuerNegotiationResult> =
+            runCatchingCancellable {
+                val credentialOffer =
+                    CredentialOffer
+                        .resolve(
+                            requestEncryptionSpecFactory,
+                            responseEncryptionSpecFactory,
+                            httpClient,
+                            config,
+                            credentialOfferUri,
+                        ).getOrThrow()
+                make(
+                    config,
+                    credentialOffer,
+                    httpClient,
+                    requestEncryptionSpecFactory,
+                    responseEncryptionSpecFactory,
+                ).getOrThrow()
+            }
 
         /**
          * Factory method for creating an instance of [Issuer] with a credential offer (Wallet initiated)
@@ -372,34 +405,35 @@ interface Issuer :
             httpClient: HttpClient,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
-        ): Result<IssuerNegotiationResult> = runCatchingCancellable {
-            val metadata = metaData(httpClient, credentialIssuerId, config.issuerMetadataPolicy)
-            val authorizationServer = metadata.first.authorizationServers.first()
+        ): Result<IssuerNegotiationResult> =
+            runCatchingCancellable {
+                val metadata = metaData(httpClient, credentialIssuerId, config.issuerMetadataPolicy)
+                val authorizationServer = metadata.first.authorizationServers.first()
 
-            val credentialOffer = CredentialOffer.walletInitiated(
-                requestEncryptionSpecFactory,
-                responseEncryptionSpecFactory,
-                httpClient,
-                config,
-                credentialIssuerId,
-                credentialConfigurationIdentifiers,
-                authorizationServer,
-            ).getOrThrow()
+                val credentialOffer =
+                    CredentialOffer
+                        .walletInitiated(
+                            requestEncryptionSpecFactory,
+                            responseEncryptionSpecFactory,
+                            httpClient,
+                            config,
+                            credentialIssuerId,
+                            credentialConfigurationIdentifiers,
+                            authorizationServer,
+                        ).getOrThrow()
 
-            make(
-                config,
-                credentialOffer,
-                httpClient,
-                requestEncryptionSpecFactory,
-                responseEncryptionSpecFactory,
-            ).getOrThrow()
-        }
+                make(
+                    config,
+                    credentialOffer,
+                    httpClient,
+                    requestEncryptionSpecFactory,
+                    responseEncryptionSpecFactory,
+                ).getOrThrow()
+            }
     }
 }
 
-internal fun ProvisionClientAttestation.ensureSupportedByAuthorizationServer(
-    authorizationServerMetadata: CIAuthorizationServerMetadata,
-) {
+internal fun ProvisionClientAttestation.ensureSupportedByAuthorizationServer(authorizationServerMetadata: CIAuthorizationServerMetadata) {
     val supportedAuthenticationMethods = authorizationServerMetadata.tokenEndpointAuthMethods.orEmpty()
     val authenticationMethod =
         ClientAuthenticationMethod(AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_CLIENT_AUTHENTICATION_METHOD)
@@ -425,7 +459,10 @@ internal fun ProvisionClientAttestation.ensureSupportedByAuthorizationServer(
  * is active and according to the specification advertised by the [this].
  */
 @Suppress("UNUSED")
-fun ProvisionClientAttestation.ensureValid(now: Instant, provisioned: ProvisionClientAttestation.Provisioned) {
+fun ProvisionClientAttestation.ensureValid(
+    now: Instant,
+    provisioned: ProvisionClientAttestation.Provisioned,
+) {
     val clientAttestation = SignedJWT.parse(provisioned.clientAttestation.value)
 
     check(algorithm.toNimbus() == clientAttestation.header.algorithm) {
@@ -446,10 +483,10 @@ fun ProvisionClientAttestation.ensureValid(now: Instant, provisioned: ProvisionC
     }
 }
 
-sealed class AuthorizationPolicyValidationError(cause: Throwable) : Throwable(cause) {
-
-    class MissingIssuerInfo :
-        AuthorizationPolicyValidationError(IllegalArgumentException("Missing issuer info"))
+sealed class AuthorizationPolicyValidationError(
+    cause: Throwable,
+) : Throwable(cause) {
+    class MissingIssuerInfo : AuthorizationPolicyValidationError(IllegalArgumentException("Missing issuer info"))
 
     class MissingRegistrationCertificate :
         AuthorizationPolicyValidationError(IllegalArgumentException("Missing issuer registration certificate"))
@@ -457,16 +494,17 @@ sealed class AuthorizationPolicyValidationError(cause: Throwable) : Throwable(ca
     class MultipleRegistrationCertificates :
         AuthorizationPolicyValidationError(IllegalArgumentException("Multiple Registration Certificates provided while only one expected"))
 
-    class MissingAccessCertificate :
-        AuthorizationPolicyValidationError(IllegalArgumentException("Missing access certificate"))
+    class MissingAccessCertificate : AuthorizationPolicyValidationError(IllegalArgumentException("Missing access certificate"))
 
-    class AuthorizationPolicyNotMet(val violation: RegistrationCertificatePolicy.PolicyViolation) :
-        AuthorizationPolicyValidationError(IllegalArgumentException("Authorization policy not met"))
+    class AuthorizationPolicyNotMet(
+        val violation: RegistrationCertificatePolicy.PolicyViolation,
+    ) : AuthorizationPolicyValidationError(IllegalArgumentException("Authorization policy not met"))
 
-    class MalformedRegistrationCertificate(msg: String) :
-        AuthorizationPolicyValidationError(IllegalArgumentException(msg)) {
-            init {
-                require(msg.isNotEmpty()) { "Cause cannot be empty" }
-            }
+    class MalformedRegistrationCertificate(
+        msg: String,
+    ) : AuthorizationPolicyValidationError(IllegalArgumentException(msg)) {
+        init {
+            require(msg.isNotEmpty()) { "Cause cannot be empty" }
         }
+    }
 }
