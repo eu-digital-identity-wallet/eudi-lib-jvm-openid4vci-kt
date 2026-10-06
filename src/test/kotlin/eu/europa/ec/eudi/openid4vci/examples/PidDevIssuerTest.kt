@@ -27,42 +27,45 @@ import kotlin.time.measureTime
 
 @DisplayName("PID DEV Issuer Test")
 class PidDevIssuerTest {
+    @Test
+    @Ignore
+    fun `Issue PID in mso_mdoc using authorize code flow and JWT proofs`() =
+        runTest {
+            repeatBatchIssuanceUsingAuthorizationCodeFlow(
+                PidDevIssuer.PID_MsoMdoc_config_id,
+                ProofsType.JwtProof(BatchOption.Specific(2)),
+            )
+        }
 
     @Test
     @Ignore
-    fun `Issue PID in mso_mdoc using authorize code flow and JWT proofs`() = runTest {
-        repeatBatchIssuanceUsingAuthorizationCodeFlow(
-            PidDevIssuer.PID_MsoMdoc_config_id,
-            ProofsType.JwtProof(BatchOption.Specific(2)),
-        )
-    }
+    fun `Issue PID in sd-jwt vc using authorize code flow and JWT proofs`() =
+        runTest {
+            repeatBatchIssuanceUsingAuthorizationCodeFlow(
+                PidDevIssuer.PID_SdJwtVC_config_id,
+                ProofsType.JwtProof(BatchOption.Specific(2)),
+            )
+        }
 
     @Test
     @Ignore
-    fun `Issue PID in sd-jwt vc using authorize code flow and JWT proofs`() = runTest {
-        repeatBatchIssuanceUsingAuthorizationCodeFlow(
-            PidDevIssuer.PID_SdJwtVC_config_id,
-            ProofsType.JwtProof(BatchOption.Specific(2)),
-        )
-    }
+    fun `Issue mDL in mso_mdoc using authorize code flow and JWT proofs`() =
+        runTest {
+            repeatBatchIssuanceUsingAuthorizationCodeFlow(
+                PidDevIssuer.MDL_config_id,
+                ProofsType.JwtProof(BatchOption.Specific(2)),
+            )
+        }
 
     @Test
     @Ignore
-    fun `Issue mDL in mso_mdoc using authorize code flow and JWT proofs`() = runTest {
-        repeatBatchIssuanceUsingAuthorizationCodeFlow(
-            PidDevIssuer.MDL_config_id,
-            ProofsType.JwtProof(BatchOption.Specific(2)),
-        )
-    }
-
-    @Test
-    @Ignore
-    fun `Issue Learning Credential in sd-jwt vc compact using authorize code flow and JWT proofs`() = runTest {
-        repeatBatchIssuanceUsingAuthorizationCodeFlow(
-            PidDevIssuer.LearningCredential_SdJwtVcCompact_Config_Id,
-            ProofsType.JwtProof(BatchOption.Specific(2)),
-        )
-    }
+    fun `Issue Learning Credential in sd-jwt vc compact using authorize code flow and JWT proofs`() =
+        runTest {
+            repeatBatchIssuanceUsingAuthorizationCodeFlow(
+                PidDevIssuer.LearningCredential_SdJwtVcCompact_Config_Id,
+                ProofsType.JwtProof(BatchOption.Specific(2)),
+            )
+        }
 }
 
 private suspend fun repeatBatchIssuanceUsingAuthorizationCodeFlow(
@@ -75,13 +78,14 @@ private suspend fun repeatBatchIssuanceUsingAuthorizationCodeFlow(
     require(repetitions > 0u) { "repetitions must be greater than 0" }
     createHttpClient(enableHttpLogging).use { httpClient ->
         repeat(repetitions.toInt()) {
-            val duration = measureTime {
-                PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
-                    credentialConfigurationIdentifier,
-                    proofsType = proofsType,
-                    httpClient = httpClient,
-                )
-            }
+            val duration =
+                measureTime {
+                    PidDevIssuer.testIssuanceWithAuthorizationCodeFlow(
+                        credentialConfigurationIdentifier,
+                        proofsType = proofsType,
+                        httpClient = httpClient,
+                    )
+                }
             println("It took ${duration.inWholeMilliseconds} milliseconds to issue ${credentialConfigurationIdentifier.value}")
             delay(delayBetweenRepetitions)
         }

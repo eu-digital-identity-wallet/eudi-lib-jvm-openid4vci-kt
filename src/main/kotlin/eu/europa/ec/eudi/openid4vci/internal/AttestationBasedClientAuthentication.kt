@@ -45,33 +45,32 @@ internal class ClientAttestationPoPBuilder(
     private val authorizationServerId: URL,
     private val signer: Signer<JWK>,
 ) {
-
     suspend fun attestationPoPJWT(challenge: Nonce?): ClientAttestationPoPJWT {
         val now = clock.instant()
-        val claimSet = ClientAttestationPOPClaims(
-            issuer = clientId,
-            audience = authorizationServerId,
-            jwtId = JwtId(JWTID().value),
-            issuedAt = now,
-            challenge = challenge,
-            notBefore = now,
-        )
-        val signedJwt = signer.use { signOperation ->
-            JwtSigner<ClientAttestationPOPClaims, JWK>(
-                signOperation = signOperation,
-                algorithm = signer.javaAlgorithm.toJoseAlg(),
-                customizeHeader = {
-                    put(RFC7519.TYPE, AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE)
-                },
-            ).sign(claimSet)
-        }
+        val claimSet =
+            ClientAttestationPOPClaims(
+                issuer = clientId,
+                audience = authorizationServerId,
+                jwtId = JwtId(JWTID().value),
+                issuedAt = now,
+                challenge = challenge,
+                notBefore = now,
+            )
+        val signedJwt =
+            signer.use { signOperation ->
+                JwtSigner<ClientAttestationPOPClaims, JWK>(
+                    signOperation = signOperation,
+                    algorithm = signer.javaAlgorithm.toJoseAlg(),
+                    customizeHeader = {
+                        put(RFC7519.TYPE, AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE)
+                    },
+                ).sign(claimSet)
+            }
         return ClientAttestationPoPJWT(SignedJWT.parse(signedJwt))
     }
 }
 
-internal fun HttpRequestBuilder.clientAttestationHeaders(
-    clientAttestation: ClientAttestation,
-) {
+internal fun HttpRequestBuilder.clientAttestationHeaders(clientAttestation: ClientAttestation) {
     val (attestation, pop) = clientAttestation
     header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_HEADER, attestation.value)
     header(AttestationBasedClientAuthenticationSpec.CLIENT_ATTESTATION_POP_HEADER, pop.jwt.serialize())

@@ -50,39 +50,40 @@ internal data class CertificateAndKey(
     }
 }
 
-internal data class RootCa(val certAndKey: CertificateAndKey) {
-
+internal data class RootCa(
+    val certAndKey: CertificateAndKey,
+) {
     companion object {
-
         val NAME: X500Name = X500Name("CN=RootCa")
 
         val DEFAULT = RootCa(CertOps.genTrustAnchor(SIGN_ALG, NAME))
 
-        operator fun invoke(certAndKey: Pair<KeyPair, X509CertificateHolder>): RootCa =
-            RootCa(CertificateAndKey(certAndKey))
+        operator fun invoke(certAndKey: Pair<KeyPair, X509CertificateHolder>): RootCa = RootCa(CertificateAndKey(certAndKey))
     }
 }
 
-internal class WrpacProvider(private val certAndKey: CertificateAndKey) {
-
+internal class WrpacProvider(
+    private val certAndKey: CertificateAndKey,
+) {
     fun issueAccessCertificate(subjectName: X500Name): Pair<KeyPair, List<X509Certificate>> {
-        val (keyPair, wrpac) = CertOps.genEndEntity(
-            signerCert = certAndKey.cert,
-            signerKey = certAndKey.keyPair.private,
-            sigAlg = SIGN_ALG,
-            subject = subjectName,
-        )
-        return keyPair to listOf(
-            wrpac.toX509Certificate(),
-            certAndKey.cert.toX509Certificate(),
-        )
+        val (keyPair, wrpac) =
+            CertOps.genEndEntity(
+                signerCert = certAndKey.cert,
+                signerKey = certAndKey.keyPair.private,
+                sigAlg = SIGN_ALG,
+                subject = subjectName,
+            )
+        return keyPair to
+            listOf(
+                wrpac.toX509Certificate(),
+                certAndKey.cert.toX509Certificate(),
+            )
     }
 
     companion object {
         val NAME: X500Name = X500Name("CN=Wrpac Provider")
 
-        operator fun invoke(certAndKey: Pair<KeyPair, X509CertificateHolder>): WrpacProvider =
-            WrpacProvider(CertificateAndKey(certAndKey))
+        operator fun invoke(certAndKey: Pair<KeyPair, X509CertificateHolder>): WrpacProvider = WrpacProvider(CertificateAndKey(certAndKey))
     }
 }
 
@@ -90,30 +91,33 @@ internal class WrprcProvider(
     private val certAndKey: CertificateAndKey,
     private val clock: Clock,
 ) {
-
     fun issueWRPRC(wrprcContent: JsonObject): SignedJWT {
         val jwsHeader = header()
         val payload = payload(wrprcContent)
-        val jWSObject = JWSObject(jwsHeader, payload).apply {
-            sign(certAndKey.keyPair.jwsSigner(JWSAlgorithm.ES256))
-        }
+        val jWSObject =
+            JWSObject(jwsHeader, payload).apply {
+                sign(certAndKey.keyPair.jwsSigner(JWSAlgorithm.ES256))
+            }
         return SignedJWT.parse(jWSObject.serialize())
     }
 
-    private fun payload(wrprcContent: JsonObject): Payload = wrprcContent
-        .buildUpon {
-            put(RFC7519.ISSUED_AT, clock.now().epochSeconds)
-        }.let {
-            Payload(JSONObjectUtils.parse(Json.encodeToString(it)))
-        }
+    private fun payload(wrprcContent: JsonObject): Payload =
+        wrprcContent
+            .buildUpon {
+                put(RFC7519.ISSUED_AT, clock.now().epochSeconds)
+            }.let {
+                Payload(JSONObjectUtils.parse(Json.encodeToString(it)))
+            }
 
-    private fun header(): JWSHeader? = JWSHeader.Builder(JWSAlgorithm.ES256)
-        .apply {
-            type(JOSEObjectType(ETSI119475_REG_CERT_HEADER_TYPE))
-            x509CertChain(
-                listOf(Base64.encode(certAndKey.cert.encoded)),
-            )
-        }.build()
+    private fun header(): JWSHeader? =
+        JWSHeader
+            .Builder(JWSAlgorithm.ES256)
+            .apply {
+                type(JOSEObjectType(ETSI119475_REG_CERT_HEADER_TYPE))
+                x509CertChain(
+                    listOf(Base64.encode(certAndKey.cert.encoded)),
+                )
+            }.build()
 
     companion object {
         val NAME: X500Name = X500Name("CN=Wrprc Provider")
@@ -130,8 +134,10 @@ internal class Registrar(
     private val wrpacProvider: WrpacProvider,
     private val wrprcProvider: WrprcProvider,
 ) {
-
-    fun registerAttestationProvider(issuer: CredentialIssuerId, wrprcContent: JsonObject): AttestationProvider {
+    fun registerAttestationProvider(
+        issuer: CredentialIssuerId,
+        wrprcContent: JsonObject,
+    ): AttestationProvider {
         val name = X500Name("CN=${issuer.value.value.host}")
         val (wrpacKeyPair, wrpacCertChain) = wrpacProvider.issueAccessCertificate(name)
         val wrprc = wrprcProvider.issueWRPRC(wrprcContent)
@@ -150,19 +156,21 @@ internal class Registrar(
             clock: Clock,
             rootCa: RootCa = RootCa.DEFAULT,
         ): Registrar {
-            val wrpacCertAndKey = CertOps.genIntermediateCertificate(
-                signerCert = rootCa.certAndKey.cert,
-                signerKey = rootCa.certAndKey.keyPair.private,
-                sigAlg = SIGN_ALG,
-                subject = WrpacProvider.NAME,
-            )
+            val wrpacCertAndKey =
+                CertOps.genIntermediateCertificate(
+                    signerCert = rootCa.certAndKey.cert,
+                    signerKey = rootCa.certAndKey.keyPair.private,
+                    sigAlg = SIGN_ALG,
+                    subject = WrpacProvider.NAME,
+                )
 
-            val wrprcCertAndKey = CertOps.genIntermediateCertificate(
-                signerCert = rootCa.certAndKey.cert,
-                signerKey = rootCa.certAndKey.keyPair.private,
-                sigAlg = SIGN_ALG,
-                subject = WrprcProvider.NAME,
-            )
+            val wrprcCertAndKey =
+                CertOps.genIntermediateCertificate(
+                    signerCert = rootCa.certAndKey.cert,
+                    signerKey = rootCa.certAndKey.keyPair.private,
+                    sigAlg = SIGN_ALG,
+                    subject = WrprcProvider.NAME,
+                )
 
             return Registrar(
                 clock,
@@ -182,49 +190,53 @@ internal class AttestationProvider(
 ) {
     private val metadataJson = getResourceAsText("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_valid.json")
 
-    fun unsignedMetadata(): CredentialIssuerMetadata =
-        CredentialIssuerMetadataJsonParser.parseMetaData(metadataJson, id)
+    fun unsignedMetadata(): CredentialIssuerMetadata = CredentialIssuerMetadataJsonParser.parseMetaData(metadataJson, id)
 
     fun signedMetadata(): SignedJWT {
         val metadataJson = Json.decodeFromString<JsonObject>(metadataJson).embedWrprc()
         val jwsHeader = header()
         val payload = metadataJson.toPayload()
-        val jWSObject = JWSObject(jwsHeader, payload)
-            .apply {
-                sign(wrpacKey.jwsSigner(JWSAlgorithm.ES256))
-            }
+        val jWSObject =
+            JWSObject(jwsHeader, payload)
+                .apply {
+                    sign(wrpacKey.jwsSigner(JWSAlgorithm.ES256))
+                }
         return SignedJWT.parse(jWSObject.serialize())
     }
 
-    private fun JsonObject.toPayload(): Payload = this
-        .buildUpon {
-            put(RFC7519.ISSUED_AT, clock.now().epochSeconds)
-            put(RFC7519.ISSUER, id.toString())
-            put(RFC7519.SUBJECT, id.toString())
-        }.let {
-            Payload(JSONObjectUtils.parse(Json.encodeToString(it)))
-        }
+    private fun JsonObject.toPayload(): Payload =
+        this
+            .buildUpon {
+                put(RFC7519.ISSUED_AT, clock.now().epochSeconds)
+                put(RFC7519.ISSUER, id.toString())
+                put(RFC7519.SUBJECT, id.toString())
+            }.let {
+                Payload(JSONObjectUtils.parse(Json.encodeToString(it)))
+            }
 
-    private fun header(): JWSHeader? = JWSHeader.Builder(JWSAlgorithm.ES256)
-        .apply {
-            type(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
-            x509CertChain(wrpacCertChain.map { Base64.encode(it.encoded) })
-        }.build()
+    private fun header(): JWSHeader? =
+        JWSHeader
+            .Builder(JWSAlgorithm.ES256)
+            .apply {
+                type(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
+                x509CertChain(wrpacCertChain.map { Base64.encode(it.encoded) })
+            }.build()
 
-    private fun JsonObject.embedWrprc(): JsonObject = this
-        .buildUpon {
-            put(
-                "issuer_info",
-                buildJsonArray {
-                    add(
-                        buildJsonObject {
-                            put(ETSI119472Part3.FORMAT, ETSI119472Part3.REGISTRATION_CERT)
-                            put(ETSI119472Part3.DATA, wrprc.serialize())
-                        },
-                    )
-                },
-            )
-        }
+    private fun JsonObject.embedWrprc(): JsonObject =
+        this
+            .buildUpon {
+                put(
+                    "issuer_info",
+                    buildJsonArray {
+                        add(
+                            buildJsonObject {
+                                put(ETSI119472Part3.FORMAT, ETSI119472Part3.REGISTRATION_CERT)
+                                put(ETSI119472Part3.DATA, wrprc.serialize())
+                            },
+                        )
+                    },
+                )
+            }
 }
 
 private fun Map<String, JsonElement>.buildUpon(builder: JsonObjectBuilder.() -> Unit): JsonObject =
@@ -245,9 +257,10 @@ private fun KeyPair.jwsSigner(signingAlg: JWSAlgorithm): JWSSigner =
         error("Unsupported alg $signingAlg")
     }
 
-private fun JWSAlgorithm.curve(): Curve = when (this) {
-    JWSAlgorithm.ES256 -> Curve.P_256
-    JWSAlgorithm.ES384 -> Curve.P_384
-    JWSAlgorithm.ES512 -> Curve.P_521
-    else -> error("Unsupported EC alg $this")
-}
+private fun JWSAlgorithm.curve(): Curve =
+    when (this) {
+        JWSAlgorithm.ES256 -> Curve.P_256
+        JWSAlgorithm.ES384 -> Curve.P_384
+        JWSAlgorithm.ES512 -> Curve.P_521
+        else -> error("Unsupported EC alg $this")
+    }

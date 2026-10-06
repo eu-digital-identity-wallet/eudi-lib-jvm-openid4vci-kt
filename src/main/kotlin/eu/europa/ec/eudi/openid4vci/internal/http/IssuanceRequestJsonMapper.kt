@@ -34,10 +34,8 @@ internal data class CredentialResponseEncryptionSpecTO(
     @SerialName("jwk") val jwk: JsonObject,
     @SerialName("enc") val encryptionMethod: String,
     @SerialName("zip") val compressionAlgorithm: String? = null,
-
 ) {
     companion object {
-
         fun from(responseEncryption: EncryptionSpec): CredentialResponseEncryptionSpecTO {
             val credentialEncryptionJwk =
                 Json.parseToJsonElement(responseEncryption.recipientKey.toPublicJWK().toString()).jsonObject
@@ -58,7 +56,6 @@ data class ProofsTO(
     @SerialName("di_vp") val diVpProofs: List<String>? = null,
     @SerialName("attestation") val attestationProofs: List<String>? = null,
 ) {
-
     init {
         require(!(jwtProofs.isNullOrEmpty() && diVpProofs.isNullOrEmpty() && attestationProofs.isNullOrEmpty()))
     }
@@ -78,7 +75,6 @@ internal data class CredentialRequestTO(
     }
 
     companion object {
-
         fun from(
             credentialIdentifier: CredentialIdentifier,
             proofs: List<Proof>,
@@ -108,23 +104,26 @@ internal data class CredentialRequestTO(
         fun from(request: CredentialIssuanceRequest): CredentialRequestTO {
             val (ref, proofs, encryption) = request
             return when (ref) {
-                is CredentialConfigurationReference.ByCredentialId ->
+                is CredentialConfigurationReference.ByCredentialId -> {
                     from(ref.credentialIdentifier, proofs, encryption.responseEncryptionSpec)
+                }
 
-                is CredentialConfigurationReference.ByCredentialConfigurationId ->
+                is CredentialConfigurationReference.ByCredentialConfigurationId -> {
                     from(ref.credentialConfigurationId, proofs, encryption.responseEncryptionSpec)
+                }
             }
         }
 
-        fun toJwtClaimsSet(to: CredentialRequestTO): JWTClaimsSet =
-            JWTClaimsSet.parse(JsonSupport.encodeToString(to))
+        fun toJwtClaimsSet(to: CredentialRequestTO): JWTClaimsSet = JWTClaimsSet.parse(JsonSupport.encodeToString(to))
 
         private fun List<Proof>?.proofsTO(): ProofsTO? =
-            if (this.isNullOrEmpty()) null
-            else ProofsTO(
-                jwtProofs = filterIsInstance<Proof.Jwt>().map { it.jwt.serialize() }.takeIf { it.isNotEmpty() },
-                attestationProofs = filterIsInstance<Proof.Attestation>().map { it.keyAttestation.jwt }.takeIf { it.isNotEmpty() },
-            )
+            if (this.isNullOrEmpty())
+                null
+            else
+                ProofsTO(
+                    jwtProofs = filterIsInstance<Proof.Jwt>().map { it.jwt.serialize() }.takeIf { it.isNotEmpty() },
+                    attestationProofs = filterIsInstance<Proof.Attestation>().map { it.keyAttestation.jwt }.takeIf { it.isNotEmpty() },
+                )
     }
 }
 
@@ -169,24 +168,35 @@ internal data class CredentialResponseSuccessTO(
 
         val issuedCredentials =
             when {
-                !credentials.isNullOrEmpty() -> credentials.map {
-                    checkNotNull(it.issuedCredential())
+                !credentials.isNullOrEmpty() -> {
+                    credentials.map {
+                        checkNotNull(it.issuedCredential())
+                    }
                 }
 
-                else -> emptyList()
+                else -> {
+                    emptyList()
+                }
             }
 
         return when {
-            issuedCredentials.isNotEmpty() -> SubmissionOutcomeInternal.Success(
-                issuedCredentials,
-                notificationId,
-            )
+            issuedCredentials.isNotEmpty() -> {
+                SubmissionOutcomeInternal.Success(
+                    issuedCredentials,
+                    notificationId,
+                )
+            }
 
-            transactionId != null && interval != null -> SubmissionOutcomeInternal.Deferred(
-                transactionId,
-                interval.toDuration(DurationUnit.SECONDS),
-            )
-            else -> error("Cannot happen")
+            transactionId != null && interval != null -> {
+                SubmissionOutcomeInternal.Deferred(
+                    transactionId,
+                    interval.toDuration(DurationUnit.SECONDS),
+                )
+            }
+
+            else -> {
+                error("Cannot happen")
+            }
         }
     }
 
@@ -197,15 +207,17 @@ internal data class CredentialResponseSuccessTO(
 }
 
 private fun JsonObject.issuedCredential(): IssuedCredential? {
-    fun credentialOf(json: JsonElement): Credential? = when {
-        json is JsonPrimitive && json.isString -> Credential.Str(json.content)
-        json is JsonObject && json.isNotEmpty() -> Credential.Json(json)
-        else -> null
-    }
+    fun credentialOf(json: JsonElement): Credential? =
+        when {
+            json is JsonPrimitive && json.isString -> Credential.Str(json.content)
+            json is JsonObject && json.isNotEmpty() -> Credential.Json(json)
+            else -> null
+        }
 
-    val credential = ensureNotNull(this["credential"]) {
-        throw ResponseUnparsable("Missing 'credential' property from credential response")
-    }
+    val credential =
+        ensureNotNull(this["credential"]) {
+            throw ResponseUnparsable("Missing 'credential' property from credential response")
+        }
     val additionalInfo = JsonObject(filterKeys { it != "credential" })
 
     return credentialOf(credential)?.let { IssuedCredential(it, additionalInfo) }
@@ -221,8 +233,7 @@ internal data class DeferredRequestTO(
     @SerialName("credential_response_encryption") val credentialResponseEncryption: CredentialResponseEncryptionSpecTO? = null,
 ) {
     companion object {
-        fun toJwtClaimsSet(to: DeferredRequestTO): JWTClaimsSet =
-            JWTClaimsSet.parse(JsonSupport.encodeToString(to))
+        fun toJwtClaimsSet(to: DeferredRequestTO): JWTClaimsSet = JWTClaimsSet.parse(JsonSupport.encodeToString(to))
     }
 }
 
@@ -277,23 +288,29 @@ internal class NotificationTO(
     companion object {
         fun from(credentialIssuanceEvent: CredentialIssuanceEvent): NotificationTO =
             when (credentialIssuanceEvent) {
-                is CredentialIssuanceEvent.Accepted -> NotificationTO(
-                    id = credentialIssuanceEvent.id.value,
-                    event = NotificationEventTO.CREDENTIAL_ACCEPTED,
-                    description = credentialIssuanceEvent.description,
-                )
+                is CredentialIssuanceEvent.Accepted -> {
+                    NotificationTO(
+                        id = credentialIssuanceEvent.id.value,
+                        event = NotificationEventTO.CREDENTIAL_ACCEPTED,
+                        description = credentialIssuanceEvent.description,
+                    )
+                }
 
-                is CredentialIssuanceEvent.Deleted -> NotificationTO(
-                    id = credentialIssuanceEvent.id.value,
-                    event = NotificationEventTO.CREDENTIAL_DELETED,
-                    description = credentialIssuanceEvent.description,
-                )
+                is CredentialIssuanceEvent.Deleted -> {
+                    NotificationTO(
+                        id = credentialIssuanceEvent.id.value,
+                        event = NotificationEventTO.CREDENTIAL_DELETED,
+                        description = credentialIssuanceEvent.description,
+                    )
+                }
 
-                is CredentialIssuanceEvent.Failed -> NotificationTO(
-                    id = credentialIssuanceEvent.id.value,
-                    event = NotificationEventTO.CREDENTIAL_FAILURE,
-                    description = credentialIssuanceEvent.description,
-                )
+                is CredentialIssuanceEvent.Failed -> {
+                    NotificationTO(
+                        id = credentialIssuanceEvent.id.value,
+                        event = NotificationEventTO.CREDENTIAL_FAILURE,
+                        description = credentialIssuanceEvent.description,
+                    )
+                }
             }
     }
 }
@@ -319,19 +336,18 @@ internal data class GenericErrorResponseTO(
     @SerialName("error") val error: String,
     @SerialName("error_description") val errorDescription: String? = null,
 ) {
-
-    fun toIssuanceError(): CredentialIssuanceError = when (error) {
-        "invalid_proof" -> InvalidProof(errorDescription)
-        "invalid_token" -> InvalidToken()
-        "invalid_transaction_id" -> InvalidTransactionId()
-        "unknown_credential_configuration" -> UnknownCredentialConfiguration()
-        "unknown_credential_identifier" -> UnknownCredentialIdentifier()
-        "invalid_encryption_parameters" -> InvalidEncryptionParameters()
-        else -> IssuanceRequestFailed(error, errorDescription)
-    }
+    fun toIssuanceError(): CredentialIssuanceError =
+        when (error) {
+            "invalid_proof" -> InvalidProof(errorDescription)
+            "invalid_token" -> InvalidToken()
+            "invalid_transaction_id" -> InvalidTransactionId()
+            "unknown_credential_configuration" -> UnknownCredentialConfiguration()
+            "unknown_credential_identifier" -> UnknownCredentialIdentifier()
+            "invalid_encryption_parameters" -> InvalidEncryptionParameters()
+            else -> IssuanceRequestFailed(error, errorDescription)
+        }
 
     companion object {
-
         /**
          * Tries to construct a [GenericErrorResponseTO] by parsing the `error` and `error_description` parameters from
          * the challenge provided in the `WWW-Authenticate` response header.

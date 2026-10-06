@@ -27,7 +27,6 @@ import java.util.*
  * Cryptographic Binding Methods for issued Credentials.
  */
 sealed interface CryptographicBindingMethod : Serializable {
-
     /**
      * JWK format.
      */
@@ -45,12 +44,16 @@ sealed interface CryptographicBindingMethod : Serializable {
     /**
      * DID method.
      */
-    data class DID(val method: String) : CryptographicBindingMethod
+    data class DID(
+        val method: String,
+    ) : CryptographicBindingMethod
 
     /**
      * Other format
      */
-    data class Other(val value: String) : CryptographicBindingMethod
+    data class Other(
+        val value: String,
+    ) : CryptographicBindingMethod
 }
 
 /**
@@ -80,7 +83,9 @@ sealed interface ProofTypeMeta : Serializable {
         }
     }
 
-    data class Unsupported(val type: String) : ProofTypeMeta
+    data class Unsupported(
+        val type: String,
+    ) : ProofTypeMeta
 }
 
 /**
@@ -117,22 +122,25 @@ val KeyAttestationRequirement.userAuthenticationOrDefault: List<AttackPotentialR
     get() = userAuthentication.orEmpty()
 
 val ProofTypeMeta.type: ProofType?
-    get() = when (this) {
-        is ProofTypeMeta.Jwt -> ProofType.JWT
-        is ProofTypeMeta.Attestation -> ProofType.ATTESTATION
-        is ProofTypeMeta.Unsupported -> null
-    }
+    get() =
+        when (this) {
+            is ProofTypeMeta.Jwt -> ProofType.JWT
+            is ProofTypeMeta.Attestation -> ProofType.ATTESTATION
+            is ProofTypeMeta.Unsupported -> null
+        }
 
 val ProofTypeMeta.algorithms: List<JWSAlgorithm>
-    get() = when (this) {
-        is ProofTypeMeta.Jwt -> algorithms
-        is ProofTypeMeta.Attestation -> algorithms
-        is ProofTypeMeta.Unsupported -> emptyList()
-    }
+    get() =
+        when (this) {
+            is ProofTypeMeta.Jwt -> algorithms
+            is ProofTypeMeta.Attestation -> algorithms
+            is ProofTypeMeta.Unsupported -> emptyList()
+        }
 
 @JvmInline
-value class ProofTypesSupported private constructor(val values: Set<ProofTypeMeta>) {
-
+value class ProofTypesSupported private constructor(
+    val values: Set<ProofTypeMeta>,
+) {
     operator fun get(type: ProofType): ProofTypeMeta? = values.firstOrNull { it.type == type }
 
     companion object {
@@ -169,7 +177,6 @@ data class Display(
     val backgroundImage: URI? = null,
     val textColor: CssColor? = null,
 ) : Serializable {
-
     /**
      * Logo information.
      */
@@ -204,7 +211,6 @@ data class Claim(
     @SerialName("mandatory") val mandatory: Boolean? = false,
     @SerialName("display") val display: List<Display> = emptyList(),
 ) : Serializable {
-
     /**
      * Display properties of a Claim.
      */
@@ -222,7 +228,9 @@ data class Claim(
  * @see <a href="https://www.iana.org/assignments/cose/cose.xhtml">CBOR Object Signing and Encryption (COSE)</a>
  */
 @JvmInline
-value class CoseAlgorithm(val value: Int) : Serializable {
+value class CoseAlgorithm(
+    val value: Int,
+) : Serializable {
     override fun toString(): String = value.toString()
 }
 
@@ -244,9 +252,12 @@ data class MsoMdocCredential(
  * @see <a href="https://www.iana.org/assignments/jose/jose.xhtml">JSON Object Signing and Encryption (JOSE)</a>
  */
 @JvmInline
-value class JwsAlgorithm(val name: String) : Serializable {
+value class JwsAlgorithm(
+    val name: String,
+) : Serializable {
     override fun toString(): String = name
 }
+
 internal fun JwsAlgorithm.toNimbus(): JWSAlgorithm = JWSAlgorithm(name)
 
 /**
@@ -272,7 +283,9 @@ data class W3CJsonLdCredentialDefinition(
  * @see <a href="https://w3c-ccg.github.io/ld-cryptosuite-registry/">Linked Data Cryptographic Suite Registry</a>
  */
 @JvmInline
-value class LinkedDataAlgorithm(val identifier: String) : Serializable {
+value class LinkedDataAlgorithm(
+    val identifier: String,
+) : Serializable {
     override fun toString(): String = identifier
 }
 
@@ -311,7 +324,6 @@ data class W3CSignedJwtCredential(
     override val credentialMetadata: CredentialMetadata?,
     val credentialDefinition: CredentialDefinition,
 ) : CredentialConfiguration {
-
     data class CredentialDefinition(
         val type: List<String>,
     )

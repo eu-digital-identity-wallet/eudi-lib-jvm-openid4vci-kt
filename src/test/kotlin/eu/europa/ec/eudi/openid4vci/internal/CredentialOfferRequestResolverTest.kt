@@ -24,7 +24,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 internal class CredentialOfferRequestResolverTest {
-
     @Test
     fun `resolve a credential offer passed by value that contains a pre-authorized code grant without transaction code`() =
         runTest {
@@ -46,12 +45,12 @@ internal class CredentialOfferRequestResolverTest {
                         }
                     }
                     """.trimIndent()
-                val credentialOfferUri = URLBuilder()
-                    .apply {
-                        path("/credential_offer")
-                        parameters.append("credential_offer", credentialOfferJson)
-                    }
-                    .buildString()
+                val credentialOfferUri =
+                    URLBuilder()
+                        .apply {
+                            path("/credential_offer")
+                            parameters.append("credential_offer", credentialOfferJson)
+                        }.buildString()
                 val credentialOfferRequest = CredentialOfferRequest(credentialOfferUri).getOrThrow()
 
                 val resolver = CredentialOfferRequestResolver(httpClient)
@@ -105,12 +104,12 @@ internal class CredentialOfferRequestResolverTest {
                         }
                     }
                     """.trimIndent()
-                val credentialOfferUri = URLBuilder()
-                    .apply {
-                        path("/credential_offer")
-                        parameters.append("credential_offer", credentialOfferJson)
-                    }
-                    .buildString()
+                val credentialOfferUri =
+                    URLBuilder()
+                        .apply {
+                            path("/credential_offer")
+                            parameters.append("credential_offer", credentialOfferJson)
+                        }.buildString()
                 val credentialOfferRequest = CredentialOfferRequest(credentialOfferUri).getOrThrow()
                 val config = OpenId4VCIConfiguration.copy(issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned)
                 val credentialOffer = resolver.resolve(config, credentialOfferRequest).getOrThrow()
