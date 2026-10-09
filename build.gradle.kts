@@ -15,7 +15,6 @@ plugins {
     alias(libs.plugins.kover)
     alias(libs.plugins.dokka)
     alias(libs.plugins.maven.publish)
-    alias(libs.plugins.dependency.check)
 }
 
 repositories {
@@ -122,12 +121,5 @@ mavenPublishing {
             system = "github"
             url = "${Meta.BASE_URL}/actions"
         }
-    }
-}
-
-dependencyCheck {
-    formats = mutableListOf("XML", "HTML")
-    nvd {
-        apiKey = System.getenv("NVD_API_KEY") ?: properties["nvdApiKey"]?.toString() ?: ""
     }
 }
