@@ -12,6 +12,6 @@ jobs:
   sast:
     permissions:
       contents: read
-    uses: eu-digital-identity-wallet/eudi-infra-ci/.github/workflows/sast_action_libs_kotlin.yml@feat/sast_kotlin_libs
+    uses: eu-digital-identity-wallet/eudi-infra-ci/.github/workflows/sast_action_libs_kotlin.yml@main
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
