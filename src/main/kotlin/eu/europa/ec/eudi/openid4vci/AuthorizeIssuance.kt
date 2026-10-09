@@ -63,7 +63,6 @@ data class AuthorizedRequest(
     val resourceServerDpopNonce: Nonce?,
     val grant: Grant,
 ) : java.io.Serializable {
-
     fun isAccessTokenExpired(at: Instant): Boolean = accessToken.isExpired(timestamp, at)
 
     fun withRefreshedAccessToken(
@@ -79,20 +78,21 @@ data class AuthorizedRequest(
             authorizationServerDpopNonce = newAuthorizationServerDpopNonce,
         )
 
-    fun withResourceServerDpopNonce(newResourceServerDpopNonce: Nonce?): AuthorizedRequest = copy(
-        resourceServerDpopNonce = newResourceServerDpopNonce,
-    )
+    fun withResourceServerDpopNonce(newResourceServerDpopNonce: Nonce?): AuthorizedRequest =
+        copy(
+            resourceServerDpopNonce = newResourceServerDpopNonce,
+        )
 }
 
 sealed interface AccessTokenOption {
-
     data object AsRequested : AccessTokenOption
 
-    data class Limited(val filter: (CredentialConfigurationIdentifier) -> Boolean) : AccessTokenOption
+    data class Limited(
+        val filter: (CredentialConfigurationIdentifier) -> Boolean,
+    ) : AccessTokenOption
 }
 
 interface AuthorizeIssuance {
-
     /**
      * Initial step to authorize an issuance request using Authorized Code Flow.
      * If the specified authorization server supports PAR,

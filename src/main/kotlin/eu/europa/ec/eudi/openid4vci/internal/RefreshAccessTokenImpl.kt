@@ -21,8 +21,9 @@ import eu.europa.ec.eudi.openid4vci.RefreshToken
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
 import eu.europa.ec.eudi.openid4vci.runCatchingCancellable
 
-internal class RefreshAccessTokenImpl(private val tokenEndpointClient: TokenEndpointClient) : RefreshAccessToken {
-
+internal class RefreshAccessTokenImpl(
+    private val tokenEndpointClient: TokenEndpointClient,
+) : RefreshAccessToken {
     override suspend fun AuthorizedRequest.refresh(): Result<AuthorizedRequest> =
         runCatchingCancellable {
             val refreshToken = checkNotNull<RefreshToken>(refreshToken) { "Refresh token was not provided" }

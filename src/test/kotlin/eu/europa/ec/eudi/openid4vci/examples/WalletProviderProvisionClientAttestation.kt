@@ -43,18 +43,20 @@ class WalletProviderProvisionClientAttestation(
     ): ProvisionClientAttestation.Provisioned {
         val signer = CryptoGenerator.ecSigner(curve = Curve.P_256, alg = JWSAlgorithm.ES256)
         val jwk = signer.publicKeyMaterial()
-        val response = httpClient.post(url) {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            header(HttpHeaders.Accept, ContentType.Application.Json.toString())
-            setBody(
-                buildJsonObject {
-                    put("jwk", JsonSupport.parseToJsonElement(jwk.toJSONString()))
-                    if (null != preferredClientStatusPeriod) {
-                        put("preferredClientStatusPeriod", preferredClientStatusPeriod.value.toSeconds())
-                    }
-                },
-            )
-        }.body<JsonObject>()
+        val response =
+            httpClient
+                .post(url) {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+                    setBody(
+                        buildJsonObject {
+                            put("jwk", JsonSupport.parseToJsonElement(jwk.toJSONString()))
+                            if (null != preferredClientStatusPeriod) {
+                                put("preferredClientStatusPeriod", preferredClientStatusPeriod.value.toSeconds())
+                            }
+                        },
+                    )
+                }.body<JsonObject>()
         val clientAttestationJWT = ClientAttestationJWT(checkNotNull(response["walletInstanceAttestation"]).jsonPrimitive.content)
         return ProvisionClientAttestation.Provisioned(clientAttestationJWT, signer)
     }

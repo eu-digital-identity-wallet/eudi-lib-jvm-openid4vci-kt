@@ -38,7 +38,10 @@ interface ProvisionClientAttestation {
     val algorithm: JwsAlgorithm
     val popAlgorithm: JwsAlgorithm
 
-    suspend operator fun invoke(authorizationServer: HttpsUrl, preferredClientStatusPeriod: PositiveDuration?): Provisioned
+    suspend operator fun invoke(
+        authorizationServer: HttpsUrl,
+        preferredClientStatusPeriod: PositiveDuration?,
+    ): Provisioned
 
     data class Provisioned(
         val clientAttestation: ClientAttestationJWT,
@@ -58,7 +61,9 @@ interface ProvisionDPoPSigner {
 /**
  * Configuration options for DPoP.
  */
-data class DPoPConfig(val provisionDPoPSigner: ProvisionDPoPSigner)
+data class DPoPConfig(
+    val provisionDPoPSigner: ProvisionDPoPSigner,
+)
 
 /**
  * An indication about the Client's preference for DPoP.
@@ -69,7 +74,6 @@ typealias DPoPUsageOption = DPoPUsage<DPoPConfig>
  * The Client Authentication Method used by the Wallet.
  */
 sealed interface ClientAuthentication : java.io.Serializable {
-
     /**
      * The client_id of the Wallet, issued when interacting with a credential issuer
      */
@@ -78,7 +82,9 @@ sealed interface ClientAuthentication : java.io.Serializable {
     /**
      * None, i.e. a Public Client.
      */
-    data class None(override val id: ClientId) : ClientAuthentication
+    data class None(
+        override val id: ClientId,
+    ) : ClientAuthentication
 
     /**
      * Attestation-Based Client Authentication.
@@ -105,7 +111,6 @@ sealed interface ClientAuthentication : java.io.Serializable {
  * against a set of credential configurations to determine authorization for issuance.
  */
 fun interface RegistrationCertificatePolicy {
-
     suspend operator fun invoke(
         accessCertificate: X509Certificate,
         registrationCertificate: String,
@@ -116,12 +121,19 @@ fun interface RegistrationCertificatePolicy {
      * Represents the result of registration certificate policy evaluation.
      */
     sealed interface Authorization {
-        data class Granted(val warnings: List<PolicyViolation> = emptyList()) : Authorization
-        data class NotGranted(val error: PolicyViolation) : Authorization
+        data class Granted(
+            val warnings: List<PolicyViolation> = emptyList(),
+        ) : Authorization
+
+        data class NotGranted(
+            val error: PolicyViolation,
+        ) : Authorization
     }
 
     @JvmInline
-    value class PolicyViolation(val violation: String) {
+    value class PolicyViolation(
+        val violation: String,
+    ) {
         init {
             require(violation.isNotEmpty()) { "Violation must not be empty" }
         }
@@ -165,7 +177,6 @@ data class OpenId4VCIConfig(
     val authResponseIssChecking: AuthorizationResponseIssChecking = AuthorizationResponseIssChecking.Never,
     val grants: SupportedGrants = SupportedGrants.Both,
 ) {
-
     init {
         if (registrationCertificatePolicy != null) {
             ensure(issuerMetadataPolicy is IssuerMetadataPolicy.RequireSigned) {
@@ -230,7 +241,9 @@ sealed interface CredentialReusePolicies {
     /**
      * The Wallet supports the provided reuse policies.
      */
-    data class Supported(override val policyTypes: Set<EudiReusePolicyType>) : CredentialReusePolicies {
+    data class Supported(
+        override val policyTypes: Set<EudiReusePolicyType>,
+    ) : CredentialReusePolicies {
         init {
             require(policyTypes.isNotEmpty()) { "policyTypes must not be empty" }
             require(policyTypes.contains(EudiReusePolicyType.OnceOnly) || policyTypes.contains(EudiReusePolicyType.LimitedTime)) {
@@ -242,7 +255,9 @@ sealed interface CredentialReusePolicies {
     /**
      * The Wallet requires at least one of the provided reuse policies to be used.
      */
-    data class Required(override val policyTypes: Set<EudiReusePolicyType>) : CredentialReusePolicies {
+    data class Required(
+        override val policyTypes: Set<EudiReusePolicyType>,
+    ) : CredentialReusePolicies {
         init {
             require(policyTypes.isNotEmpty()) { "policyTypes must not be empty" }
             require(policyTypes.contains(EudiReusePolicyType.OnceOnly) || policyTypes.contains(EudiReusePolicyType.LimitedTime)) {
@@ -265,13 +280,17 @@ sealed interface DPoPUsage<out C : Any> {
      * DPoP is used if supported by the Authorization Server.
      *
      */
-    data class IfSupported<C : Any>(val value: C) : DPoPUsage<C>
+    data class IfSupported<C : Any>(
+        val value: C,
+    ) : DPoPUsage<C>
 
     /**
      * DPoP usage is required. If the Authorization Server doesn't support DPoP, issuance does not proceed.
      *
      */
-    data class Required<C : Any>(val value: C) : DPoPUsage<C>
+    data class Required<C : Any>(
+        val value: C,
+    ) : DPoPUsage<C>
 }
 
 /**
@@ -287,9 +306,13 @@ sealed interface ParUsage : java.io.Serializable {
         private fun readResolve(): Any = Never
     }
 
-    data class IfSupported(val authorizationCodeDPoPBinding: Boolean = true) : ParUsage
+    data class IfSupported(
+        val authorizationCodeDPoPBinding: Boolean = true,
+    ) : ParUsage
 
-    data class Required(val authorizationCodeDPoPBinding: Boolean = true) : ParUsage
+    data class Required(
+        val authorizationCodeDPoPBinding: Boolean = true,
+    ) : ParUsage
 }
 
 /**
@@ -307,7 +330,6 @@ sealed interface ParUsage : java.io.Serializable {
  *   parameter is validated.
  */
 sealed interface AuthorizationResponseIssChecking : java.io.Serializable {
-
     /**
      * The Wallet never validates the `iss` parameter of the authorization response.
      */
@@ -336,7 +358,6 @@ sealed interface AuthorizationResponseIssChecking : java.io.Serializable {
  * Wallet's policy concerning Credential Response encryption.
  */
 enum class CredentialResponseEncryptionPolicy {
-
     /**
      * The Wallet requires Credential Responses to be encrypted.
      */
@@ -367,10 +388,11 @@ data class EncryptionSupportConfig(
         }
     }
 
-    val supportedEncryptionAlgorithms: List<JWEAlgorithm> get() = buildList {
-        ecConfig?.supportedJWEAlgorithms?.let { addAll(it) }
-        rsaConfig?.supportedJWEAlgorithms?.let { addAll(it) }
-    }
+    val supportedEncryptionAlgorithms: List<JWEAlgorithm> get() =
+        buildList {
+            ecConfig?.supportedJWEAlgorithms?.let { addAll(it) }
+            rsaConfig?.supportedJWEAlgorithms?.let { addAll(it) }
+        }
 
     companion object {
         val SUPPORTED_ENCRYPTION_METHODS: Set<EncryptionMethod> get() =
@@ -382,11 +404,12 @@ data class EncryptionSupportConfig(
             ecKeyCurve: Curve,
             rcaKeySize: Int,
             credentialResponseEncryptionPolicy: CredentialResponseEncryptionPolicy,
-        ): EncryptionSupportConfig = EncryptionSupportConfig(
-            ecConfig = EcConfig(ecKeyCurve),
-            rsaConfig = RsaConfig(rcaKeySize),
-            credentialResponseEncryptionPolicy = credentialResponseEncryptionPolicy,
-        )
+        ): EncryptionSupportConfig =
+            EncryptionSupportConfig(
+                ecConfig = EcConfig(ecKeyCurve),
+                rsaConfig = RsaConfig(rcaKeySize),
+                credentialResponseEncryptionPolicy = credentialResponseEncryptionPolicy,
+            )
     }
 }
 
@@ -440,7 +463,6 @@ enum class AuthorizeIssuanceConfig {
  * Wallet's policy concerning the metadata of the Credential Issuer.
  */
 sealed interface IssuerMetadataPolicy {
-
     /**
      * Credential Issuer **must** provide signed metadata. Only values from signed metadata are used.
      *
@@ -452,7 +474,6 @@ sealed interface IssuerMetadataPolicy {
         val issuerTrust: CertificateChainTrust,
         val allowedJwsAlgorithms: Set<JWSAlgorithm> = TS3.ALLOWED_SIGNATURE_ALGORITHMS,
     ) : IssuerMetadataPolicy {
-
         init {
             require(allowedJwsAlgorithms.isNotEmpty()) { "allowedJwsAlgorithms must not be empty" }
         }
@@ -473,7 +494,6 @@ sealed interface IssuerMetadataPolicy {
         val issuerTrust: CertificateChainTrust,
         val allowedJwsAlgorithms: Set<JWSAlgorithm> = TS3.ALLOWED_SIGNATURE_ALGORITHMS,
     ) : IssuerMetadataPolicy {
-
         init {
             require(allowedJwsAlgorithms.isNotEmpty()) { "allowedJwsAlgorithms must not be empty" }
         }
@@ -502,13 +522,14 @@ data class ProofsConfig(
     val attestationProof: SupportedAttestationProof?,
     val jwtProofsWithoutKeyAttestation: SupportedJwtProof?,
 ) {
-
     /**
      * Indicates support for JWT Proofs.
      *
      * @property supportedAlgorithms the signing algorithms supported by the Wallet
      */
-    data class SupportedJwtProof(val supportedAlgorithms: Set<JWSAlgorithm>) {
+    data class SupportedJwtProof(
+        val supportedAlgorithms: Set<JWSAlgorithm>,
+    ) {
         init {
             require(supportedAlgorithms.isNotEmpty()) { "At least one supported algorithm must be provided." }
         }
@@ -519,7 +540,9 @@ data class ProofsConfig(
      *
      * @property supportedAlgorithms the signing algorithms supported by the Wallet
      */
-    data class SupportedAttestationProof(val supportedAlgorithms: Set<JWSAlgorithm>) {
+    data class SupportedAttestationProof(
+        val supportedAlgorithms: Set<JWSAlgorithm>,
+    ) {
         init {
             require(supportedAlgorithms.isNotEmpty()) { "At least one supported algorithm must be provided." }
         }
@@ -545,7 +568,10 @@ data class ProofsConfig(
          * Creates a [ProofsConfig] instance for a Wallet that supports issuance of attestations that require
          * either JWT Proofs with Key Attestation, or Attestation Proofs signed with one of the provided JWS Algorithms.
          */
-        operator fun invoke(first: JWSAlgorithm, vararg remaining: JWSAlgorithm): ProofsConfig {
+        operator fun invoke(
+            first: JWSAlgorithm,
+            vararg remaining: JWSAlgorithm,
+        ): ProofsConfig {
             val supportedAlgorithms = setOf(first, *remaining)
             return ProofsConfig(
                 isNoProofSupported = false,

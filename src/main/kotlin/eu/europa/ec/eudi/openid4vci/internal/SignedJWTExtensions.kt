@@ -36,8 +36,7 @@ internal fun SignedJWT.ensureSignedNotMAC() {
     requireIsNotMAC(alg)
 }
 
-internal fun requireIsNotMAC(alg: JWSAlgorithm) =
-    require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
+internal fun requireIsNotMAC(alg: JWSAlgorithm) = require(!alg.isMACSigning()) { "MAC signing algorithm not allowed" }
 
 internal fun JWSAlgorithm.isMACSigning(): Boolean = this in MACSigner.SUPPORTED_ALGORITHMS
 
@@ -47,7 +46,10 @@ internal fun SignedJWT.ensureType(expectedType: JOSEObjectType) {
     }
 }
 
-internal operator fun <T : Any> JWTClaimsSet.get(key: String, deserializer: DeserializationStrategy<T>): T? =
+internal operator fun <T : Any> JWTClaimsSet.get(
+    key: String,
+    deserializer: DeserializationStrategy<T>,
+): T? =
     claims[key]?.let { value ->
         JsonSupport.decodeFromString(deserializer, GsonSupport.toJson(value))
     }

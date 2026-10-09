@@ -32,10 +32,18 @@ import com.nimbusds.oauth2.sdk.dpop.DPoPProofFactory as NimbusDPoPProofFactory
 import com.nimbusds.oauth2.sdk.token.DPoPAccessToken as NimbusDPoPAccessToken
 import com.nimbusds.openid.connect.sdk.Nonce as NimbusNonce
 
+@Suppress("ktlint:standard:property-naming")
 const val DPoP = "DPoP"
 
 enum class Htm {
-    GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE
+    GET,
+    HEAD,
+    POST,
+    PUT,
+    DELETE,
+    CONNECT,
+    OPTIONS,
+    TRACE,
 }
 
 /**
@@ -46,7 +54,6 @@ class DPoPJwtFactory(
     private val clock: Clock,
     private val signer: Signer<JWK>,
 ) {
-
     init {
         require(jtiByteLength > 0) { "jtiByteLength must be greater than zero" }
     }
@@ -56,28 +63,31 @@ class DPoPJwtFactory(
         htu: URL,
         accessToken: AccessToken.DPoP? = null,
         nonce: Nonce? = null,
-    ): Result<SignedJWT> = runCatchingCancellable {
-        val jwtClaimsSet = DPoPUtils.createJWTClaimsSet(
-            jti(),
-            htm.name,
-            htu.toURI(),
-            now(),
-            accessToken?.let {
-                NimbusDPoPAccessToken(it.accessToken)
-            },
-            nonce?.let { NimbusNonce(it.value) },
-        )
+    ): Result<SignedJWT> =
+        runCatchingCancellable {
+            val jwtClaimsSet =
+                DPoPUtils.createJWTClaimsSet(
+                    jti(),
+                    htm.name,
+                    htu.toURI(),
+                    now(),
+                    accessToken?.let {
+                        NimbusDPoPAccessToken(it.accessToken)
+                    },
+                    nonce?.let { NimbusNonce(it.value) },
+                )
 
-        val signedJwt = signer.use { signOperation ->
-            JwtSigner(
-                serializer = JWTClaimsSetSerializer,
-                signOperation = signOperation,
-                algorithm = signer.javaAlgorithm.toJoseAlg(),
-                customizeHeader = { key -> dpopJwtHeader(key) },
-            ).sign(jwtClaimsSet)
+            val signedJwt =
+                signer.use { signOperation ->
+                    JwtSigner(
+                        serializer = JWTClaimsSetSerializer,
+                        signOperation = signOperation,
+                        algorithm = signer.javaAlgorithm.toJoseAlg(),
+                        customizeHeader = { key -> dpopJwtHeader(key) },
+                    ).sign(jwtClaimsSet)
+                }
+            SignedJWT.parse(signedJwt)
         }
-        SignedJWT.parse(signedJwt)
-    }
 
     private fun JsonObjectBuilder.dpopJwtHeader(jwk: JWK) {
         put("typ", NimbusDPoPProofFactory.TYPE.type)
@@ -85,6 +95,7 @@ class DPoPJwtFactory(
     }
 
     private fun now(): Date = Date.from(clock.instant())
+
     private fun jti(): JWTID = JWTID(jtiByteLength)
 
     companion object {
@@ -106,43 +117,49 @@ class DPoPJwtFactory(
 }
 
 @JvmInline
-value class DPoPCtx private constructor(val algorithm: JwsAlgorithm) {
+value class DPoPCtx private constructor(
+    val algorithm: JwsAlgorithm,
+) {
     companion object {
         fun createForServer(
             dPoPUsage: DPoPUsage<JwsAlgorithm>,
             oauthServerMetadata: CIAuthorizationServerMetadata,
-        ): Result<DPoPCtx?> =
-            create(dPoPUsage, oauthServerMetadata.dPoPJWSAlgs.orEmpty())
+        ): Result<DPoPCtx?> = create(dPoPUsage, oauthServerMetadata.dPoPJWSAlgs.orEmpty())
 
         fun create(
             dPoPUsage: DPoPUsage<JwsAlgorithm>,
             supportedDPopAlgorithms: List<JWSAlgorithm>,
-        ): Result<DPoPCtx?> = runCatching {
-            when (dPoPUsage) {
-                DPoPUsage.Never -> null
+        ): Result<DPoPCtx?> =
+            runCatching {
+                when (dPoPUsage) {
+                    DPoPUsage.Never -> {
+                        null
+                    }
 
-                is DPoPUsage.IfSupported -> {
-                    val signerAlg = dPoPUsage.value.toNimbus()
-                    if (supportedDPopAlgorithms.isNotEmpty()) {
+                    is DPoPUsage.IfSupported -> {
+                        val signerAlg = dPoPUsage.value.toNimbus()
+                        if (supportedDPopAlgorithms.isNotEmpty()) {
+                            require(signerAlg in supportedDPopAlgorithms) {
+                                "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportedDPopAlgorithms"
+                            }
+                            DPoPCtx(dPoPUsage.value)
+                        } else {
+                            null
+                        }
+                    }
+
+                    is DPoPUsage.Required -> {
+                        require(supportedDPopAlgorithms.isNotEmpty()) {
+                            "Wallet requires DPoP but the Authorization Server doesn't support it"
+                        }
+                        val signerAlg = dPoPUsage.value.toNimbus()
                         require(signerAlg in supportedDPopAlgorithms) {
                             "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportedDPopAlgorithms"
                         }
                         DPoPCtx(dPoPUsage.value)
-                    } else null
-                }
-
-                is DPoPUsage.Required -> {
-                    require(supportedDPopAlgorithms.isNotEmpty()) {
-                        "Wallet requires DPoP but the Authorization Server doesn't support it"
                     }
-                    val signerAlg = dPoPUsage.value.toNimbus()
-                    require(signerAlg in supportedDPopAlgorithms) {
-                        "DPoP signer uses $signerAlg which is not dpop_signing_alg_values_supported=  $supportedDPopAlgorithms"
-                    }
-                    DPoPCtx(dPoPUsage.value)
                 }
             }
-        }
     }
 }
 
@@ -163,7 +180,8 @@ internal suspend fun HttpRequestBuilder.bearerOrDPoPAuth(
         is AccessToken.DPoP -> {
             checkNotNull(dPoPJwtFactory) { "dPoPJwtFactory is required when using DPoP access tokens" }
             val dPoPProof =
-                dPoPJwtFactory.createDPoPJwt(method.htm, url.build().toURI().toURL(), accessToken, dPoPNonce)
+                dPoPJwtFactory
+                    .createDPoPJwt(method.htm, url.build().toURI().toURL(), accessToken, dPoPNonce)
                     .getOrThrow()
                     .serialize()
             dpopAuth(accessToken)
@@ -173,17 +191,18 @@ internal suspend fun HttpRequestBuilder.bearerOrDPoPAuth(
 }
 
 private val HttpMethod.htm: Htm
-    get() = when (this) {
-        HttpMethod.Get -> Htm.GET
-        HttpMethod.Head -> Htm.HEAD
-        HttpMethod.Post -> Htm.POST
-        HttpMethod.Put -> Htm.PUT
-        HttpMethod.Delete -> Htm.DELETE
-        HttpMethod("CONNECT") -> Htm.CONNECT
-        HttpMethod.Options -> Htm.OPTIONS
-        HttpMethod("TRACE") -> Htm.TRACE
-        else -> throw IllegalArgumentException("Unsupported HTTP method: $this")
-    }
+    get() =
+        when (this) {
+            HttpMethod.Get -> Htm.GET
+            HttpMethod.Head -> Htm.HEAD
+            HttpMethod.Post -> Htm.POST
+            HttpMethod.Put -> Htm.PUT
+            HttpMethod.Delete -> Htm.DELETE
+            HttpMethod("CONNECT") -> Htm.CONNECT
+            HttpMethod.Options -> Htm.OPTIONS
+            HttpMethod("TRACE") -> Htm.TRACE
+            else -> throw IllegalArgumentException("Unsupported HTTP method: $this")
+        }
 
 private fun HttpRequestBuilder.dpopAuth(accessToken: AccessToken.DPoP) {
     header(HttpHeaders.Authorization, "$DPoP ${accessToken.accessToken}")

@@ -49,9 +49,10 @@ interface HasIssuerId {
 interface CanBeUsedWithVciLib {
     val cfg: OpenId4VCIConfig
 
-    suspend fun createIssuer(credentialOfferUri: String, httpClient: HttpClient): Issuer {
-        return Issuer.make(cfg, credentialOfferUri, httpClient).getIssuerOrThrow()
-    }
+    suspend fun createIssuer(
+        credentialOfferUri: String,
+        httpClient: HttpClient,
+    ): Issuer = Issuer.make(cfg, credentialOfferUri, httpClient).getIssuerOrThrow()
 }
 
 data class CredentialOfferForm<out USER>(
@@ -67,26 +68,28 @@ data class CredentialOfferForm<out USER>(
             credentialConfigurationIds: Set<CredentialConfigurationIdentifier>,
             issuerStateIncluded: Boolean = true,
             credentialOfferEndpoint: String? = null,
-        ): CredentialOfferForm<USER> = CredentialOfferForm(
-            user,
-            credentialConfigurationIds,
-            AuthorizationCodeGrant(issuerStateIncluded),
-            null,
-            credentialOfferEndpoint,
-        )
+        ): CredentialOfferForm<USER> =
+            CredentialOfferForm(
+                user,
+                credentialConfigurationIds,
+                AuthorizationCodeGrant(issuerStateIncluded),
+                null,
+                credentialOfferEndpoint,
+            )
 
         fun <USER> preAuthorizedCodeGrant(
             user: USER?,
             credentialConfigurationIds: Set<CredentialConfigurationIdentifier>,
             txCode: String?,
             credentialOfferEndpoint: String? = null,
-        ): CredentialOfferForm<USER> = CredentialOfferForm(
-            user,
-            credentialConfigurationIds,
-            null,
-            PreAuthorizedCodeGrant(txCode, "text", null),
-            credentialOfferEndpoint,
-        )
+        ): CredentialOfferForm<USER> =
+            CredentialOfferForm(
+                user,
+                credentialConfigurationIds,
+                null,
+                PreAuthorizedCodeGrant(txCode, "text", null),
+                credentialOfferEndpoint,
+            )
     }
 
     data class AuthorizationCodeGrant(
@@ -104,29 +107,32 @@ interface CanRequestForCredentialOffer<in USER> {
     suspend fun requestCredentialOffer(form: CredentialOfferForm<USER>): URI =
         createHttpClient(enableLogging = false).use { requestCredentialOffer(it, form) }
 
-    suspend fun requestCredentialOffer(httpClient: HttpClient, form: CredentialOfferForm<USER>): URI
+    suspend fun requestCredentialOffer(
+        httpClient: HttpClient,
+        form: CredentialOfferForm<USER>,
+    ): URI
 
     companion object {
         @OptIn(ExperimentalSerializationApi::class)
-        fun <USER> onlyStatelessAuthorizationCode(
-            credentialIssuerId: CredentialIssuerId,
-        ): CanRequestForCredentialOffer<USER> = object : CanRequestForCredentialOffer<USER> {
-            override suspend fun requestCredentialOffer(
-                httpClient: HttpClient,
-                form: CredentialOfferForm<USER>,
-            ): URI {
-                val offerJson = buildJsonObject {
-                    put("credential_issuer", credentialIssuerId.toString())
-                    putJsonArray("credential_configuration_ids") {
-                        addAll(form.credentialConfigurationIds.map { it.value })
-                    }
-                }.let { URLEncoder.encode(it.toString(), "UTF-8") }
+        fun <USER> onlyStatelessAuthorizationCode(credentialIssuerId: CredentialIssuerId): CanRequestForCredentialOffer<USER> =
+            object : CanRequestForCredentialOffer<USER> {
+                override suspend fun requestCredentialOffer(
+                    httpClient: HttpClient,
+                    form: CredentialOfferForm<USER>,
+                ): URI {
+                    val offerJson =
+                        buildJsonObject {
+                            put("credential_issuer", credentialIssuerId.toString())
+                            putJsonArray("credential_configuration_ids") {
+                                addAll(form.credentialConfigurationIds.map { it.value })
+                            }
+                        }.let { URLEncoder.encode(it.toString(), "UTF-8") }
 
-                val endPoint = form.credentialOfferEndpoint ?: "openid-credential-offer://"
+                    val endPoint = form.credentialOfferEndpoint ?: "openid-credential-offer://"
 
-                return URI.create("$endPoint?credential_offer=$offerJson")
+                    return URI.create("$endPoint?credential_offer=$offerJson")
+                }
             }
-        }
     }
 }
 
@@ -161,11 +167,13 @@ fun interface CanRequestKeyAttestation {
             preferredKeyStorageStatusPeriod: PositiveDuration?,
         ): KeyAttestationJWT {
             val request = Request(attestedKeys, nonce, preferredKeyStorageStatusPeriod)
-            val response = httpClient.post(url) {
-                contentType(ContentType.Application.Json)
-                accept(ContentType.Application.Json)
-                setBody(request)
-            }.body<Response>()
+            val response =
+                httpClient
+                    .post(url) {
+                        contentType(ContentType.Application.Json)
+                        accept(ContentType.Application.Json)
+                        setBody(request)
+                    }.body<Response>()
             return KeyAttestationJWT(response.keyAttestation)
         }
 
@@ -176,10 +184,15 @@ fun interface CanRequestKeyAttestation {
             @SerialName("preferredKeyStorageStatusPeriod") val preferredKeyStorageStatusPeriod: DurationAsSeconds? = null,
         ) {
             companion object {
-                operator fun invoke(keys: List<JWK>, nonce: Nonce?, preferredKeyStorageStatusPeriod: PositiveDuration?): Request {
-                    val jwkSet = JsonSupport.decodeFromString<JsonObject>(
-                        JSONObjectUtils.toJSONString(JWKSet(keys).toJSONObject(true)),
-                    )
+                operator fun invoke(
+                    keys: List<JWK>,
+                    nonce: Nonce?,
+                    preferredKeyStorageStatusPeriod: PositiveDuration?,
+                ): Request {
+                    val jwkSet =
+                        JsonSupport.decodeFromString<JsonObject>(
+                            JSONObjectUtils.toJSONString(JWKSet(keys).toJSONObject(true)),
+                        )
                     return Request(nonce?.value, jwkSet, preferredKeyStorageStatusPeriod?.value)
                 }
             }
@@ -197,14 +210,16 @@ fun interface CanRequestKeyAttestation {
  * that can issue credentials
  */
 data object NoUser
+
 interface HasTestUser<out USER> {
     val testUser: USER
 
     companion object {
         @Suppress("unused")
-        val HasNoTestUser: HasTestUser<NoUser> = object : HasTestUser<NoUser> {
-            override val testUser: NoUser = NoUser
-        }
+        val HasNoTestUser: HasTestUser<NoUser> =
+            object : HasTestUser<NoUser> {
+                override val testUser: NoUser = NoUser
+            }
     }
 }
 
@@ -213,24 +228,26 @@ interface HasTestUser<out USER> {
  * to authorize credential issuance
  */
 interface CanAuthorizeIssuance<in USER> {
-
     suspend fun loginUserAndGetAuthCode(
         authorizationRequestPrepared: AuthorizationRequestPrepared,
         user: USER,
         httpClient: HttpClient,
-    ): Pair<String, String> = coroutineScope {
-        val response = run {
-            val loginPageResponse = httpClient.visitAuthorizationPage(authorizationRequestPrepared)
-            httpClient.authorizeIssuance(loginPageResponse, user)
+    ): Pair<String, String> =
+        coroutineScope {
+            val response =
+                run {
+                    val loginPageResponse = httpClient.visitAuthorizationPage(authorizationRequestPrepared)
+                    httpClient.authorizeIssuance(loginPageResponse, user)
+                }
+            response.parseCodeAndStatus()
         }
-        response.parseCodeAndStatus()
-    }
 
     fun HttpResponse.parseCodeAndStatus(): Pair<String, String> {
-        fun <A, B> Pair<A?, B?>.toNullable(): Pair<A, B>? {
-            return if (first != null && second != null) first!! to second!!
-            else null
-        }
+        fun <A, B> Pair<A?, B?>.toNullable(): Pair<A, B>? =
+            if (first != null && second != null)
+                first!! to second!!
+            else
+                null
 
         val redirectLocation = headers["Location"].toString()
         return with(URLBuilder(redirectLocation)) {
@@ -238,9 +255,7 @@ interface CanAuthorizeIssuance<in USER> {
         }.toNullable() ?: error("Failed to get authorization code & state")
     }
 
-    suspend fun HttpClient.visitAuthorizationPage(
-        authorizationRequestPrepared: AuthorizationRequestPrepared,
-    ): HttpResponse {
+    suspend fun HttpClient.visitAuthorizationPage(authorizationRequestPrepared: AuthorizationRequestPrepared): HttpResponse {
         val url = authorizationRequestPrepared.authorizationCodeURL.toString()
         return get(url) {
             headers {
@@ -249,13 +264,19 @@ interface CanAuthorizeIssuance<in USER> {
         }
     }
 
-    suspend fun HttpClient.authorizeIssuance(loginResponse: HttpResponse, user: USER): HttpResponse
+    suspend fun HttpClient.authorizeIssuance(
+        loginResponse: HttpResponse,
+        user: USER,
+    ): HttpResponse
 }
 
 //
 // Keycloak Support
 //
-data class KeycloakUser(val username: String, val password: String)
+data class KeycloakUser(
+    val username: String,
+    val password: String,
+)
 
 object Keycloak : CanAuthorizeIssuance<KeycloakUser> {
     override suspend fun loginUserAndGetAuthCode(
@@ -263,28 +284,30 @@ object Keycloak : CanAuthorizeIssuance<KeycloakUser> {
         user: KeycloakUser,
         httpClient: HttpClient,
     ): Pair<String, String> {
-        val driver = ChromeDriver(ChromeOptions().apply { addArguments("--ignore-certificate-errors") })
-            .apply {
-                with(manage().timeouts()) {
-                    implicitlyWait(10.seconds.toJavaDuration())
-                    scriptTimeout(10.seconds.toJavaDuration())
-                    pageLoadTimeout(10.seconds.toJavaDuration())
+        val driver =
+            ChromeDriver(ChromeOptions().apply { addArguments("--ignore-certificate-errors") })
+                .apply {
+                    with(manage().timeouts()) {
+                        implicitlyWait(10.seconds.toJavaDuration())
+                        scriptTimeout(10.seconds.toJavaDuration())
+                        pageLoadTimeout(10.seconds.toJavaDuration())
+                    }
+                }
+
+        val redirectUri =
+            withContext(Dispatchers.IO) {
+                try {
+                    driver.get(authorizationRequestPrepared.authorizationCodeURL.toString())
+
+                    driver.findElement(By.id("username")).sendKeys(user.username)
+                    driver.findElement(By.id("password")).sendKeys(user.password)
+                    driver.findElement(By.id("kc-login")).click()
+
+                    Uri.parse(driver.currentUrl)
+                } finally {
+                    driver.quit()
                 }
             }
-
-        val redirectUri = withContext(Dispatchers.IO) {
-            try {
-                driver.get(authorizationRequestPrepared.authorizationCodeURL.toString())
-
-                driver.findElement(By.id("username")).sendKeys(user.username)
-                driver.findElement(By.id("password")).sendKeys(user.password)
-                driver.findElement(By.id("kc-login")).click()
-
-                Uri.parse(driver.currentUrl)
-            } finally {
-                driver.quit()
-            }
-        }
 
         val authorizationCode = redirectUri.getQueryParameter("code") ?: error("Authorization code not found in redirect URI")
         val state = redirectUri.getQueryParameter("state") ?: error("State not found in redirect URI")
@@ -292,7 +315,10 @@ object Keycloak : CanAuthorizeIssuance<KeycloakUser> {
         return authorizationCode to state
     }
 
-    override suspend fun HttpClient.authorizeIssuance(loginResponse: HttpResponse, user: KeycloakUser): HttpResponse = loginResponse
+    override suspend fun HttpClient.authorizeIssuance(
+        loginResponse: HttpResponse,
+        user: KeycloakUser,
+    ): HttpResponse = loginResponse
 
     val DebugRedirectUri: URI = URI.create("https://oauthdebugger.com/debug")
 }
