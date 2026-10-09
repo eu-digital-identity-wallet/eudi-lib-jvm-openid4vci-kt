@@ -20,7 +20,10 @@ import eu.europa.ec.eudi.openid4vci.CredentialIdentifier
 import eu.europa.ec.eudi.openid4vci.ExchangeEncryptionSpecification
 
 internal sealed interface CredentialConfigurationReference {
-    data class ByCredentialId(val credentialIdentifier: CredentialIdentifier) : CredentialConfigurationReference
+    data class ByCredentialId(
+        val credentialIdentifier: CredentialIdentifier,
+    ) : CredentialConfigurationReference
+
     data class ByCredentialConfigurationId(
         val credentialConfigurationId: CredentialConfigurationIdentifier,
     ) : CredentialConfigurationReference
@@ -34,7 +37,6 @@ internal data class CredentialIssuanceRequest(
     val proofs: List<Proof>,
     val encryptionSpecs: ExchangeEncryptionSpecification,
 ) {
-
     companion object {
         internal fun byCredentialId(
             credentialIdentifier: CredentialIdentifier,

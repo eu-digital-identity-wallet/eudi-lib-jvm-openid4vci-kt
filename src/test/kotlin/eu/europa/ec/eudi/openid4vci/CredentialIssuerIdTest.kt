@@ -21,7 +21,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 internal class CredentialIssuerIdTest {
-
     @Test
     internal fun `Fails with non https URL`() {
         val maybeId = CredentialIssuerId("ftp://issuer")

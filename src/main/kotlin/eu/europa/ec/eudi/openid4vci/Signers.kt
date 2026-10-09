@@ -21,7 +21,6 @@ package eu.europa.ec.eudi.openid4vci
  * and returning the signed result.
  */
 fun interface SignFunction {
-
     suspend fun sign(input: ByteArray): ByteArray
 
     companion object
@@ -56,7 +55,6 @@ data class BatchSignOperation<out PUB>(
  * @param PUB The type of the public material used in the signing process.
  */
 interface Signer<out PUB> {
-
     /**
      * The algorithm that will be used for signing
      */
@@ -94,7 +92,6 @@ interface Signer<out PUB> {
  * @param PUB The type of the public material used in the signing operations.
  */
 interface BatchSigner<out PUB> {
-
     /**
      * The algorithm that will be used for signing
      */

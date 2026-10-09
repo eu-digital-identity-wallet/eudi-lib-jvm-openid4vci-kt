@@ -24,9 +24,7 @@ import kotlinx.serialization.json.JsonPrimitive
 internal class RegistrationCertificatePolicyEvaluator(
     private val policy: RegistrationCertificatePolicy,
 ) {
-    suspend fun evaluate(
-        credentialOffer: CredentialOffer,
-    ): RegistrationCertificatePolicy.Authorization {
+    suspend fun evaluate(credentialOffer: CredentialOffer): RegistrationCertificatePolicy.Authorization {
         val metadata = credentialOffer.credentialIssuerMetadata
 
         val accessCertificate = ensureNotNull(metadata.metadataSigningCertificate) { MissingAccessCertificate() }
@@ -36,17 +34,21 @@ internal class RegistrationCertificatePolicyEvaluator(
 
         val wrprc = issuerInfoList.registrationCertificate()
 
-        val offeredCredentialConfigs = metadata.credentialConfigurationsSupported.filter {
-            credentialOffer.credentialConfigurationIdentifiers.contains(it.key)
-        }.values.toList()
+        val offeredCredentialConfigs =
+            metadata.credentialConfigurationsSupported
+                .filter {
+                    credentialOffer.credentialConfigurationIdentifiers.contains(it.key)
+                }.values
+                .toList()
 
         return policy.invoke(accessCertificate, wrprc, offeredCredentialConfigs)
     }
 
     private fun IssuerInfo.registrationCertificate(): String {
-        val registrationCerts = attestations.filter {
-            it.format == IssuerInfo.Attestation.Format.REGISTRATION_CERT
-        }
+        val registrationCerts =
+            attestations.filter {
+                it.format == IssuerInfo.Attestation.Format.REGISTRATION_CERT
+            }
         ensure(!registrationCerts.isEmpty()) { MissingRegistrationCertificate() }
         ensure(registrationCerts.size == 1) { MultipleRegistrationCertificates() }
         val attestation = registrationCerts.first()

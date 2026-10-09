@@ -43,24 +43,33 @@ private val CONTENT_TYPE_APPLICATION_JWT = ContentType.parse("application/jwt")
 internal class DefaultCredentialIssuerMetadataResolver(
     private val httpClient: HttpClient,
 ) : CredentialIssuerMetadataResolver {
-
     override suspend fun resolve(
         issuer: CredentialIssuerId,
         policy: IssuerMetadataPolicy,
-    ): Result<CredentialIssuerMetadata> = runCatchingCancellable {
-        val wellKnownUrl = issuer.wellKnown()
-        val (json, accessCertificate) = when (policy) {
-            IssuerMetadataPolicy.IgnoreSigned -> wellKnownUrl.requestUnsigned() to null
-            is IssuerMetadataPolicy.RequireSigned -> wellKnownUrl.requestSigned(policy.issuerTrust, issuer, policy.allowedJwsAlgorithms)
-            is IssuerMetadataPolicy.PreferSigned -> wellKnownUrl.requestPreferringSigned(
-                policy.issuerTrust,
-                issuer,
-                policy.allowedJwsAlgorithms,
-            )
+    ): Result<CredentialIssuerMetadata> =
+        runCatchingCancellable {
+            val wellKnownUrl = issuer.wellKnown()
+            val (json, accessCertificate) =
+                when (policy) {
+                    IssuerMetadataPolicy.IgnoreSigned -> {
+                        wellKnownUrl.requestUnsigned() to null
+                    }
+
+                    is IssuerMetadataPolicy.RequireSigned -> {
+                        wellKnownUrl.requestSigned(policy.issuerTrust, issuer, policy.allowedJwsAlgorithms)
+                    }
+
+                    is IssuerMetadataPolicy.PreferSigned -> {
+                        wellKnownUrl.requestPreferringSigned(
+                            policy.issuerTrust,
+                            issuer,
+                            policy.allowedJwsAlgorithms,
+                        )
+                    }
+                }
+            val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer)
+            metadata.copy(metadataSigningCertificate = accessCertificate)
         }
-        val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, issuer)
-        metadata.copy(metadataSigningCertificate = accessCertificate)
-    }
 
     private suspend fun Url.requestUnsigned(): String {
         val response = getAcceptingContentTypes(ContentType.Application.Json)
@@ -98,18 +107,24 @@ internal class DefaultCredentialIssuerMetadataResolver(
         requireNotNull(contentType) { "Credential issuer did not respond with a content type header" }
 
         return when (contentType.withoutParameters()) {
-            CONTENT_TYPE_APPLICATION_JWT -> parseAndVerifySignedMetadata(
-                jwt = response.body<String>(),
-                issuerTrust = issuerTrust,
-                issuer = issuer,
-                allowedJwsAlgorithms = allowedJwsAlgorithms,
-            ).getOrElse {
-                throw CredentialIssuerMetadataError.InvalidSignedMetadata(it)
+            CONTENT_TYPE_APPLICATION_JWT -> {
+                parseAndVerifySignedMetadata(
+                    jwt = response.body<String>(),
+                    issuerTrust = issuerTrust,
+                    issuer = issuer,
+                    allowedJwsAlgorithms = allowedJwsAlgorithms,
+                ).getOrElse {
+                    throw CredentialIssuerMetadataError.InvalidSignedMetadata(it)
+                }
             }
 
-            ContentType.Application.Json -> response.body<String>() to null
+            ContentType.Application.Json -> {
+                response.body<String>() to null
+            }
 
-            else -> "Unexpected content type $contentType when retrieving issuer metadata." to null
+            else -> {
+                "Unexpected content type $contentType when retrieving issuer metadata." to null
+            }
         }
     }
 
@@ -126,37 +141,42 @@ internal class DefaultCredentialIssuerMetadataResolver(
         issuerTrust: CertificateChainTrust,
         issuer: CredentialIssuerId,
         allowedJwsAlgorithms: Set<JWSAlgorithm>,
-    ): Result<Pair<String, X509Certificate?>> = runCatchingCancellable {
-        val signedJwt = SignedJWT.parse(jwt)
-        val processor = DefaultJWTProcessor<SecurityContext>()
-            .apply {
-                jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
-                jwsKeySelector = issuerTrust.keySelector(signedJwt, allowedJwsAlgorithms)
-                jwtClaimsSetVerifier =
-                    DefaultJWTClaimsVerifier(
-                        null,
-                        JWTClaimsSet.Builder()
-                            .subject(issuer.value.value.toExternalForm())
-                            .build(),
-                        setOf("iat", "sub"),
-                    )
-            }
+    ): Result<Pair<String, X509Certificate?>> =
+        runCatchingCancellable {
+            val signedJwt = SignedJWT.parse(jwt)
+            val processor =
+                DefaultJWTProcessor<SecurityContext>()
+                    .apply {
+                        jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
+                        jwsKeySelector = issuerTrust.keySelector(signedJwt, allowedJwsAlgorithms)
+                        jwtClaimsSetVerifier =
+                            DefaultJWTClaimsVerifier(
+                                null,
+                                JWTClaimsSet
+                                    .Builder()
+                                    .subject(issuer.value.value.toExternalForm())
+                                    .build(),
+                                setOf("iat", "sub"),
+                            )
+                    }
 
-        val claimsSet = processor.process(signedJwt, null)
-        val metadataJson = JSONObjectUtils.toJSONString(claimsSet.toJSONObject())
-        val leafCertificate = signedJwt.header.x509CertChain?.let { certChain ->
-            X509CertChainUtils.parse(certChain).firstOrNull()
+            val claimsSet = processor.process(signedJwt, null)
+            val metadataJson = JSONObjectUtils.toJSONString(claimsSet.toJSONObject())
+            val leafCertificate =
+                signedJwt.header.x509CertChain?.let { certChain ->
+                    X509CertChainUtils.parse(certChain).firstOrNull()
+                }
+            metadataJson to leafCertificate
         }
-        metadataJson to leafCertificate
-    }
 
     private suspend fun CertificateChainTrust.keySelector(
         signedJwt: SignedJWT,
         allowedJwsAlgorithms: Set<JWSAlgorithm>,
     ): JWSKeySelector<SecurityContext> {
-        val certChain = requireNotNull(signedJwt.header.x509CertChain) {
-            "missing 'x5c' header claim"
-        }.let { X509CertChainUtils.parse(it) }
+        val certChain =
+            requireNotNull(signedJwt.header.x509CertChain) {
+                "missing 'x5c' header claim"
+            }.let { X509CertChainUtils.parse(it) }
 
         require(isTrusted(certChain)) {
             "certificate chain in 'x5c' header claim is not trusted"
@@ -177,9 +197,10 @@ internal class DefaultCredentialIssuerMetadataResolver(
 
     private suspend fun Url.getAcceptingContentTypes(vararg contentTypes: ContentType): HttpResponse =
         try {
-            val response = httpClient.get(this) {
-                contentTypes.forEach { accept(it) }
-            }
+            val response =
+                httpClient.get(this) {
+                    contentTypes.forEach { accept(it) }
+                }
             require(response.status.isSuccess()) {
                 "Credential issuer responded with status code: ${response.status}"
             }
@@ -191,16 +212,17 @@ internal class DefaultCredentialIssuerMetadataResolver(
 
 internal fun CredentialIssuerId.wellKnown(): Url {
     val issuer = Url(this.value.toString())
-    return URLBuilder(issuer).apply {
-        encodedPathSegments = emptyList()
-        appendPathSegments(
-            OpenId4VCISpec.CREDENTIAL_ISSUER_WELL_KNOWN_PATH.trim('/').split("/"),
-            encodeSlash = true,
-        )
-        // Use `rawSegments` (not `segments`) so that the path component of the Credential Issuer
-        // Identifier is preserved exactly, including a trailing slash when present.
-        // OID4VCI Credential Issuer metadata discovery inserts the well-known path between the host
-        // and the path component without the RFC 8414 trailing-slash normalization.
-        issuer.rawSegments.forEach { appendPathSegments(listOf(it), encodeSlash = true) }
-    }.build()
+    return URLBuilder(issuer)
+        .apply {
+            encodedPathSegments = emptyList()
+            appendPathSegments(
+                OpenId4VCISpec.CREDENTIAL_ISSUER_WELL_KNOWN_PATH.trim('/').split("/"),
+                encodeSlash = true,
+            )
+            // Use `rawSegments` (not `segments`) so that the path component of the Credential Issuer
+            // Identifier is preserved exactly, including a trailing slash when present.
+            // OID4VCI Credential Issuer metadata discovery inserts the well-known path between the host
+            // and the path component without the RFC 8414 trailing-slash normalization.
+            issuer.rawSegments.forEach { appendPathSegments(listOf(it), encodeSlash = true) }
+        }.build()
 }

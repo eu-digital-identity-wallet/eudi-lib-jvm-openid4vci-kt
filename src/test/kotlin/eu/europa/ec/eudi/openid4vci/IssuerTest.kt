@@ -23,109 +23,121 @@ import java.net.URI
 import kotlin.test.*
 
 class IssuerTest {
-
     private val trustAll = CertificateChainTrust { _ -> true }
 
     @Test
-    fun `when wrprc policy provided then IssuerMetadataPolicy must be RequireSigned`() = runTest {
-        assertFailsWith<IllegalArgumentException> {
-            OpenId4VCIConfig(
-                clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
-                authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-                encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+    fun `when wrprc policy provided then IssuerMetadataPolicy must be RequireSigned`() =
+        runTest {
+            assertFailsWith<IllegalArgumentException> {
+                OpenId4VCIConfig(
+                    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
+                    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                    encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+                    issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+                    registrationCertificatePolicy = RegistrationCertificatePolicy { _, _, _ -> Authorization.Granted() },
+                )
+            }
+        }
 
-                issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
-                registrationCertificatePolicy = RegistrationCertificatePolicy { _, _, _ -> Authorization.Granted() },
+    @Test
+    fun `when wrprc policy return violation warnings they are reflected on the IssuerResolutionResult`() =
+        runTest {
+            val warnings =
+                listOf(
+                    PolicyViolation("WRPRC policy violation 1"),
+                    PolicyViolation("WRPRC policy violation 2"),
+                )
+            val config =
+                OpenId4VCIConfiguration.copy(
+                    issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(trustAll),
+                    registrationCertificatePolicy = RegistrationCertificatePolicy { _, _, _ -> Authorization.Granted(warnings) },
+                )
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerSignedMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+                    credentialIssuerSignedMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+                )
+
+            val issuerNegotiationResult =
+                Issuer.makeWalletInitiated(
+                    config,
+                    SampleIssuer.Id,
+                    listOf(CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc")),
+                    mockedHttpClient,
+                )
+
+            issuerNegotiationResult.fold(
+                onSuccess = {
+                    assertNotNull(it.second)
+                    assertEquals(warnings, it.second)
+                },
+                onFailure = { fail("Expected success") },
             )
         }
-    }
 
     @Test
-    fun `when wrprc policy return violation warnings they are reflected on the IssuerResolutionResult`() = runTest {
-        val warnings = listOf(
-            PolicyViolation("WRPRC policy violation 1"),
-            PolicyViolation("WRPRC policy violation 2"),
-        )
-        val config = OpenId4VCIConfiguration.copy(
-            issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(trustAll),
-            registrationCertificatePolicy = RegistrationCertificatePolicy { _, _, _ -> Authorization.Granted(warnings) },
-        )
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerSignedMetadataWellKnownMocker(),
-            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
-            credentialIssuerSignedMetadataWellKnownMocker(),
-            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
-        )
+    fun `when wrprc policy validation fails then issuer resolution fails with IssuerResolutionResult Failure`() =
+        runTest {
+            val policyViolation = PolicyViolation("You shall not pass!!")
+            val config =
+                OpenId4VCIConfiguration.copy(
+                    issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(trustAll),
+                    registrationCertificatePolicy = RegistrationCertificatePolicy { _, _, _ -> Authorization.NotGranted(policyViolation) },
+                )
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerSignedMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+                    credentialIssuerSignedMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+                )
 
-        val issuerNegotiationResult = Issuer.makeWalletInitiated(
-            config,
-            SampleIssuer.Id,
-            listOf(CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc")),
-            mockedHttpClient,
-        )
+            val issuerNegotiationResult =
+                Issuer.makeWalletInitiated(
+                    config,
+                    SampleIssuer.Id,
+                    listOf(CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc")),
+                    mockedHttpClient,
+                )
 
-        issuerNegotiationResult.fold(
-            onSuccess = {
-                assertNotNull(it.second)
-                assertEquals(warnings, it.second)
-            },
-            onFailure = { fail("Expected success") },
-        )
-    }
-
-    @Test
-    fun `when wrprc policy validation fails then issuer resolution fails with IssuerResolutionResult Failure`() = runTest {
-        val policyViolation = PolicyViolation("You shall not pass!!")
-        val config = OpenId4VCIConfiguration.copy(
-            issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(trustAll),
-            registrationCertificatePolicy = RegistrationCertificatePolicy { _, _, _ -> Authorization.NotGranted(policyViolation) },
-        )
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerSignedMetadataWellKnownMocker(),
-            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
-            credentialIssuerSignedMetadataWellKnownMocker(),
-            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
-        )
-
-        val issuerNegotiationResult = Issuer.makeWalletInitiated(
-            config,
-            SampleIssuer.Id,
-            listOf(CredentialConfigurationIdentifier("MobileDrivingLicense_msoMdoc")),
-            mockedHttpClient,
-        )
-
-        issuerNegotiationResult.fold(
-            onSuccess = { fail("Expected failure") },
-            onFailure = { e ->
-                assertIs<AuthorizationPolicyValidationError.AuthorizationPolicyNotMet>(e)
-                assertEquals(policyViolation, e.violation)
-            },
-        )
-    }
+            issuerNegotiationResult.fold(
+                onSuccess = { fail("Expected failure") },
+                onFailure = { e ->
+                    assertIs<AuthorizationPolicyValidationError.AuthorizationPolicyNotMet>(e)
+                    assertEquals(policyViolation, e.violation)
+                },
+            )
+        }
 
     @Test
-    fun `verify wallet initiated`() = runTest {
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
-        )
+    fun `verify wallet initiated`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+                )
 
-        val issuer = Issuer.makeWalletInitiated(
-            OpenId4VCIConfiguration,
-            SampleIssuer.Id,
-            listOf(CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
-            mockedHttpClient,
-        ).getIssuerOrThrow()
+            val issuer =
+                Issuer
+                    .makeWalletInitiated(
+                        OpenId4VCIConfiguration,
+                        SampleIssuer.Id,
+                        listOf(CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
+                        mockedHttpClient,
+                    ).getIssuerOrThrow()
 
-        val credentialOffer = issuer.credentialOffer
-        assertEquals(SampleIssuer.Id, credentialOffer.credentialIssuerIdentifier)
-        assertEquals(1, credentialOffer.credentialConfigurationIdentifiers.size)
-        assertEquals("eu.europa.ec.eudiw.pid_vc_sd_jwt", credentialOffer.credentialConfigurationIdentifiers.first().value)
-        val grants = assertNotNull(credentialOffer.grants)
-        val authorizationCodeGrant = assertNotNull(grants.authorizationCode())
-        assertNull(authorizationCodeGrant.issuerState)
-        assertEquals("https://auth-server.example.com", authorizationCodeGrant.authorizationServer?.value?.toExternalForm())
-    }
+            val credentialOffer = issuer.credentialOffer
+            assertEquals(SampleIssuer.Id, credentialOffer.credentialIssuerIdentifier)
+            assertEquals(1, credentialOffer.credentialConfigurationIdentifiers.size)
+            assertEquals("eu.europa.ec.eudiw.pid_vc_sd_jwt", credentialOffer.credentialConfigurationIdentifiers.first().value)
+            val grants = assertNotNull(credentialOffer.grants)
+            val authorizationCodeGrant = assertNotNull(grants.authorizationCode())
+            assertNull(authorizationCodeGrant.issuerState)
+            assertEquals("https://auth-server.example.com", authorizationCodeGrant.authorizationServer?.value?.toExternalForm())
+        }
 }

@@ -30,53 +30,66 @@ import java.security.cert.X509Certificate
 import java.time.Instant
 import java.util.Date
 
-class KeyAttestationJWTBuilder(signatureAlgorithm: JWSAlgorithm) {
+class KeyAttestationJWTBuilder(
+    signatureAlgorithm: JWSAlgorithm,
+) {
     private val header = JWSHeader.Builder(signatureAlgorithm)
     private val claimsSet = JWTClaimsSet.Builder()
 
-    fun typ(typ: JOSEObjectType): KeyAttestationJWTBuilder = apply {
-        header.type(typ)
-    }
+    fun typ(typ: JOSEObjectType): KeyAttestationJWTBuilder =
+        apply {
+            header.type(typ)
+        }
 
-    fun x5c(x5c: List<X509Certificate>): KeyAttestationJWTBuilder = apply {
-        header.x509CertChain(x5c.map { Base64.encode(it.encoded) })
-    }
+    fun x5c(x5c: List<X509Certificate>): KeyAttestationJWTBuilder =
+        apply {
+            header.x509CertChain(x5c.map { Base64.encode(it.encoded) })
+        }
 
-    fun iat(iat: Instant): KeyAttestationJWTBuilder = apply {
-        claimsSet.issueTime(Date.from(iat))
-    }
+    fun iat(iat: Instant): KeyAttestationJWTBuilder =
+        apply {
+            claimsSet.issueTime(Date.from(iat))
+        }
 
-    fun exp(exp: Instant): KeyAttestationJWTBuilder = apply {
-        claimsSet.expirationTime(Date.from(exp))
-    }
+    fun exp(exp: Instant): KeyAttestationJWTBuilder =
+        apply {
+            claimsSet.expirationTime(Date.from(exp))
+        }
 
-    fun attestedKeys(attestedKeys: List<JWK>): KeyAttestationJWTBuilder = apply {
-        claimsSet.claim(OpenId4VCISpec.ATTESTED_KEYS, attestedKeys.map { it.toJSONObject() })
-    }
+    fun attestedKeys(attestedKeys: List<JWK>): KeyAttestationJWTBuilder =
+        apply {
+            claimsSet.claim(OpenId4VCISpec.ATTESTED_KEYS, attestedKeys.map { it.toJSONObject() })
+        }
 
-    fun keyStorage(keyStorage: List<AttackPotentialResistance>): KeyAttestationJWTBuilder = apply {
-        claimsSet.claim(OpenId4VCISpec.KEY_STORAGE, keyStorage.map { it.value })
-    }
+    fun keyStorage(keyStorage: List<AttackPotentialResistance>): KeyAttestationJWTBuilder =
+        apply {
+            claimsSet.claim(OpenId4VCISpec.KEY_STORAGE, keyStorage.map { it.value })
+        }
 
-    fun userAuthentication(userAuthentication: List<AttackPotentialResistance>): KeyAttestationJWTBuilder = apply {
-        claimsSet.claim(OpenId4VCISpec.USER_AUTHENTICATION, userAuthentication.map { it.value })
-    }
+    fun userAuthentication(userAuthentication: List<AttackPotentialResistance>): KeyAttestationJWTBuilder =
+        apply {
+            claimsSet.claim(OpenId4VCISpec.USER_AUTHENTICATION, userAuthentication.map { it.value })
+        }
 
-    fun certification(certification: URL): KeyAttestationJWTBuilder = apply {
-        claimsSet.claim(OpenId4VCISpec.CERTIFICATION, certification.toExternalForm())
-    }
+    fun certification(certification: URL): KeyAttestationJWTBuilder =
+        apply {
+            claimsSet.claim(OpenId4VCISpec.CERTIFICATION, certification.toExternalForm())
+        }
 
-    fun nonce(nonce: Nonce): KeyAttestationJWTBuilder = apply {
-        claimsSet.claim(OpenId4VCISpec.NONCE, nonce.value)
-    }
+    fun nonce(nonce: Nonce): KeyAttestationJWTBuilder =
+        apply {
+            claimsSet.claim(OpenId4VCISpec.NONCE, nonce.value)
+        }
 
-    fun status(status: StatusClaim): KeyAttestationJWTBuilder = apply {
-        claimsSet.claim(TokenStatusListSpec.STATUS, JSONObjectUtils.parse(JsonSupport.encodeToString(status)))
-    }
+    fun status(status: StatusClaim): KeyAttestationJWTBuilder =
+        apply {
+            claimsSet.claim(TokenStatusListSpec.STATUS, JSONObjectUtils.parse(JsonSupport.encodeToString(status)))
+        }
 
-    fun keyStorageStatus(keyStorageStatus: KeyStorageStatus): KeyAttestationJWTBuilder = apply {
-        claimsSet.claim(TS3.KEY_STORAGE_STATUS, JSONObjectUtils.parse(JsonSupport.encodeToString(keyStorageStatus)))
-    }
+    fun keyStorageStatus(keyStorageStatus: KeyStorageStatus): KeyAttestationJWTBuilder =
+        apply {
+            claimsSet.claim(TS3.KEY_STORAGE_STATUS, JSONObjectUtils.parse(JsonSupport.encodeToString(keyStorageStatus)))
+        }
 
     fun build(): SignedJWT = SignedJWT(header.build(), claimsSet.build())
 

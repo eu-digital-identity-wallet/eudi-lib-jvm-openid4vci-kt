@@ -43,114 +43,125 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 class RegistrationCertificatePolicyEvaluatorTest {
-
     val pidProviderId = CredentialIssuerId(CREDENTIAL_ISSUER_PUBLIC_URL).getOrThrow()
 
     @OptIn(ExperimentalTime::class)
     private val pidProvider = Registrar(Clock.System).registerAttestationProvider(pidProviderId, buildJsonObject { })
 
     @Test
-    fun `evaluate throws MissingAccessCertificate when no AccessCertificate present in issuer metadata`() = runTest {
-        val evaluator = RegistrationCertificatePolicyEvaluator { _, _, _ -> RegistrationCertificatePolicy.Authorization.Granted() }
+    fun `evaluate throws MissingAccessCertificate when no AccessCertificate present in issuer metadata`() =
+        runTest {
+            val evaluator = RegistrationCertificatePolicyEvaluator { _, _, _ -> RegistrationCertificatePolicy.Authorization.Granted() }
 
-        val unsignedMetadata = pidProvider.unsignedMetadata()
-        val credentialOffer = credentialOffer(unsignedMetadata)
+            val unsignedMetadata = pidProvider.unsignedMetadata()
+            val credentialOffer = credentialOffer(unsignedMetadata)
 
-        assertFailsWith<AuthorizationPolicyValidationError.MissingAccessCertificate> {
-            evaluator.evaluate(credentialOffer)
+            assertFailsWith<AuthorizationPolicyValidationError.MissingAccessCertificate> {
+                evaluator.evaluate(credentialOffer)
+            }
         }
-    }
 
     @Test
-    fun `evaluate throws MissingIssuerInfo when issuerInfo is not present`() = runTest {
-        val evaluator = RegistrationCertificatePolicyEvaluator { _, _, _ -> RegistrationCertificatePolicy.Authorization.Granted() }
+    fun `evaluate throws MissingIssuerInfo when issuerInfo is not present`() =
+        runTest {
+            val evaluator = RegistrationCertificatePolicyEvaluator { _, _, _ -> RegistrationCertificatePolicy.Authorization.Granted() }
 
-        val metadata = pidProvider.signedMetadata().toDomain()
-        val metadataNoIssuerInfo = metadata.copy(issuerInfo = null)
+            val metadata = pidProvider.signedMetadata().toDomain()
+            val metadataNoIssuerInfo = metadata.copy(issuerInfo = null)
 
-        val credentialOffer = credentialOffer(metadataNoIssuerInfo)
+            val credentialOffer = credentialOffer(metadataNoIssuerInfo)
 
-        assertFailsWith<AuthorizationPolicyValidationError.MissingIssuerInfo> {
-            evaluator.evaluate(credentialOffer)
+            assertFailsWith<AuthorizationPolicyValidationError.MissingIssuerInfo> {
+                evaluator.evaluate(credentialOffer)
+            }
         }
-    }
 
     @Test
-    fun `evaluate throws MissingRegistrationCertificate when issuerInfo does not include required registration certificate`() = runTest {
-        val evaluator = RegistrationCertificatePolicyEvaluator { _, _, _ -> RegistrationCertificatePolicy.Authorization.Granted() }
+    fun `evaluate throws MissingRegistrationCertificate when issuerInfo does not include required registration certificate`() =
+        runTest {
+            val evaluator = RegistrationCertificatePolicyEvaluator { _, _, _ -> RegistrationCertificatePolicy.Authorization.Granted() }
 
-        val metadata = pidProvider.signedMetadata().toDomain()
-        val metadataNoWrprc = metadata.copy(
-            issuerInfo = IssuerInfo(
-                listOf(
-                    Attestation(
-                        format = Attestation.Format("wrprc"),
-                        data = Attestation.Data(JsonPrimitive("wrprc_data")),
-                    ),
-                ),
-            ),
-        )
-
-        val credentialOffer = credentialOffer(metadataNoWrprc)
-
-        assertFailsWith<AuthorizationPolicyValidationError.MissingRegistrationCertificate> {
-            evaluator.evaluate(credentialOffer)
-        }
-    }
-
-    @Test
-    fun `evaluate throws MultipleRegistrationCertificates when includes multiple registration certificates`() = runTest {
-        val evaluator = RegistrationCertificatePolicyEvaluator { _, _, _ -> RegistrationCertificatePolicy.Authorization.Granted() }
-
-        val metadata = pidProvider.signedMetadata().toDomain()
-        val metadataMultipleRegCert = metadata.copy(
-            issuerInfo = IssuerInfo(
-                listOf(
-                    Attestation(
-                        format = Attestation.Format.REGISTRATION_CERT,
-                        data = Attestation.Data(JsonPrimitive("wrprc_data")),
-                    ),
-                    Attestation(
-                        format = Attestation.Format.REGISTRATION_CERT,
-                        data = Attestation.Data(JsonPrimitive("wrprc_data")),
-                    ),
-                ),
-            ),
-        )
-
-        val credentialOffer = credentialOffer(metadataMultipleRegCert)
-
-        assertFailsWith<AuthorizationPolicyValidationError.MultipleRegistrationCertificates> {
-            evaluator.evaluate(credentialOffer)
-        }
-    }
-
-    @Test
-    fun `evaluate throws MalformedRegistrationCertificate when registration certificate is not a json string`() = runTest {
-        val evaluator = RegistrationCertificatePolicyEvaluator { _, _, _ -> RegistrationCertificatePolicy.Authorization.Granted() }
-
-        val metadata = pidProvider.signedMetadata().toDomain()
-        val metadataMalformedWrprc = metadata.copy(
-            issuerInfo = IssuerInfo(
-                listOf(
-                    Attestation(
-                        format = Attestation.Format.REGISTRATION_CERT,
-                        data = Attestation.Data(
-                            buildJsonObject {
-                                put("key", "value")
-                            },
+            val metadata = pidProvider.signedMetadata().toDomain()
+            val metadataNoWrprc =
+                metadata.copy(
+                    issuerInfo =
+                        IssuerInfo(
+                            listOf(
+                                Attestation(
+                                    format = Attestation.Format("wrprc"),
+                                    data = Attestation.Data(JsonPrimitive("wrprc_data")),
+                                ),
+                            ),
                         ),
-                    ),
-                ),
-            ),
-        )
+                )
 
-        val credentialOffer = credentialOffer(metadataMalformedWrprc)
+            val credentialOffer = credentialOffer(metadataNoWrprc)
 
-        assertFailsWith<AuthorizationPolicyValidationError.MalformedRegistrationCertificate> {
-            evaluator.evaluate(credentialOffer)
+            assertFailsWith<AuthorizationPolicyValidationError.MissingRegistrationCertificate> {
+                evaluator.evaluate(credentialOffer)
+            }
         }
-    }
+
+    @Test
+    fun `evaluate throws MultipleRegistrationCertificates when includes multiple registration certificates`() =
+        runTest {
+            val evaluator = RegistrationCertificatePolicyEvaluator { _, _, _ -> RegistrationCertificatePolicy.Authorization.Granted() }
+
+            val metadata = pidProvider.signedMetadata().toDomain()
+            val metadataMultipleRegCert =
+                metadata.copy(
+                    issuerInfo =
+                        IssuerInfo(
+                            listOf(
+                                Attestation(
+                                    format = Attestation.Format.REGISTRATION_CERT,
+                                    data = Attestation.Data(JsonPrimitive("wrprc_data")),
+                                ),
+                                Attestation(
+                                    format = Attestation.Format.REGISTRATION_CERT,
+                                    data = Attestation.Data(JsonPrimitive("wrprc_data")),
+                                ),
+                            ),
+                        ),
+                )
+
+            val credentialOffer = credentialOffer(metadataMultipleRegCert)
+
+            assertFailsWith<AuthorizationPolicyValidationError.MultipleRegistrationCertificates> {
+                evaluator.evaluate(credentialOffer)
+            }
+        }
+
+    @Test
+    fun `evaluate throws MalformedRegistrationCertificate when registration certificate is not a json string`() =
+        runTest {
+            val evaluator = RegistrationCertificatePolicyEvaluator { _, _, _ -> RegistrationCertificatePolicy.Authorization.Granted() }
+
+            val metadata = pidProvider.signedMetadata().toDomain()
+            val metadataMalformedWrprc =
+                metadata.copy(
+                    issuerInfo =
+                        IssuerInfo(
+                            listOf(
+                                Attestation(
+                                    format = Attestation.Format.REGISTRATION_CERT,
+                                    data =
+                                        Attestation.Data(
+                                            buildJsonObject {
+                                                put("key", "value")
+                                            },
+                                        ),
+                                ),
+                            ),
+                        ),
+                )
+
+            val credentialOffer = credentialOffer(metadataMalformedWrprc)
+
+            assertFailsWith<AuthorizationPolicyValidationError.MalformedRegistrationCertificate> {
+                evaluator.evaluate(credentialOffer)
+            }
+        }
 
     private fun SignedJWT.toDomain(): CredentialIssuerMetadata {
         val (metadataJson, accessCertificate) = parseAndVerifySignedMetadata(this, pidProvider.id).getOrThrow()
@@ -162,36 +173,41 @@ class RegistrationCertificatePolicyEvaluatorTest {
         signedJwt: SignedJWT,
         issuer: CredentialIssuerId,
         allowedJwsAlgorithms: Set<JWSAlgorithm> = TS3.ALLOWED_SIGNATURE_ALGORITHMS,
-    ): Result<Pair<String, X509Certificate?>> = runCatchingCancellable {
-        val processor = DefaultJWTProcessor<SecurityContext>()
-            .apply {
-                jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
-                jwsKeySelector = keySelector(signedJwt, allowedJwsAlgorithms)
-                jwtClaimsSetVerifier =
-                    DefaultJWTClaimsVerifier(
-                        null,
-                        JWTClaimsSet.Builder()
-                            .subject(issuer.value.value.toExternalForm())
-                            .build(),
-                        setOf("iat", "sub"),
-                    )
-            }
+    ): Result<Pair<String, X509Certificate?>> =
+        runCatchingCancellable {
+            val processor =
+                DefaultJWTProcessor<SecurityContext>()
+                    .apply {
+                        jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType(OpenId4VCISpec.SIGNED_METADATA_JWT_TYPE))
+                        jwsKeySelector = keySelector(signedJwt, allowedJwsAlgorithms)
+                        jwtClaimsSetVerifier =
+                            DefaultJWTClaimsVerifier(
+                                null,
+                                JWTClaimsSet
+                                    .Builder()
+                                    .subject(issuer.value.value.toExternalForm())
+                                    .build(),
+                                setOf("iat", "sub"),
+                            )
+                    }
 
-        val claimsSet = processor.process(signedJwt, null)
-        val metadataJson = JSONObjectUtils.toJSONString(claimsSet.toJSONObject())
-        val leafCertificate = signedJwt.header.x509CertChain?.let { certChain ->
-            X509CertChainUtils.parse(certChain).firstOrNull()
+            val claimsSet = processor.process(signedJwt, null)
+            val metadataJson = JSONObjectUtils.toJSONString(claimsSet.toJSONObject())
+            val leafCertificate =
+                signedJwt.header.x509CertChain?.let { certChain ->
+                    X509CertChainUtils.parse(certChain).firstOrNull()
+                }
+            metadataJson to leafCertificate
         }
-        metadataJson to leafCertificate
-    }
 
     private fun keySelector(
         signedJwt: SignedJWT,
         allowedJwsAlgorithms: Set<JWSAlgorithm>,
     ): JWSKeySelector<SecurityContext> {
-        val certChain = requireNotNull(signedJwt.header.x509CertChain) {
-            "missing 'x5c' header claim"
-        }.let { X509CertChainUtils.parse(it) }
+        val certChain =
+            requireNotNull(signedJwt.header.x509CertChain) {
+                "missing 'x5c' header claim"
+            }.let { X509CertChainUtils.parse(it) }
 
         val jwk = JWK.parse(certChain.first())
 

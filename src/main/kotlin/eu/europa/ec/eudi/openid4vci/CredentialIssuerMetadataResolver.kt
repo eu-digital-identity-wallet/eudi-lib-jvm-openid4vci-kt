@@ -78,10 +78,11 @@ sealed interface PayloadCompression : JavaIoSerializable {
     }
 
     companion object {
-        operator fun invoke(algorithms: List<CompressionAlgorithm>?) = when {
-            algorithms != null && algorithms.isNotEmpty() -> Supported(algorithms)
-            else -> NotSupported
-        }
+        operator fun invoke(algorithms: List<CompressionAlgorithm>?) =
+            when {
+                algorithms != null && algorithms.isNotEmpty() -> Supported(algorithms)
+                else -> NotSupported
+            }
     }
 }
 
@@ -96,9 +97,10 @@ data class SupportedResponseEncryptionParameters(
         if (algorithms.isEmpty()) {
             throw CredentialIssuerMetadataValidationError.CredentialResponseEncryptionAlgorithmsRequired()
         }
-        val allAreAsymmetricAlgorithms = algorithms.all {
-            JWEAlgorithm.Family.ASYMMETRIC.contains(it)
-        }
+        val allAreAsymmetricAlgorithms =
+            algorithms.all {
+                JWEAlgorithm.Family.ASYMMETRIC.contains(it)
+            }
         if (!allAreAsymmetricAlgorithms) {
             throw CredentialIssuerMetadataValidationError.CredentialResponseAsymmetricEncryptionAlgorithmsRequired()
         }
@@ -144,7 +146,9 @@ sealed interface BatchCredentialIssuance : JavaIoSerializable {
         private fun readResolve(): Any = NotSupported
     }
 
-    data class Supported(val batchSize: Int) : BatchCredentialIssuance {
+    data class Supported(
+        val batchSize: Int,
+    ) : BatchCredentialIssuance {
         init {
             require(batchSize > 0) { "batchSize must be greater than 0" }
         }
@@ -152,7 +156,9 @@ sealed interface BatchCredentialIssuance : JavaIoSerializable {
 }
 
 @JvmInline
-value class IssuerInfo(val attestations: List<Attestation>) : JavaIoSerializable {
+value class IssuerInfo(
+    val attestations: List<Attestation>,
+) : JavaIoSerializable {
     init {
         require(attestations.isNotEmpty())
     }
@@ -166,10 +172,11 @@ value class IssuerInfo(val attestations: List<Attestation>) : JavaIoSerializable
         @SerialName(ETSI119472Part3.FORMAT) @Required val format: Format,
         @SerialName(ETSI119472Part3.DATA) @Required val data: Data,
     ) : JavaIoSerializable {
-
         @Serializable
         @JvmInline
-        value class Format(val value: String) : JavaIoSerializable {
+        value class Format(
+            val value: String,
+        ) : JavaIoSerializable {
             init {
                 require(value.isNotEmpty())
             }
@@ -183,7 +190,9 @@ value class IssuerInfo(val attestations: List<Attestation>) : JavaIoSerializable
 
         @Serializable
         @JvmInline
-        value class Data(val value: JsonElement) : JavaIoSerializable {
+        value class Data(
+            val value: JsonElement,
+        ) : JavaIoSerializable {
             init {
                 require((value is JsonPrimitive && value.isString) || (value is JsonObject))
             }
@@ -219,15 +228,14 @@ data class CredentialIssuerMetadata(
     val issuerInfo: IssuerInfo? = null,
     val metadataSigningCertificate: X509Certificate? = null,
 ) : JavaIoSerializable {
-
     init {
         require(credentialConfigurationsSupported.isNotEmpty()) { "credentialConfigurationsSupported must not be empty" }
     }
 
-    inline fun <reified T : CredentialConfiguration> findByFormat(predicate: (T) -> Boolean): Map<CredentialConfigurationIdentifier, T> {
-        return credentialConfigurationsSupported.mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }
+    inline fun <reified T : CredentialConfiguration> findByFormat(predicate: (T) -> Boolean): Map<CredentialConfigurationIdentifier, T> =
+        credentialConfigurationsSupported
+            .mapNotNull { (k, v) -> if (v is T && predicate(v)) k to v else null }
             .toMap()
-    }
 }
 
 @Suppress("unused")
@@ -238,8 +246,9 @@ fun CredentialIssuerMetadata.findMsoMdoc(docType: String): MsoMdocCredential? =
  * An endpoint of a Credential Issuer. It's an [HttpsUrl] that must not have a fragment.
  */
 @JvmInline
-value class CredentialIssuerEndpoint(val value: URL) {
-
+value class CredentialIssuerEndpoint(
+    val value: URL,
+) {
     init {
         require(value.toURI().fragment.isNullOrBlank()) { "CredentialIssuerEndpoint must not have a fragment" }
     }
@@ -247,7 +256,6 @@ value class CredentialIssuerEndpoint(val value: URL) {
     override fun toString(): String = value.toString()
 
     companion object {
-
         /**
          * Parses the provided [value] as an [HttpsUrl] and tries to create a [CredentialIssuerEndpoint].
          */
@@ -259,63 +267,84 @@ value class CredentialIssuerEndpoint(val value: URL) {
 /**
  * Errors that can occur while trying to fetch and validate the metadata of a Credential Issuer.
  */
-sealed class CredentialIssuerMetadataError(cause: Throwable) : Throwable(cause), JavaIoSerializable {
-
+sealed class CredentialIssuerMetadataError(
+    cause: Throwable,
+) : Throwable(cause),
+    JavaIoSerializable {
     /**
      * Indicates the Credential Issuer metadata could not be fetched.
      */
-    class UnableToFetchCredentialIssuerMetadata(cause: Throwable) : CredentialIssuerMetadataError(cause)
+    class UnableToFetchCredentialIssuerMetadata(
+        cause: Throwable,
+    ) : CredentialIssuerMetadataError(cause)
 
     /**
      * Indicates the Credential Issuer metadata could not be parsed.
      */
-    class NonParseableCredentialIssuerMetadata(cause: Throwable) : CredentialIssuerMetadataError(cause)
+    class NonParseableCredentialIssuerMetadata(
+        cause: Throwable,
+    ) : CredentialIssuerMetadataError(cause)
 
     /**
      * Indicates the Credential Issuer does not provide signed metadata.
      */
-    class MissingSignedMetadata() : CredentialIssuerMetadataError(IllegalArgumentException("missing signed_metadata"))
+    class MissingSignedMetadata : CredentialIssuerMetadataError(IllegalArgumentException("missing signed_metadata"))
 
     /**
      * Indicates the signed metadata of the Credential Issuer are not valid.
      */
-    class InvalidSignedMetadata(cause: Throwable) : CredentialIssuerMetadataError(cause)
+    class InvalidSignedMetadata(
+        cause: Throwable,
+    ) : CredentialIssuerMetadataError(cause)
 }
 
 /**
  * Errors that can occur while trying to validate the metadata of a Credential Issuer.
  */
-sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : CredentialIssuerMetadataError(cause) {
-
+sealed class CredentialIssuerMetadataValidationError(
+    cause: Throwable,
+) : CredentialIssuerMetadataError(cause) {
     /**
      * The Id of the Credential Issuer is not valid.
      */
-    class InvalidCredentialIssuerId(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+    class InvalidCredentialIssuerId(
+        cause: Throwable,
+    ) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The URL of the Authorization Server is not valid.
      */
-    class InvalidAuthorizationServer(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+    class InvalidAuthorizationServer(
+        cause: Throwable,
+    ) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The URL of the Credential Endpoint is not valid.
      */
-    class InvalidCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+    class InvalidCredentialEndpoint(
+        cause: Throwable,
+    ) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The URL of the Nonce Endpoint is not valid.
      */
-    class InvalidNonceEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+    class InvalidNonceEndpoint(
+        cause: Throwable,
+    ) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The URL of the Deferred Credential Endpoint is not valid.
      */
-    class InvalidDeferredCredentialEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+    class InvalidDeferredCredentialEndpoint(
+        cause: Throwable,
+    ) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * The URL of the Notification Endpoint is not valid.
      */
-    class InvalidNotificationEndpoint(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+    class InvalidNotificationEndpoint(
+        cause: Throwable,
+    ) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * Credential Encryption Algorithms are required.
@@ -376,7 +405,9 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
     /**
      * The supported Credentials not valid.
      */
-    class InvalidCredentialsSupported(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+    class InvalidCredentialsSupported(
+        cause: Throwable,
+    ) : CredentialIssuerMetadataValidationError(cause)
 
     /**
      * Supported Credentials are required.
@@ -400,31 +431,35 @@ sealed class CredentialIssuerMetadataValidationError(cause: Throwable) : Credent
     /**
      * `preferred_client_status_period` advertised by Credential Issuer is invalid.
      */
-    class InvalidPreferredClientStatusPeriod(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+    class InvalidPreferredClientStatusPeriod(
+        cause: Throwable,
+    ) : CredentialIssuerMetadataValidationError(cause)
 
-    class InvalidIssuerInfo(cause: Throwable) : CredentialIssuerMetadataValidationError(cause)
+    class InvalidIssuerInfo(
+        cause: Throwable,
+    ) : CredentialIssuerMetadataValidationError(cause)
 }
 
 /**
  * Service for fetching, parsing, and validating the metadata of a Credential Issuer.
  */
 fun interface CredentialIssuerMetadataResolver {
-
     /**
      * Tries to fetch and validate the metadata of a Credential Issuer.
      */
-    suspend fun resolve(issuer: CredentialIssuerId, policy: IssuerMetadataPolicy): Result<CredentialIssuerMetadata>
+    suspend fun resolve(
+        issuer: CredentialIssuerId,
+        policy: IssuerMetadataPolicy,
+    ): Result<CredentialIssuerMetadata>
 
     companion object {
-
         /**
          * Creates a new [CredentialIssuerMetadataResolver] instance.
          */
-        operator fun invoke(
-            httpClient: HttpClient,
-        ): CredentialIssuerMetadataResolver = CredentialIssuerMetadataResolver { issuerId, policy ->
-            val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
-            resolver.resolve(issuerId, policy)
-        }
+        operator fun invoke(httpClient: HttpClient): CredentialIssuerMetadataResolver =
+            CredentialIssuerMetadataResolver { issuerId, policy ->
+                val resolver = DefaultCredentialIssuerMetadataResolver(httpClient)
+                resolver.resolve(issuerId, policy)
+            }
     }
 }
