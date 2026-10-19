@@ -53,8 +53,6 @@ class IssuerTest {
         val mockedHttpClient = mockedHttpClient(
             credentialIssuerSignedMetadataWellKnownMocker(),
             authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
-            credentialIssuerSignedMetadataWellKnownMocker(),
-            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
         )
 
         val issuerNegotiationResult = Issuer.makeWalletInitiated(
@@ -83,8 +81,6 @@ class IssuerTest {
         val mockedHttpClient = mockedHttpClient(
             credentialIssuerSignedMetadataWellKnownMocker(),
             authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
-            credentialIssuerSignedMetadataWellKnownMocker(),
-            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
         )
 
         val issuerNegotiationResult = Issuer.makeWalletInitiated(
@@ -108,8 +104,6 @@ class IssuerTest {
         val mockedHttpClient = mockedHttpClient(
             credentialIssuerMetadataWellKnownMocker(),
             authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
         )
 
         val issuer = Issuer.makeWalletInitiated(
@@ -126,6 +120,27 @@ class IssuerTest {
         val grants = assertNotNull(credentialOffer.grants)
         val authorizationCodeGrant = assertNotNull(grants.authorizationCode())
         assertNull(authorizationCodeGrant.issuerState)
+        assertNull(authorizationCodeGrant.authorizationServer)
+    }
+
+    @Test
+    fun `verify wallet initiated with explicit authorization server`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+        )
+
+        val issuer = Issuer.makeWalletInitiated(
+            OpenId4VCIConfiguration,
+            SampleIssuer.Id,
+            listOf(CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
+            mockedHttpClient,
+            authorizationServer = HttpsUrl("https://auth-server.example.com").getOrThrow(),
+        ).getIssuerOrThrow()
+
+        val credentialOffer = issuer.credentialOffer
+        val grants = assertNotNull(credentialOffer.grants)
+        val authorizationCodeGrant = assertNotNull(grants.authorizationCode())
         assertEquals("https://auth-server.example.com", authorizationCodeGrant.authorizationServer?.value?.toExternalForm())
     }
 }

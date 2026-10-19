@@ -255,12 +255,12 @@ private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata
  *
  * @param credentialIssuerId the Id of the Credential Issuer
  * @param credentialConfigurationIdentifiers the Credential Configuration Identifiers for which to generate the Credential Offer URI; must not be empty
- * @param authorizationServer the Authorization Server
+ * @param authorizationServer the Authorization Server; when `null` the first advertised authorization server of the credential issuer is used
  */
 internal fun createAuthorizationCodeGrantCredentialOffer(
     credentialIssuerId: CredentialIssuerId,
     credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
-    authorizationServer: HttpsUrl,
+    authorizationServer: HttpsUrl?,
 ): String {
     require(credentialConfigurationIdentifiers.isNotEmpty()) {
         "At least one credential configuration identifier must be specified"
@@ -271,7 +271,7 @@ internal fun createAuthorizationCodeGrantCredentialOffer(
         credentialConfigurationIds = credentialConfigurationIdentifiers.map { it.value },
         grants = GrantsTO(
             authorizationCode = AuthorizationCodeTO(
-                authorizationServer = authorizationServer.toString(),
+                authorizationServer = authorizationServer?.toString(),
                 issuerState = null,
             ),
             preAuthorizedCode = null,

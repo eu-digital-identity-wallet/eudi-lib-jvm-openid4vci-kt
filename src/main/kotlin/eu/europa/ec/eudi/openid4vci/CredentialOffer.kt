@@ -76,6 +76,10 @@ data class CredentialOffer internal constructor(
             resolver.resolve(config, request).getOrThrow()
         }
 
+        /**
+         * Creates a [CredentialOffer] for a wallet initiated flow, optionally specifying an authorization server.
+         * When [authorizationServer] is `null`, the first authorization server advertised by the credential issuer is used.
+         */
         suspend fun walletInitiated(
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
@@ -83,7 +87,7 @@ data class CredentialOffer internal constructor(
             config: OpenId4VCIConfig,
             credentialIssuerId: CredentialIssuerId,
             credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
-            authorizationServer: HttpsUrl,
+            authorizationServer: HttpsUrl? = null,
         ): Result<CredentialOffer> = runCatchingCancellable {
             val request = CredentialOfferRequest.PassByValue(
                 createAuthorizationCodeGrantCredentialOffer(

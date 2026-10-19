@@ -359,6 +359,8 @@ interface Issuer :
          * @param credentialIssuerId the id of the credential issuer
          * @param credentialConfigurationIdentifiers a list of credential configuration identifiers
          * @param httpClient an http client, used while interacting with the issuer
+         * @param authorizationServer the authorization server, when known out of band; when `null` the first
+         * authorization server advertised by the credential issuer is used
          * @param requestEncryptionSpecFactory a factory method to generate the issuance request encryption
          * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
          *
@@ -370,12 +372,10 @@ interface Issuer :
             credentialIssuerId: CredentialIssuerId,
             credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
             httpClient: HttpClient,
+            authorizationServer: HttpsUrl? = null,
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
         ): Result<IssuerNegotiationResult> = runCatchingCancellable {
-            val metadata = metaData(httpClient, credentialIssuerId, config.issuerMetadataPolicy)
-            val authorizationServer = metadata.first.authorizationServers.first()
-
             val credentialOffer = CredentialOffer.walletInitiated(
                 requestEncryptionSpecFactory,
                 responseEncryptionSpecFactory,
