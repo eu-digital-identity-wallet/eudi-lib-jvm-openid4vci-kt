@@ -353,10 +353,10 @@ interface Issuer :
          * This requires out-of-band knowledge of
          * - the [credential issuer][credentialIssuerId]
          * - one or more  [credential configurations][credentialConfigurationIdentifiers] and
-         * - optionally, the [authorizationServer] that protects the credential issuer
+         * - optionally, the [authorizationServer] that protects the credential issuer.
          *
          * The method using the above parameters assembles an equivalent credential offer that uses Authorization Code
-         * Grant without `issuer_state` and the negotiates it with the credential issuer
+         * Grant without `issuer_state` and then negotiates it with the credential issuer
          *
          *
          * @param config wallet's configuration options
