@@ -143,4 +143,24 @@ class IssuerTest {
         val authorizationCodeGrant = assertNotNull(grants.authorizationCode())
         assertEquals("https://auth-server.example.com", authorizationCodeGrant.authorizationServer?.value?.toExternalForm())
     }
+
+    @Test
+    fun `verify wallet initiated without explicit authorization server`() = runTest {
+        val mockedHttpClient = mockedHttpClient(
+            credentialIssuerMetadataWellKnownMocker(),
+            authServerWellKnownMocker(AuthServerMetadataVersion.FULL),
+        )
+
+        val issuer = Issuer.makeWalletInitiated(
+            OpenId4VCIConfiguration,
+            SampleIssuer.Id,
+            listOf(CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
+            mockedHttpClient,
+        ).getIssuerOrThrow()
+
+        val credentialOffer = issuer.credentialOffer
+        val grants = assertNotNull(credentialOffer.grants)
+        assertNotNull(grants.authorizationCode())
+        assertNull(grants.authorizationCode()?.authorizationServer)
+    }
 }
