@@ -348,19 +348,24 @@ interface Issuer :
         }
 
         /**
-         * Factory method for creating an instance of [Issuer] with a credential offer (Wallet initiated)
-         * This requires out-of-band knowledge of [issuer][credentialIssuerId] and one or more
-         * [credentialConfigurationIdentifiers].
+         * Factory method for creating an instance of [Issuer] for wallet-initiated issuance flows.
          *
-         * This is equivalent to instantiating a credential offer, using authorization code grant,
-         * without `issuer_state`.
+         * This requires out-of-band knowledge of
+         * - the [credential issuer][credentialIssuerId]
+         * - one or more  [credential configurations][credentialConfigurationIdentifiers] and
+         * - optionally, the [authorizationServer] that protects the credential issuer
+         *
+         * The method using the above parameters assembles an equivalent credential offer that uses Authorization Code
+         * Grant without `issuer_state` and the negotiates it with the credential issuer
+         *
          *
          * @param config wallet's configuration options
          * @param credentialIssuerId the id of the credential issuer
          * @param credentialConfigurationIdentifiers a list of credential configuration identifiers
          * @param httpClient an http client, used while interacting with the issuer
-         * @param authorizationServer the authorization server, when known out of band; when `null` the first
-         * authorization server advertised by the credential issuer is used
+         * @param authorizationServer  the authorization server (`iss` claim) that is used by the credential issuer
+         *  for the Authorization Code Grant.  It is optional and defaults to `null`. It must be provided in cases where
+         *  the Credential Issuer and the Authorization server are separate entities.
          * @param requestEncryptionSpecFactory a factory method to generate the issuance request encryption
          * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
          *
