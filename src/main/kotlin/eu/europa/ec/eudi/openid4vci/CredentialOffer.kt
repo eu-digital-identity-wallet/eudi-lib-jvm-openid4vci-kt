@@ -76,6 +76,24 @@ data class CredentialOffer internal constructor(
             resolver.resolve(config, request).getOrThrow()
         }
 
+        /**
+         * Attempts to establish a [CredentialOffer] context for a wallet initiated flow,
+         * optionally specifying an authorization server.
+         *
+         * The credential offer created will be using the Authorization Code Grant
+         *
+         * @param requestEncryptionSpecFactory a factory method to generate the issuance request encryption
+         * @param responseEncryptionSpecFactory a factory method to generate the issuance response encryption
+         * @param config  wallet's configuration options
+         * @param credentialIssuerId The Credential Issuer
+         * @param credentialConfigurationIdentifiers the list of the credential configurations to include in the offer
+         * @param authorizationServer the authorization server (`iss` claim) that is used by the credential issuer
+         * for the Authorization Code Grant.
+         * It is optional and defaults to `null`. It must be provided in cases where
+         * the Credential Issuer and the Authorization server are separate entities.
+         *
+         * @return the established [CredentialOffer] context or a failure if such a context cannot be agreed
+         */
         suspend fun walletInitiated(
             requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
             responseEncryptionSpecFactory: ResponseEncryptionSpecFactory = ResponseEncryptionSpecFactory.DEFAULT,
@@ -83,7 +101,7 @@ data class CredentialOffer internal constructor(
             config: OpenId4VCIConfig,
             credentialIssuerId: CredentialIssuerId,
             credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
-            authorizationServer: HttpsUrl,
+            authorizationServer: HttpsUrl? = null,
         ): Result<CredentialOffer> = runCatchingCancellable {
             val request = CredentialOfferRequest.PassByValue(
                 createAuthorizationCodeGrantCredentialOffer(
@@ -199,15 +217,15 @@ data class TxCode(
 ) {
     init {
         description?.let {
-            ensure(it.length <= DescriptionMaxSize) {
-                val er = IllegalArgumentException("Transaction code description over $DescriptionMaxSize characters")
+            ensure(it.length <= DESCRIPTION_MAX_SIZE) {
+                val er = IllegalArgumentException("Transaction code description over $DESCRIPTION_MAX_SIZE characters")
                 CredentialOfferRequestValidationError.InvalidCredentials(er).toException()
             }
         }
     }
 
     companion object {
-        private const val DescriptionMaxSize = 300
+        private const val DESCRIPTION_MAX_SIZE = 300
     }
 }
 
