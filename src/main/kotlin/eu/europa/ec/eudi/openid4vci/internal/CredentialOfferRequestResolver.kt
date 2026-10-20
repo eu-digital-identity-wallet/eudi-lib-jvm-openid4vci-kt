@@ -255,7 +255,8 @@ private fun GrantsTO.toGrants(credentialIssuerMetadata: CredentialIssuerMetadata
  *
  * @param credentialIssuerId the Id of the Credential Issuer
  * @param credentialConfigurationIdentifiers the Credential Configuration Identifiers for which to generate the Credential Offer URI; must not be empty
- * @param authorizationServer the Authorization Server; when `null` the first advertised authorization server of the credential issuer is used
+ * @param authorizationServer the Authorization Server. It is optional but has to be specified in case the
+ * credential issuer and the authorization server are different entities/services.
  */
 internal fun createAuthorizationCodeGrantCredentialOffer(
     credentialIssuerId: CredentialIssuerId,
