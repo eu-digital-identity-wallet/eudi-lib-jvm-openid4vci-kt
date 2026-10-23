@@ -38,90 +38,100 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 const val CREDENTIAL_ISSUER_PUBLIC_URL = "https://credential-issuer.example.com"
-const val PID_SdJwtVC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
-const val PID_MsoMdoc = "eu.europa.ec.eudiw.pid_mso_mdoc"
-const val DEGREE_JwtVcJson = "UniversityDegree_jwt_vc_json"
-const val MDL_MsoMdoc = "MobileDrivingLicense_msoMdoc"
+const val PID_SD_JWT_VC = "eu.europa.ec.eudiw.pid_vc_sd_jwt"
+const val PID_MSO_MDOC = "eu.europa.ec.eudiw.pid_mso_mdoc"
+const val DEGREE_JWT_VC_JSON = "UniversityDegree_jwt_vc_json"
+const val MDL_MSO_MDOC = "MobileDrivingLicense_msoMdoc"
 
-val CredentialOfferMixedDocTypes_NO_GRANTS = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_SdJwtVC", "$PID_MsoMdoc", "$DEGREE_JwtVcJson"]          
-        }
-""".trimIndent()
+val CredentialOfferMixedDocTypes_NO_GRANTS =
+    """
+    {
+      "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+      "credential_configuration_ids": ["$PID_SD_JWT_VC", "$PID_MSO_MDOC", "$DEGREE_JWT_VC_JSON"]          
+    }
+    """.trimIndent()
 
-val CredentialOfferMsoMdoc_NO_GRANTS = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_MsoMdoc"]          
-        }
-""".trimIndent()
+val CredentialOfferMsoMdoc_NO_GRANTS =
+    """
+    {
+      "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+      "credential_configuration_ids": ["$PID_MSO_MDOC"]          
+    }
+    """.trimIndent()
 
-val CredentialOfferWithSdJwtVc_NO_GRANTS = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_SdJwtVC"]          
-        }
-""".trimIndent()
+val CredentialOfferWithSdJwtVc_NO_GRANTS =
+    """
+    {
+      "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+      "credential_configuration_ids": ["$PID_SD_JWT_VC"]          
+    }
+    """.trimIndent()
 
-val CredentialOfferWithMDLMdoc_NO_GRANTS = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$MDL_MsoMdoc"]
-        }
-""".trimIndent()
+val CredentialOfferWithMDLMdoc_NO_GRANTS =
+    """
+    {
+      "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+      "credential_configuration_ids": ["$MDL_MSO_MDOC"]
+    }
+    """.trimIndent()
 
-val CredentialOfferMixedDocTypes_PRE_AUTH_GRANT = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["$PID_MsoMdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
-          "grants": {
-            "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
-              "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
-              "tx_code": {
-                "input_mode": "numeric",
-                "length": 4
-              }
-            }
+val CredentialOfferMixedDocTypes_PRE_AUTH_GRANT =
+    """
+    {
+      "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+      "credential_configuration_ids": ["$PID_MSO_MDOC", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+      "grants": {
+        "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+          "pre-authorized_code": "eyJhbGciOiJSU0EtFYUaBy",
+          "tx_code": {
+            "input_mode": "numeric",
+            "length": 4
           }
         }
-""".trimIndent()
+      }
+    }
+    """.trimIndent()
 
-val CredentialOfferMixedDocTypes_AUTH_GRANT = """
-        {
-          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
-          "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
-          "grants": {
-            "authorization_code": {
-              "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
-            }
-          }
+val CredentialOfferMixedDocTypes_AUTH_GRANT =
+    """
+    {
+      "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+      "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_mso_mdoc", "eu.europa.ec.eudiw.pid_vc_sd_jwt"],
+      "grants": {
+        "authorization_code": {
+          "issuer_state": "eyJhbGciOiJSU0EtFYUaBy"
         }
-""".trimIndent()
+      }
+    }
+    """.trimIndent()
 
-val OpenId4VCIConfiguration = OpenId4VCIConfig(
-    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
-    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-    encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    proofs = ProofsConfig.Default,
-)
+val OpenId4VCIConfiguration =
+    OpenId4VCIConfig(
+        clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
+        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+        encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+        proofs = ProofsConfig.Default,
+    )
 
-val OpenId4VCIConfigurationWithDpopSigner = OpenId4VCIConfig(
-    clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
-    dPoPUsage = DPoPUsage.IfSupported(DPoPConfig(ProvisionDPoPSigner(ecSigner(Curve.P_256, JWSAlgorithm.ES256)))),
-    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-    encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
-    proofs = ProofsConfig.Default,
-)
+val OpenId4VCIConfigurationWithDpopSigner =
+    OpenId4VCIConfig(
+        clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
+        dPoPUsage = DPoPUsage.IfSupported(DPoPConfig(ProvisionDPoPSigner(ecSigner(Curve.P_256, JWSAlgorithm.ES256)))),
+        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+        encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
+        proofs = ProofsConfig.Default,
+    )
 
-val OpenId4VCIConfigurationOnlyPlainJwtProofs = OpenId4VCIConfiguration.copy(
-    proofs = ProofsConfig(
-        isNoProofSupported = false,
-        jwtProofWithKeyAttestation = null,
-        jwtProofsWithoutKeyAttestation = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES256)),
-        attestationProof = null,
-    ),
-)
+val OpenId4VCIConfigurationOnlyPlainJwtProofs =
+    OpenId4VCIConfiguration.copy(
+        proofs =
+            ProofsConfig(
+                isNoProofSupported = false,
+                jwtProofWithKeyAttestation = null,
+                jwtProofsWithoutKeyAttestation = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES256)),
+                attestationProof = null,
+            ),
+    )
 
 suspend fun authorizeRequestForCredentialOffer(
     config: OpenId4VCIConfig? = OpenId4VCIConfiguration,
@@ -130,13 +140,15 @@ suspend fun authorizeRequestForCredentialOffer(
     requestEncryptionSpecFactory: RequestEncryptionSpecFactory = RequestEncryptionSpecFactory.DEFAULT,
     httpClient: HttpClient,
 ): Pair<AuthorizedRequest, Issuer> {
-    val issuer = Issuer.make(
-        config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
-        credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
-        httpClient = httpClient,
-        responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-        requestEncryptionSpecFactory = requestEncryptionSpecFactory,
-    ).getIssuerOrThrow()
+    val issuer =
+        Issuer
+            .make(
+                config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
+                credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
+                httpClient = httpClient,
+                responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+                requestEncryptionSpecFactory = requestEncryptionSpecFactory,
+            ).getIssuerOrThrow()
 
     val authorizedRequest =
         with(issuer) {
@@ -157,12 +169,14 @@ suspend fun preAuthorizeRequestForCredentialOffer(
     httpClient: HttpClient,
     txCode: String = "1234",
 ): Pair<AuthorizedRequest, Issuer> {
-    val issuer = Issuer.make(
-        config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
-        credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
-        httpClient = httpClient,
-        responseEncryptionSpecFactory = responseEncryptionSpecFactory,
-    ).getIssuerOrThrow()
+    val issuer =
+        Issuer
+            .make(
+                config = config.takeIf { config != null } ?: OpenId4VCIConfiguration,
+                credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
+                httpClient = httpClient,
+                responseEncryptionSpecFactory = responseEncryptionSpecFactory,
+            ).getIssuerOrThrow()
 
     val authorizedRequest = issuer.authorizeWithPreAuthorizationCode(txCode).getOrThrow()
 
@@ -177,22 +191,30 @@ fun CredentialReusePolicy.effectiveBatchSize(supportedReusePolicies: CredentialR
                 .firstNotNullOfOrNull { it.batchSize }
         }
 
-        CredentialReusePolicy.None -> null
+        CredentialReusePolicy.None -> {
+            null
+        }
     }
 
-internal fun HttpRequestData.verifyDPoPProof(dPoPSigningKey: ECKey, dpopNonce: Nonce) {
+internal fun HttpRequestData.verifyDPoPProof(
+    dPoPSigningKey: ECKey,
+    dpopNonce: Nonce,
+) {
     val dpopProof = SignedJWT.parse(assertNotNull(headers["DPoP"]))
-    val jwtProcessor = DefaultJWTProcessor<SecurityContext>()
-        .apply {
-            jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(setOf(JOSEObjectType("dpop+jwt")))
-            jwsKeySelector = SingleKeyJWSKeySelector(dpopProof.header.algorithm, dPoPSigningKey.toPublicKey())
-            jwtClaimsSetVerifier = DefaultJWTClaimsVerifier(
-                JWTClaimsSet.Builder()
-                    .claim("nonce", dpopNonce.value)
-                    .build(),
-                setOf("jti", "htm", "htu", "iat", "nonce"),
-            )
-        }
+    val jwtProcessor =
+        DefaultJWTProcessor<SecurityContext>()
+            .apply {
+                jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(setOf(JOSEObjectType("dpop+jwt")))
+                jwsKeySelector = SingleKeyJWSKeySelector(dpopProof.header.algorithm, dPoPSigningKey.toPublicKey())
+                jwtClaimsSetVerifier =
+                    DefaultJWTClaimsVerifier(
+                        JWTClaimsSet
+                            .Builder()
+                            .claim("nonce", dpopNonce.value)
+                            .build(),
+                        setOf("jti", "htm", "htu", "iat", "nonce"),
+                    )
+            }
     jwtProcessor.process(dpopProof, null)
     assertEquals(dPoPSigningKey.toPublicJWK().computeThumbprint(), dpopProof.header.jwk.computeThumbprint())
 }
@@ -200,6 +222,7 @@ internal fun HttpRequestData.verifyDPoPProof(dPoPSigningKey: ECKey, dpopNonce: N
 internal fun ProvisionDPoPSigner(signer: Signer<JWK>): ProvisionDPoPSigner =
     object : ProvisionDPoPSigner {
         override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(signer.javaAlgorithm.toJoseAlg().name)
+
         override suspend fun invoke(authorizationServer: HttpsUrl): Signer<JWK> = signer
     }
 

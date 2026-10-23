@@ -45,11 +45,14 @@ typealias ClientAttestation = Pair<ClientAttestationJWT, ClientAttestationPoPJWT
  * be used by the instance for client authentication
  */
 @JvmInline
-value class ClientAttestationJWT(val value: String)
+value class ClientAttestationJWT(
+    val value: String,
+)
 
 fun <T : Any> ClientAttestationJWT.decodeClaimsSet(deserializer: DeserializationStrategy<T>): Result<T> =
     runCatchingCancellable {
-        SignedJWT.parse(value)
+        SignedJWT
+            .parse(value)
             .jwtClaimsSet
             .decodeAs(deserializer)
             .getOrThrow()
@@ -76,7 +79,9 @@ data class ClientAttestationJWTClaims(
 
 @Serializable
 @JvmInline
-value class NonBlankString(val value: String) {
+value class NonBlankString(
+    val value: String,
+) {
     init {
         require(value.isNotBlank()) { "value must not be blank" }
     }
@@ -109,7 +114,9 @@ data class ClientStatusClaim(
  * using the key that the Client Attestation JWT is bound to.
  */
 @JvmInline
-value class ClientAttestationPoPJWT(val jwt: SignedJWT) {
+value class ClientAttestationPoPJWT(
+    val jwt: SignedJWT,
+) {
     init {
         jwt.ensureType(JOSEObjectType(AttestationBasedClientAuthenticationSpec.ATTESTATION_POP_JWT_TYPE))
         requireNotNull(jwt.jwtClaimsSet.issuer) { "Invalid PoP JWT. Misses `iss` claim" }

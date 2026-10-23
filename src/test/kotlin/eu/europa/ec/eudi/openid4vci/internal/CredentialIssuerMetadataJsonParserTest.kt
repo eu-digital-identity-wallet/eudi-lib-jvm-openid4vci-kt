@@ -28,7 +28,6 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.toJavaDuration
 
 class CredentialIssuerMetadataJsonParserTest {
-
     @Test
     fun `parsing valid preferred_key_storage_status_period succeeds`() {
         val json = getResourceAsText("well-known/openid-credential-issuer_attestation_proof_supported.json")
@@ -56,9 +55,10 @@ class CredentialIssuerMetadataJsonParserTest {
     @Test
     fun `trying to parse negative preferred_key_storage_status_period fails`() {
         val json = getResourceAsText("well-known/openid-credential-issuer_invalid_attestation_proof_supported.json")
-        val exception = assertFailsWith<CredentialIssuerMetadataValidationError.InvalidCredentialsSupported> {
-            CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
-        }
+        val exception =
+            assertFailsWith<CredentialIssuerMetadataValidationError.InvalidCredentialsSupported> {
+                CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
+            }
         val cause = assertIs<IllegalArgumentException>(exception.cause)
         assertEquals("Duration must be positive", cause.message)
     }
@@ -67,9 +67,10 @@ class CredentialIssuerMetadataJsonParserTest {
     fun `succeeds when jwt proof does not require key attestation`() {
         val json = getResourceAsText("well-known/openid-credential-issuer_jwt_proof_no_keyattestation.json")
         val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
-        val credentialConfiguration = assertNotNull(
-            metadata.credentialConfigurationsSupported[CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")],
-        )
+        val credentialConfiguration =
+            assertNotNull(
+                metadata.credentialConfigurationsSupported[CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")],
+            )
         assertEquals(1, credentialConfiguration.proofTypesSupported.values.size)
 
         val jwtProof = assertIs<ProofTypeMeta.Jwt>(credentialConfiguration.proofTypesSupported[ProofType.JWT])
@@ -78,7 +79,10 @@ class CredentialIssuerMetadataJsonParserTest {
 
     @Test
     fun `succeeds when credential configuration supports either jwt proofs or attestation proofs`() {
-        fun test(resource: String, assertions: (CredentialConfiguration) -> Unit) {
+        fun test(
+            resource: String,
+            assertions: (CredentialConfiguration) -> Unit,
+        ) {
             val json = getResourceAsText(resource)
             val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
             assertTrue { metadata.credentialConfigurationsSupported.isNotEmpty() }

@@ -33,7 +33,6 @@ data class KeyAttestationJWT private constructor(
     val claimsSet: JWTClaimsSet,
     val attestedKeys: AttestedKeys,
 ) {
-
     companion object {
         operator fun invoke(jwt: String): KeyAttestationJWT = invoke(SignedJWT.parse(jwt))
 
@@ -60,7 +59,7 @@ value class AttestedKeys(
     val value: List<
         @Serializable(with = JWKJsonObjectSerializer::class)
         JWK,
-        >,
+    >,
 ) : Iterable<JWK> by value {
     init {
         require(value.isNotEmpty()) { "attestedKeys must not be empty" }
