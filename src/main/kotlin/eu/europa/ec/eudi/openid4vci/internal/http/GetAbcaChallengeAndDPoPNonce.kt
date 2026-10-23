@@ -22,7 +22,10 @@ internal class GetAbcaChallengeAndDPoPNonce(
     private val provisionClientAttestation: suspend () -> ProvisionClientAttestation.Provisioned?,
     private val challengeEndpointClient: ChallengeEndpointClient?,
 ) {
-    suspend operator fun invoke(existingAbcaChallenge: Nonce?, existingDpopNonce: Nonce?): Pair<Nonce?, Nonce?> {
+    suspend operator fun invoke(
+        existingAbcaChallenge: Nonce?,
+        existingDpopNonce: Nonce?,
+    ): Pair<Nonce?, Nonce?> {
         val provisionedClientAttestation = provisionClientAttestation()
         if (null == provisionedClientAttestation) {
             return null to existingDpopNonce

@@ -30,8 +30,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
 
-internal class ProvisionOnce<V : Any>(private val provision: suspend () -> V) : suspend () -> V {
-
+internal class ProvisionOnce<V : Any>(
+    private val provision: suspend () -> V,
+) : suspend () -> V {
     @Volatile
     private var provisioned = false
 
@@ -49,11 +50,12 @@ internal class ProvisionOnce<V : Any>(private val provision: suspend () -> V) : 
                     }
                     value
                 }
-            else value
+            else
+                value
         return checkNotNull(value)
     }
 
-    fun verifying(verify: suspend(V) -> Unit): ProvisionOnce<V> =
+    fun verifying(verify: suspend (V) -> Unit): ProvisionOnce<V> =
         ProvisionOnce {
             val provisioned = provision()
             verify(provisioned)

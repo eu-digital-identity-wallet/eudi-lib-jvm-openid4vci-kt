@@ -39,15 +39,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class KeyAttestationJWTTest {
-
     val signingKey = randomECSigningKey(Curve.P_256)
     val signer: JWSSigner = ECDSASigner(signingKey.toECKey())
 
     @Test
     fun `KeyAttestationJWT must have correct type`() {
-        val jwt = KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
-            .typ(JOSEObjectType.JOSE)
-            .build()
+        val jwt =
+            KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
+                .typ(JOSEObjectType.JOSE)
+                .build()
         val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(jwt) }
         assertEquals(
             "Expected SignedJWT `typ` to be '${OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE}', but found '${JOSEObjectType.JOSE.type}' instead",
@@ -57,18 +57,20 @@ class KeyAttestationJWTTest {
 
     @Test
     fun `KeyAttestationJWT must be signed`() {
-        val jwt = KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
-            .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
-            .build()
+        val jwt =
+            KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
+                .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
+                .build()
         val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(jwt) }
         assertEquals("Provided JWT is not signed", exception.message)
     }
 
     @Test
     fun `KeyAttestationJWT must have attested keys`() {
-        val jwt = KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
-            .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
-            .build(signer)
+        val jwt =
+            KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
+                .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
+                .build(signer)
 
         val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(jwt) }
         assertEquals("Invalid Claims Set.", exception.message)
@@ -79,26 +81,26 @@ class KeyAttestationJWTTest {
 
     @Test
     fun `KeyAttestationJWT must contain at least 1 attested key`() {
-        val jwt = KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
-            .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
-            .iat(Instant.now())
-            .exp(Instant.now() + Duration.ofDays(1L))
-            .attestedKeys(emptyList())
-            .keyStorage(emptyList())
-            .userAuthentication(emptyList())
-            .certification(URI.create("https://example.org/certification/wscd/GlobalPlatform/").toURL())
-            .keyStorageStatus(
-                KeyStorageStatus(
-                    StatusClaim(
-                        StatusListTokenClaim(
-                            7u,
-                            URI.create("https://revocation_url/wua-type-statuslists/3"),
+        val jwt =
+            KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
+                .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
+                .iat(Instant.now())
+                .exp(Instant.now() + Duration.ofDays(1L))
+                .attestedKeys(emptyList())
+                .keyStorage(emptyList())
+                .userAuthentication(emptyList())
+                .certification(URI.create("https://example.org/certification/wscd/GlobalPlatform/").toURL())
+                .keyStorageStatus(
+                    KeyStorageStatus(
+                        StatusClaim(
+                            StatusListTokenClaim(
+                                7u,
+                                URI.create("https://revocation_url/wua-type-statuslists/3"),
+                            ),
                         ),
+                        Instant.now() + Duration.ofDays(90L),
                     ),
-                    Instant.now() + Duration.ofDays(90L),
-                ),
-            )
-            .build(signer)
+                ).build(signer)
 
         val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(jwt) }
         assertEquals("Invalid Claims Set.", exception.message)
@@ -109,29 +111,29 @@ class KeyAttestationJWTTest {
 
     @Test
     fun `KeyAttestationJWT must not have private keys in the attested keys claim`() {
-        val jwt = KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
-            .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
-            .iat(Instant.now())
-            .exp(Instant.now() + Duration.ofDays(1L))
-            .attestedKeys(listOf(ECKeyGenerator(Curve.P_256).generate()))
-            .keyStorage(emptyList())
-            .userAuthentication(emptyList())
-            .certification(URI.create("https://example.org/certification/wscd/GlobalPlatform/").toURL())
-            .keyStorageStatus(
-                KeyStorageStatus(
-                    StatusClaim(
-                        StatusListTokenClaim(
-                            7u,
-                            URI.create("https://revocation_url/wua-type-statuslists/3"),
+        val jwt =
+            KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
+                .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
+                .iat(Instant.now())
+                .exp(Instant.now() + Duration.ofDays(1L))
+                .attestedKeys(listOf(ECKeyGenerator(Curve.P_256).generate()))
+                .keyStorage(emptyList())
+                .userAuthentication(emptyList())
+                .certification(URI.create("https://example.org/certification/wscd/GlobalPlatform/").toURL())
+                .keyStorageStatus(
+                    KeyStorageStatus(
+                        StatusClaim(
+                            StatusListTokenClaim(
+                                7u,
+                                URI.create("https://revocation_url/wua-type-statuslists/3"),
+                            ),
                         ),
+                        Instant.now() + Duration.ofDays(90L),
                     ),
-                    Instant.now() + Duration.ofDays(90L),
-                ),
-            )
-            .build()
-            .apply {
-                sign(signer)
-            }
+                ).build()
+                .apply {
+                    sign(signer)
+                }
 
         val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(jwt) }
         assertEquals("Invalid Claims Set.", exception.message)
@@ -149,65 +151,71 @@ class KeyAttestationJWTTest {
         val keyStorage = listOf(AttackPotentialResistance.Iso18045High)
         val userAuthentication = listOf(AttackPotentialResistance.Iso18045High)
         val certification = URI.create("https://example.org/certification/wscd/GlobalPlatform/").toURL()
-        val keyStorageStatus = KeyStorageStatus(
-            StatusClaim(
-                StatusListTokenClaim(
-                    7u,
-                    URI.create("https://revocation_url/wua-type-statuslists/3"),
+        val keyStorageStatus =
+            KeyStorageStatus(
+                StatusClaim(
+                    StatusListTokenClaim(
+                        7u,
+                        URI.create("https://revocation_url/wua-type-statuslists/3"),
+                    ),
                 ),
-            ),
-            now + Duration.ofDays(90L),
-        )
-        val jwt = KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
-            .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
-            .iat(iat)
-            .exp(exp)
-            .attestedKeys(attestedKeys)
-            .keyStorage(keyStorage)
-            .userAuthentication(userAuthentication)
-            .certification(certification)
-            .keyStorageStatus(keyStorageStatus)
-            .build(signer)
+                now + Duration.ofDays(90L),
+            )
+        val jwt =
+            KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
+                .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
+                .iat(iat)
+                .exp(exp)
+                .attestedKeys(attestedKeys)
+                .keyStorage(keyStorage)
+                .userAuthentication(userAuthentication)
+                .certification(certification)
+                .keyStorageStatus(keyStorageStatus)
+                .build(signer)
 
         val keyAttestationJwt = KeyAttestationJWT(jwt)
-        val expectedClaimsSet = KeyAttestationJWTClaims(
-            issuedAt = iat,
-            expiresAt = exp,
-            AttestedKeys(attestedKeys),
-            keyStorage = keyStorage,
-            userAuthentication = userAuthentication,
-            certification,
-            null,
-            null,
-            keyStorageStatus,
-        )
+        val expectedClaimsSet =
+            KeyAttestationJWTClaims(
+                issuedAt = iat,
+                expiresAt = exp,
+                AttestedKeys(attestedKeys),
+                keyStorage = keyStorage,
+                userAuthentication = userAuthentication,
+                certification,
+                null,
+                null,
+                keyStorageStatus,
+            )
 
         assertEquals(expectedClaimsSet, keyAttestationJwt.claimsSet.decodeAs<KeyAttestationJWTClaims>().getOrThrow())
     }
 
     @Test
     fun `KeyAttestationJWT can be signed with any algorithm`() {
-        fun create(algorithm: JWSAlgorithm, signer: JWSSigner): KeyAttestationJWT {
-            val jwt = KeyAttestationJWTBuilder(algorithm)
-                .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
-                .iat(Instant.now())
-                .exp(Instant.now() + Duration.ofDays(1L))
-                .attestedKeys(listOf(ECKeyGenerator(Curve.P_256).generate().toPublicJWK()))
-                .keyStorage(listOf(AttackPotentialResistance.Iso18045High))
-                .userAuthentication(listOf(AttackPotentialResistance.Iso18045High))
-                .certification(URI.create("https://example.org/certification/wscd/GlobalPlatform/").toURL())
-                .keyStorageStatus(
-                    KeyStorageStatus(
-                        StatusClaim(
-                            StatusListTokenClaim(
-                                7u,
-                                URI.create("https://revocation_url/wua-type-statuslists/3"),
+        fun create(
+            algorithm: JWSAlgorithm,
+            signer: JWSSigner,
+        ): KeyAttestationJWT {
+            val jwt =
+                KeyAttestationJWTBuilder(algorithm)
+                    .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
+                    .iat(Instant.now())
+                    .exp(Instant.now() + Duration.ofDays(1L))
+                    .attestedKeys(listOf(ECKeyGenerator(Curve.P_256).generate().toPublicJWK()))
+                    .keyStorage(listOf(AttackPotentialResistance.Iso18045High))
+                    .userAuthentication(listOf(AttackPotentialResistance.Iso18045High))
+                    .certification(URI.create("https://example.org/certification/wscd/GlobalPlatform/").toURL())
+                    .keyStorageStatus(
+                        KeyStorageStatus(
+                            StatusClaim(
+                                StatusListTokenClaim(
+                                    7u,
+                                    URI.create("https://revocation_url/wua-type-statuslists/3"),
+                                ),
                             ),
+                            Instant.now() + Duration.ofDays(90L),
                         ),
-                        Instant.now() + Duration.ofDays(90L),
-                    ),
-                )
-                .build(signer)
+                    ).build(signer)
             return KeyAttestationJWT(jwt)
         }
 

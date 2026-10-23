@@ -35,6 +35,5 @@ private fun HttpResponse.nonceHeader(name: String): Nonce? = headers[name]?.let(
 /**
  * Checks if a Resource Server requires a Nonce value to be included in the DPoP Header.
  */
-internal fun isResourceServerDpopNonceRequired(
-    wwwAuthenticate: String,
-): Boolean = wwwAuthenticate.startsWith("DPoP") && wwwAuthenticate.contains("error=\"use_dpop_nonce\"")
+internal fun isResourceServerDpopNonceRequired(wwwAuthenticate: String): Boolean =
+    wwwAuthenticate.startsWith("DPoP") && wwwAuthenticate.contains("error=\"use_dpop_nonce\"")
