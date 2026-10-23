@@ -598,17 +598,15 @@ The options available for the `Issuer` are represented by `OpenId4VCIConfig`
 ```kotlin
 data class OpenId4VCIConfig(
     val clientAuthentication: ClientAuthentication,
-    val authFlowRedirectionURI: URI?,
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
-    val parUsage: ParUsage = ParUsage.IfSupported(authorizationCodeDPoPBinding = true),
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     val proofs: ProofsConfig = ProofsConfig.Default,
     val registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
-    val grants: SupportedGrants = SupportedGrants.Both,
+    val grants: SupportedGrants,
 )
 ```
 
@@ -617,11 +615,9 @@ Options available:
 - clientAuthentication: Wallet `client authentication method` in the OAuth 2.0 sense while interacting with the Credential Issuer. 
   - Either None, i.e. a Public Client,
   - [Attestation-Based Client Authentication](#oauth-20-attestation-based-client-authentication)
-- authFlowRedirectionURI: It is the `redirect_uri` parameter that will be included in a PAR or simple authorization request. Required when Wallet supports Authorization Code Grant.
 - encryptionSupportConfig: Wallet supported encryption parameters to be used for Credential Request and Credential Response encryption.
 - authorizeIssuanceConfig: Preference on using `scope` or `authorization_details` during authorization code flow.
 - dPoPUsage: An indication about whether DPoP is never to be used, supported, or required. If Wallet requires DPoP but Credential Issuer doesn't advertise this feature, issuance does not proceed. 
-- parUsage: An indication to not use PAR endpoint or use it if advertised by the credential issuer. Additionally, allows configuring whether Authorization Code DPoP binding should be performed.  
 - clock: Wallet/Caller clock.
 - issuerMetadataPolicy: Wallet policy concerning Credential Issuer metadata. Possible options:
   - `IssuerMetadataPolicy.RequireSigned(issuerTrust, allowedJwsAlgorithms)`: require the presence of signed metadata and use only values from signed metadata
@@ -635,7 +631,27 @@ Options available:
 - supportedCredentialReusePolicies: A set of `EudiReusePolicyType`s supported by the wallet for credential reuse. Defaults to `null`.
 - proofs: Whether Wallet supports attestations that require no proofs, alongside the supports proof types and signing algorithms.
 - registrationCertificatePolicy: Wallet policy for validating the Registration Certificates of Credential Issuers.
-- grants: Wallet-supported Grant Types.
+- grants: Wallet-supported Grant Types, along with the grant-specific options:
+  - `SupportedGrants.AuthorizationCode(authFlowRedirectionURI, parUsage, authResponseIssChecking, authorizationCodeDPoPBindingMethod)`:
+    the Wallet supports the Authorization Code grant.
+    - `authFlowRedirectionURI`: the `redirect_uri` parameter that will be included in a PAR or simple authorization request.
+    - `parUsage`: an indication to not use the PAR endpoint (`ParUsage.Never`) or use it if advertised by the credential
+      issuer (`ParUsage.IfSupported`, the default) or always use it (`ParUsage.Required`).
+    - `authResponseIssChecking`: the wallet's policy concerning the validation of the `iss` parameter of the
+      authorization response (`AuthorizationResponseIssChecking.Never` / `IfSupported` / `Required`; defaults to `IfSupported`).
+    - `authorizationCodeDPoPBindingMethod`: how the Authorization Code is bound to the DPoP key, per
+      [RFC 9449 §10.1](https://www.rfc-editor.org/rfc/rfc9449.html#section-10.1). Either no binding (`AuthorizationCodeDPoPBindingMethod.None`),
+      by attaching a DPoP proof in the `DPoP` header of the PAR request (`AuthorizationCodeDPoPBindingMethod.DPoPHeader`,
+      the default; requires the use of PAR) or by including the `dpop_jkt` parameter — the RFC 7638 JWK thumbprint of
+      the DPoP public key — in the PAR request body (`AuthorizationCodeDPoPBindingMethod.DPoPJkt`). When PAR is not
+      used, the code is bound to the DPoP key by including the `dpop_jkt` parameter in the authorization request
+      (the DPoP header cannot be used). The `dpop_jkt` method requires the configured `ProvisionDPoPSigner`
+      to expose the thumbprint of the DPoP public key; if it cannot, issuance fails.
+  - `SupportedGrants.PreAuthorizedCode`: the Wallet supports the Pre-authorized Code grant.
+  - `SupportedGrants.Both(SupportedGrants.AuthorizationCode)`: the Wallet supports both grant types.
+
+  When the Wallet supports the Authorization Code grant, the grant-specific options are also exposed through the
+  `OpenId4VCIConfig.authorizationCodeGrant` accessor.
 
 Trust between the Wallet and the Signer of the signed metadata advertised by the Credential Issuer is established via a
 `CertificateChainTrust` instance, which is provided as the `issuerTrust` argument of `RequireSigned` / `PreferSigned`.
@@ -648,7 +664,6 @@ import eu.europa.ec.eudi.openid4vci.*
 
 val openId4VCIConfig = OpenId4VCIConfig(
     clientAuthentication = ClientAuthentication.None("wallet-dev"), // the client id of wallet (acting as an OAUTH2 client)
-    authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
     encryptionSupportConfig = EncryptionSupportConfig(
         compressionAlgorithms = listOf(CompressionAlgorithm.DEF), // which JWE compression algorithms are supported
         credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses,
@@ -664,7 +679,12 @@ val openId4VCIConfig = OpenId4VCIConfig(
         jwtProofsWithoutKeyAttestation = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)), // whether jwt proofs without key attestation are supported
     ),
     registrationCertificatePolicy = RegistrationCertificatePolicy { accessCertificate, registrationCertificate, issuanceContext -> ... },
-    grants = SupportedGrants.Both,
+    grants = SupportedGrants.Both(
+        SupportedGrants.AuthorizationCode(
+            authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
+            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt, // bind the Authorization Code to the DPoP key via the `dpop_jkt` PAR parameter
+        ),
+    ),
 )
 val credentialOfferUri: String = "..."
 val httpClient: HttpClient = ...
@@ -747,8 +767,14 @@ that the authorization server, that protects the credential issuer, supports thi
 If wallet [configuration](#configuration-options) supports or requires, and if the credential issuer advertises DPoP with
 algorithms supported by wallet's DPoP Signer, then library will transparently request for a DPoP `access_token` instead of the default Bearer token.
 
-Additionally, if the PAR endpoint is used and wallet [configuration](#configuration-options) has enabled Authorization Code DPoP binding,
-Authorization Code DPoP binding will be performed at the PAR endpoint using the `DPoP` header.
+Additionally, if wallet [configuration](#configuration-options) has enabled Authorization Code DPoP binding,
+Authorization Code DPoP binding will be performed either by attaching a DPoP proof in the `DPoP` header of the PAR
+request (`AuthorizationCodeDPoPBindingMethod.DPoPHeader`, the default) or by including the `dpop_jkt` parameter —
+the RFC 7638 JWK thumbprint of the DPoP public key — in the PAR request body (`AuthorizationCodeDPoPBindingMethod.DPoPJkt`),
+as specified in [RFC 9449 §10.1](https://www.rfc-editor.org/rfc/rfc9449.html#section-10.1). When PAR is not used, the
+Authorization Code is bound to the DPoP key by including the `dpop_jkt` parameter in the authorization request (the
+DPoP header cannot be used). The `dpop_jkt` method requires the configured `ProvisionDPoPSigner` to expose the
+thumbprint of the DPoP public key; if it cannot, issuance fails.
 
 All further interactions will use the correct token type (Bearer or DPoP)
 

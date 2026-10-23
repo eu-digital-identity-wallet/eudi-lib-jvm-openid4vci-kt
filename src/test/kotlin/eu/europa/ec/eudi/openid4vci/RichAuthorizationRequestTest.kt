@@ -30,6 +30,7 @@ import org.junit.jupiter.api.assertThrows
 import parPostApplyAssertionsAndGetFormData
 import tokenPostApplyAuthFlowAssertionsAndGetFormData
 import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
+import java.net.URI
 import java.net.URLDecoder
 import java.util.UUID
 import kotlin.test.Test
@@ -454,7 +455,15 @@ class RichAuthorizationRequestTest {
             val issuer =
                 Issuer
                     .make(
-                        config = OpenId4VCIConfiguration.copy(parUsage = ParUsage.Never),
+                        config =
+                            OpenId4VCIConfiguration.copy(
+                                grants =
+                                    SupportedGrants.AuthorizationCode(
+                                        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                                        parUsage = ParUsage.Never,
+                                        authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.None,
+                                    ),
+                            ),
                         credentialOffer = offer,
                         httpClient = mockedKtorHttpClientFactory,
                     ).getIssuerOrThrow()

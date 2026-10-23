@@ -24,7 +24,6 @@ import com.nimbusds.jose.crypto.impl.ContentCryptoProvider
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
 import eu.europa.ec.eudi.openid4vci.internal.ensure
-import eu.europa.ec.eudi.openid4vci.internal.ensureNotNull
 import java.net.URI
 import java.security.cert.X509Certificate
 import java.time.Clock
@@ -50,12 +49,26 @@ interface ProvisionClientAttestation {
 }
 
 /**
+ * The base64url RFC 7638 SHA-256 thumbprint of a JWK.
+ *
+ * Used for the `dpop_jkt` PAR binding method (RFC 9449 §10.1).
+ */
+typealias JWKThumbprint = String
+
+/**
  * Provisions a [Signer] for signing DPoP Proofs.
  */
 interface ProvisionDPoPSigner {
     val popAlgorithm: JwsAlgorithm
 
-    suspend operator fun invoke(authorizationServer: HttpsUrl): Signer<JWK>
+    /**
+     * Provisions the [Signer] used for signing DPoP Proofs, and, when it can be known without calling
+     * [Signer.acquire], the RFC 7638 thumbprint of the signer's public key.
+     *
+     * The thumbprint is used for the `dpop_jkt` PAR binding method (RFC 9449 §10.1). It is `null` when the
+     * signer's public key cannot be exposed without acquiring the signer.
+     */
+    suspend operator fun invoke(authorizationServer: HttpsUrl): Pair<Signer<JWK>, JWKThumbprint?>
 }
 
 /**
@@ -144,39 +157,45 @@ fun interface RegistrationCertificatePolicy {
  * Configuration object to pass configuration properties to the issuance components.
  *
  * @param clientAuthentication the OAuth 2.0 Client Authentication Method of the Wallet
- * @param authFlowRedirectionURI  Redirect url to be passed as the 'redirect_url' parameter to the authorization request.
  * @param encryptionSupportConfig   Configuration related to generation of encryption keys and encryption algorithms per algorithm family.
  * @param authorizeIssuanceConfig Instruction on how to assemble the authorization request. If scopes are supported
  * by the credential issuer and [AuthorizeIssuanceConfig.FAVOR_SCOPES] is selected then scopes will be used.
  * Otherwise, authorization details (RAR)
  * @param dPoPUsage an indication about whether DPoP is never to be used, supported, or required
- * @param parUsage whether to use PAR in case of authorization code grant
  * @param clock Wallet's clock
  * @param issuerMetadataPolicy policy concerning signed metadata usage
  * @param supportedCredentialReusePolicies the reuse policies supported by the wallet, used to validate against credential issuer metadata.
  * @param proofs proofs supported by the Wallet
  * @param registrationCertificatePolicy a policy for validating Registration Certificates
- * @param authResponseIssChecking Wallet's policy concerning the validation of the `iss` parameter
- * present in the authorization response, as described by the Authorization Server metadata field
- * `authorization_response_iss_parameter_supported`
- * @param grants grant types supported by the wallet
+ * @param grants grant types supported by the wallet, along with the grant-specific options.
+ * For the Authorization Code grant, see [SupportedGrants.AuthorizationCode], which carries the redirect URI, the PAR usage
+ * policy, the Authorization Response `iss` checking policy and the Authorization Code DPoP binding method.
  *
  */
 data class OpenId4VCIConfig(
     val clientAuthentication: ClientAuthentication,
-    val authFlowRedirectionURI: URI,
     val encryptionSupportConfig: EncryptionSupportConfig,
     val authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
     val dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
-    val parUsage: ParUsage = ParUsage.IfSupported(),
     val clock: Clock = Clock.systemDefaultZone(),
     val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
     val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
     val proofs: ProofsConfig = ProofsConfig.Default,
     val registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
-    val authResponseIssChecking: AuthorizationResponseIssChecking = AuthorizationResponseIssChecking.Never,
-    val grants: SupportedGrants = SupportedGrants.Both,
+    val grants: SupportedGrants,
 ) {
+    /**
+     * The [SupportedGrants.AuthorizationCode] configuration, when the wallet supports the Authorization Code grant
+     * (either on its own, or as part of [SupportedGrants.Both]); `null` otherwise.
+     */
+    val authorizationCodeGrant: SupportedGrants.AuthorizationCode?
+        get() =
+            when (val g = grants) {
+                is SupportedGrants.AuthorizationCode -> g
+                is SupportedGrants.Both -> g.authorizationCode
+                else -> null
+            }
+
     init {
         if (registrationCertificatePolicy != null) {
             ensure(issuerMetadataPolicy is IssuerMetadataPolicy.RequireSigned) {
@@ -187,15 +206,6 @@ data class OpenId4VCIConfig(
                 )
             }
         }
-
-        if (SupportedGrants.AuthorizationCode == grants || SupportedGrants.Both == grants) {
-            ensureNotNull(authFlowRedirectionURI) {
-                IllegalArgumentException(
-                    "Wrong configuration: " +
-                        "authFlowRedirectionURI must be provided when grants is AuthorizationCode or Both",
-                )
-            }
-        }
     }
 
     /**
@@ -203,31 +213,25 @@ data class OpenId4VCIConfig(
      */
     constructor(
         clientId: ClientId,
-        authFlowRedirectionURI: URI,
         encryptionSupportConfig: EncryptionSupportConfig,
         authorizeIssuanceConfig: AuthorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
         dPoPUsage: DPoPUsageOption = DPoPUsage.Never,
-        parUsage: ParUsage = ParUsage.IfSupported(),
         clock: Clock = Clock.systemDefaultZone(),
         issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         supportedCredentialReusePolicies: CredentialReusePolicies? = null,
         proofs: ProofsConfig = ProofsConfig.Default,
         registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
-        authResponseIssChecking: AuthorizationResponseIssChecking = AuthorizationResponseIssChecking.Never,
-        grants: SupportedGrants = SupportedGrants.Both,
+        grants: SupportedGrants,
     ) : this(
         clientAuthentication = ClientAuthentication.None(clientId),
-        authFlowRedirectionURI = authFlowRedirectionURI,
         encryptionSupportConfig = encryptionSupportConfig,
         authorizeIssuanceConfig = authorizeIssuanceConfig,
         dPoPUsage = dPoPUsage,
-        parUsage = parUsage,
         clock = clock,
         issuerMetadataPolicy = issuerMetadataPolicy,
         supportedCredentialReusePolicies = supportedCredentialReusePolicies,
         proofs = proofs,
         registrationCertificatePolicy = registrationCertificatePolicy,
-        authResponseIssChecking = authResponseIssChecking,
         grants = grants,
     )
 }
@@ -300,19 +304,57 @@ sealed interface DPoPUsage<out C : Any> {
  *   to usual authorization code flow
  * - [Required]: Wallet always will place PAR request, regardless what if authorization server advertises the PAR
  *   endpoint. If PAR endpoint is not being advertised, the issuance will fail.
+ *
+ * How the Authorization Code is bound to the DPoP key (if at all) is configured separately via
+ * [SupportedGrants.AuthorizationCode.authorizationCodeDPoPBindingMethod], per RFC 9449 §10.1.
  */
 sealed interface ParUsage : java.io.Serializable {
+    /**
+     * Disables PAR. Wallet will use the usual authorization code flow.
+     */
     data object Never : ParUsage {
         private fun readResolve(): Any = Never
     }
 
-    data class IfSupported(
-        val authorizationCodeDPoPBinding: Boolean = true,
-    ) : ParUsage
+    /**
+     * If authorization server advertises PAR endpoint it will be used. Otherwise, falls back
+     * to usual authorization code flow.
+     */
+    data object IfSupported : ParUsage {
+        private fun readResolve(): Any = IfSupported
+    }
 
-    data class Required(
-        val authorizationCodeDPoPBinding: Boolean = true,
-    ) : ParUsage
+    /**
+     * Wallet always will place PAR request, regardless what if authorization server advertises the PAR
+     * endpoint. If PAR endpoint is not being advertised, the issuance will fail.
+     */
+    data object Required : ParUsage {
+        private fun readResolve(): Any = Required
+    }
+}
+
+/**
+ * How the Authorization Code is bound to the DPoP key, per RFC 9449 §10.1.
+ */
+enum class AuthorizationCodeDPoPBindingMethod {
+    /**
+     * The Authorization Code is not bound to the DPoP key.
+     */
+    None,
+
+    /**
+     * Bind the Authorization Code to the DPoP key by attaching a DPoP proof in the `DPoP` header of the
+     * PAR request. This method requires the use of PAR; without PAR the DPoP header cannot be used, so the
+     * binding is performed via [DPoPJkt] instead.
+     */
+    DPoPHeader,
+
+    /**
+     * Bind the Authorization Code to the DPoP key by including the `dpop_jkt` parameter (the RFC 7638 JWK
+     * thumbprint of the DPoP public key) in the PAR request body when PAR is used, or in the authorization
+     * request when PAR is not used.
+     */
+    DPoPJkt,
 }
 
 /**
@@ -589,8 +631,18 @@ data class ProofsConfig(
 sealed interface SupportedGrants {
     /**
      * Wallet supports Authorization Code grant.
+     *
+     * @param authFlowRedirectionURI the redirect URI to be passed as the `redirect_uri` parameter of the authorization request.
+     * @param parUsage the wallet's policy regarding the use of the PAR endpoint.
+     * @param authResponseIssChecking the wallet's policy concerning the validation of the `iss` parameter of the authorization response.
+     * @param authorizationCodeDPoPBindingMethod how the Authorization Code is bound to the DPoP key when PAR is used, per RFC 9449 §10.1.
      */
-    data object AuthorizationCode : SupportedGrants
+    data class AuthorizationCode(
+        val authFlowRedirectionURI: URI,
+        val parUsage: ParUsage = ParUsage.IfSupported,
+        val authResponseIssChecking: AuthorizationResponseIssChecking = AuthorizationResponseIssChecking.IfSupported,
+        val authorizationCodeDPoPBindingMethod: AuthorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPHeader,
+    ) : SupportedGrants
 
     /**
      * Wallet supports Pre-authorized Code grant.
@@ -599,6 +651,10 @@ sealed interface SupportedGrants {
 
     /**
      * Wallet supports both Authorization Code and Pre-authorized Code grants.
+     *
+     * @param authorizationCode the configuration of the Authorization Code grant.
      */
-    data object Both : SupportedGrants
+    data class Both(
+        val authorizationCode: AuthorizationCode,
+    ) : SupportedGrants
 }

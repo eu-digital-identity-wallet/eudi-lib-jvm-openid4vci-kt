@@ -127,7 +127,7 @@ internal class CredentialOfferRequestResolver(
                         )
                     CredentialOfferRequestValidationError.InvalidGrants(error).toException()
                 }
-                if (config.authResponseIssChecking is AuthorizationResponseIssChecking.Required) {
+                if (config.authorizationCodeGrant?.authResponseIssChecking is AuthorizationResponseIssChecking.Required) {
                     ensure(authorizationServerMetadata.supportsAuthorizationResponseIssuerParam()) {
                         AuthorizationResponseIssuerParamNotSupported()
                     }
@@ -324,21 +324,17 @@ private fun findSupportedGrants(
     when (issuerSupported) {
         is Grants.AuthorizationCode -> {
             when (walletSupported) {
-                SupportedGrants.AuthorizationCode,
-                SupportedGrants.Both,
-                -> SupportedGrants.AuthorizationCode
-
+                is SupportedGrants.AuthorizationCode -> walletSupported
+                is SupportedGrants.Both -> walletSupported.authorizationCode
                 SupportedGrants.PreAuthorizedCode -> null
             }
         }
 
         is Grants.PreAuthorizedCode -> {
             when (walletSupported) {
-                SupportedGrants.PreAuthorizedCode,
-                SupportedGrants.Both,
-                -> SupportedGrants.PreAuthorizedCode
-
-                SupportedGrants.AuthorizationCode -> null
+                SupportedGrants.PreAuthorizedCode -> SupportedGrants.PreAuthorizedCode
+                is SupportedGrants.Both -> SupportedGrants.PreAuthorizedCode
+                is SupportedGrants.AuthorizationCode -> null
             }
         }
 

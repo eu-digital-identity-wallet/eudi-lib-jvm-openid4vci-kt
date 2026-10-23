@@ -105,7 +105,10 @@ internal class AuthorizeIssuanceImpl(
 
     private fun validateAuthorizationResponseIssuer(iss: String?) {
         val metadata = credentialOffer.authorizationServerMetadata
-        when (config.authResponseIssChecking) {
+        val authResponseIssChecking =
+            config.authorizationCodeGrant?.authResponseIssChecking
+                ?: AuthorizationResponseIssChecking.Never
+        when (authResponseIssChecking) {
             AuthorizationResponseIssChecking.Never -> {
                 Unit
             }

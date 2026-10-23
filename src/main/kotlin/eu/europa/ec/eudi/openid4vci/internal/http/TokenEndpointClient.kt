@@ -123,7 +123,7 @@ internal class TokenEndpointClient(
         config.clock,
         config.clientAuthentication.id,
         provisionedClientAttestation,
-        authFlowRedirectionURI = config.authFlowRedirectionURI,
+        authFlowRedirectionURI = config.authorizationCodeGrant?.authFlowRedirectionURI,
         authServerId = HttpsUrl(authorizationServerMetadata.issuer.value).getOrThrow(),
         challengeEndpoint =
             authorizationServerMetadata.challengeEndpointURI?.let {

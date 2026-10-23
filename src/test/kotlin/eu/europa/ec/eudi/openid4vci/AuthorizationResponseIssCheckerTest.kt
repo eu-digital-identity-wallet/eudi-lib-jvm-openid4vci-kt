@@ -33,7 +33,6 @@ class AuthorizationResponseIssCheckerTest {
     private fun config(authResponseIssChecking: AuthorizationResponseIssChecking): OpenId4VCIConfig =
         OpenId4VCIConfig(
             clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
-            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
             encryptionSupportConfig =
                 EncryptionSupportConfig(
                     Curve.P_256,
@@ -41,7 +40,11 @@ class AuthorizationResponseIssCheckerTest {
                     CredentialResponseEncryptionPolicy.SUPPORTED,
                 ),
             proofs = ProofsConfig.Default,
-            authResponseIssChecking = authResponseIssChecking,
+            grants =
+                SupportedGrants.AuthorizationCode(
+                    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                    authResponseIssChecking = authResponseIssChecking,
+                ),
         )
 
     private suspend fun issuerWith(

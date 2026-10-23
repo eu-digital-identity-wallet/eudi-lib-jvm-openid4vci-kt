@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vci.examples
 
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.*
 import io.ktor.http.*
@@ -47,11 +46,9 @@ internal object PidDevIssuer :
                     WALLET_CLIENT_ID,
                     WalletProviderProvisionClientAttestation(createHttpClient(enableLogging = false), WalletInstanceAttestationServiceUrl),
                 ),
-            dPoPUsage = DPoPUsage.Required(DPoPConfig(ProvisionDPoPSigner(CryptoGenerator.ecSigner(Curve.P_256, JWSAlgorithm.ES256)))),
-            authFlowRedirectionURI = Keycloak.DebugRedirectUri,
+            dPoPUsage = DPoPUsage.Required(DPoPConfig(ProvisionDPoPSigner(CryptoGenerator.randomECSigningKey(Curve.P_256)))),
             encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
             authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-            parUsage = ParUsage.Required(),
             supportedCredentialReusePolicies =
                 CredentialReusePolicies.Supported(
                     setOf(
@@ -63,7 +60,13 @@ internal object PidDevIssuer :
                 ),
             proofs = ProofsConfig.Default,
             issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(TrustAnyX509),
-            authResponseIssChecking = AuthorizationResponseIssChecking.Required,
+            grants =
+                SupportedGrants.AuthorizationCode(
+                    authFlowRedirectionURI = Keycloak.DebugRedirectUri,
+                    parUsage = ParUsage.Required,
+                    authResponseIssChecking = AuthorizationResponseIssChecking.Required,
+                    authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
+                ),
         )
 
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_vc_sd_jwt")

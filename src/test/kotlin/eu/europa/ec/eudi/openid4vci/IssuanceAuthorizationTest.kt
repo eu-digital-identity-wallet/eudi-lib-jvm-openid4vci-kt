@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.internal.http.PushedAuthorizationRequestResponseTO
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenResponseTO
 import io.ktor.client.*
@@ -25,6 +26,7 @@ import kotlinx.serialization.json.Json
 import parPostApplyAssertionsAndGetFormData
 import tokenPostApplyAuthFlowAssertionsAndGetFormData
 import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
+import java.net.URI
 import java.util.*
 import kotlin.test.*
 
@@ -374,7 +376,15 @@ class IssuanceAuthorizationTest {
                     },
                 )
 
-            val config = OpenId4VCIConfigurationWithDpopSigner.copy(parUsage = ParUsage.Required(authorizationCodeDPoPBinding = false))
+            val config =
+                OpenId4VCIConfigurationWithDpopSigner.copy(
+                    grants =
+                        SupportedGrants.AuthorizationCode(
+                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            parUsage = ParUsage.Required,
+                            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.None,
+                        ),
+                )
             val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
             val issuer =
                 Issuer
@@ -410,7 +420,15 @@ class IssuanceAuthorizationTest {
                     },
                 )
 
-            val config = OpenId4VCIConfigurationWithDpopSigner.copy(parUsage = ParUsage.Required(authorizationCodeDPoPBinding = true))
+            val config =
+                OpenId4VCIConfigurationWithDpopSigner.copy(
+                    grants =
+                        SupportedGrants.AuthorizationCode(
+                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            parUsage = ParUsage.Required,
+                            authResponseIssChecking = AuthorizationResponseIssChecking.Never,
+                        ),
+                )
             val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
             val issuer =
                 Issuer
@@ -426,6 +444,332 @@ class IssuanceAuthorizationTest {
                 authRequestPrepared
                     .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
                     .also { println(it) }
+            }
+        }
+
+    @Test
+    fun `ensure dpop_jkt is sent to par endpoint and no dpop header when binding method is DPoPJkt`() =
+        runTest {
+            val dPoPSigningKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
+            val expectedDpopJkt = dPoPSigningKey.toPublicJWK().computeThumbprint().toString()
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                    parPostMocker { request ->
+                        val form = with(request) { parPostApplyAssertionsAndGetFormData(false) }
+                        assertEquals(expectedDpopJkt, form.formData["dpop_jkt"], "dpop_jkt was not sent as expected")
+                        assertNull(request.headers[DPoP], "no dpop proof header expected when binding method is DPoPJkt")
+                    },
+                    tokenPostMocker { request ->
+                        with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
+                    },
+                )
+
+            val config =
+                OpenId4VCIConfiguration.copy(
+                    dPoPUsage = DPoPUsage.IfSupported(DPoPConfig(ProvisionDPoPSigner(dPoPSigningKey))),
+                    grants =
+                        SupportedGrants.AuthorizationCode(
+                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            parUsage = ParUsage.Required,
+                            authResponseIssChecking = AuthorizationResponseIssChecking.Never,
+                            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
+                        ),
+                )
+            val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val issuer =
+                Issuer
+                    .make(
+                        config = config,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getIssuerOrThrow()
+            with(issuer) {
+                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
+                val authorizationCode = UUID.randomUUID().toString()
+                val serverState = authRequestPrepared.state
+                authRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState)
+            }
+        }
+
+    @Test
+    fun `ensure exception is thrown when dpop_jkt binding method is selected but DPoP is not configured`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                )
+
+            val config =
+                OpenId4VCIConfiguration.copy(
+                    grants =
+                        SupportedGrants.AuthorizationCode(
+                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            parUsage = ParUsage.Required,
+                            authResponseIssChecking = AuthorizationResponseIssChecking.Never,
+                            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
+                        ),
+                )
+            val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val issuer =
+                Issuer
+                    .make(
+                        config = config,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getIssuerOrThrow()
+            with(issuer) {
+                prepareAuthorizationRequest()
+                    .fold(
+                        onSuccess = {
+                            fail("Exception expected to be thrown")
+                        },
+                        onFailure = {
+                            assertTrue("Expected an IllegalStateException to be thrown but was not") {
+                                it is IllegalStateException
+                            }
+                        },
+                    )
+            }
+        }
+
+    @Test
+    fun `ensure exception is thrown when dpop_jkt binding method is selected but thumbprint is not available`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                )
+
+            val config =
+                OpenId4VCIConfigurationWithDpopSigner.copy(
+                    grants =
+                        SupportedGrants.AuthorizationCode(
+                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            parUsage = ParUsage.Required,
+                            authResponseIssChecking = AuthorizationResponseIssChecking.Never,
+                            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
+                        ),
+                )
+            val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val issuer =
+                Issuer
+                    .make(
+                        config = config,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getIssuerOrThrow()
+            with(issuer) {
+                prepareAuthorizationRequest()
+                    .fold(
+                        onSuccess = {
+                            fail("Exception expected to be thrown")
+                        },
+                        onFailure = {
+                            assertTrue("Expected an IllegalStateException to be thrown but was not") {
+                                it is IllegalStateException
+                            }
+                        },
+                    )
+            }
+        }
+
+    @Test
+    fun `ensure dpop_jkt is included in the authorization request url when PAR is not used and code DPoP binding is enabled`() =
+        runTest {
+            val dPoPSigningKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
+            val expectedDpopJkt = dPoPSigningKey.toPublicJWK().computeThumbprint().toString()
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                )
+
+            val config =
+                OpenId4VCIConfiguration.copy(
+                    dPoPUsage = DPoPUsage.IfSupported(DPoPConfig(ProvisionDPoPSigner(dPoPSigningKey))),
+                    grants =
+                        SupportedGrants.AuthorizationCode(
+                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            parUsage = ParUsage.Never,
+                            authResponseIssChecking = AuthorizationResponseIssChecking.Never,
+                            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
+                        ),
+                )
+            val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val issuer =
+                Issuer
+                    .make(
+                        config = config,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getIssuerOrThrow()
+            with(issuer) {
+                val authorizationCodeURL = prepareAuthorizationRequest().getOrThrow().authorizationCodeURL.toString()
+                assertTrue("dpop_jkt was not included in the authorization request url") {
+                    authorizationCodeURL.contains("dpop_jkt=$expectedDpopJkt")
+                }
+            }
+        }
+
+    @Test
+    fun `ensure dpop_jkt is included in the authorization request url when PAR is not used and binding method is DPoPHeader`() =
+        runTest {
+            val dPoPSigningKey = CryptoGenerator.randomECSigningKey(Curve.P_256)
+            val expectedDpopJkt = dPoPSigningKey.toPublicJWK().computeThumbprint().toString()
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                )
+
+            val config =
+                OpenId4VCIConfiguration.copy(
+                    dPoPUsage = DPoPUsage.IfSupported(DPoPConfig(ProvisionDPoPSigner(dPoPSigningKey))),
+                    grants =
+                        SupportedGrants.AuthorizationCode(
+                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            parUsage = ParUsage.Never,
+                            authResponseIssChecking = AuthorizationResponseIssChecking.Never,
+                            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPHeader,
+                        ),
+                )
+            val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val issuer =
+                Issuer
+                    .make(
+                        config = config,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getIssuerOrThrow()
+            with(issuer) {
+                val authorizationCodeURL = prepareAuthorizationRequest().getOrThrow().authorizationCodeURL.toString()
+                assertTrue("dpop_jkt was not included in the authorization request url") {
+                    authorizationCodeURL.contains("dpop_jkt=$expectedDpopJkt")
+                }
+            }
+        }
+
+    @Test
+    fun `ensure dpop_jkt is not included in the authorization request url when PAR is not used and code DPoP binding is disabled`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                )
+
+            val config =
+                OpenId4VCIConfiguration.copy(
+                    grants =
+                        SupportedGrants.AuthorizationCode(
+                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            parUsage = ParUsage.Never,
+                            authResponseIssChecking = AuthorizationResponseIssChecking.Never,
+                            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.None,
+                        ),
+                )
+            val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val issuer =
+                Issuer
+                    .make(
+                        config = config,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getIssuerOrThrow()
+            with(issuer) {
+                val authorizationCodeURL = prepareAuthorizationRequest().getOrThrow().authorizationCodeURL.toString()
+                assertFalse("dpop_jkt should not be included in the authorization request url") {
+                    authorizationCodeURL.contains("dpop_jkt")
+                }
+            }
+        }
+
+    @Test
+    fun `ensure exception is thrown when PAR is not used, code DPoP binding via dpop_jkt but DPoP is not configured`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                )
+
+            val config =
+                OpenId4VCIConfiguration.copy(
+                    grants =
+                        SupportedGrants.AuthorizationCode(
+                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            parUsage = ParUsage.Never,
+                            authResponseIssChecking = AuthorizationResponseIssChecking.Never,
+                            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
+                        ),
+                )
+            val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val issuer =
+                Issuer
+                    .make(
+                        config = config,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getIssuerOrThrow()
+            with(issuer) {
+                prepareAuthorizationRequest()
+                    .fold(
+                        onSuccess = {
+                            fail("Exception expected to be thrown")
+                        },
+                        onFailure = {
+                            assertTrue("Expected an IllegalStateException to be thrown but was not") {
+                                it is IllegalStateException
+                            }
+                        },
+                    )
+            }
+        }
+
+    @Test
+    fun `ensure exception is thrown when PAR is not used, code DPoP binding via dpop_jkt but thumbprint is not available`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                )
+
+            val config =
+                OpenId4VCIConfigurationWithDpopSigner.copy(
+                    grants =
+                        SupportedGrants.AuthorizationCode(
+                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            parUsage = ParUsage.Never,
+                            authResponseIssChecking = AuthorizationResponseIssChecking.Never,
+                            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
+                        ),
+                )
+            val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val issuer =
+                Issuer
+                    .make(
+                        config = config,
+                        credentialOffer = offer,
+                        httpClient = mockedHttpClient,
+                    ).getIssuerOrThrow()
+            with(issuer) {
+                prepareAuthorizationRequest()
+                    .fold(
+                        onSuccess = {
+                            fail("Exception expected to be thrown")
+                        },
+                        onFailure = {
+                            assertTrue("Expected an IllegalStateException to be thrown but was not") {
+                                it is IllegalStateException
+                            }
+                        },
+                    )
             }
         }
 
