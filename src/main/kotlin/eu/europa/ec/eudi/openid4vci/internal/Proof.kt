@@ -26,14 +26,15 @@ import kotlinx.serialization.Serializable
  */
 @Serializable(ProofSerializer::class)
 internal sealed interface Proof {
-
     /**
      * Proof of possession is structured as signed JWT
      *
      * @param jwt The proof JWT
      */
     @JvmInline
-    value class Jwt(val jwt: JWT) : Proof
+    value class Jwt(
+        val jwt: JWT,
+    ) : Proof
 
     /**
      * Proof of possession is structured as a Key Attestation JWT
@@ -41,5 +42,7 @@ internal sealed interface Proof {
      * @param keyAttestation The proof Key Attestation JWT
      */
     @JvmInline
-    value class Attestation(val keyAttestation: KeyAttestationJWT) : Proof
+    value class Attestation(
+        val keyAttestation: KeyAttestationJWT,
+    ) : Proof
 }

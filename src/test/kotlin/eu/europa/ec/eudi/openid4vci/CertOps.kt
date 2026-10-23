@@ -49,8 +49,7 @@ internal object CertOps {
     }
 
     @OptIn(ExperimentalTime::class)
-    private fun notBefore(d: Duration = Duration.ZERO): Instant =
-        (clock.now() + d)
+    private fun notBefore(d: Duration = Duration.ZERO): Instant = (clock.now() + d)
 
     fun genTrustAnchor(
         sigAlg: String,
@@ -94,8 +93,8 @@ internal object CertOps {
         keyPair: KeyPair,
         sigAlg: String,
         name: X500Name,
-    ): X509CertificateHolder {
-        return JcaX509v3CertificateBuilder(
+    ): X509CertificateHolder =
+        JcaX509v3CertificateBuilder(
             name,
             calculateSerialNumber(),
             Date.from(notBefore().toJavaInstant()),
@@ -107,7 +106,6 @@ internal object CertOps {
             basicConstraints(BasicConstraints(true))
             keyUsage(KeyUsage(KeyUsage.keyCertSign or KeyUsage.cRLSign))
         }.build(sigAlg, keyPair.private)
-    }
 
     /**
      * Build a sample V3 intermediate certificate that can be used as a CA
@@ -170,15 +168,23 @@ internal object CertOps {
         return cFact.generateCertificate(encoded.inputStream()) as X509Certificate
     }
 
-    private fun signer(sigAlg: String, privateKey: PrivateKey): ContentSigner =
-        Ctx.jcaContentSignerBuilder(sigAlg).build(privateKey)
+    private fun signer(
+        sigAlg: String,
+        privateKey: PrivateKey,
+    ): ContentSigner = Ctx.jcaContentSignerBuilder(sigAlg).build(privateKey)
 
-    private fun JcaX509v1CertificateBuilder.build(sigAlg: String, privateKey: PrivateKey): X509CertificateHolder {
+    private fun JcaX509v1CertificateBuilder.build(
+        sigAlg: String,
+        privateKey: PrivateKey,
+    ): X509CertificateHolder {
         val signer = signer(sigAlg, privateKey)
         return build(signer)
     }
 
-    private fun JcaX509v3CertificateBuilder.build(sigAlg: String, privateKey: PrivateKey): X509CertificateHolder {
+    private fun JcaX509v3CertificateBuilder.build(
+        sigAlg: String,
+        privateKey: PrivateKey,
+    ): X509CertificateHolder {
         val signer = signer(sigAlg, privateKey)
         return build(signer)
     }
@@ -215,8 +221,9 @@ private fun JcaX509v3CertificateBuilder.basicConstraints(c: BasicConstraints) {
 
 private val extUtils = JcaX509ExtensionUtils()
 
-private class SecCtx(val provider: Provider? = null) {
-
+private class SecCtx(
+    val provider: Provider? = null,
+) {
     fun certFactory(): CertificateFactory =
         provider
             ?.let { CertificateFactory.getInstance("X.509", provider) }

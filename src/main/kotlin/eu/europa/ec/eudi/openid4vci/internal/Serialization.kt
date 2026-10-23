@@ -39,27 +39,29 @@ import java.time.Duration
 import java.time.Instant
 import java.util.*
 
-internal val JsonSupport: Json = Json {
-    ignoreUnknownKeys = true
-    prettyPrint = true
-}
+internal val JsonSupport: Json =
+    Json {
+        ignoreUnknownKeys = true
+        prettyPrint = true
+    }
 
-internal val GsonSupport = GsonBuilder()
-    .setStrictness(Strictness.STRICT)
-    .serializeNulls()
-    .setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
-    .disableHtmlEscaping()
-    .create()
+internal val GsonSupport =
+    GsonBuilder()
+        .setStrictness(Strictness.STRICT)
+        .serializeNulls()
+        .setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+        .disableHtmlEscaping()
+        .create()
 
 internal object LocaleSerializer : KSerializer<Locale> {
-
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Locale", PrimitiveKind.STRING)
 
-    override fun deserialize(decoder: Decoder): Locale =
-        Locale.forLanguageTag(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): Locale = Locale.forLanguageTag(decoder.decodeString())
 
-    override fun serialize(encoder: Encoder, value: Locale) =
-        encoder.encodeString(value.toString())
+    override fun serialize(
+        encoder: Encoder,
+        value: Locale,
+    ) = encoder.encodeString(value.toString())
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -77,37 +79,48 @@ internal object ProofSerializer : KSerializer<Proof> {
     override fun deserialize(decoder: Decoder): Proof {
         val deserialized = internal.deserialize(decoder)
         return when (deserialized.proofType) {
-            ProofType.JWT.toString().lowercase() ->
+            ProofType.JWT.toString().lowercase() -> {
                 deserialized.jwt?.let {
                     Proof.Jwt(SignedJWT.parse(deserialized.jwt))
                 } ?: error("Invalid JWT proof: missing 'jwt' attribute.")
+            }
 
-            ProofType.ATTESTATION.toString().lowercase() ->
+            ProofType.ATTESTATION.toString().lowercase() -> {
                 deserialized.attestation?.let {
                     Proof.Attestation(KeyAttestationJWT(it))
                 } ?: error("Invalid Attestation proof: missing 'attestation' attribute.")
+            }
 
-            else -> error("Unsupported proof type: ${deserialized.proofType}")
+            else -> {
+                error("Unsupported proof type: ${deserialized.proofType}")
+            }
         }
     }
 
-    override fun serialize(encoder: Encoder, value: Proof) {
+    override fun serialize(
+        encoder: Encoder,
+        value: Proof,
+    ) {
         when (value) {
-            is Proof.Jwt -> internal.serialize(
-                encoder,
-                ProofJson(
-                    proofType = ProofType.JWT.toString().lowercase(),
-                    jwt = value.jwt.serialize(),
-                ),
-            )
+            is Proof.Jwt -> {
+                internal.serialize(
+                    encoder,
+                    ProofJson(
+                        proofType = ProofType.JWT.toString().lowercase(),
+                        jwt = value.jwt.serialize(),
+                    ),
+                )
+            }
 
-            is Proof.Attestation -> internal.serialize(
-                encoder,
-                ProofJson(
-                    proofType = ProofType.ATTESTATION.toString().lowercase(),
-                    attestation = value.keyAttestation.jwt,
-                ),
-            )
+            is Proof.Attestation -> {
+                internal.serialize(
+                    encoder,
+                    ProofJson(
+                        proofType = ProofType.ATTESTATION.toString().lowercase(),
+                        attestation = value.keyAttestation.jwt,
+                    ),
+                )
+            }
         }
     }
 }
@@ -115,7 +128,6 @@ internal object ProofSerializer : KSerializer<Proof> {
 @OptIn(ExperimentalSerializationApi::class)
 internal object GrantedAuthorizationDetailsSerializer :
     KSerializer<Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>>> {
-
     private const val OPENID_CREDENTIAL: String = "openid_credential"
 
     @Serializable
@@ -128,6 +140,7 @@ internal object GrantedAuthorizationDetailsSerializer :
             require(type == OPENID_CREDENTIAL) { "type must be $OPENID_CREDENTIAL" }
         }
     }
+
     private fun authDetails(
         credentialConfigurationId: CredentialConfigurationIdentifier,
         credentialIdentifiers: List<CredentialIdentifier>,
@@ -163,20 +176,23 @@ internal object GrantedAuthorizationDetailsSerializer :
  * Serializer for [ClaimPath]
  */
 internal object ClaimPathSerializer : KSerializer<ClaimPath> {
-
     private fun ClaimPath.toJson(): JsonArray = JsonArray(value.map { it.toJson() })
 
-    private fun ClaimPathElement.toJson(): JsonPrimitive = when (this) {
-        is ClaimPathElement.Claim -> JsonPrimitive(name)
-        is ArrayElement -> JsonPrimitive(index)
-        AllArrayElements -> JsonNull
-    }
+    private fun ClaimPathElement.toJson(): JsonPrimitive =
+        when (this) {
+            is ClaimPathElement.Claim -> JsonPrimitive(name)
+            is ArrayElement -> JsonPrimitive(index)
+            AllArrayElements -> JsonNull
+        }
 
     private val arraySerializer = serializer<JsonArray>()
 
     override val descriptor: SerialDescriptor = arraySerializer.descriptor
 
-    override fun serialize(encoder: Encoder, value: ClaimPath) {
+    override fun serialize(
+        encoder: Encoder,
+        value: ClaimPath,
+    ) {
         val array = value.toJson()
         arraySerializer.serialize(encoder, array)
     }
@@ -191,22 +207,25 @@ object InstantEpochSecondSerializer : KSerializer<Instant> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("InstantEpochSecondSerializer", PrimitiveKind.LONG)
 
-    override fun serialize(encoder: Encoder, value: Instant) {
+    override fun serialize(
+        encoder: Encoder,
+        value: Instant,
+    ) {
         encoder.encodeLong(value.epochSecond)
     }
 
-    override fun deserialize(decoder: Decoder): Instant {
-        return Instant.ofEpochSecond(decoder.decodeLong())
-    }
+    override fun deserialize(decoder: Decoder): Instant = Instant.ofEpochSecond(decoder.decodeLong())
 }
 
 object JWTClaimsSetSerializer : KSerializer<JWTClaimsSet> {
-
     private val objectSerializer = serializer<JsonObject>()
 
     override val descriptor: SerialDescriptor = objectSerializer.descriptor
 
-    override fun serialize(encoder: Encoder, value: JWTClaimsSet) {
+    override fun serialize(
+        encoder: Encoder,
+        value: JWTClaimsSet,
+    ) {
         val claimsJsonObject = JsonSupport.decodeFromString<JsonObject>(JSONObjectUtils.toJSONString(value.toJSONObject()))
         objectSerializer.serialize(encoder, claimsJsonObject)
     }
@@ -219,14 +238,18 @@ object JWTClaimsSetSerializer : KSerializer<JWTClaimsSet> {
 
 fun JWK.publicJwkAsJsonElement(): JsonElement = Json.parseToJsonElement(this.toPublicJWK().toJSONString())
 
-fun List<X509Certificate>.asJsonElement(): JsonArray = JsonArray(
-    this.map { Json.encodeToJsonElement(Base64.getEncoder().encodeToString(it.encoded)) },
-)
+fun List<X509Certificate>.asJsonElement(): JsonArray =
+    JsonArray(
+        this.map { Json.encodeToJsonElement(Base64.getEncoder().encodeToString(it.encoded)) },
+    )
 
 object URLSerializer : KSerializer<URL> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("URL", PrimitiveKind.STRING)
 
-    override fun serialize(encoder: Encoder, value: URL) {
+    override fun serialize(
+        encoder: Encoder,
+        value: URL,
+    ) {
         encoder.encodeString(value.toExternalForm())
     }
 
@@ -236,7 +259,10 @@ object URLSerializer : KSerializer<URL> {
 object URISerializer : KSerializer<URI> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("URI", PrimitiveKind.STRING)
 
-    override fun serialize(encoder: Encoder, value: URI) {
+    override fun serialize(
+        encoder: Encoder,
+        value: URI,
+    ) {
         encoder.encodeString(value.toString())
     }
 
@@ -248,7 +274,10 @@ object JWKJsonObjectSerializer : KSerializer<JWK> {
 
     override val descriptor: SerialDescriptor = SerialDescriptor("JWKJsonObjectSerializer", serializer.descriptor)
 
-    override fun serialize(encoder: Encoder, value: JWK) {
+    override fun serialize(
+        encoder: Encoder,
+        value: JWK,
+    ) {
         val serialized = JsonSupport.decodeFromString<JsonObject>(value.toJSONString())
         encoder.encodeSerializableValue(serializer, serialized)
     }
@@ -269,7 +298,10 @@ internal inline fun <reified T : Any> JWTClaimsSet.decodeAs(): Result<T> = decod
 object DurationSecondsSerializer : KSerializer<Duration> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DurationSecondsSerializer", PrimitiveKind.LONG)
 
-    override fun serialize(encoder: Encoder, value: Duration) {
+    override fun serialize(
+        encoder: Encoder,
+        value: Duration,
+    ) {
         encoder.encodeLong(value.toSeconds())
     }
 

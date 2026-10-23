@@ -31,13 +31,16 @@ import java.util.*
 import kotlin.time.Duration.Companion.seconds
 
 internal object CredentialIssuerMetadataJsonParser {
-
-    fun parseMetaData(json: String, issuer: CredentialIssuerId): CredentialIssuerMetadata {
-        val metadata = try {
-            JsonSupport.decodeFromString<CredentialIssuerMetadataTO>(json)
-        } catch (t: Throwable) {
-            throw CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(t)
-        }
+    fun parseMetaData(
+        json: String,
+        issuer: CredentialIssuerId,
+    ): CredentialIssuerMetadata {
+        val metadata =
+            try {
+                JsonSupport.decodeFromString<CredentialIssuerMetadataTO>(json)
+            } catch (t: Throwable) {
+                throw CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata(t)
+            }
         return metadata.toDomain(issuer)
     }
 }
@@ -49,7 +52,6 @@ internal object CredentialIssuerMetadataJsonParser {
 @Serializable
 @JsonClassDiscriminator("format")
 private sealed interface CredentialSupportedTO {
-
     val format: String
     val scope: String?
     val cryptographicBindingMethodsSupported: List<String>?
@@ -83,13 +85,18 @@ private data class CredentialReusePolicyTO(
     fun toDomain(): CredentialReusePolicy =
         when (id) {
             ETSI119472Part3.REUSE_POLICY_ARF_ANNEX_II -> {
-                val parsed = options.orEmpty()
-                    .flatMap {
-                        JsonSupport.decodeFromJsonElement<ArfAnnex2CredentialReusePolicyOptionTO>(it).toDomain()
-                    }
+                val parsed =
+                    options
+                        .orEmpty()
+                        .flatMap {
+                            JsonSupport.decodeFromJsonElement<ArfAnnex2CredentialReusePolicyOptionTO>(it).toDomain()
+                        }
                 CredentialReusePolicy.EUDI(parsed)
             }
-            else -> CredentialReusePolicy.None
+
+            else -> {
+                CredentialReusePolicy.None
+            }
         }
 }
 
@@ -109,12 +116,13 @@ private data class CredentialMetadataTO(
 }
 
 private object KeepKnownReusePolicies : JsonTransformingSerializer<CredentialReusePolicyTO>(CredentialReusePolicyTO.serializer()) {
-
     override fun transformDeserialize(element: JsonElement): JsonElement {
         // For unknown policies, replace with a JSON object whose id won't match
         // any known policy, so toDomain() will map it to CredentialReusePolicy.None
-        return if (element.isKnown()) element
-        else buildJsonObject { put("id", "unknown") }
+        return if (element.isKnown())
+            element
+        else
+            buildJsonObject { put("id", "unknown") }
     }
 
     private val knownPolicies = setOf(ETSI119472Part3.REUSE_POLICY_ARF_ANNEX_II)
@@ -126,7 +134,9 @@ private object KeepKnownReusePolicies : JsonTransformingSerializer<CredentialReu
                 policyId != null && policyId in knownPolicies
             }
 
-            else -> false
+            else -> {
+                false
+            }
         }
 }
 
@@ -166,8 +176,10 @@ private data class MsdMdocCredentialTO(
     }
 
     override fun toDomain(): MsoMdocCredential {
-        val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
-            .map { cryptographicBindingMethodOf(it) }
+        val bindingMethods =
+            cryptographicBindingMethodsSupported
+                .orEmpty()
+                .map { cryptographicBindingMethodOf(it) }
 
         val proofTypesSupported = proofTypesSupported?.toProofTypes().orEmpty()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { CoseAlgorithm(it) }
@@ -213,8 +225,10 @@ private data class SdJwtVcCredentialTO(
     }
 
     override fun toDomain(): SdJwtVcCredential {
-        val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
-            .map { cryptographicBindingMethodOf(it) }
+        val bindingMethods =
+            cryptographicBindingMethodsSupported
+                .orEmpty()
+                .map { cryptographicBindingMethodOf(it) }
 
         val proofTypesSupported = proofTypesSupported?.toProofTypes().orEmpty()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { JwsAlgorithm(it) }
@@ -245,11 +259,11 @@ private data class W3CJsonLdCredentialDefinitionTO(
     @SerialName("@context") val context: List<String>,
     @SerialName("type") val types: List<String>,
 ) {
-
-    fun toDomain(): W3CJsonLdCredentialDefinition = W3CJsonLdCredentialDefinition(
-        context = context.map { URI(it).toURL() },
-        type = types,
-    )
+    fun toDomain(): W3CJsonLdCredentialDefinition =
+        W3CJsonLdCredentialDefinition(
+            context = context.map { URI(it).toURL() },
+            type = types,
+        )
 }
 
 /**
@@ -275,8 +289,10 @@ private data class W3CJsonLdDataIntegrityCredentialTO(
     }
 
     override fun toDomain(): W3CJsonLdDataIntegrityCredential {
-        val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
-            .map { cryptographicBindingMethodOf(it) }
+        val bindingMethods =
+            cryptographicBindingMethodsSupported
+                .orEmpty()
+                .map { cryptographicBindingMethodOf(it) }
         val proofTypesSupported = proofTypesSupported?.toProofTypes().orEmpty()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { LinkedDataAlgorithm(it) }
 
@@ -324,8 +340,10 @@ private data class W3CJsonLdSignedJwtCredentialTO(
     }
 
     override fun toDomain(): W3CJsonLdSignedJwtCredential {
-        val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
-            .map { cryptographicBindingMethodOf(it) }
+        val bindingMethods =
+            cryptographicBindingMethodsSupported
+                .orEmpty()
+                .map { cryptographicBindingMethodOf(it) }
 
         val proofTypesSupported = proofTypesSupported?.toProofTypes().orEmpty()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { LinkedDataAlgorithm(it) }
@@ -385,8 +403,10 @@ private data class W3CSignedJwtCredentialTO(
     }
 
     override fun toDomain(): W3CSignedJwtCredential {
-        val bindingMethods = cryptographicBindingMethodsSupported.orEmpty()
-            .map { cryptographicBindingMethodOf(it) }
+        val bindingMethods =
+            cryptographicBindingMethodsSupported
+                .orEmpty()
+                .map { cryptographicBindingMethodOf(it) }
 
         val proofTypesSupported = proofTypesSupported?.toProofTypes().orEmpty()
         val cryptographicSuitesSupported = credentialSigningAlgorithmsSupported.orEmpty().map { JwsAlgorithm(it) }
@@ -440,12 +460,13 @@ private data class CredentialIssuerMetadataTO(
 )
 
 private object KeepKnownConfigurations : JsonTransformingSerializer<Map<String, CredentialSupportedTO>>(serializer()) {
-
     override fun transformDeserialize(element: JsonElement): JsonElement {
         val obj = element.jsonObject
         val keysToRemove = obj.keysOfUnknownCfgs()
-        return if (keysToRemove.isEmpty()) obj
-        else JsonObject(obj.toMutableMap().apply { keysToRemove.forEach { remove(it) } })
+        return if (keysToRemove.isEmpty())
+            obj
+        else
+            JsonObject(obj.toMutableMap().apply { keysToRemove.forEach { remove(it) } })
     }
 
     private fun Map<String, JsonElement>.keysOfUnknownCfgs(): Set<String> =
@@ -463,6 +484,7 @@ private object KeepKnownConfigurations : JsonTransformingSerializer<Map<String, 
             FORMAT_W3C_JSONLD_SIGNED_JWT,
             FORMAT_W3C_JSONLD_DATA_INTEGRITY,
         )
+
     private fun JsonElement.isKnown(): Boolean =
         when (this) {
             is JsonObject -> {
@@ -470,7 +492,9 @@ private object KeepKnownConfigurations : JsonTransformingSerializer<Map<String, 
                 format != null && format in knownFormats
             }
 
-            else -> false
+            else -> {
+                false
+            }
         }
 }
 
@@ -557,8 +581,7 @@ private data class CredentialSupportedDisplayTO(
                 alternativeText,
             )
 
-        fun BackgroundImageTO.toURI(): URI =
-            URI.create(uri)
+        fun BackgroundImageTO.toURI(): URI = URI.create(uri)
 
         return Display(
             name,
@@ -619,13 +642,11 @@ private data class DisplayTO(
      * Converts a [DisplayTO] to a [Display] instance.
      */
     fun toDomain(): Display {
-        fun LogoObject.toLogo(): Display.Logo =
-            Display.Logo(uri?.let { URI.create(it) }, alternativeText)
+        fun LogoObject.toLogo(): Display.Logo = Display.Logo(uri?.let { URI.create(it) }, alternativeText)
         return Display(name ?: "", locale?.let { Locale.forLanguageTag(it) }, logo?.toLogo())
     }
 
-    fun toClaimDisplay(): Claim.Display =
-        Claim.Display(name, locale?.let { languageTag -> Locale.forLanguageTag(languageTag) })
+    fun toClaimDisplay(): Claim.Display = Claim.Display(name, locale?.let { languageTag -> Locale.forLanguageTag(languageTag) })
 }
 
 private fun Map<String, ProofTypeSupportedMetaTO>.toProofTypes(): ProofTypesSupported? =
@@ -636,7 +657,10 @@ private fun Map<String, ProofTypeSupportedMetaTO>.toProofTypes(): ProofTypesSupp
 
 private fun ProofTypesSupported?.orEmpty(): ProofTypesSupported = this ?: ProofTypesSupported.Empty
 
-private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTypeMeta =
+private fun proofTypeMeta(
+    type: String,
+    meta: ProofTypeSupportedMetaTO,
+): ProofTypeMeta =
     when (type) {
         "jwt" -> {
             val algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
@@ -646,13 +670,16 @@ private fun proofTypeMeta(type: String, meta: ProofTypeSupportedMetaTO): ProofTy
 
         "attestation" -> {
             val algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
-            val keyAttestationRequirement = requireNotNull(meta.keyAttestationRequirement?.toDomain()) {
-                "attestation proof must contain 'key_attestations_required'"
-            }
+            val keyAttestationRequirement =
+                requireNotNull(meta.keyAttestationRequirement?.toDomain()) {
+                    "attestation proof must contain 'key_attestations_required'"
+                }
             ProofTypeMeta.Attestation(algorithms, keyAttestationRequirement)
         }
 
-        else -> ProofTypeMeta.Unsupported(type)
+        else -> {
+            ProofTypeMeta.Unsupported(type)
+        }
     }
 
 private fun KeyAttestationRequirementTO.toDomain(): KeyAttestationRequirement =
@@ -677,58 +704,71 @@ private fun cryptographicBindingMethodOf(s: String): CryptographicBindingMethod 
  * Converts and validates [CredentialIssuerMetadataTO] as [CredentialIssuerMetadata] instance.
  */
 private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuerId): CredentialIssuerMetadata {
-    fun ensureHttpsUrl(s: String, ex: (Throwable) -> Throwable) = HttpsUrl(s).ensureSuccess(ex)
+    fun ensureHttpsUrl(
+        s: String,
+        ex: (Throwable) -> Throwable,
+    ) = HttpsUrl(s).ensureSuccess(ex)
 
-    val credentialIssuerIdentifier = ensureNotNull(credentialIssuerIdentifier) {
-        InvalidCredentialIssuerId(IllegalArgumentException("missing credential_issuer"))
-    }.let {
-        CredentialIssuerId(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialIssuerId)
-    }.also {
-        ensure(it == expectedIssuer) {
-            InvalidCredentialIssuerId(
-                IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
-            )
+    val credentialIssuerIdentifier =
+        ensureNotNull(credentialIssuerIdentifier) {
+            InvalidCredentialIssuerId(IllegalArgumentException("missing credential_issuer"))
+        }.let {
+            CredentialIssuerId(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialIssuerId)
+        }.also {
+            ensure(it == expectedIssuer) {
+                InvalidCredentialIssuerId(
+                    IllegalArgumentException("credentialIssuerIdentifier does not match expected value"),
+                )
+            }
         }
-    }
 
-    val authorizationServers = (authorizationServers)
-        ?.map { ensureHttpsUrl(it, CredentialIssuerMetadataValidationError::InvalidAuthorizationServer) }
-        ?: listOf(credentialIssuerIdentifier.value)
+    val authorizationServers =
+        (authorizationServers)
+            ?.map { ensureHttpsUrl(it, CredentialIssuerMetadataValidationError::InvalidAuthorizationServer) }
+            ?: listOf(credentialIssuerIdentifier.value)
 
-    val credentialEndpoint = ensureNotNull(credentialEndpoint) {
-        CredentialIssuerMetadataValidationError.InvalidCredentialEndpoint(IllegalArgumentException("missing credential_endpoint"))
-    }.let {
-        CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialEndpoint)
-    }
+    val credentialEndpoint =
+        ensureNotNull(credentialEndpoint) {
+            CredentialIssuerMetadataValidationError.InvalidCredentialEndpoint(IllegalArgumentException("missing credential_endpoint"))
+        }.let {
+            CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialEndpoint)
+        }
 
-    val nonceEndpoint = nonceEndpoint?.let {
-        CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNonceEndpoint)
-    }
+    val nonceEndpoint =
+        nonceEndpoint?.let {
+            CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNonceEndpoint)
+        }
 
-    val deferredCredentialEndpoint = deferredCredentialEndpoint?.let {
-        CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidDeferredCredentialEndpoint)
-    }
+    val deferredCredentialEndpoint =
+        deferredCredentialEndpoint?.let {
+            CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidDeferredCredentialEndpoint)
+        }
 
-    val notificationEndpoint = notificationEndpoint?.let {
-        CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
-    }
+    val notificationEndpoint =
+        notificationEndpoint?.let {
+            CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
+        }
 
-    val credentialsSupported = credentialConfigurationsSupported?.map { (id, credentialSupportedTO) ->
-        val credentialId = CredentialConfigurationIdentifier(id)
-        val credential = runCatching {
-            credentialSupportedTO.toDomain()
-        }.ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
-        credentialId to credential
-    }?.toMap()
+    val credentialsSupported =
+        credentialConfigurationsSupported
+            ?.map { (id, credentialSupportedTO) ->
+                val credentialId = CredentialConfigurationIdentifier(id)
+                val credential =
+                    runCatching {
+                        credentialSupportedTO.toDomain()
+                    }.ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
+                credentialId to credential
+            }?.toMap()
     ensure(!credentialsSupported.isNullOrEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired() }
 
     val display = display?.map(DisplayTO::toDomain) ?: emptyList()
 
-    val batchIssuance = batchCredentialIssuance?.let {
-        runCatching {
-            BatchCredentialIssuance.Supported(it.batchSize)
-        }.ensureSuccess { CredentialIssuerMetadataValidationError.InvalidBatchSize() }
-    } ?: BatchCredentialIssuance.NotSupported
+    val batchIssuance =
+        batchCredentialIssuance?.let {
+            runCatching {
+                BatchCredentialIssuance.Supported(it.batchSize)
+            }.ensureSuccess { CredentialIssuerMetadataValidationError.InvalidBatchSize() }
+        } ?: BatchCredentialIssuance.NotSupported
 
     val credentialRequestEncryption = credentialRequestEncryption.toDomain()
     val credentialResponseEncryption = credentialResponseEncryption.toDomain()
@@ -740,15 +780,17 @@ private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuer
         }
     }
 
-    val preferredClientStatusPeriod = preferredClientStatusPeriod?.let {
-        PositiveDuration.of(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidPreferredClientStatusPeriod)
-    }
-
-    val issuerInfo = issuerInfo?.let { json ->
-        IssuerInfo.fromJson(json).getOrElse {
-            throw CredentialIssuerMetadataValidationError.InvalidIssuerInfo(it)
+    val preferredClientStatusPeriod =
+        preferredClientStatusPeriod?.let {
+            PositiveDuration.of(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidPreferredClientStatusPeriod)
         }
-    }
+
+    val issuerInfo =
+        issuerInfo?.let { json ->
+            IssuerInfo.fromJson(json).getOrElse {
+                throw CredentialIssuerMetadataValidationError.InvalidIssuerInfo(it)
+            }
+        }
 
     return CredentialIssuerMetadata(
         credentialIssuerIdentifier,

@@ -27,7 +27,6 @@ import java.util.*
 import kotlin.test.*
 
 class AuthorizationResponseIssCheckerTest {
-
     private val validIss = "https://auth-server.example.com"
     private val invalidIss = "https://evil.example.com/realms/pid-issuer-realm"
 
@@ -35,11 +34,12 @@ class AuthorizationResponseIssCheckerTest {
         OpenId4VCIConfig(
             clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
             authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
-            encryptionSupportConfig = EncryptionSupportConfig(
-                Curve.P_256,
-                2048,
-                CredentialResponseEncryptionPolicy.SUPPORTED,
-            ),
+            encryptionSupportConfig =
+                EncryptionSupportConfig(
+                    Curve.P_256,
+                    2048,
+                    CredentialResponseEncryptionPolicy.SUPPORTED,
+                ),
             proofs = ProofsConfig.Default,
             authResponseIssChecking = authResponseIssChecking,
         )
@@ -48,169 +48,185 @@ class AuthorizationResponseIssCheckerTest {
         config: OpenId4VCIConfig,
         mockedHttpClient: HttpClient,
         credentialOfferStr: String = CredentialOfferMixedDocTypes_NO_GRANTS,
-    ): Issuer = Issuer.make(
-        config = config,
-        credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
-        httpClient = mockedHttpClient,
-    ).getIssuerOrThrow()
+    ): Issuer =
+        Issuer
+            .make(
+                config = config,
+                credentialOfferUri = "openid-credential-offer://?credential_offer=$credentialOfferStr",
+                httpClient = mockedHttpClient,
+            ).getIssuerOrThrow()
 
     @Test
-    fun `IfSupported - valid iss succeeds`() = runTest {
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
-            tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
-        )
-        val issuer = issuerWith(config(AuthorizationResponseIssChecking.IfSupported), mockedHttpClient)
-        with(issuer) {
-            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
-            val code = UUID.randomUUID().toString()
-            authRequestPrepared
-                .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state, issuer = validIss)
-                .getOrThrow()
-        }
-    }
-
-    @Test
-    fun `IfSupported - mismatched iss fails`() = runTest {
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
-            tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
-        )
-        val issuer = issuerWith(config(AuthorizationResponseIssChecking.IfSupported), mockedHttpClient)
-        with(issuer) {
-            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
-            val code = UUID.randomUUID().toString()
-            authRequestPrepared
-                .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state, issuer = invalidIss)
-                .fold(
-                    onSuccess = { fail("Expected failure due to mismatched iss") },
-                    onFailure = {
-                        assertTrue(
-                            it is CredentialIssuanceError.InvalidAuthorizationIssuer,
-                            "Expected InvalidAuthorizationIssuer but was $it",
-                        )
-                    },
+    fun `IfSupported - valid iss succeeds`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                    parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
+                    tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
                 )
+            val issuer = issuerWith(config(AuthorizationResponseIssChecking.IfSupported), mockedHttpClient)
+            with(issuer) {
+                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
+                val code = UUID.randomUUID().toString()
+                authRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state, issuer = validIss)
+                    .getOrThrow()
+            }
         }
-    }
 
     @Test
-    fun `IfSupported - missing iss when supported fails`() = runTest {
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
-            tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
-        )
-        val issuer = issuerWith(config(AuthorizationResponseIssChecking.IfSupported), mockedHttpClient)
-        with(issuer) {
-            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
-            val code = UUID.randomUUID().toString()
-            authRequestPrepared
-                .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state)
-                .fold(
-                    onSuccess = { fail("Expected failure due to missing iss") },
-                    onFailure = {
-                        assertTrue(
-                            it is CredentialIssuanceError.MissingAuthorizationResponseIssuer,
-                            "Expected MissingAuthorizationResponseIssuer but was $it",
-                        )
-                    },
+    fun `IfSupported - mismatched iss fails`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                    parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
+                    tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
                 )
+            val issuer = issuerWith(config(AuthorizationResponseIssChecking.IfSupported), mockedHttpClient)
+            with(issuer) {
+                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
+                val code = UUID.randomUUID().toString()
+                authRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state, issuer = invalidIss)
+                    .fold(
+                        onSuccess = { fail("Expected failure due to mismatched iss") },
+                        onFailure = {
+                            assertTrue(
+                                it is CredentialIssuanceError.InvalidAuthorizationIssuer,
+                                "Expected InvalidAuthorizationIssuer but was $it",
+                            )
+                        },
+                    )
+            }
         }
-    }
 
     @Test
-    fun `Never - missing iss succeeds (no check)`() = runTest {
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
-            tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
-        )
-        val issuer = issuerWith(config(AuthorizationResponseIssChecking.Never), mockedHttpClient)
-        with(issuer) {
-            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
-            val code = UUID.randomUUID().toString()
-            authRequestPrepared
-                .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state)
-                .getOrThrow()
-        }
-    }
-
-    @Test
-    fun `Required - valid iss succeeds`() = runTest {
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
-            tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
-        )
-        val issuer = issuerWith(config(AuthorizationResponseIssChecking.Required), mockedHttpClient)
-        with(issuer) {
-            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
-            val code = UUID.randomUUID().toString()
-            authRequestPrepared
-                .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state, issuer = validIss)
-                .getOrThrow()
-        }
-    }
-
-    @Test
-    fun `Required - missing iss fails`() = runTest {
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMocker(),
-            parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
-            tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
-        )
-        val issuer = issuerWith(config(AuthorizationResponseIssChecking.Required), mockedHttpClient)
-        with(issuer) {
-            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
-            val code = UUID.randomUUID().toString()
-            authRequestPrepared
-                .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state)
-                .fold(
-                    onSuccess = { fail("Expected failure due to missing iss") },
-                    onFailure = {
-                        assertTrue(
-                            it is CredentialIssuanceError.MissingAuthorizationResponseIssuer,
-                            "Expected MissingAuthorizationResponseIssuer but was $it",
-                        )
-                    },
+    fun `IfSupported - missing iss when supported fails`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                    parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
+                    tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
                 )
+            val issuer = issuerWith(config(AuthorizationResponseIssChecking.IfSupported), mockedHttpClient)
+            with(issuer) {
+                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
+                val code = UUID.randomUUID().toString()
+                authRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state)
+                    .fold(
+                        onSuccess = { fail("Expected failure due to missing iss") },
+                        onFailure = {
+                            assertTrue(
+                                it is CredentialIssuanceError.MissingAuthorizationResponseIssuer,
+                                "Expected MissingAuthorizationResponseIssuer but was $it",
+                            )
+                        },
+                    )
+            }
         }
-    }
 
     @Test
-    fun `Required - AS does not support iss param fails`() = runTest {
-        val mockedHttpClient = mockedHttpClient(
-            credentialIssuerMetadataWellKnownMocker(),
-            authServerWellKnownMockerWithoutIssParam(),
-            parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
-            tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
-        )
-        val issuer = issuerWith(config(AuthorizationResponseIssChecking.Required), mockedHttpClient)
-        with(issuer) {
-            val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
-            val code = UUID.randomUUID().toString()
-            authRequestPrepared
-                .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state, issuer = validIss)
-                .fold(
-                    onSuccess = { fail("Expected failure because AS does not support iss param") },
-                    onFailure = {
-                        assertTrue(
-                            it is CredentialIssuanceError.AuthorizationResponseIssuerParamNotSupported,
-                            "Expected AuthorizationResponseIssuerParamNotSupported but was $it",
-                        )
-                    },
+    fun `Never - missing iss succeeds (no check)`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                    parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
+                    tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
                 )
+            val issuer = issuerWith(config(AuthorizationResponseIssChecking.Never), mockedHttpClient)
+            with(issuer) {
+                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
+                val code = UUID.randomUUID().toString()
+                authRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state)
+                    .getOrThrow()
+            }
         }
-    }
+
+    @Test
+    fun `Required - valid iss succeeds`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                    parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
+                    tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
+                )
+            val issuer = issuerWith(config(AuthorizationResponseIssChecking.Required), mockedHttpClient)
+            with(issuer) {
+                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
+                val code = UUID.randomUUID().toString()
+                authRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state, issuer = validIss)
+                    .getOrThrow()
+            }
+        }
+
+    @Test
+    fun `Required - missing iss fails`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMocker(),
+                    parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
+                    tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
+                )
+            val issuer = issuerWith(config(AuthorizationResponseIssChecking.Required), mockedHttpClient)
+            with(issuer) {
+                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
+                val code = UUID.randomUUID().toString()
+                authRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state)
+                    .fold(
+                        onSuccess = { fail("Expected failure due to missing iss") },
+                        onFailure = {
+                            assertTrue(
+                                it is CredentialIssuanceError.MissingAuthorizationResponseIssuer,
+                                "Expected MissingAuthorizationResponseIssuer but was $it",
+                            )
+                        },
+                    )
+            }
+        }
+
+    @Test
+    fun `Required - AS does not support iss param fails`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(),
+                    authServerWellKnownMockerWithoutIssParam(),
+                    parPostMocker { with(it) { parPostApplyAssertionsAndGetFormData(false) } },
+                    tokenPostMocker { request -> with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() } },
+                )
+            val issuer = issuerWith(config(AuthorizationResponseIssChecking.Required), mockedHttpClient)
+            with(issuer) {
+                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow()
+                val code = UUID.randomUUID().toString()
+                authRequestPrepared
+                    .authorizeWithAuthorizationCode(AuthorizationCode(code), authRequestPrepared.state, issuer = validIss)
+                    .fold(
+                        onSuccess = { fail("Expected failure because AS does not support iss param") },
+                        onFailure = {
+                            assertTrue(
+                                it is CredentialIssuanceError.AuthorizationResponseIssuerParamNotSupported,
+                                "Expected AuthorizationResponseIssuerParamNotSupported but was $it",
+                            )
+                        },
+                    )
+            }
+        }
 
     private fun authServerWellKnownMockerWithoutIssParam(): RequestMocker =
         RequestMocker(
@@ -218,8 +234,9 @@ class AuthorizationResponseIssCheckerTest {
                 request.url.encodedPath.contains("/.well-known/oauth-authorization-server") && request.method == HttpMethod.Get
             },
             responseBuilder = {
-                val content = getResourceAsText("well-known/openid-configuration.json")
-                    .replace(Regex("\"authorization_response_iss_parameter_supported\"\\s*:\\s*true\\s*,?\\s*"), "")
+                val content =
+                    getResourceAsText("well-known/openid-configuration.json")
+                        .replace(Regex("\"authorization_response_iss_parameter_supported\"\\s*:\\s*true\\s*,?\\s*"), "")
                 respond(
                     content = content,
                     status = HttpStatusCode.OK,

@@ -28,31 +28,43 @@ import eu.europa.ec.eudi.openid4vci.RsaConfig
 import java.util.*
 
 internal object KeyGenerator {
-
     fun genKeyIfSupported(
         encryptionSupportConfig: EncryptionSupportConfig,
         algorithm: JWEAlgorithm,
-    ): JWK? = when {
-        null != encryptionSupportConfig.ecConfig && algorithm in encryptionSupportConfig.ecConfig.supportedJWEAlgorithms ->
-            randomECEncryptionKey(encryptionSupportConfig.ecConfig, algorithm)
+    ): JWK? =
+        when {
+            null != encryptionSupportConfig.ecConfig && algorithm in encryptionSupportConfig.ecConfig.supportedJWEAlgorithms -> {
+                randomECEncryptionKey(encryptionSupportConfig.ecConfig, algorithm)
+            }
 
-        null != encryptionSupportConfig.rsaConfig && algorithm in encryptionSupportConfig.rsaConfig.supportedJWEAlgorithms ->
-            randomRSAEncryptionKey(encryptionSupportConfig.rsaConfig, algorithm)
+            null != encryptionSupportConfig.rsaConfig && algorithm in encryptionSupportConfig.rsaConfig.supportedJWEAlgorithms -> {
+                randomRSAEncryptionKey(encryptionSupportConfig.rsaConfig, algorithm)
+            }
 
-        else -> null
-    }
+            else -> {
+                null
+            }
+        }
 
-    fun randomRSAEncryptionKey(rsaConfig: RsaConfig, alg: JWEAlgorithm): RSAKey = RSAKeyGenerator(rsaConfig.rcaKeySize)
-        .keyUse(KeyUse.ENCRYPTION)
-        .keyID(UUID.randomUUID().toString())
-        .algorithm(alg)
-        .issueTime(Date(System.currentTimeMillis()))
-        .generate()
+    fun randomRSAEncryptionKey(
+        rsaConfig: RsaConfig,
+        alg: JWEAlgorithm,
+    ): RSAKey =
+        RSAKeyGenerator(rsaConfig.rcaKeySize)
+            .keyUse(KeyUse.ENCRYPTION)
+            .keyID(UUID.randomUUID().toString())
+            .algorithm(alg)
+            .issueTime(Date(System.currentTimeMillis()))
+            .generate()
 
-    fun randomECEncryptionKey(ecConfig: EcConfig, alg: JWEAlgorithm): ECKey = ECKeyGenerator(ecConfig.ecKeyCurve)
-        .keyUse(KeyUse.ENCRYPTION)
-        .keyID(UUID.randomUUID().toString())
-        .algorithm(alg)
-        .issueTime(Date(System.currentTimeMillis()))
-        .generate()
+    fun randomECEncryptionKey(
+        ecConfig: EcConfig,
+        alg: JWEAlgorithm,
+    ): ECKey =
+        ECKeyGenerator(ecConfig.ecKeyCurve)
+            .keyUse(KeyUse.ENCRYPTION)
+            .keyID(UUID.randomUUID().toString())
+            .algorithm(alg)
+            .issueTime(Date(System.currentTimeMillis()))
+            .generate()
 }

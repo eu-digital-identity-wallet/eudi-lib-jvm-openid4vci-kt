@@ -19,7 +19,6 @@ package eu.europa.ec.eudi.openid4vci
  * Service for refreshing the [AccessToken] and [RefreshAccessToken] of an [AuthorizedRequest].
  */
 interface RefreshAccessToken {
-
     /**
      * Performs a `refresh_token` grant against the Token Endpoint of the Authorization Server to fetch a new Access Token, and Refresh Token.
      */
