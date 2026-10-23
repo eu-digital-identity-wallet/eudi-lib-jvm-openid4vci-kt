@@ -1,10 +1,10 @@
 [versions]
 java = "17"
-kotlin = "2.2.21"
-coroutines = "1.10.2"
+kotlin = "2.4.20"
+coroutines = "1.11.0"
 spotless = "8.10.3"
 nimbus-sdk = "11.37"
-ktor = "3.3.3"
+ktor = "3.6.0"
 jsoup = "1.22.1"
 cbor = "0.9"
 ktlint = "1.8.0"
@@ -14,7 +14,7 @@ logback = "1.5.32"
 kover = "0.9.11"
 tink = "1.21.0"
 bouncycastle = "1.83"
-serialization = "1.9.0"
+serialization = "1.11.0"
 uri-kmp = "0.0.21"
 selenium = "4.44.0"
 
@@ -25,7 +25,7 @@ ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negoti
 ktor-client-serialization = { module = "io.ktor:ktor-client-serialization", version.ref = "ktor" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
-ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-apache = { module = "io.ktor:ktor-client-apache", version.ref = "ktor" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
