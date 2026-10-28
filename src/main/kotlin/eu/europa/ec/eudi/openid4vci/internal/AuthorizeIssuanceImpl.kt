@@ -41,7 +41,10 @@ internal class AuthorizeIssuanceImpl(
     private val authorizationEndpointClient: AuthorizationEndpointClient?,
     private val tokenEndpointClient: TokenEndpointClient,
 ) : AuthorizeIssuance {
-    override suspend fun prepareAuthorizationRequest(walletState: String?): Result<AuthorizationRequestPrepared> =
+    override suspend fun prepareAuthorizationRequest(
+        walletState: String?,
+        additionalParameters: AdditionalParameters?,
+    ): Result<AuthorizationRequestPrepared> =
         runCatchingCancellable {
             requireNotNull(authorizationEndpointClient) {
                 "Authorization server does not support Authorization Code Flow"
@@ -59,6 +62,7 @@ internal class AuthorizeIssuanceImpl(
                         configurationIds,
                         state,
                         issuerState,
+                        additionalParameters,
                     ).getOrThrow()
             AuthorizationRequestPrepared(authorizationCodeUrl, codeVerifier, state, configurationIds, dpopNonce)
         }

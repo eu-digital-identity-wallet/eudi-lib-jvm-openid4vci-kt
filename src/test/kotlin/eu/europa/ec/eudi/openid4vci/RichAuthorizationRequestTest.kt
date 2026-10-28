@@ -15,18 +15,25 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.eygraber.uri.Uri
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointForm
-import io.ktor.client.*
-import io.ktor.client.engine.mock.*
-import io.ktor.http.*
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.assertThrows
 import parPostApplyAssertionsAndGetFormData
 import tokenPostApplyAuthFlowAssertionsAndGetFormData
 import tokenPostApplyPreAuthFlowAssertionsAndGetFormData
 import java.net.URLDecoder
-import java.util.*
+import java.util.UUID
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -42,15 +49,18 @@ class RichAuthorizationRequestTest {
                         fail("No pushed authorization request should have been sent in case of pre-authorized code flow")
                     },
                     tokenPostMocker { request ->
-                        val form = with(request) { tokenPostApplyPreAuthFlowAssertionsAndGetFormData() }
+                        val form =
+                            with(request) { tokenPostApplyPreAuthFlowAssertionsAndGetFormData() }
 
-                        val authorizationDetails = form.formData[TokenEndpointForm.AUTHORIZATION_DETAILS]
+                        val authorizationDetails =
+                            form.formData[TokenEndpointForm.AUTHORIZATION_DETAILS]
                         assertTrue("Parameter ${TokenEndpointForm.AUTHORIZATION_DETAILS} was expected but not sent.") {
                             authorizationDetails != null
                         }
 
                         // Validate that can be parsed as nimbus auth details
-                        val decoded = URLDecoder.decode(form.formData["authorization_details"], "UTF-8")
+                        val decoded =
+                            URLDecoder.decode(form.formData["authorization_details"], "UTF-8")
                         val authDetails = AuthorizationDetail.parseList(decoded)
                         assertTrue("Invalid authorization_details sent.") {
                             authDetails.all {
@@ -60,7 +70,11 @@ class RichAuthorizationRequestTest {
                         }
                     },
                 )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_PRE_AUTH_GRANT)
+            val offer =
+                credentialOffer(
+                    mockedKtorHttpClientFactory,
+                    CredentialOfferMixedDocTypes_PRE_AUTH_GRANT,
+                )
             val issuer =
                 Issuer
                     .make(
@@ -86,23 +100,28 @@ class RichAuthorizationRequestTest {
                     parPostMocker { request ->
                         val form = with(request) { parPostApplyAssertionsAndGetFormData(false) }
                         assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
-                            form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
+                            form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt")
+                                ?: false
                         }
                         assertTrue("Missing scope eu.europa.ec.eudiw.pid_mso_mdoc") {
-                            form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc") ?: false
+                            form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_mso_mdoc")
+                                ?: false
                         }
                     },
                     tokenPostMocker { request ->
-                        val form = with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
+                        val form =
+                            with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
 
-                        val authorizationDetails = form.formData[TokenEndpointForm.AUTHORIZATION_DETAILS]
+                        val authorizationDetails =
+                            form.formData[TokenEndpointForm.AUTHORIZATION_DETAILS]
                         assertTrue("Parameter ${TokenEndpointForm.AUTHORIZATION_DETAILS} was not expected but sent.") {
                             authorizationDetails == null
                         }
                     },
                 )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val offer =
+                credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_NO_GRANTS)
             val issuer =
                 Issuer
                     .make(
@@ -111,7 +130,8 @@ class RichAuthorizationRequestTest {
                         httpClient = mockedKtorHttpClientFactory,
                     ).getIssuerOrThrow()
             with(issuer) {
-                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
+                val authRequestPrepared =
+                    prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
                 val serverState = authRequestPrepared.state // dummy don't use it
                 authRequestPrepared
@@ -131,7 +151,11 @@ class RichAuthorizationRequestTest {
                 mockedHttpClient(
                     // Credential Issuer Metadata Well Known Mocker
                     RequestMocker(
-                        requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
+                        requestMatcher =
+                            endsWith(
+                                "/.well-known/openid-credential-issuer",
+                                HttpMethod.Get,
+                            ),
                         responseBuilder = {
                             respond(
                                 content = getResourceAsText("well-known/openid-credential-issuer_no_scopes.json"),
@@ -145,14 +169,17 @@ class RichAuthorizationRequestTest {
                         with(request) { parPostApplyAssertionsAndGetFormData(false) }
                     },
                     tokenPostMocker { request ->
-                        val form = with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
+                        val form =
+                            with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
 
-                        val authorizationDetails = form.formData[TokenEndpointForm.AUTHORIZATION_DETAILS]
+                        val authorizationDetails =
+                            form.formData[TokenEndpointForm.AUTHORIZATION_DETAILS]
                         assertTrue("Parameter ${TokenEndpointForm.AUTHORIZATION_DETAILS} was expected but not sent.") {
                             authorizationDetails != null
                         }
                         // Validate that can be parsed as nimbus auth details
-                        val decoded = URLDecoder.decode(form.formData["authorization_details"], "UTF-8")
+                        val decoded =
+                            URLDecoder.decode(form.formData["authorization_details"], "UTF-8")
                         val authDetails = AuthorizationDetail.parseList(decoded)
                         assertTrue("Invalid authorization_details sent.") {
                             authDetails.all {
@@ -163,7 +190,8 @@ class RichAuthorizationRequestTest {
                     },
                 )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val offer =
+                credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_NO_GRANTS)
             val issuer =
                 Issuer
                     .make(
@@ -172,7 +200,8 @@ class RichAuthorizationRequestTest {
                         httpClient = mockedKtorHttpClientFactory,
                     ).getIssuerOrThrow()
             with(issuer) {
-                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
+                val authRequestPrepared =
+                    prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
                 val serverState = authRequestPrepared.state // dummy don't use it
                 authRequestPrepared
@@ -192,7 +221,11 @@ class RichAuthorizationRequestTest {
                 mockedHttpClient(
                     // Credential Issuer Metadata Well Known Mocker
                     RequestMocker(
-                        requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
+                        requestMatcher =
+                            endsWith(
+                                "/.well-known/openid-credential-issuer",
+                                HttpMethod.Get,
+                            ),
                         responseBuilder = {
                             respond(
                                 content = getResourceAsText("well-known/openid-credential-issuer_no_scopes.json"),
@@ -206,16 +239,19 @@ class RichAuthorizationRequestTest {
                         with(request) { parPostApplyAssertionsAndGetFormData(false) }
                     },
                     tokenPostMocker { request ->
-                        val form = with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
+                        val form =
+                            with(request) { tokenPostApplyAuthFlowAssertionsAndGetFormData() }
 
-                        val authorizationDetails = form.formData[TokenEndpointForm.AUTHORIZATION_DETAILS]
+                        val authorizationDetails =
+                            form.formData[TokenEndpointForm.AUTHORIZATION_DETAILS]
                         assertTrue("Parameter ${TokenEndpointForm.AUTHORIZATION_DETAILS} was not expected but sent.") {
                             authorizationDetails == null
                         }
                     },
                 )
 
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_NO_GRANTS)
+            val offer =
+                credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_NO_GRANTS)
             val issuer =
                 Issuer
                     .make(
@@ -225,7 +261,8 @@ class RichAuthorizationRequestTest {
                     ).getIssuerOrThrow()
 
             with(issuer) {
-                val authRequestPrepared = prepareAuthorizationRequest().getOrThrow().also { println(it) }
+                val authRequestPrepared =
+                    prepareAuthorizationRequest().getOrThrow().also { println(it) }
                 val authorizationCode = UUID.randomUUID().toString()
                 val serverState = authRequestPrepared.state // dummy don't use it
                 authRequestPrepared
@@ -249,11 +286,14 @@ class RichAuthorizationRequestTest {
                         assertTrue("Missing authorization_details request attribute") {
                             form.formData["authorization_details"] != null
                         }
-                        val authDetails = AuthorizationDetail.parseList(form.formData["authorization_details"])
+                        val authDetails =
+                            AuthorizationDetail.parseList(form.formData["authorization_details"])
                         assertTrue("Missing authorization_details eu.europa.ec.eudiw.pid_mso_mdoc") {
                             authDetails.any {
                                 it.getField("credential_configuration_id") != null &&
-                                    it.getField("credential_configuration_id").equals("eu.europa.ec.eudiw.pid_mso_mdoc")
+                                    it
+                                        .getField("credential_configuration_id")
+                                        .equals("eu.europa.ec.eudiw.pid_mso_mdoc")
                             }
                         }
 
@@ -261,11 +301,16 @@ class RichAuthorizationRequestTest {
                             form.formData["scope"] != null
                         }
                         assertTrue("Missing scope eu.europa.ec.eudiw.pid_vc_sd_jwt") {
-                            form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt") ?: false
+                            form.formData["scope"]?.contains("eu.europa.ec.eudiw.pid_vc_sd_jwt")
+                                ?: false
                         }
                     },
                     RequestMocker(
-                        requestMatcher = endsWith("/.well-known/openid-credential-issuer", HttpMethod.Get),
+                        requestMatcher =
+                            endsWith(
+                                "/.well-known/openid-credential-issuer",
+                                HttpMethod.Get,
+                            ),
                         responseBuilder = {
                             respond(
                                 content = getResourceAsText("well-known/openid-credential-issuer_no_scopes.json"),
@@ -275,7 +320,11 @@ class RichAuthorizationRequestTest {
                         },
                     ),
                 )
-            val offer = credentialOffer(mockedKtorHttpClientFactory, CredentialOfferMixedDocTypes_AUTH_GRANT)
+            val offer =
+                credentialOffer(
+                    mockedKtorHttpClientFactory,
+                    CredentialOfferMixedDocTypes_AUTH_GRANT,
+                )
             val issuer =
                 Issuer
                     .make(
@@ -294,11 +343,134 @@ class RichAuthorizationRequestTest {
             assert(authRequestPrepared.identifiersSentAsAuthDetails.isNotEmpty())
         }
 
+    @Test
+    fun `when additional parameters are provided, then expect custom parameters included in the PAR request`() =
+        runTest {
+            val additionalParameters =
+                AdditionalParameters(mapOf("customParamKey" to "customParamValue"))
+
+            val mockedKtorHttpClientFactory =
+                mockedHttpClient(
+                    authServerWellKnownMocker(),
+                    parPostMocker { request ->
+                        val form = with(request) { parPostApplyAssertionsAndGetFormData(true) }
+                        assertTrue("Missing custom parameter") {
+                            form.formData["customParamKey"] == "customParamValue"
+                        }
+                    },
+                    RequestMocker(
+                        requestMatcher =
+                            endsWith(
+                                "/.well-known/openid-credential-issuer",
+                                HttpMethod.Get,
+                            ),
+                        responseBuilder = {
+                            respond(
+                                content = getResourceAsText("well-known/openid-credential-issuer_no_scopes.json"),
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType to listOf("application/json")),
+                            )
+                        },
+                    ),
+                )
+            val offer =
+                credentialOffer(
+                    mockedKtorHttpClientFactory,
+                    CredentialOfferMixedDocTypes_AUTH_GRANT,
+                )
+            val issuer =
+                Issuer
+                    .make(
+                        config = OpenId4VCIConfiguration,
+                        credentialOffer = offer,
+                        httpClient = mockedKtorHttpClientFactory,
+                    ).getIssuerOrThrow()
+
+            val request =
+                issuer
+                    .prepareAuthorizationRequest(additionalParameters = additionalParameters)
+                    .getOrThrow()
+                    .also { println(it) }
+
+            val uri = Uri.parse(request.authorizationCodeURL.value.toExternalForm())
+            assertEquals(setOf("client_id", "request_uri"), uri.getQueryParameterNames())
+        }
+
+    @Test
+    fun `when additional parameters are provided, then expect custom parameters included in the Authorization Request request`() =
+        runTest {
+            val additionalParameters =
+                AdditionalParameters(mapOf("customParamKey" to "customParamValue"))
+
+            val mockedKtorHttpClientFactory =
+                mockedHttpClient(
+                    authServerWellKnownMocker(),
+                    RequestMocker(
+                        requestMatcher =
+                            endsWith(
+                                "/.well-known/openid-credential-issuer",
+                                HttpMethod.Get,
+                            ),
+                        responseBuilder = {
+                            respond(
+                                content = getResourceAsText("well-known/openid-credential-issuer_no_scopes.json"),
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType to listOf("application/json")),
+                            )
+                        },
+                    ),
+                )
+            val offer =
+                credentialOffer(
+                    mockedKtorHttpClientFactory,
+                    CredentialOfferMixedDocTypes_AUTH_GRANT,
+                )
+            val issuer =
+                Issuer
+                    .make(
+                        config = OpenId4VCIConfiguration.copy(parUsage = ParUsage.Never),
+                        credentialOffer = offer,
+                        httpClient = mockedKtorHttpClientFactory,
+                    ).getIssuerOrThrow()
+
+            val request =
+                issuer
+                    .prepareAuthorizationRequest(additionalParameters = additionalParameters)
+                    .getOrThrow()
+                    .also { println(it) }
+
+            val uri = Uri.parse(request.authorizationCodeURL.value.toExternalForm())
+
+            assertNotNull(uri.getQueryParameter("client_id"))
+            assertNotNull(uri.getQueryParameter("response_type"))
+            assertNotNull(uri.getQueryParameter("redirect_uri"))
+            assertNotNull(uri.getQueryParameter("scope"))
+            assertNotNull(uri.getQueryParameter("state"))
+            assertNotNull(uri.getQueryParameter("code_challenge"))
+            assertNotNull(uri.getQueryParameter("authorization_details"))
+            assertNotNull(uri.getQueryParameter("issuer_state"))
+
+            assertEquals("customParamValue", uri.getQueryParameter("customParamKey"))
+        }
+
+    @Test
+    fun `when forbidden parameters are provided, then throw error`() {
+        assertThrows<IllegalArgumentException> {
+            AdditionalParameters(
+                mapOf(
+                    "response_type" to "value1",
+                    "client_id" to "value2",
+                ),
+            )
+        }
+    }
+
     private suspend fun credentialOffer(
         httpClient: HttpClient,
         credentialOfferStr: String,
     ): CredentialOffer {
-        val config = OpenId4VCIConfiguration.copy(issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned)
+        val config =
+            OpenId4VCIConfiguration.copy(issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned)
         return CredentialOffer
             .resolve(
                 httpClient = httpClient,
