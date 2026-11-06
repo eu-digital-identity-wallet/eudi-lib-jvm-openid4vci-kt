@@ -470,3 +470,36 @@ value class PositiveDuration(
         fun of(value: Duration): Result<PositiveDuration> = runCatching { PositiveDuration(value) }
     }
 }
+
+@JvmInline
+value class AdditionalParameters(
+    val params: Map<String, String>,
+) {
+    constructor(first: Pair<String, String>, vararg remaining: Pair<String, String>) : this(mapOf(first, *remaining))
+
+    init {
+        require(params.isNotEmpty()) { "params cannot be empty" }
+
+        val notAllowedKeys = params.keys.filter { it in FORBIDDEN_KEYS }
+        require(notAllowedKeys.isEmpty()) {
+            val forbiddenKeys = notAllowedKeys.joinToString(", ")
+            "The following parameter are library-managed: $forbiddenKeys"
+        }
+    }
+
+    private companion object {
+        val FORBIDDEN_KEYS =
+            setOf(
+                "response_type",
+                "client_id",
+                "redirect_uri",
+                "scope",
+                "state",
+                "code_challenge",
+                "request_uri",
+                "dpop_jkt",
+                "authorization_details",
+                "issuer_state",
+            )
+    }
+}
