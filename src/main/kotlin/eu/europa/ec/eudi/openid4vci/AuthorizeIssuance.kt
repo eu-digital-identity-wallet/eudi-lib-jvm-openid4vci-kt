@@ -103,10 +103,14 @@ interface AuthorizeIssuance {
      * @param walletState an optional parameter that if provided will
      * be included in the authorization request. If it is not provided,
      * a random value will be used
+     * @param additionalParameters optional parameters appended to the authorization request
      * @see <a href="https://www.rfc-editor.org/rfc/rfc7636.html">RFC7636</a>
      * @return an HTTPS URL of the authorization request to be placed
      */
-    suspend fun prepareAuthorizationRequest(walletState: String? = null): Result<AuthorizationRequestPrepared>
+    suspend fun prepareAuthorizationRequest(
+        walletState: String? = null,
+        additionalParameters: AdditionalParameters? = null,
+    ): Result<AuthorizationRequestPrepared>
 
     /**
      * Using the access code retrieved after performing the authorization request prepared from a call to

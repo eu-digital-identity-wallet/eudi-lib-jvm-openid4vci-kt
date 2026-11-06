@@ -124,6 +124,7 @@ internal class AuthorizationEndpointClient(
         credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
         state: String,
         issuerState: String?,
+        additionalParameters: AdditionalParameters?,
     ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> {
         val usePar =
             when (config.parUsage) {
@@ -149,9 +150,16 @@ internal class AuthorizationEndpointClient(
                     is ParUsage.IfSupported -> config.parUsage.authorizationCodeDPoPBinding
                     is ParUsage.Required -> config.parUsage.authorizationCodeDPoPBinding
                 }
-            submitPushedAuthorizationRequest(scopes, credentialsConfigurationIds, state, issuerState, authorizationCodeDPoPBinding)
+            submitPushedAuthorizationRequest(
+                scopes,
+                credentialsConfigurationIds,
+                state,
+                issuerState,
+                authorizationCodeDPoPBinding,
+                additionalParameters,
+            )
         } else {
-            authorizationRequestUrl(scopes, credentialsConfigurationIds, state, issuerState).map { (a, b) ->
+            authorizationRequestUrl(scopes, credentialsConfigurationIds, state, issuerState, additionalParameters).map { (a, b) ->
                 Triple(a, b, null)
             }
         }
@@ -164,6 +172,7 @@ internal class AuthorizationEndpointClient(
      * @param state     The oauth2 specific 'state' request parameter.
      * @param issuerState   The state passed from credential issuer during the negotiation phase of the issuance.
      * @param authorizationCodeDPoPBinding Whether the Authorization Code will be bound using a DPoP Proof.
+     * @param additionalParameters optional parameters appended to the authorization request
      * @return The result of the request as a pair of the PKCE verifier used during the request and the authorization code
      *      url that caller will need to follow to retrieve the authorization code.
      *
@@ -176,6 +185,7 @@ internal class AuthorizationEndpointClient(
         state: String,
         issuerState: String?,
         authorizationCodeDPoPBinding: Boolean,
+        additionalParameters: AdditionalParameters?,
     ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> =
         runCatchingCancellable {
             require(scopes.isNotEmpty() || credentialsConfigurationIds.isNotEmpty()) {
@@ -196,6 +206,9 @@ internal class AuthorizationEndpointClient(
                                 codeChallenge(codeVerifier, CodeChallengeMethod.S256)
                                 state(State(state))
                                 issuerState?.let { customParameter("issuer_state", issuerState) }
+                                additionalParameters?.params?.forEach { (key, value) ->
+                                    customParameter(key, value)
+                                }
                                 if (scopes.isNotEmpty()) {
                                     scope(NimbusScope(*scopes.map { it.value }.toTypedArray()))
                                     if (!isCredentialIssuerAuthorizationServer) {
@@ -225,6 +238,7 @@ internal class AuthorizationEndpointClient(
         credentialsAuthorizationDetails: List<CredentialConfigurationIdentifier>,
         state: String,
         issuerState: String?,
+        additionalParameters: AdditionalParameters?,
     ): Result<Pair<PKCEVerifier, HttpsUrl>> =
         runCatching {
             require(credentialsScopes.isNotEmpty() || credentialsAuthorizationDetails.isNotEmpty()) {
@@ -242,6 +256,9 @@ internal class AuthorizationEndpointClient(
                         codeChallenge(codeVerifier, CodeChallengeMethod.S256)
                         state(State(state))
                         issuerState?.let { customParameter("issuer_state", issuerState) }
+                        additionalParameters?.params?.forEach { (key, value) ->
+                            customParameter(key, value)
+                        }
                         if (credentialsScopes.isNotEmpty()) {
                             scope(NimbusScope(*credentialsScopes.map { it.value }.toTypedArray()))
                             if (!isCredentialIssuerAuthorizationServer) {
