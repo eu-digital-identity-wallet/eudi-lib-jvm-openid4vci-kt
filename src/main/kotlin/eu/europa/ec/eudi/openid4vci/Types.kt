@@ -490,15 +490,19 @@ value class AdditionalParameters(
     private companion object {
         val FORBIDDEN_KEYS =
             setOf(
-                "response_type",
                 "client_id",
+                "response_type",
+                "response_mode",
                 "redirect_uri",
                 "scope",
                 "state",
                 "code_challenge",
+                "code_challenge_method",
+                "authorization_details",
+                "resource",
+                "request",
                 "request_uri",
                 "dpop_jkt",
-                "authorization_details",
                 "issuer_state",
             )
     }
