@@ -22,7 +22,6 @@ import com.nimbusds.oauth2.sdk.id.ClientID
 import com.nimbusds.oauth2.sdk.id.State
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod
 import com.nimbusds.oauth2.sdk.pkce.CodeVerifier
-import com.nimbusds.openid.connect.sdk.Prompt
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.AccessTokenRequestFailed
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.PushedAuthorizationRequestFailed
@@ -275,7 +274,6 @@ internal class AuthorizationEndpointClient(
                                 },
                             )
                         }
-                        prompt(Prompt.Type.LOGIN)
                     }.build()
 
             val pkceVerifier = PKCEVerifier(codeVerifier.value, CodeChallengeMethod.S256.toString())

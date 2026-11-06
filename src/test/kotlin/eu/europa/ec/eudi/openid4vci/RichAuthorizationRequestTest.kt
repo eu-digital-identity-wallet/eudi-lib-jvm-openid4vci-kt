@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci
 
 import com.eygraber.uri.Uri
 import com.nimbusds.oauth2.sdk.rar.AuthorizationDetail
+import com.nimbusds.openid.connect.sdk.Prompt
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointForm
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.respond
@@ -347,7 +348,10 @@ class RichAuthorizationRequestTest {
     fun `when additional parameters are provided, then expect custom parameters included in the PAR request`() =
         runTest {
             val additionalParameters =
-                AdditionalParameters(mapOf("customParamKey" to "customParamValue"))
+                AdditionalParameters(
+                    "customParamKey" to "customParamValue",
+                    "prompt" to "login",
+                )
 
             val mockedKtorHttpClientFactory =
                 mockedHttpClient(
@@ -367,10 +371,12 @@ class RichAuthorizationRequestTest {
                                 "state",
                                 "customParamKey",
                                 "code_challenge",
+                                "prompt",
                             ),
                             form.formData.names(),
                         )
                         assertEquals("customParamValue", form.formData["customParamKey"])
+                        assertEquals("login", form.formData["prompt"])
                     },
                     RequestMocker(
                         requestMatcher =
@@ -417,7 +423,10 @@ class RichAuthorizationRequestTest {
     fun `when additional parameters are provided, then expect custom parameters included in the Authorization Request request`() =
         runTest {
             val additionalParameters =
-                AdditionalParameters(mapOf("customParamKey" to "customParamValue"))
+                AdditionalParameters(
+                    "customParamKey" to "customParamValue",
+                    "prompt" to "login",
+                )
 
             val mockedKtorHttpClientFactory =
                 mockedHttpClient(
@@ -476,6 +485,7 @@ class RichAuthorizationRequestTest {
                 uri.getQueryParameterNames(),
             )
             assertEquals("customParamValue", uri.getQueryParameter("customParamKey"))
+            assertEquals("login", uri.getQueryParameter("prompt"))
         }
 
     @Test
