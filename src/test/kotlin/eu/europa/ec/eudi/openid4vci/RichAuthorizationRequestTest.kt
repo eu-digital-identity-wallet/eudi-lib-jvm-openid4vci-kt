@@ -354,9 +354,23 @@ class RichAuthorizationRequestTest {
                     authServerWellKnownMocker(),
                     parPostMocker { request ->
                         val form = with(request) { parPostApplyAssertionsAndGetFormData(true) }
-                        assertTrue("Missing custom parameter") {
-                            form.formData["customParamKey"] == "customParamValue"
-                        }
+                        assertEquals(
+                            setOf(
+                                "resource",
+                                "response_type",
+                                "issuer_state",
+                                "code_challenge_method",
+                                "client_id",
+                                "authorization_details",
+                                "scope",
+                                "redirect_uri",
+                                "state",
+                                "customParamKey",
+                                "code_challenge",
+                            ),
+                            form.formData.names(),
+                        )
+                        assertEquals("customParamValue", form.formData["customParamKey"])
                     },
                     RequestMocker(
                         requestMatcher =
@@ -393,7 +407,10 @@ class RichAuthorizationRequestTest {
                     .also { println(it) }
 
             val uri = Uri.parse(request.authorizationCodeURL.value.toExternalForm())
-            assertEquals(setOf("client_id", "request_uri"), uri.getQueryParameterNames())
+            assertEquals(
+                setOf("client_id", "request_uri"),
+                uri.getQueryParameterNames(),
+            )
         }
 
     @Test
@@ -441,15 +458,23 @@ class RichAuthorizationRequestTest {
 
             val uri = Uri.parse(request.authorizationCodeURL.value.toExternalForm())
 
-            assertNotNull(uri.getQueryParameter("client_id"))
-            assertNotNull(uri.getQueryParameter("response_type"))
-            assertNotNull(uri.getQueryParameter("redirect_uri"))
-            assertNotNull(uri.getQueryParameter("scope"))
-            assertNotNull(uri.getQueryParameter("state"))
-            assertNotNull(uri.getQueryParameter("code_challenge"))
-            assertNotNull(uri.getQueryParameter("authorization_details"))
-            assertNotNull(uri.getQueryParameter("issuer_state"))
-
+            assertEquals(
+                setOf(
+                    "resource",
+                    "response_type",
+                    "issuer_state",
+                    "code_challenge_method",
+                    "client_id",
+                    "authorization_details",
+                    "scope",
+                    "redirect_uri",
+                    "state",
+                    "prompt",
+                    "customParamKey",
+                    "code_challenge",
+                ),
+                uri.getQueryParameterNames(),
+            )
             assertEquals("customParamValue", uri.getQueryParameter("customParamKey"))
         }
 
