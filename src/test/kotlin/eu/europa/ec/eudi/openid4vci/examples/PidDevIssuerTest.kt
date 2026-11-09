@@ -63,7 +63,7 @@ class PidDevIssuerTest {
         runTest {
             repeatBatchIssuanceUsingAuthorizationCodeFlow(
                 PidDevIssuer.LearningCredential_SdJwtVcCompact_Config_Id,
-                ProofsType.JwtProof(BatchOption.Specific(2)),
+                ProofsType.JwtProof(BatchOption.Specific(1)),
             )
         }
 }

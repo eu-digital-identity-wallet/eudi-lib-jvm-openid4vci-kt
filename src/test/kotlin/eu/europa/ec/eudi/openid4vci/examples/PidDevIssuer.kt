@@ -52,7 +52,15 @@ internal object PidDevIssuer :
             encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
             authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
             parUsage = ParUsage.Required(),
-            supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
+            supportedCredentialReusePolicies =
+                CredentialReusePolicies.Supported(
+                    setOf(
+                        EudiReusePolicyType.OnceOnly,
+                        EudiReusePolicyType.LimitedTime,
+                        EudiReusePolicyType.RotatingBatch,
+                        EudiReusePolicyType.PerRelyingParty
+                    ),
+                ),
             proofs = ProofsConfig.Default,
             issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(TrustAnyX509),
         )

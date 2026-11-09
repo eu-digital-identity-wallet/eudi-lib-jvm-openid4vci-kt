@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.examples
 
 import com.eygraber.uri.Uri
+import com.eygraber.uri.toKmpUri
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.util.JSONObjectUtils
@@ -232,7 +233,7 @@ interface CanAuthorizeIssuance<in USER> {
         authorizationRequestPrepared: AuthorizationRequestPrepared,
         user: USER,
         httpClient: HttpClient,
-    ): Pair<String, String> =
+    ): AuthorizationContext =
         coroutineScope {
             val response =
                 run {
@@ -242,17 +243,9 @@ interface CanAuthorizeIssuance<in USER> {
             response.parseCodeAndStatus()
         }
 
-    fun HttpResponse.parseCodeAndStatus(): Pair<String, String> {
-        fun <A, B> Pair<A?, B?>.toNullable(): Pair<A, B>? =
-            if (first != null && second != null)
-                first!! to second!!
-            else
-                null
-
-        val redirectLocation = headers["Location"].toString()
-        return with(URLBuilder(redirectLocation)) {
-            parameters["code"] to parameters["state"]
-        }.toNullable() ?: error("Failed to get authorization code & state")
+    fun HttpResponse.parseCodeAndStatus(): AuthorizationContext {
+        val redirectLocation = headers["Location"].toString().toKmpUri()
+        return AuthorizationContext.fromRedirectUri(redirectLocation)
     }
 
     suspend fun HttpClient.visitAuthorizationPage(authorizationRequestPrepared: AuthorizationRequestPrepared): HttpResponse {
@@ -270,6 +263,22 @@ interface CanAuthorizeIssuance<in USER> {
     ): HttpResponse
 }
 
+data class AuthorizationContext(
+    val code: String,
+    val state: String,
+    val issuer: String?,
+) {
+    companion object {
+        fun fromRedirectUri(redirectUri: Uri): AuthorizationContext {
+            val code = redirectUri.getQueryParameter("code") ?: error("Authorization code not found in redirect URI")
+            val state = redirectUri.getQueryParameter("state") ?: error("State not found in redirect URI")
+            val issuer = redirectUri.getQueryParameter("iss")
+
+            return AuthorizationContext(code, state, issuer)
+        }
+    }
+}
+
 //
 // Keycloak Support
 //
@@ -283,7 +292,7 @@ object Keycloak : CanAuthorizeIssuance<KeycloakUser> {
         authorizationRequestPrepared: AuthorizationRequestPrepared,
         user: KeycloakUser,
         httpClient: HttpClient,
-    ): Pair<String, String> {
+    ): AuthorizationContext {
         val driver =
             ChromeDriver(ChromeOptions().apply { addArguments("--ignore-certificate-errors") })
                 .apply {
@@ -309,10 +318,7 @@ object Keycloak : CanAuthorizeIssuance<KeycloakUser> {
                 }
             }
 
-        val authorizationCode = redirectUri.getQueryParameter("code") ?: error("Authorization code not found in redirect URI")
-        val state = redirectUri.getQueryParameter("state") ?: error("State not found in redirect URI")
-
-        return authorizationCode to state
+        return AuthorizationContext.fromRedirectUri(redirectUri)
     }
 
     override suspend fun HttpClient.authorizeIssuance(

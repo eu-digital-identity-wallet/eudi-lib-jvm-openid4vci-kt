@@ -170,13 +170,17 @@ suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(
         val authorizationRequestPrepared = prepareAuthorizationRequest(walletState = null).getOrThrow()
         with(authorizationRequestPrepared) {
             val testUser = env.testUser
-            val (authorizationCode, serverState) =
+            val authorizationContext =
                 env.loginUserAndGetAuthCode(
                     authorizationRequestPrepared,
                     testUser,
                     httpClient,
                 )
-            authorizeWithAuthorizationCode(AuthorizationCode(authorizationCode), serverState).getOrThrow()
+            authorizeWithAuthorizationCode(
+                authorizationCode = AuthorizationCode(authorizationContext.code),
+                serverState = authorizationContext.state,
+                issuer = authorizationContext.issuer,
+            ).getOrThrow()
         }
     }
 
