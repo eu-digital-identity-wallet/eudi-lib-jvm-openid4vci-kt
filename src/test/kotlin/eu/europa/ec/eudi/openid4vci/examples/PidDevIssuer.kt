@@ -58,11 +58,12 @@ internal object PidDevIssuer :
                         EudiReusePolicyType.OnceOnly,
                         EudiReusePolicyType.LimitedTime,
                         EudiReusePolicyType.RotatingBatch,
-                        EudiReusePolicyType.PerRelyingParty
+                        EudiReusePolicyType.PerRelyingParty,
                     ),
                 ),
             proofs = ProofsConfig.Default,
             issuerMetadataPolicy = IssuerMetadataPolicy.RequireSigned(TrustAnyX509),
+            authResponseIssChecking = AuthorizationResponseIssChecking.Required,
         )
 
     val PID_SdJwtVC_config_id = CredentialConfigurationIdentifier("eu.europa.ec.eudi.pid_vc_sd_jwt")

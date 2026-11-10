@@ -82,7 +82,7 @@ private suspend fun authorizeRequestWithAuthCodeUseCase(
 
         val (authorizationCode, serverState) =
             createHttpClient().use { httpClient ->
-                PidDevIssuer.loginUserAndGetAuthCode(prepareAuthorizationCodeRequest, actingUser, httpClient)
+                PidDevIssuer.loginUser(prepareAuthorizationCodeRequest, actingUser, httpClient)
             }
 
         authorizationLog("Authorization code retrieved: $authorizationCode")

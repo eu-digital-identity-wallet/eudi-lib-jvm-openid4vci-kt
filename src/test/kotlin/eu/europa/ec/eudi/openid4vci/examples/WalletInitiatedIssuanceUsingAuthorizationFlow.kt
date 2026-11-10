@@ -77,7 +77,7 @@ private suspend fun Issuer.authorizeRequestWithAuthCodeUseCase(actingUser: Keycl
     return with(prepareAuthorizationCodeRequest) {
         val (authorizationCode, serverState) =
             createHttpClient(false).use { httpClient ->
-                PidDevIssuer.loginUserAndGetAuthCode(
+                PidDevIssuer.loginUser(
                     prepareAuthorizationCodeRequest,
                     actingUser,
                     httpClient,

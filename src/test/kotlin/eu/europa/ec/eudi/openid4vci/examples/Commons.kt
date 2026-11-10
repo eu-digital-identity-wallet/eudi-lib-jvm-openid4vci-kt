@@ -171,7 +171,7 @@ suspend fun <ENV, USER> Issuer.authorizeUsingAuthorizationCodeFlow(
         with(authorizationRequestPrepared) {
             val testUser = env.testUser
             val authorizationContext =
-                env.loginUserAndGetAuthCode(
+                env.loginUser(
                     authorizationRequestPrepared,
                     testUser,
                     httpClient,

@@ -229,23 +229,23 @@ interface HasTestUser<out USER> {
  * to authorize credential issuance
  */
 interface CanAuthorizeIssuance<in USER> {
-    suspend fun loginUserAndGetAuthCode(
+    suspend fun loginUser(
         authorizationRequestPrepared: AuthorizationRequestPrepared,
         user: USER,
         httpClient: HttpClient,
-    ): AuthorizationContext =
+    ): AuthorizationResponse =
         coroutineScope {
             val response =
                 run {
                     val loginPageResponse = httpClient.visitAuthorizationPage(authorizationRequestPrepared)
                     httpClient.authorizeIssuance(loginPageResponse, user)
                 }
-            response.parseCodeAndStatus()
+            response.parse()
         }
 
-    fun HttpResponse.parseCodeAndStatus(): AuthorizationContext {
+    fun HttpResponse.parse(): AuthorizationResponse {
         val redirectLocation = headers["Location"].toString().toKmpUri()
-        return AuthorizationContext.fromRedirectUri(redirectLocation)
+        return AuthorizationResponse.fromRedirectUri(redirectLocation)
     }
 
     suspend fun HttpClient.visitAuthorizationPage(authorizationRequestPrepared: AuthorizationRequestPrepared): HttpResponse {
@@ -263,18 +263,18 @@ interface CanAuthorizeIssuance<in USER> {
     ): HttpResponse
 }
 
-data class AuthorizationContext(
+data class AuthorizationResponse(
     val code: String,
     val state: String,
     val issuer: String?,
 ) {
     companion object {
-        fun fromRedirectUri(redirectUri: Uri): AuthorizationContext {
+        fun fromRedirectUri(redirectUri: Uri): AuthorizationResponse {
             val code = redirectUri.getQueryParameter("code") ?: error("Authorization code not found in redirect URI")
             val state = redirectUri.getQueryParameter("state") ?: error("State not found in redirect URI")
             val issuer = redirectUri.getQueryParameter("iss")
 
-            return AuthorizationContext(code, state, issuer)
+            return AuthorizationResponse(code, state, issuer)
         }
     }
 }
@@ -288,11 +288,11 @@ data class KeycloakUser(
 )
 
 object Keycloak : CanAuthorizeIssuance<KeycloakUser> {
-    override suspend fun loginUserAndGetAuthCode(
+    override suspend fun loginUser(
         authorizationRequestPrepared: AuthorizationRequestPrepared,
         user: KeycloakUser,
         httpClient: HttpClient,
-    ): AuthorizationContext {
+    ): AuthorizationResponse {
         val driver =
             ChromeDriver(ChromeOptions().apply { addArguments("--ignore-certificate-errors") })
                 .apply {
@@ -318,7 +318,7 @@ object Keycloak : CanAuthorizeIssuance<KeycloakUser> {
                 }
             }
 
-        return AuthorizationContext.fromRedirectUri(redirectUri)
+        return AuthorizationResponse.fromRedirectUri(redirectUri)
     }
 
     override suspend fun HttpClient.authorizeIssuance(
