@@ -679,10 +679,11 @@ val openId4VCIConfig = OpenId4VCIConfig(
         jwtProofsWithoutKeyAttestation = ProofsConfig.SupportedJwtProof(setOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512)), // whether jwt proofs without key attestation are supported
     ),
     registrationCertificatePolicy = RegistrationCertificatePolicy { accessCertificate, registrationCertificate, issuanceContext -> ... },
+    dPoPUsage = DPoPUsage.IfSupported(dPoPConfig), // DPoP configuration, see 'Demonstrating Proof of Possession (DPoP)' below
     grants = SupportedGrants.Both(
         SupportedGrants.AuthorizationCode(
             authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
-            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt, // bind the Authorization Code to the DPoP key via the `dpop_jkt` PAR parameter
+            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt, // bind the Authorization Code to the DPoP key via the `dpop_jkt` parameter (RFC 9449 §10.1)
         ),
     ),
 )
@@ -776,6 +777,23 @@ Authorization Code is bound to the DPoP key by including the `dpop_jkt` paramete
 DPoP header cannot be used). The `dpop_jkt` method requires the configured `ProvisionDPoPSigner` to expose the
 thumbprint of the DPoP public key; if it cannot, issuance fails.
 
+To use the `dpop_jkt` binding method, configure `dPoPUsage` with a `DPoPConfig` whose `ProvisionDPoPSigner`
+returns the DPoP signing key together with the RFC 7638 thumbprint of its public key:
+
+```kotlin
+val dPoPConfig = DPoPConfig(
+    object : ProvisionDPoPSigner {
+        override val popAlgorithm: JwsAlgorithm = JwsAlgorithm("ES256")
+        override suspend fun invoke(authorizationServer: HttpsUrl): Pair<Signer<JWK>, JWKThumbprint?> {
+            // provision the wallet's DPoP signing key and return it together with the RFC 7638
+            // thumbprint of its public key; a null thumbprint makes 'dpop_jkt' binding unavailable
+            val signingKey = provisionedSigningKey()
+            return signingKey to signingKey.toPublicJWK().computeThumbprint().toString()
+        }
+    },
+)
+```
+
 All further interactions will use the correct token type (Bearer or DPoP)
 
 Library supports both
@@ -814,12 +832,16 @@ val provisionClientAttestation = object : ProvisionClientAttestation {
     }
 }  
 val clientId = "..."
-val wallet = Client.AttestationBased(clientId, provisionClientAttestation)
+val clientAuthentication = ClientAuthentication.AttestationBased(clientId, provisionClientAttestation)
 val openId4VCIConfig = OpenId4VCIConfig(
-    client = wallet
-    authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
-    keyGenerationConfig = KeyGenerationConfig.ecOnly(Curve.P_256), // what kind of ephemeral keys could be generated to encrypt credential issuance response
-    credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses
+    clientAuthentication = clientAuthentication,
+    encryptionSupportConfig = EncryptionSupportConfig(
+        ecConfig = EcConfig(curve = Curve.P_256), // what kind of ephemeral keys could be generated to encrypt credential issuance response
+        credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses
+    ),
+    grants = SupportedGrants.AuthorizationCode(
+        authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
+    ),
 )
 ```
 With this configuration library is able to 
