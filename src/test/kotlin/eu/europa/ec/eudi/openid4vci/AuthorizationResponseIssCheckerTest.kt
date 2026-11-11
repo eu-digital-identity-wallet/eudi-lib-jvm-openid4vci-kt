@@ -42,7 +42,7 @@ class AuthorizationResponseIssCheckerTest {
             proofs = ProofsConfig.Default,
             grants =
                 SupportedGrants.AuthorizationCode(
-                    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                    authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                     authResponseIssChecking = authResponseIssChecking,
                 ),
         )

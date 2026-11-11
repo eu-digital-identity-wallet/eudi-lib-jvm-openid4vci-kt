@@ -388,7 +388,7 @@ internal class CredentialOfferRequestResolverTest {
             val config =
                 OpenId4VCIConfiguration.copy(
                     issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
-                    grants = SupportedGrants.AuthorizationCode(authFlowRedirectionURI = URI.create("eudi-wallet//auth")),
+                    grants = SupportedGrants.AuthorizationCode(authFlowRedirectionURI = URI.create("eudi-wallet://auth")),
                 )
 
             val exception =

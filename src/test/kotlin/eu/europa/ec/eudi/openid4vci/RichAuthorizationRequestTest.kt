@@ -459,7 +459,7 @@ class RichAuthorizationRequestTest {
                             OpenId4VCIConfiguration.copy(
                                 grants =
                                     SupportedGrants.AuthorizationCode(
-                                        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                                        authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                                         parUsage = ParUsage.Never,
                                         authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.None,
                                     ),

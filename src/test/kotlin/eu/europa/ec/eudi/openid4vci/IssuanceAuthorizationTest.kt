@@ -380,7 +380,7 @@ class IssuanceAuthorizationTest {
                 OpenId4VCIConfigurationWithDpopSigner.copy(
                     grants =
                         SupportedGrants.AuthorizationCode(
-                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                             parUsage = ParUsage.Required,
                             authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.None,
                         ),
@@ -424,7 +424,7 @@ class IssuanceAuthorizationTest {
                 OpenId4VCIConfigurationWithDpopSigner.copy(
                     grants =
                         SupportedGrants.AuthorizationCode(
-                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                             parUsage = ParUsage.Required,
                             authResponseIssChecking = AuthorizationResponseIssChecking.Never,
                         ),
@@ -471,7 +471,7 @@ class IssuanceAuthorizationTest {
                     dPoPUsage = DPoPUsage.IfSupported(DPoPConfig(ProvisionDPoPSigner(dPoPSigningKey))),
                     grants =
                         SupportedGrants.AuthorizationCode(
-                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                             parUsage = ParUsage.Required,
                             authResponseIssChecking = AuthorizationResponseIssChecking.Never,
                             authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
@@ -507,7 +507,7 @@ class IssuanceAuthorizationTest {
                 OpenId4VCIConfiguration.copy(
                     grants =
                         SupportedGrants.AuthorizationCode(
-                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                             parUsage = ParUsage.Required,
                             authResponseIssChecking = AuthorizationResponseIssChecking.Never,
                             authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
@@ -549,7 +549,7 @@ class IssuanceAuthorizationTest {
                 OpenId4VCIConfigurationWithDpopSigner.copy(
                     grants =
                         SupportedGrants.AuthorizationCode(
-                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                             parUsage = ParUsage.Required,
                             authResponseIssChecking = AuthorizationResponseIssChecking.Never,
                             authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
@@ -594,7 +594,7 @@ class IssuanceAuthorizationTest {
                     dPoPUsage = DPoPUsage.IfSupported(DPoPConfig(ProvisionDPoPSigner(dPoPSigningKey))),
                     grants =
                         SupportedGrants.AuthorizationCode(
-                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                             parUsage = ParUsage.Never,
                             authResponseIssChecking = AuthorizationResponseIssChecking.Never,
                             authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
@@ -632,7 +632,7 @@ class IssuanceAuthorizationTest {
                     dPoPUsage = DPoPUsage.IfSupported(DPoPConfig(ProvisionDPoPSigner(dPoPSigningKey))),
                     grants =
                         SupportedGrants.AuthorizationCode(
-                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                             parUsage = ParUsage.Never,
                             authResponseIssChecking = AuthorizationResponseIssChecking.Never,
                             authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPHeader,
@@ -667,7 +667,7 @@ class IssuanceAuthorizationTest {
                 OpenId4VCIConfiguration.copy(
                     grants =
                         SupportedGrants.AuthorizationCode(
-                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                             parUsage = ParUsage.Never,
                             authResponseIssChecking = AuthorizationResponseIssChecking.Never,
                             authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.None,
@@ -702,7 +702,7 @@ class IssuanceAuthorizationTest {
                 OpenId4VCIConfiguration.copy(
                     grants =
                         SupportedGrants.AuthorizationCode(
-                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                             parUsage = ParUsage.Never,
                             authResponseIssChecking = AuthorizationResponseIssChecking.Never,
                             authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
@@ -744,7 +744,7 @@ class IssuanceAuthorizationTest {
                 OpenId4VCIConfigurationWithDpopSigner.copy(
                     grants =
                         SupportedGrants.AuthorizationCode(
-                            authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                            authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                             parUsage = ParUsage.Never,
                             authResponseIssChecking = AuthorizationResponseIssChecking.Never,
                             authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,

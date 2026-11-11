@@ -682,7 +682,7 @@ val openId4VCIConfig = OpenId4VCIConfig(
     dPoPUsage = DPoPUsage.IfSupported(dPoPConfig), // DPoP configuration, see 'Demonstrating Proof of Possession (DPoP)' below
     grants = SupportedGrants.Both(
         SupportedGrants.AuthorizationCode(
-            authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
+            authFlowRedirectionURI = URI.create("eudi-wallet://auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
             authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt, // bind the Authorization Code to the DPoP key via the `dpop_jkt` parameter (RFC 9449 §10.1)
         ),
     ),
@@ -840,7 +840,7 @@ val openId4VCIConfig = OpenId4VCIConfig(
         credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED, // policy concerning the wallet's requirements for encryption of credential responses
     ),
     grants = SupportedGrants.AuthorizationCode(
-        authFlowRedirectionURI = URI.create("eudi-wallet//auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
+        authFlowRedirectionURI = URI.create("eudi-wallet://auth"), // where the Credential Issuer should redirect after Authorization code flow succeeds
     ),
 )
 ```

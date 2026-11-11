@@ -113,7 +113,7 @@ val OpenId4VCIConfiguration =
         grants =
             SupportedGrants.Both(
                 SupportedGrants.AuthorizationCode(
-                    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                    authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                     authResponseIssChecking = AuthorizationResponseIssChecking.Never,
                 ),
             ),
@@ -128,7 +128,7 @@ val OpenId4VCIConfigurationWithDpopSigner =
         grants =
             SupportedGrants.Both(
                 SupportedGrants.AuthorizationCode(
-                    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
+                    authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
                     authResponseIssChecking = AuthorizationResponseIssChecking.Never,
                 ),
             ),
