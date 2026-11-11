@@ -190,9 +190,9 @@ data class OpenId4VCIConfig(
      */
     val authorizationCodeGrant: SupportedGrants.AuthorizationCode?
         get() =
-            when (val g = grants) {
-                is SupportedGrants.AuthorizationCode -> g
-                is SupportedGrants.Both -> g.authorizationCode
+            when (grants) {
+                is SupportedGrants.AuthorizationCode -> grants
+                is SupportedGrants.Both -> grants.authorizationCode
                 else -> null
             }
 
