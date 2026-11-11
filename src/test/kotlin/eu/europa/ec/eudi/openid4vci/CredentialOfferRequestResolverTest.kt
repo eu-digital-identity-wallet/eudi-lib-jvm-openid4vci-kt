@@ -23,6 +23,7 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import eu.europa.ec.eudi.openid4vci.internal.CredentialOfferRequestResolver
 import kotlinx.coroutines.test.runTest
 import org.apache.http.client.utils.URIBuilder
+import java.net.URI
 import kotlin.test.*
 
 internal class CredentialOfferRequestResolverTest {
@@ -387,7 +388,7 @@ internal class CredentialOfferRequestResolverTest {
             val config =
                 OpenId4VCIConfiguration.copy(
                     issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
-                    grants = SupportedGrants.AuthorizationCode,
+                    grants = SupportedGrants.AuthorizationCode(authFlowRedirectionURI = URI.create("eudi-wallet://auth")),
                 )
 
             val exception =

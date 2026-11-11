@@ -122,7 +122,8 @@ interface AuthorizeIssuance {
      * @param serverState The state returned from the authorization server via front-channel
      * @param authDetailsOption Defines if upon access token request extra authorization details will be set to fine grain the scope of the access token.
      * @param issuer The issuer of the access token, as provided to the redirection URI (the last step of authorization code grant) via parameter `iss`.
-     * It is optional and can be omited (defaulting to `null`) in case of Pre-Authorized Code Flow or if [OpenId4VCIConfig.authResponseIssChecking] is
+     * It is optional and can be omited (defaulting to `null`) in case of Pre-Authorized Code Flow or if
+     * [SupportedGrants.AuthorizationCode.authResponseIssChecking] is
      * set to [AuthorizationResponseIssChecking.Never].
      * @return an issuance request in an authorized state
      */

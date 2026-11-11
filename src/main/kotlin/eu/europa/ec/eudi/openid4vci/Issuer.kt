@@ -169,18 +169,20 @@ interface Issuer :
                     }
 
                 val authorizationEndpointClient =
-                    credentialOffer.authorizationServerMetadata
-                        .authorizationEndpointURI
-                        ?.let {
-                            AuthorizationEndpointClient(
-                                credentialOffer.credentialIssuerIdentifier,
-                                credentialOffer.authorizationServerMetadata,
-                                config,
-                                provisionDPoPJwtFactory,
-                                provisionClientAttestation,
-                                httpClient,
-                            )
-                        }
+                    if (null != credentialOffer.authorizationServerMetadata.authorizationEndpointURI &&
+                        null != config.authorizationCodeGrant
+                    ) {
+                        AuthorizationEndpointClient(
+                            credentialOffer.credentialIssuerIdentifier,
+                            credentialOffer.authorizationServerMetadata,
+                            config,
+                            provisionDPoPJwtFactory,
+                            provisionClientAttestation,
+                            httpClient,
+                        )
+                    } else {
+                        null
+                    }
 
                 val tokenEndpointClient =
                     TokenEndpointClient(

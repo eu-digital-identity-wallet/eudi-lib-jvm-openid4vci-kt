@@ -19,7 +19,6 @@ import com.nimbusds.jose.jwk.Curve
 import eu.europa.ec.eudi.openid4vci.RegistrationCertificatePolicy.Authorization
 import eu.europa.ec.eudi.openid4vci.RegistrationCertificatePolicy.PolicyViolation
 import kotlinx.coroutines.test.runTest
-import java.net.URI
 import kotlin.test.*
 
 class IssuerTest {
@@ -31,10 +30,10 @@ class IssuerTest {
             assertFailsWith<IllegalArgumentException> {
                 OpenId4VCIConfig(
                     clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
-                    authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
                     encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
                     issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
                     registrationCertificatePolicy = RegistrationCertificatePolicy { _, _, _ -> Authorization.Granted() },
+                    grants = SupportedGrants.PreAuthorizedCode,
                 )
             }
         }

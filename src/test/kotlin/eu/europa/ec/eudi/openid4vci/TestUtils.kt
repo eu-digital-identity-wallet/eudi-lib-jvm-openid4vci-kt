@@ -108,18 +108,30 @@ val CredentialOfferMixedDocTypes_AUTH_GRANT =
 val OpenId4VCIConfiguration =
     OpenId4VCIConfig(
         clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
-        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
         encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
         proofs = ProofsConfig.Default,
+        grants =
+            SupportedGrants.Both(
+                SupportedGrants.AuthorizationCode(
+                    authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
+                    authResponseIssChecking = AuthorizationResponseIssChecking.Never,
+                ),
+            ),
     )
 
 val OpenId4VCIConfigurationWithDpopSigner =
     OpenId4VCIConfig(
         clientAuthentication = ClientAuthentication.None("MyWallet_ClientId"),
         dPoPUsage = DPoPUsage.IfSupported(DPoPConfig(ProvisionDPoPSigner(ecSigner(Curve.P_256, JWSAlgorithm.ES256)))),
-        authFlowRedirectionURI = URI.create("eudi-wallet//auth"),
         encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
         proofs = ProofsConfig.Default,
+        grants =
+            SupportedGrants.Both(
+                SupportedGrants.AuthorizationCode(
+                    authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
+                    authResponseIssChecking = AuthorizationResponseIssChecking.Never,
+                ),
+            ),
     )
 
 val OpenId4VCIConfigurationOnlyPlainJwtProofs =
@@ -223,12 +235,18 @@ internal fun ProvisionDPoPSigner(signer: Signer<JWK>): ProvisionDPoPSigner =
     object : ProvisionDPoPSigner {
         override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(signer.javaAlgorithm.toJoseAlg().name)
 
-        override suspend fun invoke(authorizationServer: HttpsUrl): Signer<JWK> = signer
+        override suspend fun invoke(authorizationServer: HttpsUrl): Pair<Signer<JWK>, JWKThumbprint?> = signer to null
     }
 
 internal fun ProvisionDPoPSigner(signingKey: ECKey): ProvisionDPoPSigner {
     require(signingKey.isPrivate)
-    return ProvisionDPoPSigner(Signer.fromNimbusEcKey(signingKey, signingKey.toPublicJWK(), secureRandom = null, provider = null))
+    val signer = Signer.fromNimbusEcKey(signingKey, signingKey.toPublicJWK(), secureRandom = null, provider = null)
+    return object : ProvisionDPoPSigner {
+        override val popAlgorithm: JwsAlgorithm = JwsAlgorithm(signer.javaAlgorithm.toJoseAlg().name)
+
+        override suspend fun invoke(authorizationServer: HttpsUrl): Pair<Signer<JWK>, JWKThumbprint?> =
+            signer to signingKey.toPublicJWK().computeThumbprint().toString()
+    }
 }
 
 internal fun Result<IssuerNegotiationResult>.getIssuerOrThrow(): Issuer = this.getOrThrow().first
