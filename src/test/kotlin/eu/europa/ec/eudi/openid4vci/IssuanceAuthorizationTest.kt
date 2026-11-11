@@ -647,7 +647,6 @@ class IssuanceAuthorizationTest {
             }
         }
 
-
     @Test
     fun `ensure exception is thrown when PAR is not used, code DPoP binding via dpop_jkt but thumbprint is not available`() =
         runTest {
