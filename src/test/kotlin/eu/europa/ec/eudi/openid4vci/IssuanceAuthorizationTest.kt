@@ -495,48 +495,6 @@ class IssuanceAuthorizationTest {
         }
 
     @Test
-    fun `ensure exception is thrown when dpop_jkt binding method is selected but DPoP is not configured`() =
-        runTest {
-            val mockedHttpClient =
-                mockedHttpClient(
-                    credentialIssuerMetadataWellKnownMocker(),
-                    authServerWellKnownMocker(),
-                )
-
-            val config =
-                OpenId4VCIConfiguration.copy(
-                    grants =
-                        SupportedGrants.AuthorizationCode(
-                            authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
-                            parUsage = ParUsage.Required,
-                            authResponseIssChecking = AuthorizationResponseIssChecking.Never,
-                            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
-                        ),
-                )
-            val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
-            val issuer =
-                Issuer
-                    .make(
-                        config = config,
-                        credentialOffer = offer,
-                        httpClient = mockedHttpClient,
-                    ).getIssuerOrThrow()
-            with(issuer) {
-                prepareAuthorizationRequest()
-                    .fold(
-                        onSuccess = {
-                            fail("Exception expected to be thrown")
-                        },
-                        onFailure = {
-                            assertTrue("Expected an IllegalStateException to be thrown but was not") {
-                                it is IllegalStateException
-                            }
-                        },
-                    )
-            }
-        }
-
-    @Test
     fun `ensure exception is thrown when dpop_jkt binding method is selected but thumbprint is not available`() =
         runTest {
             val mockedHttpClient =
@@ -689,47 +647,6 @@ class IssuanceAuthorizationTest {
             }
         }
 
-    @Test
-    fun `ensure exception is thrown when PAR is not used, code DPoP binding via dpop_jkt but DPoP is not configured`() =
-        runTest {
-            val mockedHttpClient =
-                mockedHttpClient(
-                    credentialIssuerMetadataWellKnownMocker(),
-                    authServerWellKnownMocker(),
-                )
-
-            val config =
-                OpenId4VCIConfiguration.copy(
-                    grants =
-                        SupportedGrants.AuthorizationCode(
-                            authFlowRedirectionURI = URI.create("eudi-wallet://auth"),
-                            parUsage = ParUsage.Never,
-                            authResponseIssChecking = AuthorizationResponseIssChecking.Never,
-                            authorizationCodeDPoPBindingMethod = AuthorizationCodeDPoPBindingMethod.DPoPJkt,
-                        ),
-                )
-            val offer = credentialOffer(config, mockedHttpClient, CredentialOfferMixedDocTypes_NO_GRANTS)
-            val issuer =
-                Issuer
-                    .make(
-                        config = config,
-                        credentialOffer = offer,
-                        httpClient = mockedHttpClient,
-                    ).getIssuerOrThrow()
-            with(issuer) {
-                prepareAuthorizationRequest()
-                    .fold(
-                        onSuccess = {
-                            fail("Exception expected to be thrown")
-                        },
-                        onFailure = {
-                            assertTrue("Expected an IllegalStateException to be thrown but was not") {
-                                it is IllegalStateException
-                            }
-                        },
-                    )
-            }
-        }
 
     @Test
     fun `ensure exception is thrown when PAR is not used, code DPoP binding via dpop_jkt but thumbprint is not available`() =

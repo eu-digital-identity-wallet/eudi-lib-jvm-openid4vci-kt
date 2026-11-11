@@ -34,6 +34,7 @@ import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
+import java.net.URL
 import com.nimbusds.oauth2.sdk.Scope as NimbusScope
 
 /**
@@ -76,6 +77,10 @@ internal class AuthorizationEndpointClient(
     private val provisionedClientAttestation: suspend () -> ProvisionClientAttestation.Provisioned?,
     private val httpClient: HttpClient,
 ) {
+    init {
+        requireNotNull(config.authorizationCodeGrant) { "Wallet does not support Authorization Code Grant" }
+    }
+
     constructor(
         credentialIssuerId: CredentialIssuerId,
         authorizationServerMetadata: CIAuthorizationServerMetadata,
@@ -107,23 +112,22 @@ internal class AuthorizationEndpointClient(
     private val isCredentialIssuerAuthorizationServer: Boolean
         get() = credentialIssuerId.toString() == authorizationIssuer
 
-    private val authorizationCodeGrant: SupportedGrants.AuthorizationCode?
-        get() = config.authorizationCodeGrant
+    private val authorizationCodeGrant: SupportedGrants.AuthorizationCode
+        get() = checkNotNull(config.authorizationCodeGrant)
 
     private val supportsPar: Boolean
         get() = pushedAuthorizationRequestEndpoint != null
 
     private suspend fun resolveDpopJktOrThrow(): String? {
-        val factory =
-            dPoPJwtFactory()
-                ?: throw IllegalStateException(
-                    "Authorization Code DPoP binding via 'dpop_jkt' requires DPoP to be configured (dPoPUsage).",
-                )
-        return factory.dPoPJkt
-            ?: throw IllegalStateException(
+        // factory can be null when DPoPUsage is IfSupported and no common ground between
+        // the Authorization Server and the Wallet exists
+        val factory = dPoPJwtFactory()
+        return factory?.let {
+            checkNotNull(it.dPoPJkt) {
                 "Authorization Code DPoP binding via 'dpop_jkt' requires a ProvisionDPoPSigner that " +
-                    "exposes the DPoP public key thumbprint.",
-            )
+                    "exposes the DPoP public key thumbprint."
+            }
+        }
     }
 
     private val challengeEndpointClient: ChallengeEndpointClient? by lazy {
@@ -149,7 +153,7 @@ internal class AuthorizationEndpointClient(
         additionalParameters: AdditionalParameters?,
     ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> {
         val usePar =
-            when (authorizationCodeGrant?.parUsage ?: ParUsage.Never) {
+            when (authorizationCodeGrant.parUsage) {
                 ParUsage.Never -> {
                     false
                 }
@@ -166,25 +170,19 @@ internal class AuthorizationEndpointClient(
                 }
             }
         return if (usePar) {
-            val authorizationCodeDPoPBindingMethod =
-                authorizationCodeGrant?.authorizationCodeDPoPBindingMethod ?: AuthorizationCodeDPoPBindingMethod.None
             submitPushedAuthorizationRequest(
                 scopes,
                 credentialsConfigurationIds,
                 state,
                 issuerState,
-                authorizationCodeDPoPBindingMethod,
                 additionalParameters,
             )
         } else {
-            val authorizationCodeDPoPBindingMethod =
-                authorizationCodeGrant?.authorizationCodeDPoPBindingMethod ?: AuthorizationCodeDPoPBindingMethod.None
             authorizationRequestUrl(
                 scopes,
                 credentialsConfigurationIds,
                 state,
                 issuerState,
-                authorizationCodeDPoPBindingMethod,
                 additionalParameters,
             ).map { (a, b) ->
                 Triple(a, b, null)
@@ -198,7 +196,6 @@ internal class AuthorizationEndpointClient(
      * @param scopes    The scopes of the authorization request.
      * @param state     The oauth2 specific 'state' request parameter.
      * @param issuerState   The state passed from credential issuer during the negotiation phase of the issuance.
-     * @param authorizationCodeDPoPBindingMethod How the Authorization Code is bound to the DPoP key, per RFC 9449 §10.1.
      * @param additionalParameters optional parameters appended to the authorization request
      * @return The result of the request as a pair of the PKCE verifier used during the request and the authorization code
      *      url that caller will need to follow to retrieve the authorization code.
@@ -211,7 +208,6 @@ internal class AuthorizationEndpointClient(
         credentialsConfigurationIds: List<CredentialConfigurationIdentifier>,
         state: String,
         issuerState: String?,
-        authorizationCodeDPoPBindingMethod: AuthorizationCodeDPoPBindingMethod,
         additionalParameters: AdditionalParameters?,
     ): Result<Triple<PKCEVerifier, HttpsUrl, Nonce?>> =
         runCatchingCancellable {
@@ -223,10 +219,7 @@ internal class AuthorizationEndpointClient(
             checkNotNull(parEndpoint) { "PAR endpoint not advertised" }
             val clientID = ClientID(config.clientAuthentication.id)
             val codeVerifier = CodeVerifier()
-            val redirectionURI =
-                checkNotNull(authorizationCodeGrant) {
-                    "Authorization Code grant is not configured"
-                }.authFlowRedirectionURI
+            val redirectionURI = authorizationCodeGrant.authFlowRedirectionURI
             val pushedAuthorizationRequest =
                 run {
                     val request =
@@ -263,7 +256,6 @@ internal class AuthorizationEndpointClient(
                 pushAuthorizationRequest(
                     parEndpoint,
                     pushedAuthorizationRequest,
-                    authorizationCodeDPoPBindingMethod,
                 )
             val (pkceVerifier, url) = response.authorizationCodeUrlOrFail(clientID, codeVerifier)
             Triple(pkceVerifier, url, dpopNonce)
@@ -282,7 +274,6 @@ internal class AuthorizationEndpointClient(
         credentialsAuthorizationDetails: List<CredentialConfigurationIdentifier>,
         state: String,
         issuerState: String?,
-        authorizationCodeDPoPBindingMethod: AuthorizationCodeDPoPBindingMethod,
         additionalParameters: AdditionalParameters?,
     ): Result<Pair<PKCEVerifier, HttpsUrl>> =
         runCatchingCancellable {
@@ -290,7 +281,7 @@ internal class AuthorizationEndpointClient(
                 "No scopes or authorization details provided. Cannot prepare authorization request."
             }
             val dpopJkt =
-                if (authorizationCodeDPoPBindingMethod != AuthorizationCodeDPoPBindingMethod.None) {
+                if (authorizationCodeGrant.authorizationCodeDPoPBindingMethod != AuthorizationCodeDPoPBindingMethod.None) {
                     resolveDpopJktOrThrow()
                 } else {
                     null
@@ -298,10 +289,7 @@ internal class AuthorizationEndpointClient(
 
             val clientID = ClientID(config.clientAuthentication.id)
             val codeVerifier = CodeVerifier()
-            val redirectionURI =
-                checkNotNull(authorizationCodeGrant) {
-                    "Authorization Code grant is not configured"
-                }.authFlowRedirectionURI
+            val redirectionURI = authorizationCodeGrant.authFlowRedirectionURI
             val authorizationRequest =
                 AuthorizationRequest
                     .Builder(ResponseType.CODE, clientID)
@@ -366,11 +354,10 @@ internal class AuthorizationEndpointClient(
     private suspend fun pushAuthorizationRequest(
         parEndpoint: URI,
         pushedAuthorizationRequest: PushedAuthorizationRequest,
-        authorizationCodeDPoPBindingMethod: AuthorizationCodeDPoPBindingMethod,
     ): Pair<PushedAuthorizationRequestResponseTO, Nonce?> {
         val url = parEndpoint.toURL()
         val dpopJkt =
-            if (authorizationCodeDPoPBindingMethod == AuthorizationCodeDPoPBindingMethod.DPoPJkt) {
+            if (authorizationCodeGrant.authorizationCodeDPoPBindingMethod == AuthorizationCodeDPoPBindingMethod.DPoPJkt) {
                 resolveDpopJktOrThrow()
             } else {
                 null
@@ -396,7 +383,7 @@ internal class AuthorizationEndpointClient(
                     existingDpopNonce = existingDpopNonce,
                 )
             val dpopProof =
-                if (authorizationCodeDPoPBindingMethod == AuthorizationCodeDPoPBindingMethod.DPoPHeader)
+                if (authorizationCodeGrant.authorizationCodeDPoPBindingMethod == AuthorizationCodeDPoPBindingMethod.DPoPHeader)
                     dPoPJwtFactory()
                         ?.createDPoPJwt(Htm.POST, url, null, dpopNonce)
                         ?.getOrThrow()
