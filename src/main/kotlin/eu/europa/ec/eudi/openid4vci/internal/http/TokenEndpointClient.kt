@@ -334,7 +334,7 @@ internal class TokenEndpointClient(
         return credentialConfigurationIds
             .map {
                 it.toNimbusAuthDetail(
-                    includeLocations = isCredentialIssuerAuthorizationServer,
+                    includeLocations = !isCredentialIssuerAuthorizationServer,
                     credentialIssuerId = credentialIssuerId,
                 )
             }.toFormParamString()
