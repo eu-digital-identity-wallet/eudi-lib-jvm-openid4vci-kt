@@ -110,6 +110,37 @@ class KeyAttestationJWTTest {
     }
 
     @Test
+    fun `KeyAttestationJWT must not attest the same key twice`() {
+        val key = randomECSigningKey(Curve.P_256).toPublicJWK()
+        val jwt =
+            KeyAttestationJWTBuilder(JWSAlgorithm.ES256)
+                .typ(JOSEObjectType(OpenId4VCISpec.KEY_ATTESTATION_JWT_TYPE))
+                .iat(Instant.now())
+                .exp(Instant.now() + Duration.ofDays(1L))
+                .attestedKeys(listOf(key, key))
+                .keyStorage(emptyList())
+                .userAuthentication(emptyList())
+                .certification(URI.create("https://example.org/certification/wscd/GlobalPlatform/").toURL())
+                .keyStorageStatus(
+                    KeyStorageStatus(
+                        StatusClaim(
+                            StatusListTokenClaim(
+                                7u,
+                                URI.create("https://revocation_url/wua-type-statuslists/3"),
+                            ),
+                        ),
+                        Instant.now() + Duration.ofDays(90L),
+                    ),
+                ).build(signer)
+
+        val exception = assertThrows<IllegalArgumentException> { KeyAttestationJWT(jwt) }
+        assertEquals("Invalid Claims Set.", exception.message)
+
+        val cause = assertIs<IllegalArgumentException>(exception.cause)
+        assertEquals("attestedKeys must be distinct", cause.message)
+    }
+
+    @Test
     fun `KeyAttestationJWT must not have private keys in the attested keys claim`() {
         val jwt =
             KeyAttestationJWTBuilder(JWSAlgorithm.ES256)

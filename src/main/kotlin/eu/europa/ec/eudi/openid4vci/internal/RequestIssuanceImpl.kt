@@ -322,6 +322,7 @@ internal class RequestIssuanceImpl(
             }
         return proofSpecification.proofSigner.use { operation ->
             operation.assertMatchesBatchIssuanceBatchSize()
+            operation.assertDistinctBindingKeys()
             val proofsSigner = NoKeyAttestationJwtProofsSigner(joseAlg, operation)
             val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
             proofsSigner.sign(claims).map {
@@ -363,6 +364,31 @@ internal class RequestIssuanceImpl(
             }
         }
     }
+
+    private fun BatchSignOperation<JwtBindingKey>.assertDistinctBindingKeys() {
+        val bindingKeys = operations.map { it.publicMaterial.identity() }
+        ensure(bindingKeys.distinct().size == bindingKeys.size) {
+            CredentialIssuanceError.ProofGenerationError.DuplicateBindingKeys()
+        }
+    }
+
+    private fun JwtBindingKey.identity(): Any =
+        when (this) {
+            is JwtBindingKey.Jwk -> {
+                jwk.computeThumbprint()
+            }
+
+            is JwtBindingKey.Did -> {
+                identity
+            }
+
+            is JwtBindingKey.X509 -> {
+                chain
+                    .first()
+                    .publicKey.encoded
+                    .toList()
+            }
+        }
 
     private fun AttestedKeys.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy: EudiReusePolicy?) {
         size.assertMatchesBatchIssuanceBatchSize(selectedReusePolicy)

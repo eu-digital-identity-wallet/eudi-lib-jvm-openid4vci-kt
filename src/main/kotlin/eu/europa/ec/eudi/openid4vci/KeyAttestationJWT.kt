@@ -64,6 +64,7 @@ value class AttestedKeys(
     init {
         require(value.isNotEmpty()) { "attestedKeys must not be empty" }
         require(value.none { it.isPrivate }) { "attestedKeys must all be public" }
+        require(value.distinctBy { it.computeThumbprint() }.size == value.size) { "attestedKeys must be distinct" }
     }
 
     val size: Int

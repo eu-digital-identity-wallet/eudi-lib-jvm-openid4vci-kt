@@ -143,6 +143,50 @@ class IssuanceBatchRequestTest {
             }
 
         @Test
+        fun `fails when the batch signer uses the same key more than once`() =
+            runTest {
+                val issuerMetadataVersion = IssuerMetadataVersion.ONLY_JWT_PROOFS_WITHOUT_KEY_ATTESTATION_SUPPORTED
+                val mockedKtorHttpClientFactory =
+                    mockedHttpClient(
+                        credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion = issuerMetadataVersion),
+                        authServerWellKnownMocker(),
+                        parPostMocker(),
+                        tokenPostMocker(),
+                        nonceEndpointMocker(),
+                    )
+                val (authorizedRequest, issuer) =
+                    authorizeRequestForCredentialOffer(
+                        config = OpenId4VCIConfigurationOnlyPlainJwtProofs,
+                        credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                        httpClient = mockedKtorHttpClientFactory,
+                    )
+                val oneKey = jwtProofsWithoutKeyAttestation(keysNo = 1).proofSigner
+                val sameKeyThreeTimes =
+                    object : BatchSigner<JwtBindingKey> {
+                        override val javaAlgorithm: String = oneKey.javaAlgorithm
+
+                        override suspend fun authenticate(): BatchSignOperation<JwtBindingKey> {
+                            val operation = oneKey.authenticate().operations.single()
+                            return BatchSignOperation(List(3) { operation })
+                        }
+
+                        override suspend fun release(signOps: BatchSignOperation<JwtBindingKey>?) = Unit
+                    }
+
+                val request =
+                    IssuanceRequestPayload.ConfigurationBased(
+                        CredentialConfigurationIdentifier(PID_SD_JWT_VC),
+                    )
+                assertFailsWith<CredentialIssuanceError.ProofGenerationError.DuplicateBindingKeys> {
+                    with(issuer) {
+                        authorizedRequest
+                            .request(request, ProofSpecification.JwtProofsWithoutKeyAttestation(sameKeyThreeTimes))
+                            .getOrThrow()
+                    }
+                }
+            }
+
+        @Test
         fun `fails when issuer does not support batch credential issuance`() =
             runTest {
                 val issuerMetadataVersion = IssuerMetadataVersion.NO_BATCH
