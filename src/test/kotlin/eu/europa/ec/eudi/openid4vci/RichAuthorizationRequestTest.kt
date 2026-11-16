@@ -69,6 +69,12 @@ class RichAuthorizationRequestTest {
                                     it.getField("type") == "openid_credential"
                             }
                         }
+                        // Credential Issuer metadata lists a separate authorization server
+                        assertTrue("Credential Issuer identifier expected in locations.") {
+                            authDetails.all {
+                                it.locations?.map { location -> location.toString() } == listOf(CREDENTIAL_ISSUER_PUBLIC_URL)
+                            }
+                        }
                     },
                 )
             val offer =
