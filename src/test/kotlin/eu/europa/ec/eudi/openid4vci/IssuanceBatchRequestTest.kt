@@ -15,9 +15,13 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.CertOps.toX509Certificate
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofWithKeyAttestationSpec
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofsWithoutKeyAttestation
+import eu.europa.ec.eudi.openid4vci.internal.fromNimbusEcKey
 import kotlinx.coroutines.test.runTest
+import org.bouncycastle.asn1.x500.X500Name
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import kotlin.test.*
@@ -181,6 +185,52 @@ class IssuanceBatchRequestTest {
                     with(issuer) {
                         authorizedRequest
                             .request(request, ProofSpecification.JwtProofsWithoutKeyAttestation(sameKeyThreeTimes))
+                            .getOrThrow()
+                    }
+                }
+            }
+
+        @Test
+        fun `fails when the batch signer gives the same key as a JWK and as a certificate`() =
+            runTest {
+                val issuerMetadataVersion = IssuerMetadataVersion.ONLY_JWT_PROOFS_WITHOUT_KEY_ATTESTATION_SUPPORTED
+                val mockedKtorHttpClientFactory =
+                    mockedHttpClient(
+                        credentialIssuerMetadataWellKnownMocker(issuerMetadataVersion = issuerMetadataVersion),
+                        authServerWellKnownMocker(),
+                        parPostMocker(),
+                        tokenPostMocker(),
+                        nonceEndpointMocker(),
+                    )
+                val (authorizedRequest, issuer) =
+                    authorizeRequestForCredentialOffer(
+                        config = OpenId4VCIConfigurationOnlyPlainJwtProofs,
+                        credentialOfferStr = CredentialOfferWithSdJwtVc_NO_GRANTS,
+                        httpClient = mockedKtorHttpClientFactory,
+                    )
+                val key = CryptoGenerator.randomECSigningKey(Curve.P_256)
+                val certificate =
+                    CertOps.createTrustAnchor(key.toKeyPair(), "SHA256withECDSA", X500Name("CN=Binding Key")).toX509Certificate()
+                val asJwk = Signer.fromNimbusEcKey(key, JwtBindingKey.Jwk(key.toPublicJWK()), null, null)
+                val asCertificate = Signer.fromNimbusEcKey(key, JwtBindingKey.X509(listOf(certificate)), null, null)
+                val sameKeyTwoForms =
+                    object : BatchSigner<JwtBindingKey> {
+                        override val javaAlgorithm: String = asJwk.javaAlgorithm
+
+                        override suspend fun authenticate(): BatchSignOperation<JwtBindingKey> =
+                            BatchSignOperation(listOf(asJwk.acquire(), asCertificate.acquire()))
+
+                        override suspend fun release(signOps: BatchSignOperation<JwtBindingKey>?) = Unit
+                    }
+
+                val request =
+                    IssuanceRequestPayload.ConfigurationBased(
+                        CredentialConfigurationIdentifier(PID_SD_JWT_VC),
+                    )
+                assertFailsWith<CredentialIssuanceError.ProofGenerationError.DuplicateBindingKeys> {
+                    with(issuer) {
+                        authorizedRequest
+                            .request(request, ProofSpecification.JwtProofsWithoutKeyAttestation(sameKeyTwoForms))
                             .getOrThrow()
                     }
                 }
