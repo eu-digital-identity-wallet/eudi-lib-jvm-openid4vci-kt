@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSAVerifier
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.internal.http.CNonceAndDPoPNonce
@@ -322,6 +323,7 @@ internal class RequestIssuanceImpl(
             }
         return proofSpecification.proofSigner.use { operation ->
             operation.assertMatchesBatchIssuanceBatchSize()
+            operation.assertDistinctBindingKeys()
             val proofsSigner = NoKeyAttestationJwtProofsSigner(joseAlg, operation)
             val claims = jwtProofClaims(cNonce = cNonce, grant = grant)
             proofsSigner.sign(claims).map {
@@ -361,6 +363,13 @@ internal class RequestIssuanceImpl(
             ensure(operations.size <= batchCredentialIssuance.batchSize) {
                 CredentialIssuanceError.IssuerBatchSizeLimitExceeded(batchCredentialIssuance.batchSize)
             }
+        }
+    }
+
+    private fun BatchSignOperation<JwtBindingKey>.assertDistinctBindingKeys() {
+        val bindingKeys = operations.map { it.publicMaterial.batchIdentity() }
+        ensure(bindingKeys.distinct().size == bindingKeys.size) {
+            CredentialIssuanceError.ProofGenerationError.DuplicateBindingKeys()
         }
     }
 
@@ -606,3 +615,35 @@ private val ProofTypesSupported.jwtProof: ProofTypeMeta.Jwt?
 
 private val ProofTypesSupported.attestationProof: ProofTypeMeta.Attestation?
     get() = this[ProofType.ATTESTATION] as ProofTypeMeta.Attestation?
+
+/**
+ * A value that identifies the public key behind a [JwtBindingKey], used to make sure that every proof in a batch
+ * uses its own key. Two binding keys with equal identities carry the same public key.
+ *
+ * A [JwtBindingKey.Jwk] and a [JwtBindingKey.X509] are both reduced to the RFC 7638 thumbprint of the public key
+ * (for an X509 binding key, the key of the end-entity certificate), so the same key is recognised whichever of the two
+ * forms carries it. When the end-entity key cannot be expressed as a JWK, its encoded form is compared by content.
+ *
+ * Limitations:
+ * - A [JwtBindingKey.Did] is identified by its DID URL, as given. DID URLs are not resolved, so two different DID URLs
+ *   that resolve to the same key, or a DID URL and a JWK or X509 binding key for the same key, are not recognised as
+ *   the same key.
+ * - The check covers the public material declared by each signing operation. The library cannot verify that a
+ *   [SignOperation]'s function actually signs with the private key that corresponds to that public material.
+ */
+internal fun JwtBindingKey.batchIdentity(): Any =
+    when (this) {
+        is JwtBindingKey.Jwk -> {
+            jwk.toPublicJWK().computeThumbprint()
+        }
+
+        is JwtBindingKey.Did -> {
+            identity
+        }
+
+        is JwtBindingKey.X509 -> {
+            val endEntity = chain.first()
+            runCatching { JWK.parse(endEntity).computeThumbprint() }
+                .getOrElse { endEntity.publicKey.encoded.toList() }
+        }
+    }

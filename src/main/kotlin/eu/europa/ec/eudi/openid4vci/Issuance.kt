@@ -434,6 +434,12 @@ sealed class CredentialIssuanceError(
          * Proof type signing algorithm provided for specific credential is not supported from the issuance server
          */
         class ProofTypeSigningAlgorithmNotSupported : ProofGenerationError("ProofTypeSigningAlgorithmNotSupported")
+
+        /**
+         * The batch signer provided more than one signing operation for the same binding key.
+         * Each proof in a batch must use its own key, otherwise the issued Credentials share a key and become linkable.
+         */
+        class DuplicateBindingKeys : ProofGenerationError("DuplicateBindingKeys")
     }
 
     /**
