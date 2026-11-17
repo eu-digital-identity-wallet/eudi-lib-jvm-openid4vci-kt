@@ -20,16 +20,15 @@ import eu.europa.ec.eudi.openid4vci.*
 import eu.europa.ec.eudi.openid4vci.CryptoGenerator.jwtProofWithKeyAttestationSpec
 import eu.europa.ec.eudi.openid4vci.internal.ensure
 import kotlinx.coroutines.runBlocking
-import java.net.URI
 
 fun main(): Unit =
     runBlocking {
         val vciConfig =
             OpenId4VCIConfig(
                 clientAuthentication = ClientAuthentication.None("218232426"),
-                authFlowRedirectionURI = URI.create("urn:ietf:wg:oauth:2.0:oob"),
                 encryptionSupportConfig = EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED),
                 proofs = ProofsConfig.Default,
+                grants = SupportedGrants.PreAuthorizedCode,
             )
         val credentialOfferUrl =
             "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Ftrial.authlete.net" +

@@ -105,7 +105,11 @@ internal class AuthorizeIssuanceImpl(
 
     private fun validateAuthorizationResponseIssuer(iss: String?) {
         val metadata = credentialOffer.authorizationServerMetadata
-        when (config.authResponseIssChecking) {
+        val authResponseIssChecking =
+            checkNotNull(config.authorizationCodeGrant) {
+                "Wallet does not support Authorization Code Grant"
+            }.authResponseIssChecking
+        when (authResponseIssChecking) {
             AuthorizationResponseIssChecking.Never -> {
                 Unit
             }

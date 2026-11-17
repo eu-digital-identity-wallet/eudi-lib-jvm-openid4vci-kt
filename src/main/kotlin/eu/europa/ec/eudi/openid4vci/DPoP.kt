@@ -53,10 +53,21 @@ class DPoPJwtFactory(
     private val jtiByteLength: Int = NimbusDPoPProofFactory.MINIMAL_JTI_BYTE_LENGTH,
     private val clock: Clock,
     private val signer: Signer<JWK>,
+    private val jwkThumbprint: JWKThumbprint? = null,
 ) {
     init {
         require(jtiByteLength > 0) { "jtiByteLength must be greater than zero" }
     }
+
+    /**
+     * The base64url RFC 7638 SHA-256 thumbprint of the DPoP public key, as provided by the
+     * [ProvisionDPoPSigner], or `null` when it cannot be known without acquiring the signer.
+     *
+     * This is the value to be sent as the `dpop_jkt` parameter when binding the Authorization Code to the
+     * DPoP key via PAR (RFC 9449 §10.1).
+     */
+    val dPoPJkt: JWKThumbprint?
+        get() = jwkThumbprint
 
     suspend fun createDPoPJwt(
         htm: Htm,
@@ -104,6 +115,7 @@ class DPoPJwtFactory(
             clock: Clock,
             dPoPCtx: DPoPCtx,
             signer: Signer<JWK>,
+            jwkThumbprint: JWKThumbprint? = null,
         ): DPoPJwtFactory {
             check(dPoPCtx.algorithm.toNimbus() == signer.javaAlgorithm.toJoseAlg())
 
@@ -111,6 +123,7 @@ class DPoPJwtFactory(
                 jtiByteLength = jtiByteLength,
                 clock = clock,
                 signer = signer,
+                jwkThumbprint = jwkThumbprint,
             )
         }
     }

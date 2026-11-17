@@ -16,16 +16,7 @@
 package eu.europa.ec.eudi.openid4vci.internal
 
 import com.nimbusds.jose.jwk.JWK
-import eu.europa.ec.eudi.openid4vci.ClientAuthentication
-import eu.europa.ec.eudi.openid4vci.DPoPConfig
-import eu.europa.ec.eudi.openid4vci.DPoPJwtFactory
-import eu.europa.ec.eudi.openid4vci.HttpsUrl
-import eu.europa.ec.eudi.openid4vci.JwsAlgorithm
-import eu.europa.ec.eudi.openid4vci.PositiveDuration
-import eu.europa.ec.eudi.openid4vci.ProvisionClientAttestation
-import eu.europa.ec.eudi.openid4vci.ProvisionDPoPSigner
-import eu.europa.ec.eudi.openid4vci.Signer
-import eu.europa.ec.eudi.openid4vci.ensureValid
+import eu.europa.ec.eudi.openid4vci.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
@@ -77,9 +68,9 @@ internal fun dPoPJwtFactory(
         }
 
         val provisionDPoPSigner = config.provisionDPoPSigner
-        val dPoPSigner = provisionDPoPSigner(authorizationServer)
+        val (dPoPSigner, jwkThumbprint) = provisionDPoPSigner(authorizationServer)
         provisionDPoPSigner.ensureValid(dPoPSigner)
-        DPoPJwtFactory(clock = clock, signer = dPoPSigner)
+        DPoPJwtFactory(clock = clock, signer = dPoPSigner, jwkThumbprint = jwkThumbprint)
     }
 
 internal fun clientAttestation(

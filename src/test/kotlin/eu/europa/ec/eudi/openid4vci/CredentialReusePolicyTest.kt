@@ -306,7 +306,6 @@ internal class CredentialReusePolicyTest {
         assertFailsWith<IllegalArgumentException> {
             OpenId4VCIConfig(
                 clientAuthentication = ClientAuthentication.None("wallet"),
-                authFlowRedirectionURI = URI("eudi-openid4vci://cb"),
                 encryptionSupportConfig =
                     EncryptionSupportConfig.invoke(
                         Curve.P_256,
@@ -315,6 +314,7 @@ internal class CredentialReusePolicyTest {
                     ),
                 supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.RotatingBatch)),
                 proofs = ProofsConfig.Default,
+                grants = SupportedGrants.AuthorizationCode(authFlowRedirectionURI = URI("eudi-openid4vci://cb")),
             )
         }
     }
@@ -324,7 +324,6 @@ internal class CredentialReusePolicyTest {
         assertDoesNotThrow {
             OpenId4VCIConfig(
                 clientAuthentication = ClientAuthentication.None("wallet"),
-                authFlowRedirectionURI = URI("eudi-openid4vci://cb"),
                 encryptionSupportConfig =
                     EncryptionSupportConfig.invoke(
                         Curve.P_256,
@@ -333,6 +332,7 @@ internal class CredentialReusePolicyTest {
                     ),
                 supportedCredentialReusePolicies = CredentialReusePolicies.Supported(setOf(EudiReusePolicyType.OnceOnly)),
                 proofs = ProofsConfig.Default,
+                grants = SupportedGrants.AuthorizationCode(authFlowRedirectionURI = URI("eudi-openid4vci://cb")),
             )
         }
     }
