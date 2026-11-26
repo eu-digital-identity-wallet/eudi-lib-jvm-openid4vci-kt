@@ -749,17 +749,18 @@ private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuer
             CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
         }
 
-    val credentialsSupported =
+    val parsedCredentialConfigurations =
         credentialConfigurationsSupported
             ?.map { (id, credentialSupportedTO) ->
-                val credentialId = CredentialConfigurationIdentifier(id)
-                val credential =
-                    runCatching {
-                        credentialSupportedTO.toDomain()
-                    }.ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
-                credentialId to credential
-            }?.toMap()
-    ensure(!credentialsSupported.isNullOrEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired() }
+                runCatching { CredentialConfigurationIdentifier(id) to credentialSupportedTO.toDomain() }
+            }.orEmpty()
+    val credentialsSupported = parsedCredentialConfigurations.mapNotNull { it.getOrNull() }.toMap()
+    if (credentialsSupported.isEmpty()) {
+        parsedCredentialConfigurations
+            .firstNotNullOfOrNull { it.exceptionOrNull() }
+            ?.let { throw CredentialIssuerMetadataValidationError.InvalidCredentialsSupported(it) }
+    }
+    ensure(credentialsSupported.isNotEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired() }
 
     val display = display?.map(DisplayTO::toDomain) ?: emptyList()
 
