@@ -24,6 +24,7 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.InvalidAuthorization
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError.MissingAuthorizationResponseIssuer
 import eu.europa.ec.eudi.openid4vci.internal.http.AuthorizationEndpointClient
 import eu.europa.ec.eudi.openid4vci.internal.http.TokenEndpointClient
+import java.time.Duration
 import java.time.Instant
 import com.nimbusds.oauth2.sdk.id.Issuer as NimbusIssuer
 import com.nimbusds.oauth2.sdk.id.State as NimbusState
@@ -33,6 +34,7 @@ internal data class TokenResponse(
     val refreshToken: RefreshToken?,
     val authorizationDetails: Map<CredentialConfigurationIdentifier, List<CredentialIdentifier>> = emptyMap(),
     val timestamp: Instant,
+    val authorizationExpiresIn: Duration? = null,
 )
 
 internal class AuthorizeIssuanceImpl(
@@ -151,6 +153,7 @@ internal class AuthorizeIssuanceImpl(
             refreshToken = tokenResponse.refreshToken,
             credentialIdentifiers = tokenResponse.authorizationDetails,
             timestamp = tokenResponse.timestamp,
+            authorizationExpiresIn = tokenResponse.authorizationExpiresIn,
             authorizationServerDpopNonce = newDpopNonce,
             resourceServerDpopNonce = null,
             grant = Grant.AuthorizationCode,
@@ -188,6 +191,7 @@ internal class AuthorizeIssuanceImpl(
                 refreshToken = tokenResponse.refreshToken,
                 credentialIdentifiers = tokenResponse.authorizationDetails,
                 timestamp = tokenResponse.timestamp,
+                authorizationExpiresIn = tokenResponse.authorizationExpiresIn,
                 authorizationServerDpopNonce = newDpopNonce,
                 resourceServerDpopNonce = null,
                 grant = Grant.PreAuthorizedCodeGrant,

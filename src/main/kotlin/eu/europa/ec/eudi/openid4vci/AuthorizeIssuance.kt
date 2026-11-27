@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vci
 
+import java.time.Duration
 import java.time.Instant
 
 /**
@@ -53,6 +54,7 @@ enum class Grant : java.io.Serializable {
  * @param timestamp the point in time of the authorization (when tokens were issued)
  * @param resourceServerDpopNonce Nonce value for DPoP provided by the Resource Server
  * @param grant The Grant through which the authorization was obtained
+ * @param authorizationExpiresIn Lifetime of the authorization behind the refresh token, if provided by the token endpoint
  */
 data class AuthorizedRequest(
     val accessToken: AccessToken,
@@ -62,6 +64,7 @@ data class AuthorizedRequest(
     val authorizationServerDpopNonce: Nonce?,
     val resourceServerDpopNonce: Nonce?,
     val grant: Grant,
+    val authorizationExpiresIn: Duration? = null,
 ) : java.io.Serializable {
     fun isAccessTokenExpired(at: Instant): Boolean = accessToken.isExpired(timestamp, at)
 
