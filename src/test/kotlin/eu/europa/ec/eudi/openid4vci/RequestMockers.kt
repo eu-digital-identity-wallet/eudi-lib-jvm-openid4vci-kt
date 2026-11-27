@@ -122,6 +122,7 @@ enum class IssuerMetadataVersion {
     ONLY_JWT_PROOFS_SUPPORTED,
     ONLY_JWT_PROOFS_WITHOUT_KEY_ATTESTATION_SUPPORTED,
     ONLY_ATTESTATION_PROOFS_SUPPORTED,
+    ATTESTATION_PROOF_WITHOUT_KEY_ATTESTATIONS_REQUIRED,
     SIGNED_FULL,
     NO_BATCH,
 }
@@ -176,6 +177,10 @@ internal fun issuerMetadataJsonContent(issuerMetadataVersion: IssuerMetadataVers
 
         ONLY_ATTESTATION_PROOFS_SUPPORTED -> {
             getResourceAsText("well-known/openid-credential-issuer_only_attestation_proof.json")
+        }
+
+        ATTESTATION_PROOF_WITHOUT_KEY_ATTESTATIONS_REQUIRED -> {
+            getResourceAsText("well-known/openid-credential-issuer_attestation_proof_without_key_attestations_required.json")
         }
 
         SIGNED_FULL -> {

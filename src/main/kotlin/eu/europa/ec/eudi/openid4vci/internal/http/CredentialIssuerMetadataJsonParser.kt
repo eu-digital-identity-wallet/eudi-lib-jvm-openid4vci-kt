@@ -668,13 +668,14 @@ private fun proofTypeMeta(
             ProofTypeMeta.Jwt(algorithms, keyAttestationRequirement)
         }
 
-        "attestation" -> {
+        "attestation" if meta.keyAttestationRequirement != null -> {
             val algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
-            val keyAttestationRequirement =
-                requireNotNull(meta.keyAttestationRequirement?.toDomain()) {
-                    "attestation proof must contain 'key_attestations_required'"
-                }
+            val keyAttestationRequirement = meta.keyAttestationRequirement.toDomain()
             ProofTypeMeta.Attestation(algorithms, keyAttestationRequirement)
+        }
+
+        "attestation" -> {
+            ProofTypeMeta.Unsupported(type, "missing key_attestations_required")
         }
 
         else -> {
@@ -749,18 +750,17 @@ private fun CredentialIssuerMetadataTO.toDomain(expectedIssuer: CredentialIssuer
             CredentialIssuerEndpoint(it).ensureSuccess(CredentialIssuerMetadataValidationError::InvalidNotificationEndpoint)
         }
 
-    val parsedCredentialConfigurations =
+    val credentialsSupported =
         credentialConfigurationsSupported
             ?.map { (id, credentialSupportedTO) ->
-                runCatching { CredentialConfigurationIdentifier(id) to credentialSupportedTO.toDomain() }
-            }.orEmpty()
-    val credentialsSupported = parsedCredentialConfigurations.mapNotNull { it.getOrNull() }.toMap()
-    if (credentialsSupported.isEmpty()) {
-        parsedCredentialConfigurations
-            .firstNotNullOfOrNull { it.exceptionOrNull() }
-            ?.let { throw CredentialIssuerMetadataValidationError.InvalidCredentialsSupported(it) }
-    }
-    ensure(credentialsSupported.isNotEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired() }
+                val credentialId = CredentialConfigurationIdentifier(id)
+                val credential =
+                    runCatching {
+                        credentialSupportedTO.toDomain()
+                    }.ensureSuccess(CredentialIssuerMetadataValidationError::InvalidCredentialsSupported)
+                credentialId to credential
+            }?.toMap()
+    ensure(!credentialsSupported.isNullOrEmpty()) { CredentialIssuerMetadataValidationError.CredentialsSupportedRequired() }
 
     val display = display?.map(DisplayTO::toDomain) ?: emptyList()
 

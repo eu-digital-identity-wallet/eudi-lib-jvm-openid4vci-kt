@@ -28,14 +28,10 @@ import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.InvalidSignedM
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.NonParseableCredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataError.UnableToFetchCredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataValidationError.*
-import eu.europa.ec.eudi.openid4vci.internal.http.CredentialIssuerMetadataJsonParser
 import eu.europa.ec.eudi.openid4vci.internal.wellKnown
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.security.cert.X509Certificate
 import java.time.Duration
@@ -496,7 +492,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         }
 
     @Test
-    internal fun `resolution drops credential configuration with credential reuse policy both once only and limited time`() =
+    internal fun `resolution fails with credential reuse policy both once only and limited time`() =
         runTest {
             suspend fun test(resource: String) {
                 val credentialIssuerId = SampleIssuer.Id
@@ -509,12 +505,16 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                         ),
                     )
 
-                val metaData = resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow()
-                assertEquals(
-                    setOf(CredentialConfigurationIdentifier("PID_msoMdoc")),
-                    metaData.credentialConfigurationsSupported.keys,
-                )
-                assertOnlySdJwtVcConfigurationFails(resource, "details must contain exactly one base method: once_only or limited_time")
+                val error =
+                    assertFailsWith<InvalidCredentialsSupported> {
+                        resolver
+                            .resolve(
+                                credentialIssuerId,
+                                IssuerMetadataPolicy.IgnoreSigned,
+                            ).getOrThrow()
+                    }
+                val cause = assertIs<IllegalArgumentException>(error.cause)
+                assertEquals("details must contain exactly one base method: once_only or limited_time", cause.message)
             }
 
             test(
@@ -526,7 +526,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         }
 
     @Test
-    internal fun `resolution drops credential configuration with duplicate credential reuse policies`() =
+    internal fun `resolution fails with duplicate credential reuse policies`() =
         runTest {
             suspend fun test(resource: String) {
                 val credentialIssuerId = SampleIssuer.Id
@@ -539,12 +539,16 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                         ),
                     )
 
-                val metaData = resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow()
-                assertEquals(
-                    setOf(CredentialConfigurationIdentifier("PID_msoMdoc")),
-                    metaData.credentialConfigurationsSupported.keys,
-                )
-                assertOnlySdJwtVcConfigurationFails(resource, "When multiple policy options are defined, each option type must be unique")
+                val error =
+                    assertFailsWith<InvalidCredentialsSupported> {
+                        resolver
+                            .resolve(
+                                credentialIssuerId,
+                                IssuerMetadataPolicy.IgnoreSigned,
+                            ).getOrThrow()
+                    }
+                val cause = assertIs<IllegalArgumentException>(error.cause)
+                assertEquals("When multiple policy options are defined, each option type must be unique", cause.message)
             }
 
             test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_duplicates_compact.json")
@@ -552,7 +556,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         }
 
     @Test
-    internal fun `resolution drops credential configuration with duplicate details in credential reuse policies`() =
+    internal fun `resolution fails with duplicate details in credential reuse policies`() =
         runTest {
             suspend fun test(resource: String) {
                 val credentialIssuerId = SampleIssuer.Id
@@ -565,12 +569,16 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                         ),
                     )
 
-                val metaData = resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow()
-                assertEquals(
-                    setOf(CredentialConfigurationIdentifier("PID_msoMdoc")),
-                    metaData.credentialConfigurationsSupported.keys,
-                )
-                assertOnlySdJwtVcConfigurationFails(resource, "details must not contain duplicate values")
+                val error =
+                    assertFailsWith<InvalidCredentialsSupported> {
+                        resolver
+                            .resolve(
+                                credentialIssuerId,
+                                IssuerMetadataPolicy.IgnoreSigned,
+                            ).getOrThrow()
+                    }
+                val cause = assertIs<IllegalArgumentException>(error.cause)
+                assertEquals("details must not contain duplicate values", cause.message)
             }
 
             test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_duplicate_details_compact.json")
@@ -578,7 +586,7 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
         }
 
     @Test
-    internal fun `resolution drops credential configuration without a base credential reuse policy`() =
+    internal fun `resolution fails when no base credential reuse policy is present`() =
         runTest {
             suspend fun test(resource: String) {
                 val credentialIssuerId = SampleIssuer.Id
@@ -591,12 +599,16 @@ internal class DefaultCredentialIssuerMetadataResolverTest {
                         ),
                     )
 
-                val metaData = resolver.resolve(credentialIssuerId, IssuerMetadataPolicy.IgnoreSigned).getOrThrow()
-                assertEquals(
-                    setOf(CredentialConfigurationIdentifier("PID_msoMdoc")),
-                    metaData.credentialConfigurationsSupported.keys,
-                )
-                assertOnlySdJwtVcConfigurationFails(resource, "details must contain exactly one base method: once_only or limited_time")
+                val error =
+                    assertFailsWith<InvalidCredentialsSupported> {
+                        resolver
+                            .resolve(
+                                credentialIssuerId,
+                                IssuerMetadataPolicy.IgnoreSigned,
+                            ).getOrThrow()
+                    }
+                val cause = assertIs<IllegalArgumentException>(error.cause)
+                assertEquals("details must contain exactly one base method: once_only or limited_time", cause.message)
             }
 
             test("eu/europa/ec/eudi/openid4vci/internal/credential_issuer_metadata_with_reuse_policy_only_rotating_batch.json")
@@ -790,20 +802,4 @@ private fun rs256SignedMetadataJwt(resource: String): String {
             .x509CertChain(listOf(Base64.encode(certificate.encoded)))
             .build()
     return SignedJWT(header, original.jwtClaimsSet).apply { sign(RSASSASigner(rsa)) }.serialize()
-}
-
-private fun assertOnlySdJwtVcConfigurationFails(
-    resource: String,
-    expectedMessage: String,
-) {
-    val metadata = Json.parseToJsonElement(getResourceAsText(resource)).jsonObject
-    val configurations = metadata.getValue("credential_configurations_supported").jsonObject
-    val onlySdJwtVc =
-        JsonObject(metadata + ("credential_configurations_supported" to JsonObject(configurations - "PID_msoMdoc")))
-    val error =
-        assertFailsWith<InvalidCredentialsSupported> {
-            CredentialIssuerMetadataJsonParser.parseMetaData(onlySdJwtVc.toString(), SampleIssuer.Id)
-        }
-    val cause = assertIs<IllegalArgumentException>(error.cause)
-    assertEquals(expectedMessage, cause.message)
 }

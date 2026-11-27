@@ -53,42 +53,14 @@ class CredentialIssuerMetadataJsonParserTest {
     }
 
     @Test
-    fun `credential configuration with negative preferred_key_storage_status_period is dropped`() {
+    fun `trying to parse negative preferred_key_storage_status_period fails`() {
         val json = getResourceAsText("well-known/openid-credential-issuer_invalid_attestation_proof_supported.json")
-        val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
-
-        assertNull(metadata.credentialConfigurationsSupported[CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")])
-        assertEquals(
-            setOf(
-                "eu.europa.ec.eudiw.pid_mso_mdoc",
-                "UniversityDegree_mso_mdoc",
-                "UniversityDegree_jwt_vc_json",
-                "MobileDrivingLicense_msoMdoc",
-            ).map(::CredentialConfigurationIdentifier).toSet(),
-            metadata.credentialConfigurationsSupported.keys,
-        )
-    }
-
-    @Test
-    fun `credential configuration with attestation proof without key_attestations_required is dropped`() {
-        val json = getResourceAsText("well-known/openid-credential-issuer_attestation_proof_without_key_attestations_required.json")
-        val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
-
-        assertEquals(
-            setOf(CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt")),
-            metadata.credentialConfigurationsSupported.keys,
-        )
-    }
-
-    @Test
-    fun `fails when every credential configuration is invalid`() {
-        val json = getResourceAsText("well-known/openid-credential-issuer_only_attestation_proof_without_key_attestations_required.json")
         val exception =
             assertFailsWith<CredentialIssuerMetadataValidationError.InvalidCredentialsSupported> {
                 CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
             }
         val cause = assertIs<IllegalArgumentException>(exception.cause)
-        assertEquals("attestation proof must contain 'key_attestations_required'", cause.message)
+        assertEquals("Duration must be positive", cause.message)
     }
 
     @Test
@@ -103,6 +75,24 @@ class CredentialIssuerMetadataJsonParserTest {
 
         val jwtProof = assertIs<ProofTypeMeta.Jwt>(credentialConfiguration.proofTypesSupported[ProofType.JWT])
         assertNull(jwtProof.keyAttestationRequirement)
+    }
+
+    @Test
+    fun `attestation proof without key_attestations_required is unsupported`() {
+        val json = getResourceAsText("well-known/openid-credential-issuer_attestation_proof_without_key_attestations_required.json")
+        val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
+        val credentialConfiguration =
+            assertNotNull(
+                metadata.credentialConfigurationsSupported[
+                    CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt.attestation"),
+                ],
+            )
+
+        assertNull(credentialConfiguration.proofTypesSupported[ProofType.ATTESTATION])
+        assertEquals(
+            setOf(ProofTypeMeta.Unsupported("attestation", "missing key_attestations_required")),
+            credentialConfiguration.proofTypesSupported.values,
+        )
     }
 
     @Test

@@ -1416,6 +1416,47 @@ class IssuanceSingleRequestTest {
         }
 
     @Test
+    fun `when the only attestation proof lacks key_attestations_required, issuance fails`() =
+        runTest {
+            val mockedHttpClient =
+                mockedHttpClient(
+                    credentialIssuerMetadataWellKnownMocker(IssuerMetadataVersion.ATTESTATION_PROOF_WITHOUT_KEY_ATTESTATIONS_REQUIRED),
+                    authServerWellKnownMocker(),
+                    parPostMocker(),
+                    tokenPostMocker(),
+                    nonceEndpointMocker(),
+                )
+            val (authorizedRequest, issuer) =
+                authorizeRequestForCredentialOffer(
+                    credentialOfferStr =
+                        """
+                        {
+                          "credential_issuer": "$CREDENTIAL_ISSUER_PUBLIC_URL",
+                          "credential_configuration_ids": ["$PID_SD_JWT_VC.attestation"]
+                        }
+                        """.trimIndent(),
+                    httpClient = mockedHttpClient,
+                )
+
+            val credentialConfigurationId = issuer.credentialOffer.credentialConfigurationIdentifiers[0]
+            val credentialConfiguration =
+                issuer.credentialOffer.credentialIssuerMetadata.credentialConfigurationsSupported
+                    .getValue(credentialConfigurationId)
+            assertEquals(
+                setOf(ProofTypeMeta.Unsupported("attestation", "missing key_attestations_required")),
+                credentialConfiguration.proofTypesSupported.values,
+            )
+            val exception =
+                with(issuer) {
+                    val requestPayload = IssuanceRequestPayload.ConfigurationBased(credentialConfigurationId)
+                    assertFailsWith<IllegalArgumentException> {
+                        authorizedRequest.request(requestPayload, attestationProofSpec()).getOrThrow()
+                    }
+                }
+            assertEquals("Wallet doesn't support any of the advertised Proofs", exception.message)
+        }
+
+    @Test
     fun `when issuer supports only attestation proofs and wallet sends jwt proof issuance fails`() =
         runTest {
             val mockedHttpClient =

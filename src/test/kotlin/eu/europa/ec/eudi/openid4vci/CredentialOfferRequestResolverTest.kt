@@ -133,39 +133,6 @@ internal class CredentialOfferRequestResolverTest {
         }
 
     @Test
-    internal fun `resolve failure when offered credential configuration is invalid`() =
-        runTest {
-            val resolver =
-                resolver(
-                    RequestEncryptionSpecFactory.DEFAULT,
-                    ResponseEncryptionSpecFactory.DEFAULT,
-                    RequestMocker(
-                        match(SampleIssuer.WellKnownUrl.value.toURI()),
-                        jsonResponse("well-known/openid-credential-issuer_attestation_proof_without_key_attestations_required.json"),
-                    ),
-                    oauthMetaDataHandler,
-                )
-            val credentialOffer =
-                """
-                {
-                  "credential_issuer": "https://credential-issuer.example.com",
-                  "credential_configuration_ids": ["eu.europa.ec.eudiw.pid_vc_sd_jwt.attestation"]
-                }
-                """.trimIndent()
-
-            val credentialEndpointUrl =
-                URIBuilder("wallet://credential_offer")
-                    .addParameter("credential_offer", credentialOffer)
-                    .build()
-
-            val exception =
-                assertFailsWith<CredentialOfferRequestException> {
-                    resolver.resolve(uri = credentialEndpointUrl.toString()).getOrThrow()
-                }
-            assertIs<CredentialOfferRequestValidationError.InvalidCredentials>(exception.error)
-        }
-
-    @Test
     internal fun `resolve failure with blank issuer_state in grant`() =
         runTest {
             val resolver =
