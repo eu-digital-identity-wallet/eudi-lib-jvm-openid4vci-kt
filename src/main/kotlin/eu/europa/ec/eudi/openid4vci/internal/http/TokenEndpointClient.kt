@@ -30,6 +30,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
 import java.time.Clock
+import java.time.Duration
 
 /**
  * Sealed hierarchy of possible responses to an Access Token request.
@@ -47,6 +48,7 @@ internal sealed interface TokenResponseTO {
         @SerialName("access_token") val accessToken: String,
         @SerialName("refresh_token") val refreshToken: String? = null,
         @SerialName("expires_in") val expiresIn: Long? = null,
+        @SerialName("authorization_expires_in") val authorizationExpiresIn: Long? = null,
         @Serializable(with = GrantedAuthorizationDetailsSerializer::class)
         @SerialName(
             "authorization_details",
@@ -78,6 +80,7 @@ internal sealed interface TokenResponseTO {
                     refreshToken = refreshToken?.let { RefreshToken(it) },
                     authorizationDetails = authorizationDetails ?: emptyMap(),
                     timestamp = clock.instant(),
+                    authorizationExpiresIn = authorizationExpiresIn?.let(Duration::ofSeconds),
                 )
             }
 
