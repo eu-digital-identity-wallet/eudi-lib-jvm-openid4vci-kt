@@ -78,6 +78,24 @@ class CredentialIssuerMetadataJsonParserTest {
     }
 
     @Test
+    fun `attestation proof without key_attestations_required is unsupported`() {
+        val json = getResourceAsText("well-known/openid-credential-issuer_attestation_proof_without_key_attestations_required.json")
+        val metadata = CredentialIssuerMetadataJsonParser.parseMetaData(json, SampleIssuer.Id)
+        val credentialConfiguration =
+            assertNotNull(
+                metadata.credentialConfigurationsSupported[
+                    CredentialConfigurationIdentifier("eu.europa.ec.eudiw.pid_vc_sd_jwt.attestation"),
+                ],
+            )
+
+        assertNull(credentialConfiguration.proofTypesSupported[ProofType.ATTESTATION])
+        assertEquals(
+            setOf(ProofTypeMeta.Unsupported("attestation", "missing key_attestations_required")),
+            credentialConfiguration.proofTypesSupported.values,
+        )
+    }
+
+    @Test
     fun `succeeds when credential configuration supports either jwt proofs or attestation proofs`() {
         fun test(
             resource: String,

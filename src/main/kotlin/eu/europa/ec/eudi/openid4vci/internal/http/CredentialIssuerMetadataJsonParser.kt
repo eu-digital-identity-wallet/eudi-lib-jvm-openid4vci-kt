@@ -668,13 +668,14 @@ private fun proofTypeMeta(
             ProofTypeMeta.Jwt(algorithms, keyAttestationRequirement)
         }
 
-        "attestation" -> {
+        "attestation" if meta.keyAttestationRequirement != null -> {
             val algorithms = meta.algorithms.map { JWSAlgorithm.parse(it) }
-            val keyAttestationRequirement =
-                requireNotNull(meta.keyAttestationRequirement?.toDomain()) {
-                    "attestation proof must contain 'key_attestations_required'"
-                }
+            val keyAttestationRequirement = meta.keyAttestationRequirement.toDomain()
             ProofTypeMeta.Attestation(algorithms, keyAttestationRequirement)
+        }
+
+        "attestation" -> {
+            ProofTypeMeta.Unsupported(type, "missing key_attestations_required")
         }
 
         else -> {

@@ -83,9 +83,19 @@ sealed interface ProofTypeMeta : Serializable {
         }
     }
 
+    /**
+     * A proof type that the library cannot use.
+     *
+     * @property type the name of the proof type, as it appears in `proof_types_supported`
+     * @property reason why the library rejected a proof type it recognises, for example an `attestation`
+     * proof without `key_attestations_required`, or `null` when the proof type is unknown
+     */
     data class Unsupported(
         val type: String,
-    ) : ProofTypeMeta
+        val reason: String?,
+    ) : ProofTypeMeta {
+        constructor(type: String) : this(type, null)
+    }
 }
 
 /**
@@ -147,13 +157,14 @@ value class ProofTypesSupported private constructor(
         val Empty: ProofTypesSupported = ProofTypesSupported(emptySet())
 
         operator fun invoke(values: Set<ProofTypeMeta>): ProofTypesSupported {
-            require(values.groupBy { it.type }.all { (_, instances) -> instances.size == 1 }) {
+            require(values.groupBy { (it as? ProofTypeMeta.Unsupported)?.type ?: it.type }.all { (_, instances) -> instances.size == 1 }) {
                 "Multiple instance of the same proof type are not allowed"
             }
             if (values.isNotEmpty()) {
                 val supportsJwtProof = null != values.firstOrNull { it.type == ProofType.JWT }
                 val supportsAttestationProof = null != values.firstOrNull { it.type == ProofType.ATTESTATION }
-                require(supportsJwtProof || supportsAttestationProof) {
+                val hasRejectedAttestationProof = values.any { it is ProofTypeMeta.Unsupported && it.type == "attestation" }
+                require(supportsJwtProof || supportsAttestationProof || hasRejectedAttestationProof) {
                     "Either JWT Proofs, or Attestation Proofs must be supported"
                 }
             }
